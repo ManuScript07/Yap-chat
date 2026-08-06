@@ -1,0 +1,8 @@
+- [x] Add dependencies to `pubspec.yaml`
+- [x] Implement `Friends` feature placeholder
+- [x] Implement `Profile` feature placeholder
+- [x] Implement `Main` (Shell) feature with `AutoTabsScaffold`
+- [x] Update `ChatsPage` with `@RoutePage()`
+- [x] Configure `AppRouter` in `router.dart`
+- [x] Update `YapChatApp` to use `AppRouter`
+- [x] Run `build_runner` to generate routes
