@@ -25,20 +25,24 @@ class MainPage extends StatelessWidget {
         final tabsRouter = AutoTabsRouter.of(context);
         const int chatsTabIndex = 0;
 
+        final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
         return PopScope(
-          canPop: tabsRouter.activeIndex == chatsTabIndex,
+          canPop: tabsRouter.activeIndex == chatsTabIndex && !isKeyboardOpen,
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
+
+            if (isKeyboardOpen) {
+              FocusScope.of(context).unfocus();
+              return;
+            }
 
             if (tabsRouter.activeIndex != chatsTabIndex) {
               tabsRouter.setActiveIndex(chatsTabIndex);
             }
           },
           child: Scaffold(
-            // КРИТИЧНО ВАЖНАЯ СТРОКА:
-            // Отключаем сжатие главного экрана.
-            // Теперь навигационная панель красиво спрячется под клавиатуру,
-            // а экран чатов получит точные размеры для поднятия строки поиска.
+            // сжатие главного экрана.
             resizeToAvoidBottomInset: false,
 
             extendBody: true,

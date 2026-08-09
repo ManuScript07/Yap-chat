@@ -48,16 +48,19 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+
+    final mainColor = context.colorScheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: SizedBox(
         width: double.infinity,
-        height: 50, // Увеличено с 45 до 50 под крупный шрифт
+        height: 50,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: context.colorScheme.onSurface.withValues(alpha: 0.4),
+              color: mainColor.withValues(alpha: 0.4),
               width: 1.5,
             ),
           ),
@@ -66,19 +69,19 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
               child: Container(
-                color: context.colorScheme.surface.withValues(alpha: 0.15),
+                color: mainColor.withValues(alpha: 0.15),
                 child: TextField(
                   controller: _controller,
                   onChanged: widget.onChanged,
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                  cursorColor: context.colorScheme.primary,
+                  cursorColor: mainColor,
                   textAlignVertical: TextAlignVertical.center,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.50,
-                    color: context.colorScheme.onSurface,
+                    color: mainColor,
                   ),
                   decoration: InputDecoration(
                     filled: false,
@@ -90,7 +93,7 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
                     prefixIcon: Icon(
                       Icons.search_rounded,
                       size: 32,
-                      color: context.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: mainColor.withValues(alpha: 0.6),
                     ),
                     hintText: widget.hintText,
                     hintStyle: TextStyle(
@@ -98,7 +101,7 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.50,
-                      color: context.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: mainColor.withValues(alpha: 0.6),
                     ),
                     suffixIconConstraints: const BoxConstraints(
                       minWidth: 44,
@@ -110,7 +113,7 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
                       constraints: const BoxConstraints(),
                       icon: Icon(
                         Icons.close_rounded,
-                        color: context.colorScheme.onSurface,
+                        color: mainColor,
                         size: 26,
                       ),
                       onPressed: () {

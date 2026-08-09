@@ -9,21 +9,29 @@ class ChatListItem extends StatelessWidget {
     super.key,
     required this.chat,
     this.onTap,
+    this.onLongPress,
+    this.isSelected = false,
   });
 
   final Chat chat;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final bool isSelected;
 
 
   @override
   Widget build(BuildContext context) {
+    final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
 
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
+      onLongPress: onLongPress,
+      child: Container(
+        color: isSelected ? selectionColor : Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
             _buildAvatar(context),
             const SizedBox(width: 16),
             Expanded(
@@ -34,6 +42,7 @@ class ChatListItem extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 

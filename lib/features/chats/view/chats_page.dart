@@ -2,6 +2,7 @@
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/core/core.dart';
@@ -16,6 +17,25 @@ class ChatsPage extends StatefulWidget {
 }
 
 class _ChatsPageState extends State<ChatsPage> {
+  final Set<String> _selectedChatIds = {};
+
+  bool get _isSelectionMode => _selectedChatIds.isNotEmpty;
+
+  void _toggleSelection(String chatId) {
+    setState(() {
+      if (_selectedChatIds.contains(chatId)) {
+        _selectedChatIds.remove(chatId);
+      } else {
+        _selectedChatIds.add(chatId);
+      }
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectedChatIds.clear();
+    });
+  }
 
   final List<Chat> _mockChats = [
     Chat(
@@ -26,6 +46,7 @@ class _ChatsPageState extends State<ChatsPage> {
       unreadCount: 2,
       isOnline: true,
       isLastMessageFromMe: false,
+      isMuted: false,
     ),
     Chat(
       id: '2',
@@ -35,6 +56,7 @@ class _ChatsPageState extends State<ChatsPage> {
       unreadCount: 0,
       isOnline: false,
       isLastMessageFromMe: true,
+      isMuted: true,
     ),
     Chat(
       id: '3',
@@ -44,6 +66,7 @@ class _ChatsPageState extends State<ChatsPage> {
       unreadCount: 15,
       isOnline: true,
       isLastMessageFromMe: false,
+      isMuted: false,
     ),
     Chat(
       id: '4',
@@ -53,6 +76,7 @@ class _ChatsPageState extends State<ChatsPage> {
       unreadCount: 0,
       isOnline: false,
       isLastMessageFromMe: false,
+      isMuted: false,
     ),
     Chat(
       id: '5',
@@ -62,64 +86,29 @@ class _ChatsPageState extends State<ChatsPage> {
       unreadCount: 0,
       isOnline: true,
       isLastMessageFromMe: false,
+      isMuted: false,
     ),
     Chat(
-      id: '5',
-      userName: 'Служба поддержки',
-      lastMessage: 'Ваш запрос №12345 был успешно обработан.',
+      id: '6',
+      userName: 'Служба поддержки 2',
+      lastMessage: 'Ваш запрос №12346 был успешно обработан.',
       lastMessageTime: DateTime(2026, 1, 7, 12, 0),
       unreadCount: 0,
       isOnline: true,
       isLastMessageFromMe: false,
+      isMuted: false,
     ),
     Chat(
-      id: '5',
-      userName: 'Служба поддержки',
-      lastMessage: 'Ваш запрос №12345 был успешно обработан.',
+      id: '7',
+      userName: 'Служба поддержки 3',
+      lastMessage: 'Ваш запрос №12347 был успешно обработан.',
       lastMessageTime: DateTime(2025, 7, 6, 12, 0),
       unreadCount: 0,
       isOnline: true,
       isLastMessageFromMe: false,
+      isMuted: false,
     ),
-    Chat(
-      id: '5',
-      userName: 'Служба поддержки',
-      lastMessage: 'Ваш запрос №12345 был успешно обработан.',
-      lastMessageTime: DateTime(2027, 7, 6, 12, 0),
-      unreadCount: 0,
-      isOnline: true,
-      isLastMessageFromMe: false,
-    ),
-    Chat(
-      id: '5',
-      userName: 'Служба поддержки',
-      lastMessage: 'Ваш запрос №12345 был успешно обработан.',
-      lastMessageTime: DateTime.now().subtract(const Duration(hours: 5)),
-      unreadCount: 0,
-      isOnline: true,
-      isLastMessageFromMe: false,
-    ),
-    Chat(
-      id: '5',
-      userName: 'Служба поддержки',
-      lastMessage: 'Ваш запрос №12345 был успешно обработан.',
-      lastMessageTime: DateTime.now().subtract(const Duration(hours: 5)),
-      unreadCount: 0,
-      isOnline: true,
-      isLastMessageFromMe: false,
-    ),
-    Chat(
-      id: '5',
-      userName: 'Служба поддержки',
-      lastMessage: 'Ваш запрос №12345 был успешно обработан.',
-      lastMessageTime: DateTime.now().subtract(const Duration(hours: 5)),
-      unreadCount: 0,
-      isOnline: true,
-      isLastMessageFromMe: false,
-    ),
-
   ];
-
 
   @override
   Widget build(BuildContext context) {
@@ -136,68 +125,104 @@ class _ChatsPageState extends State<ChatsPage> {
 
     final baseOffset = effectiveBottomPadding + navBarBottomOffset + navBarHeight + searchBarSpacing;
 
-    // 1. Отступ для ПОИСКА
     final searchBarBottomOffset = isKeyboardOpen
         ? keyboardHeight + 16.0
         : baseOffset;
 
-    // 2. Отступ для СВЕЧЕНИЯ
-    // Если клавиатура закрыта - свечение прижато к самому низу (0.0).
-    // Если клавиатура открыта - свечение поднимается на уровень клавиатуры.
     final glowBottomOffset = isKeyboardOpen
         ? keyboardHeight
         : 0.0;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: context.scaffoldBackgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: PrimaryAppBar(
-        title: context.l10n.navChats,
-        actionIcon: Icons.add_comment_rounded,
-        onActionPressed: () {},
-      ),
-      body: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          // Список чатов
-          ListView.builder(
-            padding: EdgeInsets.only(
-              top: 130,
-              bottom: searchBarBottomOffset + searchBarHeight + 16,
-            ),
-            itemCount: _mockChats.length,
-            itemBuilder: (context, index) {
-              return ChatListItem(
-                chat: _mockChats[index],
-                onTap: () {},
-              );
-            },
-          ),
+    // Logic for notifications toggle icon
+    bool firstSelectedMuted = false;
+    if (_selectedChatIds.isNotEmpty) {
+      final firstId = _selectedChatIds.first;
+      firstSelectedMuted = _mockChats.firstWhere((c) => c.id == firstId).isMuted;
+    }
 
-          // Свечение
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 0),
-            curve: Curves.easeOutQuad,
-            left: 0,
-            right: 0,
-            bottom: glowBottomOffset,
-            child: const BottomAmbientGlow(),
-          ),
+    return PopScope(
+      canPop: !_isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
 
-          // Поисковая строка
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutQuad,
-            left: 0,
-            right: 0,
-            bottom: searchBarBottomOffset,
-            child: GlassSearchBar(
-              hintText: context.l10n.searchHintChats,
-              onChanged: (value) {},
+        if (_isSelectionMode) {
+          _exitSelectionMode();
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: context.scaffoldBackgroundColor,
+        extendBodyBehindAppBar: true,
+        appBar: _isSelectionMode
+            ? SelectionToolbar(
+          selectedCount: _selectedChatIds.length,
+          onClose: _exitSelectionMode,
+          isMuted: firstSelectedMuted,
+          onToggleNotifications: () {},
+          onMarkAsRead: () {},
+          onDelete: () {},
+        )
+            : PrimaryAppBar(
+          title: context.l10n.navChats,
+          actionIcon: Icons.add_comment_rounded,
+          onActionPressed: () => context.router.push(const NewChatRoute()),
+        ),
+        body: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            // Список чатов
+            ListView.builder(
+              padding: EdgeInsets.only(
+                top: 130,
+                bottom: searchBarBottomOffset + searchBarHeight + 16,
+              ),
+              itemCount: _mockChats.length,
+              itemBuilder: (context, index) {
+                final chat = _mockChats[index];
+                final isSelected = _selectedChatIds.contains(chat.id);
+                return ChatListItem(
+                  chat: chat,
+                  isSelected: isSelected,
+                  onTap: () {
+                    if (_isSelectionMode) {
+                      _toggleSelection(chat.id);
+                    } else {
+                      context.router.push(ChatRoute(chat: chat));
+                    }
+                  },
+                  onLongPress: () {
+                    if (!_isSelectionMode) {
+                      _toggleSelection(chat.id);
+                    }
+                  },
+                );
+              },
             ),
-          ),
-        ],
+
+            // Свечение
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 0),
+              curve: Curves.easeOutQuad,
+              left: 0,
+              right: 0,
+              bottom: glowBottomOffset,
+              child: const BottomAmbientGlow(),
+            ),
+
+            // Поисковая строка
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuad,
+              left: 0,
+              right: 0,
+              bottom: _isSelectionMode ? -100 : searchBarBottomOffset,
+              child: GlassSearchBar(
+                hintText: context.l10n.searchHintChats,
+                onChanged: (value) {},
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

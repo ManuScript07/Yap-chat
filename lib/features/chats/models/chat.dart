@@ -7,6 +7,7 @@ class Chat {
   final int unreadCount;
   final bool isOnline;
   final bool isLastMessageFromMe;
+  final bool isMuted;
 
   Chat({
     required this.id,
@@ -17,5 +18,6 @@ class Chat {
     required this.unreadCount,
     required this.isOnline,
     required this.isLastMessageFromMe,
+    this.isMuted = false,
   });
 }

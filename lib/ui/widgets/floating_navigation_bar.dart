@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,10 @@ class FloatingNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    final navBarWidth = math.min(screenWidth * 0.7, 380.0);
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
     final backgroundColor = context.scaffoldBackgroundColor.withValues(alpha: 0.9);
@@ -40,39 +45,34 @@ class FloatingNavigationBar extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
+        left: 16.0,
+        right: 16.0,
         bottom: bottomPadding + bottomOffset,
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 5),
-            child: Container(
-              height: 70,
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: borderColor,
-                  width: 0,
+        child: SizedBox(
+          width: navBarWidth,
+          height: 70,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 5),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(
+                    color: borderColor,
+                    width: 0,
+                  ),
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(items.length, (index) {
-                  final isSelected = activeIndex == index;
-                  final item = items[index];
+                child: Row(
+                  children: List.generate(items.length, (index) {
+                    final isSelected = activeIndex == index;
+                    final item = items[index];
 
-                  final tabWidget = Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6.0),
-                    child: SizedBox(
-                      width: itemWidth,
-                      height: double.infinity,
+                    return Expanded(
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () {
@@ -81,7 +81,6 @@ class FloatingNavigationBar extends StatelessWidget {
                         },
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.max,
                           children: [
                             Icon(
                               isSelected ? item.activeIcon : item.icon,
@@ -104,21 +103,9 @@ class FloatingNavigationBar extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
-                  );
-
-                  if (index < items.length - 1) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        tabWidget,
-                        SizedBox(width: itemSpacing),
-                      ],
                     );
-                  }
-
-                  return tabWidget;
-                }),
+                  }),
+                ),
               ),
             ),
           ),
