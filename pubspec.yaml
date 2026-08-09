@@ -11,7 +11,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  bloc_concurrency: ^0.3.0
+  equatable: ^2.1.0
+  flutter_dotenv: ^6.0.1
+  flutter_bloc: ^9.1.1
   google_fonts: ^8.2.1
+  shared_preferences: ^2.5.5
+  stream_transform: ^2.1.1
+  talker_bloc_logger: ^5.1.20
+  talker_flutter: ^5.1.20
 
   flutter_localizations:
     sdk: flutter
@@ -40,6 +48,9 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   generate: true
+
+  assets:
+    - .env
 
   fonts:
     - family: RobotoFlex

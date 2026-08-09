@@ -61,4 +61,10 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get failedToLoadChats => 'Failed to load chats';
+
+  @override
+  String get noChats => 'You have no chats';
 }

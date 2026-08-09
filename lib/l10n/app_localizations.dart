@@ -157,6 +157,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'{count, plural, one{{count} дн. назад} few{{count} дня назад} many{{count} дней назад} other{{count} дней назад}}'**
   String timeDaysAgo(num count);
+
+  /// No description provided for @failedToLoadChats.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить чаты'**
+  String get failedToLoadChats;
+
+  /// No description provided for @noChats.
+  ///
+  /// In ru, this message translates to:
+  /// **'У вас нет чатов'**
+  String get noChats;
 }
 
 class _AppLocalizationsDelegate

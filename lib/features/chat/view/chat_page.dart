@@ -1,6 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:yap_chat/features/chats/models/chat.dart';
+import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()

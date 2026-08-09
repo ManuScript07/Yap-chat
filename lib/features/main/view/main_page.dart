@@ -1,8 +1,10 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
-import 'package:yap_chat/core/core.dart';
 
 @RoutePage()
 class MainPage extends StatelessWidget {
@@ -10,7 +12,6 @@ class MainPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return AutoTabsRouter(
       routes: const [
         ChatsRoute(),
@@ -23,12 +24,18 @@ class MainPage extends StatelessWidget {
       ),
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
-        const int chatsTabIndex = 0;
+        const chatsTabIndex = 0;
 
         final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+        final isSelectionMode = context.select<ChatsBloc, bool>(
+          (bloc) => bloc.state.isSelectionMode,
+        );
 
         return PopScope(
-          canPop: tabsRouter.activeIndex == chatsTabIndex && !isKeyboardOpen,
+          canPop:
+              tabsRouter.activeIndex == chatsTabIndex &&
+              !isKeyboardOpen &&
+              !isSelectionMode,
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
 
@@ -37,14 +44,17 @@ class MainPage extends StatelessWidget {
               return;
             }
 
+            if (tabsRouter.activeIndex == chatsTabIndex && isSelectionMode) {
+              context.read<ChatsBloc>().add(const ChatSelectionCleared());
+              return;
+            }
+
             if (tabsRouter.activeIndex != chatsTabIndex) {
               tabsRouter.setActiveIndex(chatsTabIndex);
             }
           },
           child: Scaffold(
-            // сжатие главного экрана.
             resizeToAvoidBottomInset: false,
-
             extendBody: true,
             body: Stack(
               children: [

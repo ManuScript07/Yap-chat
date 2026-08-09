@@ -67,4 +67,10 @@ class AppLocalizationsRu extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get failedToLoadChats => 'Не удалось загрузить чаты';
+
+  @override
+  String get noChats => 'У вас нет чатов';
 }
