@@ -8,11 +8,13 @@ class GlassSearchBar extends StatefulWidget {
     required this.hintText,
     this.onChanged,
     this.controller,
+    this.focusNode,
   });
 
   final String hintText;
   final ValueChanged<String>? onChanged;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
 
   @override
   State<GlassSearchBar> createState() => _GlassSearchBarState();
@@ -20,12 +22,15 @@ class GlassSearchBar extends StatefulWidget {
 
 class _GlassSearchBarState extends State<GlassSearchBar> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
   bool _showClearButton = false;
 
   @override
   void initState() {
     super.initState();
     _controller = widget.controller ?? TextEditingController();
+    _focusNode = widget.focusNode ?? FocusNode();
+
     _controller.addListener(_handleTextChange);
   }
 
@@ -35,6 +40,10 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
       _controller.dispose();
     } else {
       _controller.removeListener(_handleTextChange);
+    }
+
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
     }
     super.dispose();
   }
@@ -48,7 +57,6 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-
     final mainColor = context.colorScheme.onSurface;
 
     return Padding(
@@ -72,8 +80,9 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
                 color: mainColor.withValues(alpha: 0.15),
                 child: TextField(
                   controller: _controller,
+                  focusNode: _focusNode,
                   onChanged: widget.onChanged,
-                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  onTapOutside: (_) => _focusNode.unfocus(),
                   cursorColor: mainColor,
                   textAlignVertical: TextAlignVertical.center,
                   style: TextStyle(

@@ -79,7 +79,7 @@ class MockChatsRepository implements IChatsRepository {
 
   final List<Chat> _chats;
 
-  static const _networkDelay = Duration(milliseconds: 350);
+  static const _networkDelay = Duration(milliseconds: 0);
 
   @override
   Future<List<Chat>> getChats() async {

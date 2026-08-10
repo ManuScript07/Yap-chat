@@ -32,6 +32,16 @@ class FloatingNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
+    debugPrint(
+      '''
+════════ NAV LAYOUT ════════
+padding.bottom: ${MediaQuery.paddingOf(context).bottom}
+viewPadding.bottom: ${MediaQuery.viewPaddingOf(context).bottom}
+viewInsets.bottom: ${MediaQuery.viewInsetsOf(context).bottom}
+═══════════════════════════
+''',
+    );
+
     final screenWidth = MediaQuery.of(context).size.width;
 
     final navBarWidth = math.min(screenWidth * 0.7, 380.0);

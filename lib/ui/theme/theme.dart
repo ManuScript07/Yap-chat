@@ -25,6 +25,7 @@ final ThemeData theme = ThemeData(
   brightness: Brightness.dark,
   scaffoldBackgroundColor: AppColors.background,
 
+
   // Цветовая схема
   colorScheme: ColorScheme.dark(
     primary: AppColors.brandPrimary,

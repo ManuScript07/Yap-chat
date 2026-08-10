@@ -9,11 +9,17 @@
   "messagePrefix": "You: ",
 
   "timeJustNow": "Just now",
+  "today": "Today",
   "timeYesterday": "Yesterday",
   "timeMinutesAgo": "{count, plural, one{{count} min ago} other{{count} mins ago}}",
   "timeHoursAgo": "{count, plural, one{{count} hour ago} other{{count} hours ago}}",
   "timeDaysAgo": "{count, plural, one{{count} day ago} other{{count} days ago}}",
 
   "failedToLoadChats": "Failed to load chats",
-  "noChats": "You have no chats"
+  "noChats": "You have no chats",
+
+  "chatInputHint": "Type a message",
+  "chatOnlineStatus": "Online",
+  "chatOfflineStatus": "Offline",
+  "chatAddPhoto": "Add photo"
 }

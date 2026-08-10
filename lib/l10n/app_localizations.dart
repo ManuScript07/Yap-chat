@@ -134,6 +134,12 @@ abstract class AppLocalizations {
   /// **'Только что'**
   String get timeJustNow;
 
+  /// No description provided for @today.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сегодня'**
+  String get today;
+
   /// No description provided for @timeYesterday.
   ///
   /// In ru, this message translates to:
@@ -169,6 +175,30 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'У вас нет чатов'**
   String get noChats;
+
+  /// No description provided for @chatInputHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите сообщение'**
+  String get chatInputHint;
+
+  /// No description provided for @chatOnlineStatus.
+  ///
+  /// In ru, this message translates to:
+  /// **'В сети'**
+  String get chatOnlineStatus;
+
+  /// No description provided for @chatOfflineStatus.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не в сети'**
+  String get chatOfflineStatus;
+
+  /// No description provided for @chatAddPhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить фото'**
+  String get chatAddPhoto;
 }
 
 class _AppLocalizationsDelegate

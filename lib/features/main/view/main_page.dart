@@ -18,22 +18,30 @@ class MainPage extends StatelessWidget {
         FriendsRoute(),
         ProfileRoute(),
       ],
-      transitionBuilder: (context, child, animation) => FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
+      transitionBuilder: (context, child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
+
         const chatsTabIndex = 0;
 
-        final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
+        final rootMediaQuery = MediaQuery.of(context);
+
+        final isKeyboardOpen =
+            rootMediaQuery.viewInsets.bottom > 0;
+
         final isSelectionMode = context.select<ChatsBloc, bool>(
-          (bloc) => bloc.state.isSelectionMode,
+              (bloc) => bloc.state.isSelectionMode,
         );
 
         return PopScope(
           canPop:
-              tabsRouter.activeIndex == chatsTabIndex &&
+          tabsRouter.activeIndex == chatsTabIndex &&
               !isKeyboardOpen &&
               !isSelectionMode,
           onPopInvokedWithResult: (didPop, result) {
@@ -44,8 +52,11 @@ class MainPage extends StatelessWidget {
               return;
             }
 
-            if (tabsRouter.activeIndex == chatsTabIndex && isSelectionMode) {
-              context.read<ChatsBloc>().add(const ChatSelectionCleared());
+            if (tabsRouter.activeIndex == chatsTabIndex &&
+                isSelectionMode) {
+              context.read<ChatsBloc>().add(
+                const ChatSelectionCleared(),
+              );
               return;
             }
 
@@ -56,11 +67,17 @@ class MainPage extends StatelessWidget {
           child: Scaffold(
             resizeToAvoidBottomInset: false,
             extendBody: true,
-            body: Stack(
-              children: [
-                child,
-              ],
+
+            body: MediaQuery(
+
+              data: rootMediaQuery,
+              child: Stack(
+                children: [
+                  child,
+                ],
+              ),
             ),
+
             bottomNavigationBar: FloatingNavigationBar(
               activeIndex: tabsRouter.activeIndex,
               onTap: tabsRouter.setActiveIndex,

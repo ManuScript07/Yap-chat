@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/utils/utils.dart';
 import 'package:yap_chat/features/chats/chats.dart';
-import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/core/core.dart';
 
 class ChatListItem extends StatelessWidget {
@@ -32,7 +32,13 @@ class ChatListItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-            _buildAvatar(context),
+              UserAvatar(
+                avatarUrl: chat.avatarUrl,
+                size: 56,
+                borderRadius: 10,
+                isOnline: chat.isOnline,
+                showOnlineBadge: true,
+              ),
             const SizedBox(width: 16),
             Expanded(
               child: _buildChatInfo(context),
@@ -43,60 +49,6 @@ class ChatListItem extends StatelessWidget {
         ),
       ),
     ),
-    );
-  }
-
-  Widget _buildAvatar(BuildContext context) {
-    final surfaceColor = context.colorScheme.primary;
-    final secondaryTextColor = context.colorScheme.onSurface;
-
-    final primaryBrandColor = context.colorScheme.primary;
-    final backgroundColor = context.scaffoldBackgroundColor;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            width: 56,
-            height: 56,
-            color: surfaceColor,
-            child: chat.avatarUrl != null
-                ? Image.network(
-                  chat.avatarUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Icon(
-                    Icons.person,
-                    color: secondaryTextColor,
-                    size: 36,
-                  ),
-                )
-                : Icon(
-                  Icons.person,
-                  color: secondaryTextColor,
-                  size: 36,
-                ),
-          ),
-        ),
-        if (chat.isOnline)
-          Positioned(
-            right: -4,
-            bottom: -4,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: primaryBrandColor,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: backgroundColor,
-                  width: 2,
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 

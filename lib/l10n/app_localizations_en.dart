@@ -27,6 +27,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get timeJustNow => 'Just now';
 
   @override
+  String get today => 'Today';
+
+  @override
   String get timeYesterday => 'Yesterday';
 
   @override
@@ -67,4 +70,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noChats => 'You have no chats';
+
+  @override
+  String get chatInputHint => 'Type a message';
+
+  @override
+  String get chatOnlineStatus => 'Online';
+
+  @override
+  String get chatOfflineStatus => 'Offline';
+
+  @override
+  String get chatAddPhoto => 'Add photo';
 }
