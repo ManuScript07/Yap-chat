@@ -9,10 +9,12 @@ class MessageBubble extends StatefulWidget {
     super.key,
     required this.message,
     required this.isNew,
+    required this.maxWidth,
   });
 
   final ChatMessage message;
   final bool isNew;
+  final double maxWidth;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -24,11 +26,13 @@ class _MessageBubbleState extends State<MessageBubble>
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
 
-  bool _hasAnimated = false;
+  final bool _hasAnimated = false;
+  static final _timeFormat = DateFormat('HH:mm');
 
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -42,13 +46,9 @@ class _MessageBubbleState extends State<MessageBubble>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.15),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
-    if (widget.isNew && !_hasAnimated) {
-      _hasAnimated = true;
+    if (widget.isNew) {
       _controller.forward();
     } else {
       _controller.value = 1.0;
@@ -96,12 +96,11 @@ class _MessageBubbleState extends State<MessageBubble>
       child: SlideTransition(
         position: _slideAnimation,
         child: Align(
-          alignment:
-          message.isMine ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: message.isMine
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
           child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.8,
-            ),
+            constraints: BoxConstraints(maxWidth: widget.maxWidth),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: bubbleColor,
@@ -121,10 +120,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     ),
                     children: [
                       WidgetSpan(
-                        child: SizedBox(
-                          width: timeStatusWidth,
-                          height: 1,
-                        ),
+                        child: SizedBox(width: timeStatusWidth, height: 1),
                       ),
                     ],
                   ),
@@ -137,7 +133,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        DateFormat('HH:mm').format(message.timestamp),
+                        _timeFormat.format(message.timestamp),
                         style: TextStyle(
                           color: timeColor,
                           fontSize: 14,
@@ -162,29 +158,13 @@ class _MessageBubbleState extends State<MessageBubble>
   Widget _buildStatusIcon(Color color) {
     switch (widget.message.status) {
       case MessageStatus.sending:
-        return Icon(
-          Icons.access_time_rounded,
-          size: 18,
-          color: color,
-        );
+        return Icon(Icons.access_time_rounded, size: 18, color: color);
       case MessageStatus.sent:
-        return Icon(
-          Icons.done_rounded,
-          size: 18,
-          color: color,
-        );
+        return Icon(Icons.done_rounded, size: 18, color: color);
       case MessageStatus.read:
-        return Icon(
-          Icons.done_all_rounded,
-          size: 18,
-          color: color,
-        );
+        return Icon(Icons.done_all_rounded, size: 18, color: color);
       case MessageStatus.error:
-        return Icon(
-          Icons.error_outline_rounded,
-          size: 18,
-          color: color,
-        );
+        return Icon(Icons.error_outline_rounded, size: 18, color: color);
     }
   }
 }

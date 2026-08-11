@@ -11,42 +11,161 @@ import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
 class ChatPage extends StatelessWidget {
-  const ChatPage({
-    super.key,
-    required this.chat,
-  });
+  const ChatPage({super.key, required this.chat});
 
   final Chat chat;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ChatBloc(
-        chatRepository: context.read<IChatRepository>(),
-      )..add(ChatStarted(chat.id)),
+      create: (context) =>
+          ChatBloc(chatRepository: context.read<IChatRepository>())
+            ..add(ChatStarted(chat.id)),
       child: _ChatView(chat: chat),
     );
   }
 }
 
-class _ChatView extends StatelessWidget {
+class _ChatView extends StatefulWidget {
   const _ChatView({required this.chat});
 
   final Chat chat;
 
   @override
-  Widget build(BuildContext context) {
-    final topSafeArea = MediaQuery.paddingOf(context).top;
-    final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
+  State<_ChatView> createState() => _ChatViewState();
+}
 
-    // Проверяем, открыта ли сейчас клавиатура
-    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+class _ChatViewState extends State<_ChatView> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+
+    final topSafeArea = mediaQuery.padding.top;
+
+    const inputContentHeight = 66.0;
+
+    final inputBarHeight = inputContentHeight + mediaQuery.padding.bottom;
 
     final headerHeight = 64.0 + topSafeArea;
-    final inputBarHeight = 70.0 + bottomSafeArea;
 
     final backgroundColor = context.scaffoldBackgroundColor;
-    final colorScheme = context.colorScheme;
+
+    return _ChatPopScope(
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        resizeToAvoidBottomInset: false,
+
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () {
+            FocusManager.instance.primaryFocus?.unfocus();
+          },
+          child: Stack(
+            children: [
+              _ChatMessages(
+                controller: _scrollController,
+                headerHeight: headerHeight,
+                inputBarHeight: inputBarHeight,
+              ),
+
+              _GradientOverlay(
+                height: headerHeight + 20,
+                isTop: true,
+                backgroundColor: backgroundColor,
+              ),
+
+              _GradientOverlay(
+                height: inputBarHeight + 20,
+                isTop: false,
+                backgroundColor: backgroundColor,
+              ),
+
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ChatAppBar(
+                  userName: widget.chat.userName,
+                  isOnline: widget.chat.isOnline,
+                  avatarUrl: widget.chat.avatarUrl,
+                  onBack: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+
+              _KeyboardAwareInput(onMessageSent: _scrollToBottom),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KeyboardAwareInput extends StatelessWidget {
+  const _KeyboardAwareInput({required this.onMessageSent});
+
+  final VoidCallback onMessageSent;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: keyboardHeight),
+        child: MessageInputBar(
+          onSend: (text) {
+            context.read<ChatBloc>().add(ChatMessageSent(text));
+            onMessageSent();
+          },
+          onAddPhoto: () {
+            // TODO: Реализовать добавление фото
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatPopScope extends StatelessWidget {
+  const _ChatPopScope({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return PopScope(
       canPop: !isKeyboardOpen,
@@ -55,164 +174,418 @@ class _ChatView extends StatelessWidget {
           FocusManager.instance.primaryFocus?.unfocus();
         }
       },
-      child: Scaffold(
-        backgroundColor: backgroundColor,
-        resizeToAvoidBottomInset: true,
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Stack(
-            children: [
-              // 1. Список сообщений
-              BlocBuilder<ChatBloc, ChatState>(
-                builder: (context, state) {
-                  if (state.status == ChatStatus.loading) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: colorScheme.primary,
-                      ),
-                    );
-                  }
+      child: child,
+    );
+  }
+}
 
-                  if (state.messages.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'Нет сообщений',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    );
-                  }
+class _ChatMessages extends StatefulWidget {
+  const _ChatMessages({
+    required this.controller,
+    required this.headerHeight,
+    required this.inputBarHeight,
+  });
 
-                  final items = <ChatListItemElement>[];
-                  for (var i = 0; i < state.messages.length; i++) {
-                    final currentMessage = state.messages[i];
-                    items.add(MessageItemElement(currentMessage));
+  final ScrollController controller;
+  final double headerHeight;
+  final double inputBarHeight;
 
-                    final isLast = i == state.messages.length - 1;
-                    if (isLast) {
-                      items.add(DateSeparatorElement(currentMessage.timestamp));
-                    } else {
-                      final nextMessage = state.messages[i + 1];
-                      final currentDate = DateTime(
-                        currentMessage.timestamp.year,
-                        currentMessage.timestamp.month,
-                        currentMessage.timestamp.day,
-                      );
-                      final nextDate = DateTime(
-                        nextMessage.timestamp.year,
-                        nextMessage.timestamp.month,
-                        nextMessage.timestamp.day,
-                      );
+  @override
+  State<_ChatMessages> createState() => _ChatMessagesState();
+}
 
-                      if (currentDate != nextDate) {
-                        items.add(DateSeparatorElement(currentMessage.timestamp));
-                      }
-                    }
-                  }
+class _ChatMessagesState extends State<_ChatMessages> {
+  bool _showScrollToBottom = false;
+  int _newMessagesCount = 0;
 
-                  return ListView.builder(
-                    reverse: true,
-                    padding: EdgeInsets.only(
-                      top: headerHeight + 12,
-                      bottom: inputBarHeight + 12,
-                      left: 16,
-                      right: 16,
-                    ),
-                    itemCount: items.length,
+  Set<String> _knownMessageIds = {};
+  bool _initialMessagesLoaded = false;
 
-                    // 1. ДОБАВЛЯЕМ ЭТОТ КОЛБЭК: он помогает Flutter найти виджет,
-                    // если его индекс изменился (например, при добавлении нового сообщения)
-                    findChildIndexCallback: (Key key) {
-                      if (key is ValueKey<String>) {
-                        final index = items.indexWhere((item) {
-                          if (item is MessageItemElement) {
-                            return 'msg_${item.message.id}' == key.value;
-                          } else if (item is DateSeparatorElement) {
-                            return 'date_${item.date.millisecondsSinceEpoch}' == key.value;
-                          }
-                          return false;
-                        });
-                        if (index >= 0) return index;
-                      }
-                      return null;
-                    },
+  // Для отслеживания направления скролла
+  double _lastOffset = 0.0;
+  bool _isAnimatingToBottom = false;
 
-                    itemBuilder: (context, index) {
-                      final item = items[index];
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_handleScroll);
+  }
 
-                      // 2. Генерируем уникальный строковый ключ для каждого элемента
-                      final itemKey = switch (item) {
-                        MessageItemElement(:final message) => ValueKey<String>('msg_${message.id}'),
-                        DateSeparatorElement(:final date) => ValueKey<String>('date_${date.millisecondsSinceEpoch}'),
-                      };
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleScroll);
+    super.dispose();
+  }
 
-                      // 3. Вешаем ключ на самый верхний виджет ячейки (Padding)
-                      return Padding(
-                        key: itemKey, // <-- КЛЮЧ ДОЛЖЕН БЫТЬ ЗДЕСЬ
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: switch (item) {
-                          MessageItemElement(:final message) => MessageBubble(
-                            // Здесь ключ уже не нужен, так как он висит на Padding
-                            message: message,
-                            isNew: !state.initialMessageIds.contains(message.id),
-                          ),
-                          DateSeparatorElement(:final date) => DateSeparator(date: date),
-                        },
-                      );
-                    },
-                  );
-                },
+  void _handleScroll() {
+    // Если мы сейчас программно скроллим вниз — игнорируем события,
+    // чтобы кнопка не появлялась случайно в процессе анимации.
+    if (!widget.controller.hasClients || _isAnimatingToBottom) return;
+
+    final offset = widget.controller.offset;
+    final isAtBottom = offset <= 20;
+
+    // Если достигли низа — всегда прячем кнопку и сбрасываем счетчик
+    if (isAtBottom) {
+      if (_showScrollToBottom || _newMessagesCount != 0) {
+        setState(() {
+          _showScrollToBottom = false;
+          _newMessagesCount = 0;
+        });
+      }
+      _lastOffset = offset;
+      return;
+    }
+
+    // Вычисляем разницу:
+    // delta > 0 значит offset растет (мы листаем ВВЕРХ к истории)
+    // delta < 0 значит offset падает (мы листаем ВНИЗ к новым сообщениям)
+    final delta = offset - _lastOffset;
+
+    if (delta > 2.0) {
+      // Пользователь скроллит ВВЕРХ — прячем кнопку
+      if (_showScrollToBottom) {
+        setState(() {
+          _showScrollToBottom = false;
+        });
+      }
+    } else if (delta < -2.0) {
+      // Пользователь скроллит ВНИЗ — показываем кнопку
+      if (!_showScrollToBottom) {
+        setState(() {
+          _showScrollToBottom = true;
+        });
+      }
+    }
+
+    _lastOffset = offset;
+  }
+
+  void _handleMessagesChanged(List<ChatMessage> messages) {
+    final currentIds = messages.map((message) => message.id).toSet();
+
+    if (!_initialMessagesLoaded) {
+      _knownMessageIds = currentIds;
+      _initialMessagesLoaded = true;
+      return;
+    }
+
+    final newMessages = messages
+        .where((message) => !_knownMessageIds.contains(message.id))
+        .toList();
+
+    _knownMessageIds = currentIds;
+
+    if (newMessages.isEmpty) return;
+
+    final hasMine = newMessages.any((m) => m.isMine);
+    final isAtBottom =
+        !widget.controller.hasClients || widget.controller.offset <= 20;
+
+    if (hasMine) {
+      _scrollToBottom();
+    } else if (!isAtBottom) {
+      // Пришло чужое сообщение, а мы находимся высоко в истории.
+      // ВСЕГДА показываем кнопку и увеличиваем счетчик.
+      setState(() {
+        _showScrollToBottom = true;
+        _newMessagesCount += newMessages.length;
+      });
+    } else {
+      _scrollToBottom();
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_newMessagesCount != 0 || _showScrollToBottom) {
+      setState(() {
+        _newMessagesCount = 0;
+        _showScrollToBottom = false;
+      });
+    }
+
+    if (!widget.controller.hasClients) return;
+
+    // Включаем блокировку, чтобы _handleScroll не мешал
+    _isAnimatingToBottom = true;
+
+    widget.controller
+        .animateTo(
+          0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        )
+        .then((_) {
+          // Снимаем блокировку по завершении анимации
+          _isAnimatingToBottom = false;
+        });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<ChatBloc, ChatState>(
+      listenWhen: (previous, current) => previous.messages != current.messages,
+      listener: (context, state) {
+        _handleMessagesChanged(state.messages);
+      },
+      child: BlocBuilder<ChatBloc, ChatState>(
+        buildWhen: (previous, current) {
+          return previous.status != current.status ||
+              previous.messages != current.messages ||
+              previous.initialMessageIds != current.initialMessageIds;
+        },
+        builder: (context, state) {
+          if (state.status == ChatStatus.loading) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: context.colorScheme.primary,
               ),
+            );
+          }
 
-              // 2. Верхнее градиентное затемнение
-              _GradientOverlay(
-                height: headerHeight + 20,
-                isTop: true,
-                backgroundColor: backgroundColor,
-              ),
-
-              // 3. Нижнее градиентное затемнение
-              _GradientOverlay(
-                height: inputBarHeight + 20,
-                isTop: false,
-                backgroundColor: backgroundColor,
-              ),
-
-              // 4. Шапка чата
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: ChatAppBar(
-                  userName: chat.userName,
-                  isOnline: chat.isOnline,
-                  avatarUrl: chat.avatarUrl,
-                  onBack: () => Navigator.of(context).pop(),
+          if (state.messages.isEmpty) {
+            return Center(
+              child: Text(
+                'Нет сообщений',
+                style: TextStyle(
+                  color: context.colorScheme.onSurfaceVariant,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
                 ),
               ),
+            );
+          }
 
-              // 5. Панель ввода сообщения
+          // Отрезаем новые сообщения из отрисовки, пока не проскроллим вниз,
+          // чтобы интерфейс не дергался
+          List<ChatMessage> displayedMessages = state.messages;
+          if (_newMessagesCount > 0 &&
+              state.messages.length >= _newMessagesCount) {
+            displayedMessages = state.messages.skip(_newMessagesCount).toList();
+          }
+
+          return Stack(
+            children: [
+              _MessagesList(
+                controller: widget.controller,
+                messages: displayedMessages,
+                initialMessageIds: state.initialMessageIds,
+                headerHeight: widget.headerHeight,
+                inputBarHeight: widget.inputBarHeight,
+              ),
+
               Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: MessageInputBar(
-                  onSend: (text) {
-                    context.read<ChatBloc>().add(ChatMessageSent(text));
+                right: 16,
+                bottom:
+                    widget.inputBarHeight +
+                    MediaQuery.viewInsetsOf(context).bottom +
+                    20,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  reverseDuration: const Duration(milliseconds: 180),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(
+                        scale: Tween<double>(
+                          begin: 0.85,
+                          end: 1.0,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    );
                   },
-                  onAddPhoto: () {
-                    // TODO: Реализовать добавление фото
-                  },
+                  child: _showScrollToBottom
+                      ? _ScrollToBottomButton(
+                          key: const ValueKey('scroll_to_bottom'),
+                          newMessagesCount: _newMessagesCount,
+                          onPressed: _scrollToBottom,
+                        )
+                      : const SizedBox(
+                          key: ValueKey('scroll_to_bottom_hidden'),
+                          width: 50,
+                          height: 50,
+                        ),
                 ),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
+    );
+  }
+}
+
+class _MessagesList extends StatelessWidget {
+  const _MessagesList({
+    required this.controller,
+    required this.messages,
+    required this.initialMessageIds,
+    required this.headerHeight,
+    required this.inputBarHeight,
+  });
+
+  final ScrollController controller;
+  final List<ChatMessage> messages;
+  final Set<String> initialMessageIds;
+
+  final double headerHeight;
+  final double inputBarHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+
+    final items = <ChatListItemElement>[];
+    final itemIndexByKey = <String, int>{};
+
+    for (var i = 0; i < messages.length; i++) {
+      final message = messages[i];
+
+      final messageItem = MessageItemElement(message);
+
+      itemIndexByKey['msg_${message.id}'] = items.length;
+      items.add(messageItem);
+
+      final isLast = i == messages.length - 1;
+
+      if (isLast) {
+        final separator = DateSeparatorElement(message.timestamp);
+
+        itemIndexByKey['date_${message.timestamp.millisecondsSinceEpoch}'] =
+            items.length;
+
+        items.add(separator);
+
+        continue;
+      }
+
+      final current = message.timestamp;
+      final next = messages[i + 1].timestamp;
+
+      final sameDay =
+          current.year == next.year &&
+          current.month == next.month &&
+          current.day == next.day;
+
+      if (!sameDay) {
+        final separator = DateSeparatorElement(message.timestamp);
+
+        itemIndexByKey['date_${message.timestamp.millisecondsSinceEpoch}'] =
+            items.length;
+
+        items.add(separator);
+      }
+    }
+
+    final bottomPadding = inputBarHeight + keyboardHeight + 12.0;
+
+    return ListView.builder(
+      controller: controller,
+      reverse: true,
+      padding: EdgeInsets.only(
+        top: headerHeight + 12.0,
+        bottom: bottomPadding,
+        left: 16.0,
+        right: 16.0,
+      ),
+
+      itemCount: items.length,
+
+      findChildIndexCallback: (Key key) {
+        if (key is ValueKey<String>) {
+          return itemIndexByKey[key.value];
+        }
+
+        return null;
+      },
+
+      itemBuilder: (context, index) {
+        final item = items[index];
+
+        final key = switch (item) {
+          MessageItemElement(:final message) => ValueKey<String>(
+            'msg_${message.id}',
+          ),
+
+          DateSeparatorElement(:final date) => ValueKey<String>(
+            'date_${date.millisecondsSinceEpoch}',
+          ),
+        };
+
+        return Padding(
+          key: key,
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: switch (item) {
+            MessageItemElement(:final message) => MessageBubble(
+              message: message,
+              isNew: !initialMessageIds.contains(message.id),
+              maxWidth: screenWidth * 0.8,
+            ),
+
+            DateSeparatorElement(:final date) => DateSeparator(date: date),
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ScrollToBottomButton extends StatelessWidget {
+  const _ScrollToBottomButton({
+    super.key,
+    required this.newMessagesCount,
+    required this.onPressed,
+  });
+
+  final int newMessagesCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GlassIconButton(
+          icon: Icons.keyboard_arrow_down_rounded,
+          onTap: onPressed,
+          width: 50,
+          height: 50,
+          borderRadius: 36,
+          iconSize: 36,
+        ),
+
+        if (newMessagesCount > 0)
+          Positioned(
+            top: -5,
+            right: -5,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: context.colorScheme.primary,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: context.scaffoldBackgroundColor,
+                  width: 1.5,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                newMessagesCount > 99 ? '99+' : '$newMessagesCount',
+                style: TextStyle(
+                  color: context.scaffoldBackgroundColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -243,10 +616,7 @@ class _GradientOverlay extends StatelessWidget {
             gradient: LinearGradient(
               begin: isTop ? Alignment.topCenter : Alignment.bottomCenter,
               end: isTop ? Alignment.bottomCenter : Alignment.topCenter,
-              colors: [
-                backgroundColor,
-                backgroundColor.withValues(alpha: 0.0),
-              ],
+              colors: [backgroundColor, backgroundColor.withValues(alpha: 0.0)],
             ),
           ),
         ),
@@ -259,10 +629,12 @@ sealed class ChatListItemElement {}
 
 class MessageItemElement extends ChatListItemElement {
   MessageItemElement(this.message);
+
   final ChatMessage message;
 }
 
 class DateSeparatorElement extends ChatListItemElement {
   DateSeparatorElement(this.date);
+
   final DateTime date;
 }
