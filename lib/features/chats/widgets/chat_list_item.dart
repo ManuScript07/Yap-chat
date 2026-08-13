@@ -18,7 +18,6 @@ class ChatListItem extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool isSelected;
 
-
   @override
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
@@ -39,22 +38,21 @@ class ChatListItem extends StatelessWidget {
                 isOnline: chat.isOnline,
                 showOnlineBadge: true,
               ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildChatInfo(context),
-            ),
-            const SizedBox(width: 16),
-            _buildMetadata(context),
-          ],
+              const SizedBox(width: 16),
+              Expanded(child: _buildChatInfo(context)),
+              const SizedBox(width: 16),
+              _buildMetadata(context),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
   Widget _buildChatInfo(BuildContext context) {
-
-    final messagePrefix = chat.isLastMessageFromMe ? context.l10n.chatsMessagePrefixYou : '';
+    final messagePrefix = chat.isLastMessageFromMe
+        ? "${context.l10n.chatsMessagePrefixYou}: "
+        : '';
     final primaryTextColor = context.colorScheme.onSurface;
     final secondaryTextColor = context.colorScheme.onSurfaceVariant;
 
@@ -63,9 +61,7 @@ class ChatListItem extends StatelessWidget {
       children: [
         Text(
           chat.userName,
-          style: AppTextStyles.chatName.copyWith(
-            color: primaryTextColor,
-          ),
+          style: AppTextStyles.chatName.copyWith(color: primaryTextColor),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -91,9 +87,7 @@ class ChatListItem extends StatelessWidget {
       children: [
         Text(
           TimeFormatter.format(context, chat.lastMessageTime),
-          style: AppTextStyles.metadata.copyWith(
-            color: secondaryTextColor,
-          ),
+          style: AppTextStyles.metadata.copyWith(color: secondaryTextColor),
         ),
         const SizedBox(height: 8),
         if (chat.unreadCount > 0)
@@ -107,9 +101,7 @@ class ChatListItem extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               '${chat.unreadCount}',
-              style: AppTextStyles.badgeText.copyWith(
-                color: badgeTextColor,
-              ),
+              style: AppTextStyles.badgeText.copyWith(color: badgeTextColor),
             ),
           )
         else

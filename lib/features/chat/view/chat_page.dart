@@ -4,9 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
-import 'package:yap_chat/features/chat/repositories/repositories.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
+import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -42,6 +42,9 @@ class _ChatViewState extends State<_ChatView> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreLostAttachment();
+    });
   }
 
   @override
@@ -60,6 +63,23 @@ class _ChatViewState extends State<_ChatView> {
         curve: Curves.easeOutCubic,
       );
     });
+  }
+
+  Future<void> _restoreLostAttachment() async {
+    final pendingPath = await context
+        .read<ILocalMediaRepository>()
+        .consumePendingMedia();
+    if (!mounted || pendingPath == null) return;
+
+    final images = await showAttachmentBottomSheet(
+      context,
+      chatId: widget.chat.id,
+      initiallySelectedPath: pendingPath,
+    );
+    if (!mounted || images == null || images.isEmpty) return;
+
+    context.read<ChatBloc>().add(ChatMessageImagesSent(images));
+    _scrollToBottom();
   }
 
   @override
@@ -90,6 +110,7 @@ class _ChatViewState extends State<_ChatView> {
             children: [
               _ChatMessages(
                 controller: _scrollController,
+                chat: widget.chat,
                 headerHeight: headerHeight,
                 inputBarHeight: inputBarHeight,
               ),
@@ -120,7 +141,10 @@ class _ChatViewState extends State<_ChatView> {
                 ),
               ),
 
-              _KeyboardAwareInput(onMessageSent: _scrollToBottom),
+              _KeyboardAwareInput(
+                chatId: widget.chat.id,
+                onMessageSent: _scrollToBottom,
+              ),
             ],
           ),
         ),
@@ -130,9 +154,22 @@ class _ChatViewState extends State<_ChatView> {
 }
 
 class _KeyboardAwareInput extends StatelessWidget {
-  const _KeyboardAwareInput({required this.onMessageSent});
+  const _KeyboardAwareInput({
+    required this.chatId,
+    required this.onMessageSent,
+  });
 
+  final String chatId;
   final VoidCallback onMessageSent;
+
+  Future<void> _openAttachmentSheet(BuildContext context) async {
+    final images = await showAttachmentBottomSheet(context, chatId: chatId);
+
+    if (images != null && images.isNotEmpty && context.mounted) {
+      context.read<ChatBloc>().add(ChatMessageImagesSent(images));
+      onMessageSent();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,9 +186,8 @@ class _KeyboardAwareInput extends StatelessWidget {
             context.read<ChatBloc>().add(ChatMessageSent(text));
             onMessageSent();
           },
-          onAddPhoto: () {
-            // TODO: Реализовать добавление фото
-          },
+          // 2. Вызываем вынесенный метод
+          onAddPhoto: () => _openAttachmentSheet(context),
         ),
       ),
     );
@@ -182,11 +218,13 @@ class _ChatPopScope extends StatelessWidget {
 class _ChatMessages extends StatefulWidget {
   const _ChatMessages({
     required this.controller,
+    required this.chat,
     required this.headerHeight,
     required this.inputBarHeight,
   });
 
   final ScrollController controller;
+  final Chat chat;
   final double headerHeight;
   final double inputBarHeight;
 
@@ -346,7 +384,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
           if (state.messages.isEmpty) {
             return Center(
               child: Text(
-                'Нет сообщений',
+                context.l10n.noMessages,
                 style: TextStyle(
                   color: context.colorScheme.onSurfaceVariant,
                   fontSize: 16,
@@ -368,6 +406,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
             children: [
               _MessagesList(
                 controller: widget.controller,
+                chat: widget.chat,
                 messages: displayedMessages,
                 initialMessageIds: state.initialMessageIds,
                 headerHeight: widget.headerHeight,
@@ -421,6 +460,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
 class _MessagesList extends StatelessWidget {
   const _MessagesList({
     required this.controller,
+    required this.chat,
     required this.messages,
     required this.initialMessageIds,
     required this.headerHeight,
@@ -428,6 +468,7 @@ class _MessagesList extends StatelessWidget {
   });
 
   final ScrollController controller;
+  final Chat chat;
   final List<ChatMessage> messages;
   final Set<String> initialMessageIds;
 
@@ -525,6 +566,8 @@ class _MessagesList extends StatelessWidget {
               message: message,
               isNew: !initialMessageIds.contains(message.id),
               maxWidth: screenWidth * 0.8,
+              peerName: chat.userName,
+              peerAvatarUrl: chat.avatarUrl,
             ),
 
             DateSeparatorElement(:final date) => DateSeparator(date: date),

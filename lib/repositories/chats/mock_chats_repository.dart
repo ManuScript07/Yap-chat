@@ -1,5 +1,5 @@
 import 'package:yap_chat/features/chats/data/data.dart';
-import 'package:yap_chat/features/chats/repositories/abstract_chats_repository.dart';
+import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 
 /// In-memory репозиторий для разработки UI, Storybook-сценариев и тестов.
 class MockChatsRepository implements IChatsRepository {

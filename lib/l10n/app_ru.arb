@@ -4,22 +4,31 @@
   "navFriends": "Друны",
   "navProfile": "Акк",
   "searchHintChats": "поиск по чатам",
-
   "@@CHATS": "",
-  "chatsMessagePrefixYou": "Ты: ",
-
+  "chatsMessagePrefixYou": "Ты",
   "timeJustNow": "Только что",
   "today": "Сегодня",
   "timeYesterday": "Вчера",
   "timeMinutesAgo": "{count, plural, one{{count} мин. назад} few{{count} мин. назад} many{{count} мин. назад} other{{count} мин. назад}}",
   "timeHoursAgo": "{count, plural, one{{count} ч. назад} few{{count} ч. назад} many{{count} ч. назад} other{{count} ч. назад}}",
   "timeDaysAgo": "{count, plural, one{{count} дн. назад} few{{count} дня назад} many{{count} дней назад} other{{count} дней назад}}",
-
   "failedToLoadChats": "Не удалось загрузить чаты",
   "noChats": "У вас нет чатов",
-
   "chatInputHint": "Введите сообщение",
   "chatOnlineStatus": "В сети",
   "chatOfflineStatus": "Не в сети",
-  "chatAddPhoto": "Добавить фото"
+  "chatAddPhoto": "Добавить фото",
+  "chatActionCamera": "Камера",
+  "chatActionGallery": "Галерея",
+  "chatActionLocation": "Локация",
+  "chatSendFiles": "Отправить ({count})",
+  "chatSelectFiles": "Выберите файлы",
+  "noMessages": "Нет сообщений",
+  "permissionDenied": "Разрешение отклонено",
+  "youMustAllowCameraPermission": "Чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.",
+  "cancel": "Отмена",
+  "settings": "Настроки",
+  "photoHasBeenSavedToGallery": "Фото сохранено в галерею",
+  "failedToSavePhoto": "Не удалось сохранить фото",
+  "repeat": "Повторить"
 }

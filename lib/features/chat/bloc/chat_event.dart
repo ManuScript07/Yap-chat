@@ -24,6 +24,23 @@ class ChatMessageSent extends ChatEvent {
   List<Object?> get props => [text];
 }
 
+class ChatMessageImagesSent extends ChatEvent {
+  final List<String> imagePaths;
+  const ChatMessageImagesSent(this.imagePaths);
+
+  @override
+  List<Object?> get props => [imagePaths];
+}
+
+class ChatMessageRetryRequested extends ChatEvent {
+  const ChatMessageRetryRequested(this.message);
+
+  final ChatMessage message;
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class ChatMessagesReceived extends ChatEvent {
   final List<ChatMessage> messages;
   const ChatMessagesReceived(this.messages);

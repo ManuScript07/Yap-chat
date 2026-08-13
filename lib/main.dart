@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:talker_bloc_logger/talker_bloc_logger.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/app/app.dart';
+import 'package:yap_chat/core/services/media_service.dart';
+import 'package:yap_chat/repositories/chat/local_media_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +18,17 @@ Future<void> main() async {
 
   final preferences = await SharedPreferences.getInstance();
   final talker = Talker();
+
+  final localMediaRepository = LocalMediaRepository(
+    preferences: preferences,
+  );
+  final lostPhotoPath = await MediaService.retrieveLostPhoto();
+  if (lostPhotoPath != null) {
+    final persistedPath = await localMediaRepository.persistMedia(lostPhotoPath);
+    if (persistedPath != null) {
+      await localMediaRepository.savePendingMedia(persistedPath);
+    }
+  }
 
   Bloc.observer = TalkerBlocObserver(talker: talker);
 

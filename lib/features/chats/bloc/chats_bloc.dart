@@ -2,7 +2,7 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chats/bloc/bloc.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
-import 'package:yap_chat/features/chats/repositories/repositories.dart';
+import 'package:yap_chat/repositories/chats/chats.dart';
 import 'package:stream_transform/stream_transform.dart';
 
 

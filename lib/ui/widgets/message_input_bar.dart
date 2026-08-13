@@ -134,7 +134,7 @@ class _AttachmentButton extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: visible
           ? GlassIconButton(
-              icon: Icons.image,
+              icon: Icons.add,
               onTap: onTap ?? () {},
               width: 50,
               height: 50,

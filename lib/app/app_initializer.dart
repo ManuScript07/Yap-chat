@@ -2,8 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/repository_container.dart';
-import 'package:yap_chat/features/chat/chat.dart';
 import 'package:yap_chat/features/chats/chats.dart';
+import 'package:yap_chat/repositories/repositories.dart';
 
 /// Центральная точка Dependency Injection.
 ///
@@ -32,6 +32,9 @@ class AppInitializer extends StatelessWidget {
         ),
         RepositoryProvider<IChatRepository>.value(
           value: repositories.chatRepository,
+        ),
+        RepositoryProvider<ILocalMediaRepository>.value(
+          value: repositories.localMediaRepository,
         ),
       ],
       child: MultiBlocProvider(

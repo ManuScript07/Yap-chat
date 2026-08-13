@@ -1,7 +1,7 @@
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
-import 'package:yap_chat/features/chat/repositories/abstract_chat_repository.dart';
-import 'package:yap_chat/features/chat/repositories/mock_chat_repository.dart';
+import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
+import 'package:yap_chat/repositories/chat/mock_chat_repository.dart';
 
 /// Production-адаптер репозитория чата.
 ///
@@ -26,5 +26,17 @@ class ChatRepository implements IChatRepository {
   Future<void> sendMessage(String chatId, String text) {
     _config.talker.debug('ChatRepository.sendMessage to $chatId: $text');
     return _fallback.sendMessage(chatId, text);
+  }
+
+  @override
+  Future<void> sendImages(String chatId, List<String> imagePaths) {
+    _config.talker.debug('ChatRepository.sendImages to $chatId: ${imagePaths.length} items');
+    return _fallback.sendImages(chatId, imagePaths);
+  }
+
+  @override
+  Future<void> retryImages(String chatId, ChatMessage message) {
+    _config.talker.debug('ChatRepository.retryImages: ${message.id}');
+    return _fallback.retryImages(chatId, message);
   }
 }

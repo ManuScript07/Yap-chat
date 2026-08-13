@@ -1,7 +1,7 @@
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
-import 'package:yap_chat/features/chats/repositories/abstract_chats_repository.dart';
-import 'package:yap_chat/features/chats/repositories/mock_chats_repository.dart';
+import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
+import 'package:yap_chat/repositories/chats/mock_chats_repository.dart';
 
 /// Production-адаптер репозитория чатов.
 ///

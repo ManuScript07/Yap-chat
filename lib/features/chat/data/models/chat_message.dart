@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 
 enum MessageStatus { sending, sent, read, error }
 
+enum MessageType { text, image, location }
+
 class ChatMessage extends Equatable {
   final String id;
   final String chatId;
@@ -10,6 +12,8 @@ class ChatMessage extends Equatable {
   final DateTime timestamp;
   final bool isMine;
   final MessageStatus status;
+  final MessageType type;
+  final List<String> mediaUrls;
 
   const ChatMessage({
     required this.id,
@@ -19,6 +23,8 @@ class ChatMessage extends Equatable {
     required this.timestamp,
     required this.isMine,
     this.status = MessageStatus.sent,
+    this.type = MessageType.text,
+    this.mediaUrls = const [],
   });
 
   ChatMessage copyWith({
@@ -29,6 +35,8 @@ class ChatMessage extends Equatable {
     DateTime? timestamp,
     bool? isMine,
     MessageStatus? status,
+    MessageType? type,
+    List<String>? mediaUrls,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -38,9 +46,21 @@ class ChatMessage extends Equatable {
       timestamp: timestamp ?? this.timestamp,
       isMine: isMine ?? this.isMine,
       status: status ?? this.status,
+      type: type ?? this.type,
+      mediaUrls: mediaUrls ?? this.mediaUrls,
     );
   }
 
   @override
-  List<Object?> get props => [id, chatId, senderId, text, timestamp, isMine, status];
+  List<Object?> get props => [
+        id,
+        chatId,
+        senderId,
+        text,
+        timestamp,
+        isMine,
+        status,
+        type,
+        mediaUrls,
+      ];
 }

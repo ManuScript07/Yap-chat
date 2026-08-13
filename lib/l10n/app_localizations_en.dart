@@ -21,7 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHintChats => 'search chats';
 
   @override
-  String get chatsMessagePrefixYou => 'Ты: ';
+  String get chatsMessagePrefixYou => 'Ты';
 
   @override
   String get timeJustNow => 'Just now';
@@ -82,4 +82,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatAddPhoto => 'Add photo';
+
+  @override
+  String get chatActionCamera => 'Camera';
+
+  @override
+  String get chatActionGallery => 'Gallery';
+
+  @override
+  String get chatActionLocation => 'Location';
+
+  @override
+  String chatSendFiles(Object count) {
+    return 'Send ($count)';
+  }
+
+  @override
+  String get chatSelectFiles => 'Select files';
+
+  @override
+  String get noMessages => 'No messages';
+
+  @override
+  String get permissionDenied => 'Permission denied';
+
+  @override
+  String get youMustAllowCameraPermission =>
+      'To take a photo, you must allow access to the camera in the app settings.';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get photoHasBeenSavedToGallery => 'Photo has been saved to gallery';
+
+  @override
+  String get failedToSavePhoto => 'Failed to save photo';
+
+  @override
+  String get repeat => 'Repeat';
 }

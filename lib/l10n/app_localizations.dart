@@ -125,7 +125,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatsMessagePrefixYou.
   ///
   /// In ru, this message translates to:
-  /// **'Ты: '**
+  /// **'Ты'**
   String get chatsMessagePrefixYou;
 
   /// No description provided for @timeJustNow.
@@ -199,6 +199,84 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Добавить фото'**
   String get chatAddPhoto;
+
+  /// No description provided for @chatActionCamera.
+  ///
+  /// In ru, this message translates to:
+  /// **'Камера'**
+  String get chatActionCamera;
+
+  /// No description provided for @chatActionGallery.
+  ///
+  /// In ru, this message translates to:
+  /// **'Галерея'**
+  String get chatActionGallery;
+
+  /// No description provided for @chatActionLocation.
+  ///
+  /// In ru, this message translates to:
+  /// **'Локация'**
+  String get chatActionLocation;
+
+  /// No description provided for @chatSendFiles.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отправить ({count})'**
+  String chatSendFiles(Object count);
+
+  /// No description provided for @chatSelectFiles.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите файлы'**
+  String get chatSelectFiles;
+
+  /// No description provided for @noMessages.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет сообщений'**
+  String get noMessages;
+
+  /// No description provided for @permissionDenied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешение отклонено'**
+  String get permissionDenied;
+
+  /// No description provided for @youMustAllowCameraPermission.
+  ///
+  /// In ru, this message translates to:
+  /// **'Чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.'**
+  String get youMustAllowCameraPermission;
+
+  /// No description provided for @cancel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отмена'**
+  String get cancel;
+
+  /// No description provided for @settings.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настроки'**
+  String get settings;
+
+  /// No description provided for @photoHasBeenSavedToGallery.
+  ///
+  /// In ru, this message translates to:
+  /// **'Фото сохранено в галерею'**
+  String get photoHasBeenSavedToGallery;
+
+  /// No description provided for @failedToSavePhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось сохранить фото'**
+  String get failedToSavePhoto;
+
+  /// No description provided for @repeat.
+  ///
+  /// In ru, this message translates to:
+  /// **'Повторить'**
+  String get repeat;
 }
 
 class _AppLocalizationsDelegate

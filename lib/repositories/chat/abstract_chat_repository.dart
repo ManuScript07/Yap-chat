@@ -6,4 +6,10 @@ abstract interface class IChatRepository {
 
   /// Отправка сообщения в чат.
   Future<void> sendMessage(String chatId, String text);
+
+  /// Отправка изображений в чат.
+  Future<void> sendImages(String chatId, List<String> imagePaths);
+
+  /// Повторная отправка медиа-сообщения после ошибки.
+  Future<void> retryImages(String chatId, ChatMessage message);
 }

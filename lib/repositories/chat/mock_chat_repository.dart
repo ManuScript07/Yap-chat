@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:yap_chat/features/chat/data/data.dart';
-import 'package:yap_chat/features/chat/repositories/abstract_chat_repository.dart';
+import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 
 class MockChatRepository implements IChatRepository {
   final _messagesController = StreamController<List<ChatMessage>>.broadcast();
@@ -108,6 +109,57 @@ class MockChatRepository implements IChatRepository {
       status: MessageStatus.sent,
     );
     _messages.insert(0, responseMessage);
+    _messagesController.add(List.unmodifiable(_messages));
+  }
+
+  @override
+  Future<void> sendImages(String chatId, List<String> imagePaths) async {
+    final newMessage = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      chatId: chatId,
+      senderId: 'me',
+      text: '',
+      timestamp: DateTime.now(),
+      isMine: true,
+      status: MessageStatus.sending,
+      type: MessageType.image,
+      mediaUrls: imagePaths,
+    );
+
+    _messages.insert(0, newMessage);
+    _messagesController.add(List.unmodifiable(_messages));
+
+    // Simulate network delay
+    await Future.delayed(const Duration(seconds: 1));
+
+    final index = _messages.indexWhere((m) => m.id == newMessage.id);
+    if (index != -1) {
+      final hasMissingFile = imagePaths.any(
+        (path) => !path.startsWith('http') && !File(path).existsSync(),
+      );
+      _messages[index] = _messages[index].copyWith(
+        status: hasMissingFile ? MessageStatus.error : MessageStatus.sent,
+      );
+      _messagesController.add(List.unmodifiable(_messages));
+    }
+  }
+
+  @override
+  Future<void> retryImages(String chatId, ChatMessage message) async {
+    final index = _messages.indexWhere((item) => item.id == message.id);
+    if (index == -1) return;
+
+    _messages[index] = message.copyWith(status: MessageStatus.sending);
+    _messagesController.add(List.unmodifiable(_messages));
+
+    await Future<void>.delayed(const Duration(seconds: 1));
+
+    final hasMissingFile = message.mediaUrls.any(
+      (path) => !path.startsWith('http') && !File(path).existsSync(),
+    );
+    _messages[index] = _messages[index].copyWith(
+      status: hasMissingFile ? MessageStatus.error : MessageStatus.sent,
+    );
     _messagesController.add(List.unmodifiable(_messages));
   }
 }

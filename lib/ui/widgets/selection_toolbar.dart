@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/widgets/glass_button.dart';
 
 class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
   const SelectionToolbar({
@@ -37,10 +38,7 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
             children: [
               Row(
                 children: [
-                  _GlassButton(
-                    icon: Icons.close_rounded,
-                    onPressed: onClose,
-                  ),
+                  GlassButton(icon: Icons.close_rounded, onPressed: onClose),
                   const SizedBox(width: 12),
                   Text(
                     '$selectedCount',
@@ -56,17 +54,19 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
 
               Row(
                 children: [
-                  _GlassButton(
-                    icon: isMuted ? Icons.notifications_off_rounded : Icons.notifications_active_rounded,
+                  GlassButton(
+                    icon: isMuted
+                        ? Icons.notifications_off_rounded
+                        : Icons.notifications_active_rounded,
                     onPressed: onToggleNotifications,
                   ),
                   const SizedBox(width: 12),
-                  _GlassButton(
+                  GlassButton(
                     icon: Icons.done_all_rounded,
                     onPressed: onMarkAsRead,
                   ),
                   const SizedBox(width: 12),
-                  _GlassButton(
+                  GlassButton(
                     icon: Icons.delete_outline_rounded,
                     onPressed: onDelete,
                   ),
@@ -81,42 +81,4 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(130);
-}
-
-class _GlassButton extends StatelessWidget {
-  const _GlassButton({
-    required this.icon,
-    this.onPressed,
-  });
-
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final backgroundColor = context.colorScheme.surface;
-
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: backgroundColor.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: backgroundColor.withValues(alpha: 0.8),
-            width: 2,
-          ),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            color: backgroundColor,
-            size: 24,
-          ),
-        ),
-      ),
-    );
-  }
 }

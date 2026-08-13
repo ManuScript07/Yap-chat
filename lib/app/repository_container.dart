@@ -1,6 +1,5 @@
 import 'package:yap_chat/app/app_config.dart';
-import 'package:yap_chat/features/chat/chat.dart';
-import 'package:yap_chat/features/chats/chats.dart';
+import 'package:yap_chat/repositories/repositories.dart';
 
 /// Контейнер репозиториев приложения.
 ///
@@ -10,6 +9,7 @@ class RepositoryContainer {
   const RepositoryContainer({
     required this.chatsRepository,
     required this.chatRepository,
+    required this.localMediaRepository,
   });
 
   factory RepositoryContainer.prod({
@@ -18,6 +18,9 @@ class RepositoryContainer {
     return RepositoryContainer(
       chatsRepository: ChatsRepository(config: config),
       chatRepository: ChatRepository(config: config),
+      localMediaRepository: LocalMediaRepository(
+        preferences: config.preferences,
+      ),
     );
   }
 
@@ -27,9 +30,13 @@ class RepositoryContainer {
     return RepositoryContainer(
       chatsRepository: MockChatsRepository(),
       chatRepository: MockChatRepository(),
+      localMediaRepository: LocalMediaRepository(
+        preferences: config.preferences,
+      ),
     );
   }
 
   final IChatsRepository chatsRepository;
   final IChatRepository chatRepository;
+  final ILocalMediaRepository localMediaRepository;
 }

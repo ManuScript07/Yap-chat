@@ -21,7 +21,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get searchHintChats => 'поиск по чатам';
 
   @override
-  String get chatsMessagePrefixYou => 'Ты: ';
+  String get chatsMessagePrefixYou => 'Ты';
 
   @override
   String get timeJustNow => 'Только что';
@@ -88,4 +88,46 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get chatAddPhoto => 'Добавить фото';
+
+  @override
+  String get chatActionCamera => 'Камера';
+
+  @override
+  String get chatActionGallery => 'Галерея';
+
+  @override
+  String get chatActionLocation => 'Локация';
+
+  @override
+  String chatSendFiles(Object count) {
+    return 'Отправить ($count)';
+  }
+
+  @override
+  String get chatSelectFiles => 'Выберите файлы';
+
+  @override
+  String get noMessages => 'Нет сообщений';
+
+  @override
+  String get permissionDenied => 'Разрешение отклонено';
+
+  @override
+  String get youMustAllowCameraPermission =>
+      'Чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.';
+
+  @override
+  String get cancel => 'Отмена';
+
+  @override
+  String get settings => 'Настроки';
+
+  @override
+  String get photoHasBeenSavedToGallery => 'Фото сохранено в галерею';
+
+  @override
+  String get failedToSavePhoto => 'Не удалось сохранить фото';
+
+  @override
+  String get repeat => 'Повторить';
 }

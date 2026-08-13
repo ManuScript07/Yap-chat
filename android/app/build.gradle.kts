@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.yap_chat"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
