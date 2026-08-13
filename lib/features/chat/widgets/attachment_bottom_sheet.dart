@@ -2,23 +2,42 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/widgets/glass_button.dart';
 import 'package:yap_chat/ui/widgets/widgets.dart';
 
-Future<List<String>?> showAttachmentBottomSheet(
+class AttachmentSelection {
+  const AttachmentSelection.images(this.imagePaths) : location = null;
+
+  const AttachmentSelection.location(this.location) : imagePaths = null;
+
+  final List<String>? imagePaths;
+  final ChatLocation? location;
+}
+
+class ChatLocation {
+  const ChatLocation({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+}
+
+Future<AttachmentSelection?> showAttachmentBottomSheet(
   BuildContext context, {
   required String chatId,
+  required String peerName,
   String? initiallySelectedPath,
 }) {
-  return showModalBottomSheet<List<String>>(
+  return showModalBottomSheet<AttachmentSelection>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (context) => _AttachmentBottomSheet(
       chatId: chatId,
+      peerName: peerName,
       initiallySelectedPath: initiallySelectedPath,
     ),
   );
@@ -27,10 +46,12 @@ Future<List<String>?> showAttachmentBottomSheet(
 class _AttachmentBottomSheet extends StatefulWidget {
   const _AttachmentBottomSheet({
     required this.chatId,
+    required this.peerName,
     this.initiallySelectedPath,
   });
 
   final String chatId;
+  final String peerName;
   final String? initiallySelectedPath;
 
   @override
@@ -197,7 +218,7 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                               icon: Icons.near_me,
                               label: l10n.chatActionLocation,
                               isLandscape: isLandscape,
-                              onTap: () {},
+                              onTap: _handleLocationAction,
                             ),
                           ],
                         ),
@@ -250,9 +271,11 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                         child: FilledButton(
                           onPressed: _selectedImages.isEmpty
                               ? null
-                              : () => Navigator.of(
-                                  context,
-                                ).pop(_selectedImages.toList()),
+                              : () => Navigator.of(context).pop(
+                                  AttachmentSelection.images(
+                                    _selectedImages.toList(),
+                                  ),
+                                ),
                           style: FilledButton.styleFrom(
                             backgroundColor: colorScheme.onSurface,
                             foregroundColor: backgroundColor,
@@ -287,6 +310,64 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleLocationAction() async {
+    final locationRepository = context.read<ILocationRepository>();
+    late final Position position;
+
+    try {
+      position = await locationRepository.getCurrentPosition();
+    } on LocationServiceDisabledFailure {
+      if (!mounted) return;
+
+      await showPermissionDeniedDialog(
+        context,
+        title: context.l10n.locationDisabled,
+        content: context.l10n.locationEnableDescription,
+        onOpenSettings: locationRepository.openLocationSettings,
+      );
+      return;
+    } on LocationPermissionPermanentlyDeniedFailure {
+      if (!mounted) return;
+
+      await showPermissionDeniedDialog(
+        context,
+        title: context.l10n.locationPermissionDenied,
+        content: context.l10n.locationPermissionSettingsDescription,
+        onOpenSettings: locationRepository.openAppSettings,
+      );
+      return;
+    } on LocationPermissionDeniedFailure {
+      if (!mounted) return;
+
+      showAppSnackBar(
+        context,
+        message: context.l10n.locationPermissionDenied,
+        type: SnackBarType.error,
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.locationConfirmationDescription,
+      content: context.l10n.locationConfirmation(widget.peerName),
+      confirmLabel: context.l10n.locationShare,
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    Navigator.of(context).pop(
+      AttachmentSelection.location(
+        ChatLocation(
+          latitude: position.latitude,
+          longitude: position.longitude,
         ),
       ),
     );

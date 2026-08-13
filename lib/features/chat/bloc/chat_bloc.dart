@@ -14,6 +14,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatMessageSent>(_onMessageSent);
     on<ChatMessageImagesSent>(_onImagesSent);
     on<ChatMessageRetryRequested>(_onRetryRequested);
+    on<ChatLocationSent>(_onLocationSent);
     on<ChatMessagesReceived>(_onMessagesReceived);
   }
 
@@ -63,6 +64,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
     try {
       await _chatRepository.retryImages(state.chatId, event.message);
+    } catch (_) {
+      emit(state.copyWith(status: ChatStatus.failure));
+    }
+  }
+
+  Future<void> _onLocationSent(
+    ChatLocationSent event,
+    Emitter<ChatState> emit,
+  ) async {
+    try {
+      await _chatRepository.sendLocation(
+        state.chatId,
+        event.latitude,
+        event.longitude,
+      );
     } catch (_) {
       emit(state.copyWith(status: ChatStatus.failure));
     }

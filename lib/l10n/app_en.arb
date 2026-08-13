@@ -30,5 +30,15 @@
   "settings": "Settings",
   "photoHasBeenSavedToGallery": "Photo has been saved to gallery",
   "failedToSavePhoto": "Failed to save photo",
-  "repeat": "Repeat"
+  "repeat": "Repeat",
+  "locationConfirmation": "Are you sure you want to send your location to {name}?",
+  "locationConfirmationDescription": "Share location?",
+  "locationShare": "Send",
+  "locationDisabled": "Location is disabled",
+  "locationEnableDescription": "Enable location in device settings to share your position.",
+  "locationPermissionDenied": "Location access denied",
+  "locationPermissionSettingsDescription": "Allow location access in the app settings.",
+  "locationMessageYou": "You shared your location",
+  "locationMessageIncoming": "You received a location",
+  "locationOpenError": "Unable to open a map application"
 }

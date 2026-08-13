@@ -36,6 +36,9 @@ class AppInitializer extends StatelessWidget {
         RepositoryProvider<ILocalMediaRepository>.value(
           value: repositories.localMediaRepository,
         ),
+        RepositoryProvider<ILocationRepository>.value(
+          value: repositories.locationRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [

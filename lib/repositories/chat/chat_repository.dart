@@ -39,4 +39,14 @@ class ChatRepository implements IChatRepository {
     _config.talker.debug('ChatRepository.retryImages: ${message.id}');
     return _fallback.retryImages(chatId, message);
   }
+
+  @override
+  Future<void> sendLocation(
+    String chatId,
+    double latitude,
+    double longitude,
+  ) {
+    _config.talker.debug('ChatRepository.sendLocation to $chatId');
+    return _fallback.sendLocation(chatId, latitude, longitude);
+  }
 }

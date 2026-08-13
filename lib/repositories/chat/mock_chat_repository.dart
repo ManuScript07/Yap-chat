@@ -162,4 +162,33 @@ class MockChatRepository implements IChatRepository {
     );
     _messagesController.add(List.unmodifiable(_messages));
   }
+
+  @override
+  Future<void> sendLocation(
+    String chatId,
+    double latitude,
+    double longitude,
+  ) async {
+    final message = ChatMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      chatId: chatId,
+      senderId: 'me',
+      text: '',
+      timestamp: DateTime.now(),
+      isMine: true,
+      status: MessageStatus.sending,
+      type: MessageType.location,
+      latitude: latitude,
+      longitude: longitude,
+    );
+
+    _messages.insert(0, message);
+    _messagesController.add(List.unmodifiable(_messages));
+    await Future<void>.delayed(const Duration(seconds: 1));
+
+    final index = _messages.indexWhere((item) => item.id == message.id);
+    if (index == -1) return;
+    _messages[index] = _messages[index].copyWith(status: MessageStatus.sent);
+    _messagesController.add(List.unmodifiable(_messages));
+  }
 }

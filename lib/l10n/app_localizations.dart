@@ -277,6 +277,66 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Повторить'**
   String get repeat;
+
+  /// No description provided for @locationConfirmation.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вы точно хотите отправить своё местоположение пользователю {name}?'**
+  String locationConfirmation(Object name);
+
+  /// No description provided for @locationConfirmationDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поделиться местоположением?'**
+  String get locationConfirmationDescription;
+
+  /// No description provided for @locationShare.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отправить'**
+  String get locationShare;
+
+  /// No description provided for @locationDisabled.
+  ///
+  /// In ru, this message translates to:
+  /// **'Геолокация выключена'**
+  String get locationDisabled;
+
+  /// No description provided for @locationEnableDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Включите геолокацию в настройках устройства, чтобы отправить местоположение.'**
+  String get locationEnableDescription;
+
+  /// No description provided for @locationPermissionDenied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет доступа к геолокации'**
+  String get locationPermissionDenied;
+
+  /// No description provided for @locationPermissionSettingsDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешите доступ к геолокации в настройках приложения.'**
+  String get locationPermissionSettingsDescription;
+
+  /// No description provided for @locationMessageYou.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вы поделились местоположением'**
+  String get locationMessageYou;
+
+  /// No description provided for @locationMessageIncoming.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вам отправили местоположение'**
+  String get locationMessageIncoming;
+
+  /// No description provided for @locationOpenError.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось открыть приложение с картой'**
+  String get locationOpenError;
 }
 
 class _AppLocalizationsDelegate

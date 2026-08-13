@@ -41,6 +41,16 @@ class ChatMessageRetryRequested extends ChatEvent {
   List<Object?> get props => [message];
 }
 
+class ChatLocationSent extends ChatEvent {
+  const ChatLocationSent({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+
+  @override
+  List<Object?> get props => [latitude, longitude];
+}
+
 class ChatMessagesReceived extends ChatEvent {
   final List<ChatMessage> messages;
   const ChatMessagesReceived(this.messages);

@@ -12,4 +12,6 @@ abstract interface class IChatRepository {
 
   /// Повторная отправка медиа-сообщения после ошибки.
   Future<void> retryImages(String chatId, ChatMessage message);
+
+  Future<void> sendLocation(String chatId, double latitude, double longitude);
 }

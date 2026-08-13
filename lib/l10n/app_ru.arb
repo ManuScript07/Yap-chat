@@ -30,5 +30,15 @@
   "settings": "Настроки",
   "photoHasBeenSavedToGallery": "Фото сохранено в галерею",
   "failedToSavePhoto": "Не удалось сохранить фото",
-  "repeat": "Повторить"
+  "repeat": "Повторить",
+  "locationConfirmation": "Вы точно хотите отправить своё местоположение пользователю {name}?",
+  "locationConfirmationDescription": "Поделиться местоположением?",
+  "locationShare": "Отправить",
+  "locationDisabled": "Геолокация выключена",
+  "locationEnableDescription": "Включите геолокацию в настройках устройства, чтобы отправить местоположение.",
+  "locationPermissionDenied": "Нет доступа к геолокации",
+  "locationPermissionSettingsDescription": "Разрешите доступ к геолокации в настройках приложения.",
+  "locationMessageYou": "Вы поделились местоположением",
+  "locationMessageIncoming": "Вам отправили местоположение",
+  "locationOpenError": "Не удалось открыть приложение с картой"
 }

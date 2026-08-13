@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
@@ -80,6 +81,10 @@ class _MessageBubbleState extends State<MessageBubble>
     final message = widget.message;
     final isImage =
         message.type == MessageType.image && message.mediaUrls.isNotEmpty;
+    final isLocation =
+        message.type == MessageType.location &&
+        message.latitude != null &&
+        message.longitude != null;
 
     final bubbleColor = message.isMine
         ? context.colorScheme.primary
@@ -109,13 +114,15 @@ class _MessageBubbleState extends State<MessageBubble>
               : Alignment.centerLeft,
           child: Container(
             constraints: BoxConstraints(maxWidth: widget.maxWidth),
-            padding: EdgeInsets.all(isImage ? 3 : 12),
+            padding: EdgeInsets.all(isImage || isLocation ? 3 : 12),
             decoration: BoxDecoration(
               color: bubbleColor,
               borderRadius: BorderRadius.circular(22),
             ),
             child: isImage
                 ? _buildImageMessage(context, textColor)
+                : isLocation
+                ? _buildLocationMessage(context)
                 : Stack(
                     children: [
                       _buildMessageContent(context, textColor, timeStatusWidth),
@@ -130,6 +137,94 @@ class _MessageBubbleState extends State<MessageBubble>
         ),
       ),
     );
+  }
+
+  Widget _buildLocationMessage(BuildContext context) {
+    final message = widget.message;
+
+    final textColor = message.isMine
+        ? context.scaffoldBackgroundColor
+        : context.colorScheme.onSecondaryContainer;
+
+    final iconColor = message.isMine
+        ? context.scaffoldBackgroundColor
+        : context.colorScheme.primary;
+
+    final timeColor = message.isMine
+        ? context.scaffoldBackgroundColor
+        : AppColors.incomingTime;
+
+    // Ширина, которую нужно зарезервировать под время + статус.
+    final timeStatusWidth = message.isMine ? 66.0 : 44.0;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => _openLocation(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(right: timeStatusWidth),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.location_on_rounded, size: 36, color: iconColor),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message.isMine
+                              ? context.l10n.locationMessageYou
+                              : context.l10n.locationMessageIncoming,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: _buildTimeStatus(
+                context,
+                timeColor,
+                message.isMine
+                    ? context.scaffoldBackgroundColor
+                    : context.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLocation(BuildContext context) async {
+    final message = widget.message;
+    final latitude = message.latitude;
+    final longitude = message.longitude;
+    if (latitude == null || longitude == null) return;
+
+    final uri = Uri.parse('geo:$latitude,$longitude?q=$latitude,$longitude');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.locationOpenError)));
+    }
   }
 
   Widget _buildImageMessage(BuildContext context, Color textColor) {

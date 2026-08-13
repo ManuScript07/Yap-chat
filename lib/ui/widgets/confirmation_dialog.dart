@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/ui.dart';
 
-/// Утвержденная универсальная функция для показа диалога при отказе в разрешениях.
-///
-/// Принимает кастомный [title] и [content], если стандартные тексты для камеры не подходят.
-Future<void> showPermissionDeniedDialog(
+Future<bool?> showConfirmationDialog(
   BuildContext context, {
-  String? title,
-  String? content,
-  VoidCallback? onOpenSettings,
+  required String title,
+  required String content,
+  required String confirmLabel,
 }) async {
   final l10n = context.l10n;
   final colorScheme = context.colorScheme;
 
-  return showDialog<void>(
+  return showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       backgroundColor: context.scaffoldBackgroundColor,
@@ -27,7 +24,7 @@ Future<void> showPermissionDeniedDialog(
         ),
       ),
       title: Text(
-        title ?? l10n.permissionDenied,
+        title,
         style: const TextStyle(
           color: AppColors.textPrimary,
           fontSize: 20,
@@ -35,7 +32,7 @@ Future<void> showPermissionDeniedDialog(
         ),
       ),
       content: Text(
-        content ?? l10n.youMustAllowCameraPermission,
+        content,
         style: const TextStyle(
           color: AppColors.textSecondary,
           fontSize: 16,
@@ -45,7 +42,7 @@ Future<void> showPermissionDeniedDialog(
       actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
+          onPressed: () => Navigator.of(dialogContext).pop(false),
           style: TextButton.styleFrom(
             foregroundColor: colorScheme.onSurfaceVariant,
             textStyle: const TextStyle(
@@ -56,15 +53,7 @@ Future<void> showPermissionDeniedDialog(
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: () {
-            if (onOpenSettings != null) {
-              onOpenSettings();
-            } else {
-              MediaService.openSettings();
-            }
-
-            Navigator.of(dialogContext).pop();
-          },
+          onPressed: () => Navigator.of(dialogContext).pop(true),
           style: FilledButton.styleFrom(
             backgroundColor: colorScheme.primary,
             foregroundColor: AppColors.textPrimary,
@@ -77,7 +66,7 @@ Future<void> showPermissionDeniedDialog(
               fontWeight: FontWeight.w600,
             ),
           ),
-          child: Text(l10n.settings),
+          child: Text(confirmLabel),
         ),
       ],
     ),

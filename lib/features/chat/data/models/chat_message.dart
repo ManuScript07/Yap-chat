@@ -14,6 +14,8 @@ class ChatMessage extends Equatable {
   final MessageStatus status;
   final MessageType type;
   final List<String> mediaUrls;
+  final double? latitude;
+  final double? longitude;
 
   const ChatMessage({
     required this.id,
@@ -25,6 +27,8 @@ class ChatMessage extends Equatable {
     this.status = MessageStatus.sent,
     this.type = MessageType.text,
     this.mediaUrls = const [],
+    this.latitude,
+    this.longitude,
   });
 
   ChatMessage copyWith({
@@ -37,6 +41,8 @@ class ChatMessage extends Equatable {
     MessageStatus? status,
     MessageType? type,
     List<String>? mediaUrls,
+    double? latitude,
+    double? longitude,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -48,6 +54,8 @@ class ChatMessage extends Equatable {
       status: status ?? this.status,
       type: type ?? this.type,
       mediaUrls: mediaUrls ?? this.mediaUrls,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 
@@ -62,5 +70,7 @@ class ChatMessage extends Equatable {
         status,
         type,
         mediaUrls,
+        latitude,
+        longitude,
       ];
 }

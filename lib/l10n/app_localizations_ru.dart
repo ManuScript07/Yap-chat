@@ -130,4 +130,38 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get repeat => 'Повторить';
+
+  @override
+  String locationConfirmation(Object name) {
+    return 'Вы точно хотите отправить своё местоположение пользователю $name?';
+  }
+
+  @override
+  String get locationConfirmationDescription => 'Поделиться местоположением?';
+
+  @override
+  String get locationShare => 'Отправить';
+
+  @override
+  String get locationDisabled => 'Геолокация выключена';
+
+  @override
+  String get locationEnableDescription =>
+      'Включите геолокацию в настройках устройства, чтобы отправить местоположение.';
+
+  @override
+  String get locationPermissionDenied => 'Нет доступа к геолокации';
+
+  @override
+  String get locationPermissionSettingsDescription =>
+      'Разрешите доступ к геолокации в настройках приложения.';
+
+  @override
+  String get locationMessageYou => 'Вы поделились местоположением';
+
+  @override
+  String get locationMessageIncoming => 'Вам отправили местоположение';
+
+  @override
+  String get locationOpenError => 'Не удалось открыть приложение с картой';
 }

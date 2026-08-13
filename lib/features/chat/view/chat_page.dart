@@ -71,13 +71,16 @@ class _ChatViewState extends State<_ChatView> {
         .consumePendingMedia();
     if (!mounted || pendingPath == null) return;
 
-    final images = await showAttachmentBottomSheet(
+    final selection = await showAttachmentBottomSheet(
       context,
       chatId: widget.chat.id,
+      peerName: widget.chat.userName,
       initiallySelectedPath: pendingPath,
     );
-    if (!mounted || images == null || images.isEmpty) return;
+    if (!mounted || selection?.imagePaths == null) return;
 
+    final images = selection!.imagePaths!;
+    if (images.isEmpty) return;
     context.read<ChatBloc>().add(ChatMessageImagesSent(images));
     _scrollToBottom();
   }
@@ -143,6 +146,7 @@ class _ChatViewState extends State<_ChatView> {
 
               _KeyboardAwareInput(
                 chatId: widget.chat.id,
+                peerName: widget.chat.userName,
                 onMessageSent: _scrollToBottom,
               ),
             ],
@@ -156,17 +160,38 @@ class _ChatViewState extends State<_ChatView> {
 class _KeyboardAwareInput extends StatelessWidget {
   const _KeyboardAwareInput({
     required this.chatId,
+    required this.peerName,
     required this.onMessageSent,
   });
 
   final String chatId;
+  final String peerName;
   final VoidCallback onMessageSent;
 
   Future<void> _openAttachmentSheet(BuildContext context) async {
-    final images = await showAttachmentBottomSheet(context, chatId: chatId);
+    final selection = await showAttachmentBottomSheet(
+      context,
+      chatId: chatId,
+      peerName: peerName,
+    );
 
-    if (images != null && images.isNotEmpty && context.mounted) {
-      context.read<ChatBloc>().add(ChatMessageImagesSent(images));
+    if (selection?.imagePaths != null &&
+        selection!.imagePaths!.isNotEmpty &&
+        context.mounted) {
+      context.read<ChatBloc>().add(
+        ChatMessageImagesSent(selection.imagePaths!),
+      );
+      onMessageSent();
+      return;
+    }
+
+    if (selection?.location != null && context.mounted) {
+      context.read<ChatBloc>().add(
+        ChatLocationSent(
+          latitude: selection!.location!.latitude,
+          longitude: selection.location!.longitude,
+        ),
+      );
       onMessageSent();
     }
   }

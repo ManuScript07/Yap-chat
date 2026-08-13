@@ -124,4 +124,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get repeat => 'Repeat';
+
+  @override
+  String locationConfirmation(Object name) {
+    return 'Are you sure you want to send your location to $name?';
+  }
+
+  @override
+  String get locationConfirmationDescription => 'Share location?';
+
+  @override
+  String get locationShare => 'Send';
+
+  @override
+  String get locationDisabled => 'Location is disabled';
+
+  @override
+  String get locationEnableDescription =>
+      'Enable location in device settings to share your position.';
+
+  @override
+  String get locationPermissionDenied => 'Location access denied';
+
+  @override
+  String get locationPermissionSettingsDescription =>
+      'Allow location access in the app settings.';
+
+  @override
+  String get locationMessageYou => 'You shared your location';
+
+  @override
+  String get locationMessageIncoming => 'You received a location';
+
+  @override
+  String get locationOpenError => 'Unable to open a map application';
 }

@@ -10,6 +10,7 @@ class RepositoryContainer {
     required this.chatsRepository,
     required this.chatRepository,
     required this.localMediaRepository,
+    required this.locationRepository,
   });
 
   factory RepositoryContainer.prod({
@@ -21,6 +22,7 @@ class RepositoryContainer {
       localMediaRepository: LocalMediaRepository(
         preferences: config.preferences,
       ),
+      locationRepository: LocationRepository(),
     );
   }
 
@@ -33,10 +35,12 @@ class RepositoryContainer {
       localMediaRepository: LocalMediaRepository(
         preferences: config.preferences,
       ),
+      locationRepository: LocationRepository(),
     );
   }
 
   final IChatsRepository chatsRepository;
   final IChatRepository chatRepository;
   final ILocalMediaRepository localMediaRepository;
+  final ILocationRepository locationRepository;
 }
