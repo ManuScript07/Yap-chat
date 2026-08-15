@@ -10,6 +10,13 @@ abstract interface class IChatRepository {
   /// Отправка изображений в чат.
   Future<void> sendImages(String chatId, List<String> imagePaths);
 
+  Future<void> sendAudio(
+    String chatId,
+    String audioPath,
+    Duration duration,
+    List<double> waveform,
+  );
+
   /// Повторная отправка медиа-сообщения после ошибки.
   Future<void> retryImages(String chatId, ChatMessage message);
 

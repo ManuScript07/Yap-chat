@@ -164,4 +164,24 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get locationOpenError => 'Не удалось открыть приложение с картой';
+
+  @override
+  String get microphonePermissionDenied => 'Нет доступа к микрофону';
+
+  @override
+  String get microphonePermissionSettingsDescription =>
+      'Разрешите доступ к микрофону в настройках приложения, чтобы записывать голосовые сообщения.';
+
+  @override
+  String get voiceRecordingExitTitle => 'Сбросить голосовое сообщение?';
+
+  @override
+  String get voiceRecordingExitDescription =>
+      'Запись будет удалена без возможности восстановления.';
+
+  @override
+  String get voiceRecordingExitStay => 'Остаться';
+
+  @override
+  String get voiceRecordingExitDiscard => 'Сбросить';
 }

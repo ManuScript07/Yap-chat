@@ -47,3 +47,4 @@ app.*.map.json
 # Custom build artifacts
 .artifacts/
 /.env
+/node_modules/

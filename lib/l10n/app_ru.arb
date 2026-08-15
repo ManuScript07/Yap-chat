@@ -40,5 +40,11 @@
   "locationPermissionSettingsDescription": "Разрешите доступ к геолокации в настройках приложения.",
   "locationMessageYou": "Вы поделились местоположением",
   "locationMessageIncoming": "Вам отправили местоположение",
-  "locationOpenError": "Не удалось открыть приложение с картой"
+  "locationOpenError": "Не удалось открыть приложение с картой",
+  "microphonePermissionDenied": "Нет доступа к микрофону",
+  "microphonePermissionSettingsDescription": "Разрешите доступ к микрофону в настройках приложения, чтобы записывать голосовые сообщения.",
+  "voiceRecordingExitTitle": "Сбросить голосовое сообщение?",
+  "voiceRecordingExitDescription": "Запись будет удалена без возможности восстановления.",
+  "voiceRecordingExitStay": "Остаться",
+  "voiceRecordingExitDiscard": "Сбросить"
 }

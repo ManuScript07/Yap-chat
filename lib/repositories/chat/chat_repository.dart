@@ -35,6 +35,17 @@ class ChatRepository implements IChatRepository {
   }
 
   @override
+  Future<void> sendAudio(
+    String chatId,
+    String audioPath,
+    Duration duration,
+    List<double> waveform,
+  ) {
+    _config.talker.debug('ChatRepository.sendAudio to $chatId');
+    return _fallback.sendAudio(chatId, audioPath, duration, waveform);
+  }
+
+  @override
   Future<void> retryImages(String chatId, ChatMessage message) {
     _config.talker.debug('ChatRepository.retryImages: ${message.id}');
     return _fallback.retryImages(chatId, message);

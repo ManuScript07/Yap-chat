@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
+import 'package:yap_chat/features/chat/widgets/audio_message_content.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class MessageBubble extends StatefulWidget {
@@ -85,6 +86,10 @@ class _MessageBubbleState extends State<MessageBubble>
         message.type == MessageType.location &&
         message.latitude != null &&
         message.longitude != null;
+    final isAudio =
+        message.type == MessageType.audio &&
+        message.audioUrl != null &&
+        message.audioUrl!.isNotEmpty;
 
     final bubbleColor = message.isMine
         ? context.colorScheme.primary
@@ -114,7 +119,7 @@ class _MessageBubbleState extends State<MessageBubble>
               : Alignment.centerLeft,
           child: Container(
             constraints: BoxConstraints(maxWidth: widget.maxWidth),
-            padding: EdgeInsets.all(isImage || isLocation ? 3 : 12),
+            padding: EdgeInsets.all(isImage || isLocation || isAudio ? 3 : 12),
             decoration: BoxDecoration(
               color: bubbleColor,
               borderRadius: BorderRadius.circular(22),
@@ -123,6 +128,8 @@ class _MessageBubbleState extends State<MessageBubble>
                 ? _buildImageMessage(context, textColor)
                 : isLocation
                 ? _buildLocationMessage(context)
+                : isAudio
+                ? AudioMessageContent(message: message)
                 : Stack(
                     children: [
                       _buildMessageContent(context, textColor, timeStatusWidth),
@@ -220,10 +227,13 @@ class _MessageBubbleState extends State<MessageBubble>
 
     final uri = Uri.parse('geo:$latitude,$longitude?q=$latitude,$longitude');
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.locationOpenError)));
+        message: context.l10n.locationOpenError,
+        type: SnackBarType.error,
+      );
     }
   }
 

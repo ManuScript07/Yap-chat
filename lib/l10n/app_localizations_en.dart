@@ -158,4 +158,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get locationOpenError => 'Unable to open a map application';
+
+  @override
+  String get microphonePermissionDenied => 'Microphone access denied';
+
+  @override
+  String get microphonePermissionSettingsDescription =>
+      'Allow microphone access in the app settings to record voice messages.';
+
+  @override
+  String get voiceRecordingExitTitle => 'Discard voice message?';
+
+  @override
+  String get voiceRecordingExitDescription =>
+      'The recording will be deleted and cannot be restored.';
+
+  @override
+  String get voiceRecordingExitStay => 'Stay';
+
+  @override
+  String get voiceRecordingExitDiscard => 'Discard';
 }

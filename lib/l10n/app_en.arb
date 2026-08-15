@@ -40,5 +40,11 @@
   "locationPermissionSettingsDescription": "Allow location access in the app settings.",
   "locationMessageYou": "You shared your location",
   "locationMessageIncoming": "You received a location",
-  "locationOpenError": "Unable to open a map application"
+  "locationOpenError": "Unable to open a map application",
+  "microphonePermissionDenied": "Microphone access denied",
+  "microphonePermissionSettingsDescription": "Allow microphone access in the app settings to record voice messages.",
+  "voiceRecordingExitTitle": "Discard voice message?",
+  "voiceRecordingExitDescription": "The recording will be deleted and cannot be restored.",
+  "voiceRecordingExitStay": "Stay",
+  "voiceRecordingExitDiscard": "Discard"
 }

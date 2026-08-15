@@ -145,6 +145,38 @@ class MockChatRepository implements IChatRepository {
   }
 
   @override
+  Future<void> sendAudio(
+    String chatId,
+    String audioPath,
+    Duration duration,
+    List<double> waveform,
+  ) async {
+    final newMessage = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      chatId: chatId,
+      senderId: 'me',
+      text: '',
+      timestamp: DateTime.now(),
+      isMine: true,
+      status: MessageStatus.sending,
+      type: MessageType.audio,
+      audioUrl: audioPath,
+      audioDuration: duration,
+      audioWaveform: waveform,
+    );
+
+    _messages.insert(0, newMessage);
+    _messagesController.add(List.unmodifiable(_messages));
+
+    await Future<void>.delayed(const Duration(seconds: 1));
+    final index = _messages.indexWhere((message) => message.id == newMessage.id);
+    if (index == -1) return;
+
+    _messages[index] = _messages[index].copyWith(status: MessageStatus.sent);
+    _messagesController.add(List.unmodifiable(_messages));
+  }
+
+  @override
   Future<void> retryImages(String chatId, ChatMessage message) async {
     final index = _messages.indexWhere((item) => item.id == message.id);
     if (index == -1) return;

@@ -39,6 +39,12 @@ class AppInitializer extends StatelessWidget {
         RepositoryProvider<ILocationRepository>.value(
           value: repositories.locationRepository,
         ),
+        RepositoryProvider<IAudioRecorderRepository>.value(
+          value: repositories.audioRecorderRepository,
+        ),
+        RepositoryProvider<IAudioPlayerRepository>.value(
+          value: repositories.audioPlayerRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [

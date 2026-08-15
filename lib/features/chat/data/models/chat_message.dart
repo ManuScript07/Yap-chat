@@ -2,7 +2,7 @@ import 'package:equatable/equatable.dart';
 
 enum MessageStatus { sending, sent, read, error }
 
-enum MessageType { text, image, location }
+enum MessageType { text, image, location, audio }
 
 class ChatMessage extends Equatable {
   final String id;
@@ -16,6 +16,9 @@ class ChatMessage extends Equatable {
   final List<String> mediaUrls;
   final double? latitude;
   final double? longitude;
+  final String? audioUrl;
+  final Duration? audioDuration;
+  final List<double> audioWaveform;
 
   const ChatMessage({
     required this.id,
@@ -29,6 +32,9 @@ class ChatMessage extends Equatable {
     this.mediaUrls = const [],
     this.latitude,
     this.longitude,
+    this.audioUrl,
+    this.audioDuration,
+    this.audioWaveform = const [],
   });
 
   ChatMessage copyWith({
@@ -43,6 +49,9 @@ class ChatMessage extends Equatable {
     List<String>? mediaUrls,
     double? latitude,
     double? longitude,
+    String? audioUrl,
+    Duration? audioDuration,
+    List<double>? audioWaveform,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -56,6 +65,9 @@ class ChatMessage extends Equatable {
       mediaUrls: mediaUrls ?? this.mediaUrls,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      audioUrl: audioUrl ?? this.audioUrl,
+      audioDuration: audioDuration ?? this.audioDuration,
+      audioWaveform: audioWaveform ?? this.audioWaveform,
     );
   }
 
@@ -72,5 +84,8 @@ class ChatMessage extends Equatable {
         mediaUrls,
         latitude,
         longitude,
+        audioUrl,
+        audioDuration,
+        audioWaveform,
       ];
 }

@@ -11,6 +11,8 @@ class RepositoryContainer {
     required this.chatRepository,
     required this.localMediaRepository,
     required this.locationRepository,
+    required this.audioRecorderRepository,
+    required this.audioPlayerRepository,
   });
 
   factory RepositoryContainer.prod({
@@ -23,6 +25,8 @@ class RepositoryContainer {
         preferences: config.preferences,
       ),
       locationRepository: LocationRepository(),
+      audioRecorderRepository: AudioRecorderRepository(),
+      audioPlayerRepository: AudioPlayerRepository(),
     );
   }
 
@@ -36,6 +40,8 @@ class RepositoryContainer {
         preferences: config.preferences,
       ),
       locationRepository: LocationRepository(),
+      audioRecorderRepository: AudioRecorderRepository(),
+      audioPlayerRepository: AudioPlayerRepository(),
     );
   }
 
@@ -43,4 +49,6 @@ class RepositoryContainer {
   final IChatRepository chatRepository;
   final ILocalMediaRepository localMediaRepository;
   final ILocationRepository locationRepository;
+  final IAudioRecorderRepository audioRecorderRepository;
+  final IAudioPlayerRepository audioPlayerRepository;
 }

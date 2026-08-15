@@ -337,6 +337,42 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Не удалось открыть приложение с картой'**
   String get locationOpenError;
+
+  /// No description provided for @microphonePermissionDenied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет доступа к микрофону'**
+  String get microphonePermissionDenied;
+
+  /// No description provided for @microphonePermissionSettingsDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешите доступ к микрофону в настройках приложения, чтобы записывать голосовые сообщения.'**
+  String get microphonePermissionSettingsDescription;
+
+  /// No description provided for @voiceRecordingExitTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сбросить голосовое сообщение?'**
+  String get voiceRecordingExitTitle;
+
+  /// No description provided for @voiceRecordingExitDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Запись будет удалена без возможности восстановления.'**
+  String get voiceRecordingExitDescription;
+
+  /// No description provided for @voiceRecordingExitStay.
+  ///
+  /// In ru, this message translates to:
+  /// **'Остаться'**
+  String get voiceRecordingExitStay;
+
+  /// No description provided for @voiceRecordingExitDiscard.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сбросить'**
+  String get voiceRecordingExitDiscard;
 }
 
 class _AppLocalizationsDelegate

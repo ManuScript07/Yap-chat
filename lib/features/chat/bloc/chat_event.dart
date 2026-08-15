@@ -32,6 +32,21 @@ class ChatMessageImagesSent extends ChatEvent {
   List<Object?> get props => [imagePaths];
 }
 
+class ChatMessageAudioSent extends ChatEvent {
+  const ChatMessageAudioSent({
+    required this.audioPath,
+    required this.duration,
+    required this.waveform,
+  });
+
+  final String audioPath;
+  final Duration duration;
+  final List<double> waveform;
+
+  @override
+  List<Object?> get props => [audioPath, duration, waveform];
+}
+
 class ChatMessageRetryRequested extends ChatEvent {
   const ChatMessageRetryRequested(this.message);
 

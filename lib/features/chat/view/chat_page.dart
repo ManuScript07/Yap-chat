@@ -17,10 +17,20 @@ class ChatPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) =>
-          ChatBloc(chatRepository: context.read<IChatRepository>())
-            ..add(ChatStarted(chat.id)),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) =>
+              ChatBloc(chatRepository: context.read<IChatRepository>())
+                ..add(ChatStarted(chat.id)),
+        ),
+        BlocProvider(
+          create: (context) => VoiceRecorderCubit(
+            recorderRepository: context.read<IAudioRecorderRepository>(),
+            playerRepository: context.read<IAudioPlayerRepository>(),
+          ),
+        ),
+      ],
       child: _ChatView(chat: chat),
     );
   }
@@ -99,57 +109,77 @@ class _ChatViewState extends State<_ChatView> {
 
     final backgroundColor = context.scaffoldBackgroundColor;
 
-    return _ChatPopScope(
-      child: Scaffold(
-        backgroundColor: backgroundColor,
-        resizeToAvoidBottomInset: false,
+    return BlocListener<VoiceRecorderCubit, VoiceRecorderState>(
+      listenWhen: (previous, current) =>
+          previous.permissionStatus != current.permissionStatus &&
+          current.permissionStatus != null,
+      listener: (context, state) async {
+        final permissionStatus = state.permissionStatus;
+        if (permissionStatus == null) return;
 
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () {
-            FocusManager.instance.primaryFocus?.unfocus();
+        await showPermissionDeniedDialog(
+          context,
+          title: context.l10n.microphonePermissionDenied,
+          content: context.l10n.microphonePermissionSettingsDescription,
+          onOpenSettings: () {
+            context.read<VoiceRecorderCubit>().openAppSettings();
           },
-          child: Stack(
-            children: [
-              _ChatMessages(
-                controller: _scrollController,
-                chat: widget.chat,
-                headerHeight: headerHeight,
-                inputBarHeight: inputBarHeight,
-              ),
+        );
 
-              _GradientOverlay(
-                height: headerHeight + 20,
-                isTop: true,
-                backgroundColor: backgroundColor,
+        if (context.mounted) {
+          await context.read<VoiceRecorderCubit>().clearPermissionFeedback();
+        }
+      },
+      child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+        builder: (context, voiceState) => _ChatPopScope(
+          voiceState: voiceState,
+          child: Scaffold(
+            backgroundColor: backgroundColor,
+            resizeToAvoidBottomInset: false,
+            body: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+              },
+              child: Stack(
+                children: [
+                  _ChatMessages(
+                    controller: _scrollController,
+                    chat: widget.chat,
+                    headerHeight: headerHeight,
+                    inputBarHeight: inputBarHeight,
+                  ),
+                  _GradientOverlay(
+                    height: headerHeight + 20,
+                    isTop: true,
+                    backgroundColor: backgroundColor,
+                  ),
+                  _GradientOverlay(
+                    height: inputBarHeight + 20,
+                    isTop: false,
+                    backgroundColor: backgroundColor,
+                  ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: ChatAppBar(
+                      userName: widget.chat.userName,
+                      isOnline: widget.chat.isOnline,
+                      avatarUrl: widget.chat.avatarUrl,
+                      onBack: () {
+                        Navigator.of(context).maybePop();
+                      },
+                    ),
+                  ),
+                  _KeyboardAwareInput(
+                    chatId: widget.chat.id,
+                    peerName: widget.chat.userName,
+                    onMessageSent: _scrollToBottom,
+                  ),
+                ],
               ),
-
-              _GradientOverlay(
-                height: inputBarHeight + 20,
-                isTop: false,
-                backgroundColor: backgroundColor,
-              ),
-
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: ChatAppBar(
-                  userName: widget.chat.userName,
-                  isOnline: widget.chat.isOnline,
-                  avatarUrl: widget.chat.avatarUrl,
-                  onBack: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ),
-
-              _KeyboardAwareInput(
-                chatId: widget.chat.id,
-                peerName: widget.chat.userName,
-                onMessageSent: _scrollToBottom,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -206,13 +236,56 @@ class _KeyboardAwareInput extends StatelessWidget {
       bottom: 0,
       child: Padding(
         padding: EdgeInsets.only(bottom: keyboardHeight),
-        child: MessageInputBar(
-          onSend: (text) {
-            context.read<ChatBloc>().add(ChatMessageSent(text));
-            onMessageSent();
+        child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+          builder: (context, state) {
+            if (state.hasPendingRecording) {
+              return VoiceRecorderBar(
+                state: state,
+                onDiscard: () {
+                  context.read<VoiceRecorderCubit>().discardRecording();
+                },
+                onStop: () {
+                  context.read<VoiceRecorderCubit>().stopRecording();
+                },
+                onTogglePreview: () {
+                  context.read<VoiceRecorderCubit>().togglePreviewPlayback();
+                },
+                onSeekUpdate: (position) {
+                  context.read<VoiceRecorderCubit>().previewSeek(position);
+                },
+                onSeekEnd: () {
+                  context.read<VoiceRecorderCubit>().finishPreviewSeeking();
+                },
+                onSend: () async {
+                  final audio = await context
+                      .read<VoiceRecorderCubit>()
+                      .takeRecordingForSending();
+                  if (audio == null || !context.mounted) return;
+
+                  context.read<ChatBloc>().add(
+                    ChatMessageAudioSent(
+                      audioPath: audio.path,
+                      duration: audio.duration,
+                      waveform: audio.waveform,
+                    ),
+                  );
+                  onMessageSent();
+                },
+              );
+            }
+
+            return MessageInputBar(
+              onSend: (text) {
+                context.read<ChatBloc>().add(ChatMessageSent(text));
+                onMessageSent();
+              },
+              onAddPhoto: () => _openAttachmentSheet(context),
+              onVoiceRecord: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                context.read<VoiceRecorderCubit>().startRecording();
+              },
+            );
           },
-          // 2. Вызываем вынесенный метод
-          onAddPhoto: () => _openAttachmentSheet(context),
         ),
       ),
     );
@@ -220,19 +293,35 @@ class _KeyboardAwareInput extends StatelessWidget {
 }
 
 class _ChatPopScope extends StatelessWidget {
-  const _ChatPopScope({required this.child});
+  const _ChatPopScope({required this.child, required this.voiceState});
 
   final Widget child;
+  final VoiceRecorderState voiceState;
 
   @override
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return PopScope(
-      canPop: !isKeyboardOpen,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
+      canPop: !isKeyboardOpen && !voiceState.hasPendingRecording,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        if (isKeyboardOpen) {
           FocusManager.instance.primaryFocus?.unfocus();
+          return;
+        }
+
+        if (!voiceState.hasPendingRecording) return;
+
+        final shouldDiscard = await showConfirmationDialog(
+          context,
+          title: context.l10n.voiceRecordingExitTitle,
+          content: context.l10n.voiceRecordingExitDescription,
+          confirmLabel: context.l10n.voiceRecordingExitDiscard,
+        );
+        if (shouldDiscard == true && context.mounted) {
+          await context.read<VoiceRecorderCubit>().discardRecording();
         }
       },
       child: child,
