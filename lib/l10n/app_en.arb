@@ -45,6 +45,19 @@
   "microphonePermissionSettingsDescription": "Allow microphone access in the app settings to record voice messages.",
   "voiceRecordingExitTitle": "Discard voice message?",
   "voiceRecordingExitDescription": "The recording will be deleted and cannot be restored.",
+  "chatActionCopy": "Copy",
+  "chatActionDelete": "Delete",
+  "chatActionReply": "Reply",
+  "chatReplyingTo": "Replying to {name}",
+  "@chatReplyingTo": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "chatReplyYou": "You",
+  "chatReplyPhoto": "Photo",
+  "chatReplyAudio": "Audio message",
+  "chatReplyLocation": "Location",
   "voiceRecordingExitStay": "Stay",
   "voiceRecordingExitDiscard": "Discard"
 }

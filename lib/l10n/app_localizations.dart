@@ -362,6 +362,54 @@ abstract class AppLocalizations {
   /// **'Запись будет удалена без возможности восстановления.'**
   String get voiceRecordingExitDescription;
 
+  /// No description provided for @chatActionCopy.
+  ///
+  /// In ru, this message translates to:
+  /// **'Копировать'**
+  String get chatActionCopy;
+
+  /// No description provided for @chatActionDelete.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить'**
+  String get chatActionDelete;
+
+  /// No description provided for @chatActionReply.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ответить'**
+  String get chatActionReply;
+
+  /// No description provided for @chatReplyingTo.
+  ///
+  /// In ru, this message translates to:
+  /// **'В ответ {name}'**
+  String chatReplyingTo(Object name);
+
+  /// No description provided for @chatReplyYou.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вы'**
+  String get chatReplyYou;
+
+  /// No description provided for @chatReplyPhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'Фотография'**
+  String get chatReplyPhoto;
+
+  /// No description provided for @chatReplyAudio.
+  ///
+  /// In ru, this message translates to:
+  /// **'Аудиосообщение'**
+  String get chatReplyAudio;
+
+  /// No description provided for @chatReplyLocation.
+  ///
+  /// In ru, this message translates to:
+  /// **'Местоположение'**
+  String get chatReplyLocation;
+
   /// No description provided for @voiceRecordingExitStay.
   ///
   /// In ru, this message translates to:

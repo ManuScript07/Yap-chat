@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
@@ -73,6 +74,23 @@ class _ChatViewState extends State<_ChatView> {
         curve: Curves.easeOutCubic,
       );
     });
+  }
+
+  Future<void> _showMessageActions(ChatMessage message) async {
+    final action = await showMessageActionsBottomSheet(
+      context,
+      message: message,
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case MessageAction.copy:
+        await Clipboard.setData(ClipboardData(text: message.text));
+      case MessageAction.reply:
+        context.read<ChatBloc>().add(ChatReplySelected(message));
+      case MessageAction.delete:
+        context.read<ChatBloc>().add(ChatMessageDeleteRequested(message));
+    }
   }
 
   Future<void> _restoreLostAttachment() async {
@@ -148,6 +166,9 @@ class _ChatViewState extends State<_ChatView> {
                     chat: widget.chat,
                     headerHeight: headerHeight,
                     inputBarHeight: inputBarHeight,
+                    canOpenMessageMenu:
+                        voiceState.status != VoiceRecorderStatus.recording,
+                    onMessageLongPress: _showMessageActions,
                   ),
                   _GradientOverlay(
                     height: headerHeight + 20,
@@ -236,53 +257,108 @@ class _KeyboardAwareInput extends StatelessWidget {
       bottom: 0,
       child: Padding(
         padding: EdgeInsets.only(bottom: keyboardHeight),
-        child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-          builder: (context, state) {
-            if (state.hasPendingRecording) {
-              return VoiceRecorderBar(
-                state: state,
-                onDiscard: () {
-                  context.read<VoiceRecorderCubit>().discardRecording();
-                },
-                onStop: () {
-                  context.read<VoiceRecorderCubit>().stopRecording();
-                },
-                onTogglePreview: () {
-                  context.read<VoiceRecorderCubit>().togglePreviewPlayback();
-                },
-                onSeekUpdate: (position) {
-                  context.read<VoiceRecorderCubit>().previewSeek(position);
-                },
-                onSeekEnd: () {
-                  context.read<VoiceRecorderCubit>().finishPreviewSeeking();
-                },
-                onSend: () async {
-                  final audio = await context
-                      .read<VoiceRecorderCubit>()
-                      .takeRecordingForSending();
-                  if (audio == null || !context.mounted) return;
+        child: BlocBuilder<ChatBloc, ChatState>(
+          buildWhen: (previous, current) =>
+              previous.replyToMessage != current.replyToMessage,
+          builder: (context, chatState) {
+            return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+              builder: (context, state) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (chatState.replyToMessage case final reply?) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ReplyComposerPreview(
+                          message: reply,
+                          peerName: peerName,
+                          onClear: () {
+                            context.read<ChatBloc>().add(
+                              const ChatReplyCleared(),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      reverseDuration: const Duration(milliseconds: 180),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                    child: SizeTransition(
+                      sizeFactor: animation,
+                      alignment: Alignment.topCenter,
+                      child: child,
+                        ),
+                      ),
+                      child: state.hasPendingRecording
+                          ? VoiceRecorderBar(
+                              key: const ValueKey('voice_recorder_bar'),
+                              state: state,
+                              onDiscard: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .discardRecording();
+                              },
+                              onStop: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .stopRecording();
+                              },
+                              onTogglePreview: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .togglePreviewPlayback();
+                              },
+                              onSeekUpdate: (position) {
+                                context.read<VoiceRecorderCubit>().previewSeek(
+                                  position,
+                                );
+                              },
+                              onSeekEnd: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .finishPreviewSeeking();
+                              },
+                              onSend: () async {
+                                final audio = await context
+                                    .read<VoiceRecorderCubit>()
+                                    .takeRecordingForSending();
+                                if (audio == null || !context.mounted) return;
 
-                  context.read<ChatBloc>().add(
-                    ChatMessageAudioSent(
-                      audioPath: audio.path,
-                      duration: audio.duration,
-                      waveform: audio.waveform,
+                                context.read<ChatBloc>().add(
+                                  ChatMessageAudioSent(
+                                    audioPath: audio.path,
+                                    duration: audio.duration,
+                                    waveform: audio.waveform,
+                                  ),
+                                );
+                                onMessageSent();
+                              },
+                            )
+                          : MessageInputBar(
+                              key: const ValueKey('message_input_bar'),
+                              replyToMessageId: chatState.replyToMessage?.id,
+                              onSend: (text) {
+                                context.read<ChatBloc>().add(
+                                  ChatMessageSent(text),
+                                );
+                                onMessageSent();
+                              },
+                              onAddPhoto: () => _openAttachmentSheet(context),
+                              onVoiceRecord: () {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .startRecording();
+                              },
+                            ),
                     ),
-                  );
-                  onMessageSent();
-                },
-              );
-            }
-
-            return MessageInputBar(
-              onSend: (text) {
-                context.read<ChatBloc>().add(ChatMessageSent(text));
-                onMessageSent();
-              },
-              onAddPhoto: () => _openAttachmentSheet(context),
-              onVoiceRecord: () {
-                FocusManager.instance.primaryFocus?.unfocus();
-                context.read<VoiceRecorderCubit>().startRecording();
+                  ],
+                );
               },
             );
           },
@@ -335,12 +411,16 @@ class _ChatMessages extends StatefulWidget {
     required this.chat,
     required this.headerHeight,
     required this.inputBarHeight,
+    required this.canOpenMessageMenu,
+    required this.onMessageLongPress,
   });
 
   final ScrollController controller;
   final Chat chat;
   final double headerHeight;
   final double inputBarHeight;
+  final bool canOpenMessageMenu;
+  final ValueChanged<ChatMessage> onMessageLongPress;
 
   @override
   State<_ChatMessages> createState() => _ChatMessagesState();
@@ -356,6 +436,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
   // Для отслеживания направления скролла
   double _lastOffset = 0.0;
   bool _isAnimatingToBottom = false;
+  final Map<String, GlobalKey> _messageKeys = {};
+  final Map<String, int> _messageIndexes = {};
+  String? _highlightedMessageId;
 
   @override
   void initState() {
@@ -473,6 +556,49 @@ class _ChatMessagesState extends State<_ChatMessages> {
         });
   }
 
+  GlobalKey _messageKey(String messageId) {
+    return _messageKeys.putIfAbsent(messageId, GlobalKey.new);
+  }
+
+  Future<void> _jumpToMessage(String messageId) async {
+    if (_messageKeys[messageId]?.currentContext == null &&
+        widget.controller.hasClients) {
+      final messageIndex = _messageIndexes[messageId];
+      if (messageIndex != null) {
+        final targetOffset = (messageIndex * 120.0)
+            .clamp(0.0, widget.controller.position.maxScrollExtent)
+            .toDouble();
+        await widget.controller.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+      }
+    }
+
+    await _ensureMessageVisible(messageId);
+    if (!mounted) return;
+
+    setState(() => _highlightedMessageId = messageId);
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (mounted && _highlightedMessageId == messageId) {
+      setState(() => _highlightedMessageId = null);
+    }
+  }
+
+  Future<void> _ensureMessageVisible(String messageId) {
+    final targetContext = _messageKeys[messageId]?.currentContext;
+    if (targetContext == null) return Future<void>.value();
+
+    return Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: 0.5,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<ChatBloc, ChatState>(
@@ -484,9 +610,14 @@ class _ChatMessagesState extends State<_ChatMessages> {
         buildWhen: (previous, current) {
           return previous.status != current.status ||
               previous.messages != current.messages ||
-              previous.initialMessageIds != current.initialMessageIds;
+              previous.initialMessageIds != current.initialMessageIds ||
+              previous.replyToMessage != current.replyToMessage;
         },
         builder: (context, state) {
+          _messageIndexes.clear();
+          for (var index = 0; index < state.messages.length; index++) {
+            _messageIndexes[state.messages[index].id] = index;
+          }
           if (state.status == ChatStatus.loading) {
             return Center(
               child: CircularProgressIndicator(
@@ -525,12 +656,20 @@ class _ChatMessagesState extends State<_ChatMessages> {
                 initialMessageIds: state.initialMessageIds,
                 headerHeight: widget.headerHeight,
                 inputBarHeight: widget.inputBarHeight,
+                replyPreviewHeight: state.replyToMessage == null ? 0 : 78,
+                messageKeyBuilder: _messageKey,
+                highlightedMessageId: _highlightedMessageId,
+                onReplyTap: _jumpToMessage,
+                onMessageLongPress: widget.canOpenMessageMenu
+                    ? widget.onMessageLongPress
+                    : null,
               ),
 
               Positioned(
                 right: 16,
                 bottom:
                     widget.inputBarHeight +
+                    (state.replyToMessage == null ? 0 : 78) +
                     MediaQuery.viewInsetsOf(context).bottom +
                     20,
                 child: AnimatedSwitcher(
@@ -579,6 +718,11 @@ class _MessagesList extends StatelessWidget {
     required this.initialMessageIds,
     required this.headerHeight,
     required this.inputBarHeight,
+    required this.replyPreviewHeight,
+    required this.messageKeyBuilder,
+    required this.highlightedMessageId,
+    required this.onReplyTap,
+    this.onMessageLongPress,
   });
 
   final ScrollController controller;
@@ -588,6 +732,11 @@ class _MessagesList extends StatelessWidget {
 
   final double headerHeight;
   final double inputBarHeight;
+  final double replyPreviewHeight;
+  final GlobalKey Function(String messageId) messageKeyBuilder;
+  final String? highlightedMessageId;
+  final ValueChanged<String> onReplyTap;
+  final ValueChanged<ChatMessage>? onMessageLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -637,17 +786,13 @@ class _MessagesList extends StatelessWidget {
       }
     }
 
-    final bottomPadding = inputBarHeight + keyboardHeight + 12.0;
+    final bottomPadding =
+        inputBarHeight + replyPreviewHeight + keyboardHeight + 12.0;
 
     return ListView.builder(
       controller: controller,
       reverse: true,
-      padding: EdgeInsets.only(
-        top: headerHeight + 12.0,
-        bottom: bottomPadding,
-        left: 16.0,
-        right: 16.0,
-      ),
+      padding: EdgeInsets.only(top: headerHeight + 12.0, bottom: bottomPadding),
 
       itemCount: items.length,
 
@@ -672,9 +817,19 @@ class _MessagesList extends StatelessWidget {
           ),
         };
 
-        return Padding(
-          key: key,
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
+        final isHighlighted =
+            item is MessageItemElement &&
+            highlightedMessageId == item.message.id;
+
+        return AnimatedContainer(
+          key: item is MessageItemElement
+              ? messageKeyBuilder(item.message.id)
+              : key,
+          duration: const Duration(milliseconds: 180),
+          color: isHighlighted
+              ? context.colorScheme.primary.withValues(alpha: 0.42)
+              : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: switch (item) {
             MessageItemElement(:final message) => MessageBubble(
               message: message,
@@ -682,6 +837,10 @@ class _MessagesList extends StatelessWidget {
               maxWidth: screenWidth * 0.8,
               peerName: chat.userName,
               peerAvatarUrl: chat.avatarUrl,
+              onLongPress: onMessageLongPress,
+              onReplyTap: message.replyTo == null
+                  ? null
+                  : () => onReplyTap(message.replyTo!.messageId),
             ),
 
             DateSeparatorElement(:final date) => DateSeparator(date: date),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
 import 'package:yap_chat/features/chat/widgets/audio_message_content.dart';
+import 'package:yap_chat/features/chat/widgets/message_reply_preview.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class MessageBubble extends StatefulWidget {
@@ -15,6 +17,8 @@ class MessageBubble extends StatefulWidget {
     required this.maxWidth,
     required this.peerName,
     this.peerAvatarUrl,
+    this.onLongPress,
+    this.onReplyTap,
   });
 
   final ChatMessage message;
@@ -22,6 +26,8 @@ class MessageBubble extends StatefulWidget {
   final double maxWidth;
   final String peerName;
   final String? peerAvatarUrl;
+  final ValueChanged<ChatMessage>? onLongPress;
+  final VoidCallback? onReplyTap;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -108,6 +114,13 @@ class _MessageBubbleState extends State<MessageBubble>
         : AppColors.incomingTime;
 
     final timeStatusWidth = message.isMine ? 66.0 : 44.0;
+    final replyWidth = switch (message.type) {
+      MessageType.image =>
+        (widget.maxWidth - 6).clamp(160.0, 300.0).toDouble() + 6,
+      MessageType.audio => widget.maxWidth.clamp(160.0, 286.0).toDouble(),
+      MessageType.location => widget.maxWidth.clamp(160.0, 300.0).toDouble(),
+      MessageType.text => widget.maxWidth,
+    };
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -117,29 +130,70 @@ class _MessageBubbleState extends State<MessageBubble>
           alignment: message.isMine
               ? Alignment.centerRight
               : Alignment.centerLeft,
-          child: Container(
-            constraints: BoxConstraints(maxWidth: widget.maxWidth),
-            padding: EdgeInsets.all(isImage || isLocation || isAudio ? 3 : 12),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: isImage
-                ? _buildImageMessage(context, textColor)
-                : isLocation
-                ? _buildLocationMessage(context)
-                : isAudio
-                ? AudioMessageContent(message: message)
-                : Stack(
-                    children: [
-                      _buildMessageContent(context, textColor, timeStatusWidth),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: _buildTimeStatus(context, timeColor, iconColor),
+          child: GestureDetector(
+            onLongPress: widget.onLongPress == null
+                ? null
+                : () {
+                    HapticFeedback.mediumImpact();
+                    widget.onLongPress!(message);
+                  },
+            child: Container(
+              constraints: BoxConstraints(maxWidth: widget.maxWidth),
+              width: message.replyTo == null ? null : replyWidth,
+              padding: EdgeInsets.all(
+                isImage || isLocation || isAudio ? 3 : 12,
+              ),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: message.replyTo == null
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.stretch,
+                children: [
+                  if (message.replyTo case final reply?) ...[
+                      Padding(
+                        padding: isImage || isLocation || isAudio
+                            ? const EdgeInsets.fromLTRB(9, 9, 9, 0)
+                            : EdgeInsets.zero,
+                      child: MessageReplyPreview(
+                        reply: reply,
+                        peerName: widget.peerName,
+                        isMessageMine: message.isMine,
+                        onTap: widget.onReplyTap,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  isImage
+                      ? _buildImageMessage(context, textColor)
+                      : isLocation
+                      ? _buildLocationMessage(context)
+                      : isAudio
+                      ? AudioMessageContent(message: message)
+                      : Stack(
+                          children: [
+                            _buildMessageContent(
+                              context,
+                              textColor,
+                              timeStatusWidth,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: _buildTimeStatus(
+                                context,
+                                timeColor,
+                                iconColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

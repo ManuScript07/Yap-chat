@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:yap_chat/features/chat/data/models/message_reply.dart';
 
 enum MessageStatus { sending, sent, read, error }
 
@@ -19,6 +20,7 @@ class ChatMessage extends Equatable {
   final String? audioUrl;
   final Duration? audioDuration;
   final List<double> audioWaveform;
+  final MessageReply? replyTo;
 
   const ChatMessage({
     required this.id,
@@ -35,6 +37,7 @@ class ChatMessage extends Equatable {
     this.audioUrl,
     this.audioDuration,
     this.audioWaveform = const [],
+    this.replyTo,
   });
 
   ChatMessage copyWith({
@@ -52,6 +55,8 @@ class ChatMessage extends Equatable {
     String? audioUrl,
     Duration? audioDuration,
     List<double>? audioWaveform,
+    MessageReply? replyTo,
+    bool clearReplyTo = false,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -68,6 +73,7 @@ class ChatMessage extends Equatable {
       audioUrl: audioUrl ?? this.audioUrl,
       audioDuration: audioDuration ?? this.audioDuration,
       audioWaveform: audioWaveform ?? this.audioWaveform,
+      replyTo: clearReplyTo ? null : replyTo ?? this.replyTo,
     );
   }
 
@@ -87,5 +93,6 @@ class ChatMessage extends Equatable {
         audioUrl,
         audioDuration,
         audioWaveform,
+        replyTo,
       ];
 }

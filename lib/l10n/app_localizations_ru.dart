@@ -180,6 +180,32 @@ class AppLocalizationsRu extends AppLocalizations {
       'Запись будет удалена без возможности восстановления.';
 
   @override
+  String get chatActionCopy => 'Копировать';
+
+  @override
+  String get chatActionDelete => 'Удалить';
+
+  @override
+  String get chatActionReply => 'Ответить';
+
+  @override
+  String chatReplyingTo(Object name) {
+    return 'В ответ $name';
+  }
+
+  @override
+  String get chatReplyYou => 'Вы';
+
+  @override
+  String get chatReplyPhoto => 'Фотография';
+
+  @override
+  String get chatReplyAudio => 'Аудиосообщение';
+
+  @override
+  String get chatReplyLocation => 'Местоположение';
+
+  @override
   String get voiceRecordingExitStay => 'Остаться';
 
   @override

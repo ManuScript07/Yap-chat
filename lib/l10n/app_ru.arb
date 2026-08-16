@@ -45,6 +45,19 @@
   "microphonePermissionSettingsDescription": "Разрешите доступ к микрофону в настройках приложения, чтобы записывать голосовые сообщения.",
   "voiceRecordingExitTitle": "Сбросить голосовое сообщение?",
   "voiceRecordingExitDescription": "Запись будет удалена без возможности восстановления.",
+  "chatActionCopy": "Копировать",
+  "chatActionDelete": "Удалить",
+  "chatActionReply": "Ответить",
+  "chatReplyingTo": "В ответ {name}",
+  "@chatReplyingTo": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "chatReplyYou": "Вы",
+  "chatReplyPhoto": "Фотография",
+  "chatReplyAudio": "Аудиосообщение",
+  "chatReplyLocation": "Местоположение",
   "voiceRecordingExitStay": "Остаться",
   "voiceRecordingExitDiscard": "Сбросить"
 }

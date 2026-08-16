@@ -9,11 +9,13 @@ class MessageInputBar extends StatefulWidget {
     required this.onSend,
     this.onAddPhoto,
     this.onVoiceRecord,
+    this.replyToMessageId,
   });
 
   final ValueChanged<String> onSend;
   final VoidCallback? onAddPhoto;
   final VoidCallback? onVoiceRecord;
+  final String? replyToMessageId;
 
   @override
   State<MessageInputBar> createState() => _MessageInputBarState();
@@ -68,6 +70,16 @@ class _MessageInputBarState extends State<MessageInputBar> {
   }
 
   @override
+  void didUpdateWidget(covariant MessageInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.replyToMessageId == null && widget.replyToMessageId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _controller.removeListener(_handleTextChange);
     _controller.dispose();
@@ -90,28 +102,41 @@ class _MessageInputBarState extends State<MessageInputBar> {
       right: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _AttachmentButton(visible: !_hasText, onTap: widget.onAddPhoto),
-
-            const SizedBox(width: 8),
-
-            Expanded(
-              child: _MessageTextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                mainColor: mainColor,
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            _SendButton(
-              hasText: _hasText,
-              primaryColor: primaryColor,
-              iconColor: backgroundColor,
-              onTap: _handleAction,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.centerLeft,
+                  child: _hasText
+                      ? const SizedBox.shrink()
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _AttachmentButton(onTap: widget.onAddPhoto),
+                            const SizedBox(width: 8),
+                          ],
+                        ),
+                ),
+                Expanded(
+                  child: _MessageTextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    mainColor: mainColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _SendButton(
+                  hasText: _hasText,
+                  primaryColor: primaryColor,
+                  iconColor: backgroundColor,
+                  onTap: _handleAction,
+                ),
+              ],
             ),
           ],
         ),
@@ -121,27 +146,19 @@ class _MessageInputBarState extends State<MessageInputBar> {
 }
 
 class _AttachmentButton extends StatelessWidget {
-  const _AttachmentButton({required this.visible, required this.onTap});
+  const _AttachmentButton({required this.onTap});
 
-  final bool visible;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-      alignment: Alignment.centerRight,
-      child: visible
-          ? GlassIconButton(
-              icon: Icons.add,
-              onTap: onTap ?? () {},
-              width: 50,
-              height: 50,
-              borderRadius: 20,
-              iconSize: 32,
-            )
-          : const SizedBox(width: 0),
+    return GlassIconButton(
+      icon: Icons.add,
+      onTap: onTap ?? () {},
+      width: 50,
+      height: 50,
+      borderRadius: 20,
+      iconSize: 32,
     );
   }
 }

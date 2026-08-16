@@ -30,6 +30,22 @@ class MockChatRepository implements IChatRepository {
         isMine: true,
         status: MessageStatus.read,
       ),
+      ChatMessage(
+        id: 'reply-1',
+        chatId: '1',
+        senderId: 'other',
+        text: 'Да, давай покажем результат на следующей встрече.',
+        timestamp: now.subtract(const Duration(minutes: 20)),
+        isMine: false,
+        status: MessageStatus.read,
+        replyTo: const MessageReply(
+          messageId: '2',
+          senderId: 'me',
+          isMine: true,
+          type: MessageType.text,
+          text: 'Привет! Все отлично, скоро закончим верстку.',
+        ),
+      ),
       // Вчера
       ChatMessage(
         id: '3',
@@ -74,7 +90,11 @@ class MockChatRepository implements IChatRepository {
   }
 
   @override
-  Future<void> sendMessage(String chatId, String text) async {
+  Future<void> sendMessage(
+    String chatId,
+    String text, {
+    String? replyToMessageId,
+  }) async {
     final newMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       chatId: chatId,
@@ -83,6 +103,7 @@ class MockChatRepository implements IChatRepository {
       timestamp: DateTime.now(),
       isMine: true,
       status: MessageStatus.sending,
+      replyTo: _createReply(replyToMessageId),
     );
 
     _messages.insert(0, newMessage);
@@ -113,7 +134,11 @@ class MockChatRepository implements IChatRepository {
   }
 
   @override
-  Future<void> sendImages(String chatId, List<String> imagePaths) async {
+  Future<void> sendImages(
+    String chatId,
+    List<String> imagePaths, {
+    String? replyToMessageId,
+  }) async {
     final newMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       chatId: chatId,
@@ -124,6 +149,7 @@ class MockChatRepository implements IChatRepository {
       status: MessageStatus.sending,
       type: MessageType.image,
       mediaUrls: imagePaths,
+      replyTo: _createReply(replyToMessageId),
     );
 
     _messages.insert(0, newMessage);
@@ -149,8 +175,9 @@ class MockChatRepository implements IChatRepository {
     String chatId,
     String audioPath,
     Duration duration,
-    List<double> waveform,
-  ) async {
+    List<double> waveform, {
+    String? replyToMessageId,
+  }) async {
     final newMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       chatId: chatId,
@@ -163,13 +190,16 @@ class MockChatRepository implements IChatRepository {
       audioUrl: audioPath,
       audioDuration: duration,
       audioWaveform: waveform,
+      replyTo: _createReply(replyToMessageId),
     );
 
     _messages.insert(0, newMessage);
     _messagesController.add(List.unmodifiable(_messages));
 
     await Future<void>.delayed(const Duration(seconds: 1));
-    final index = _messages.indexWhere((message) => message.id == newMessage.id);
+    final index = _messages.indexWhere(
+      (message) => message.id == newMessage.id,
+    );
     if (index == -1) return;
 
     _messages[index] = _messages[index].copyWith(status: MessageStatus.sent);
@@ -199,8 +229,9 @@ class MockChatRepository implements IChatRepository {
   Future<void> sendLocation(
     String chatId,
     double latitude,
-    double longitude,
-  ) async {
+    double longitude, {
+    String? replyToMessageId,
+  }) async {
     final message = ChatMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       chatId: chatId,
@@ -212,6 +243,7 @@ class MockChatRepository implements IChatRepository {
       type: MessageType.location,
       latitude: latitude,
       longitude: longitude,
+      replyTo: _createReply(replyToMessageId),
     );
 
     _messages.insert(0, message);
@@ -222,5 +254,26 @@ class MockChatRepository implements IChatRepository {
     if (index == -1) return;
     _messages[index] = _messages[index].copyWith(status: MessageStatus.sent);
     _messagesController.add(List.unmodifiable(_messages));
+  }
+
+  @override
+  Future<void> deleteMessage(
+    String chatId,
+    String messageId, {
+    required bool deleteForEveryone,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    _messages.removeWhere((message) => message.id == messageId);
+    _messagesController.add(List.unmodifiable(_messages));
+  }
+
+  MessageReply? _createReply(String? messageId) {
+    if (messageId == null) return null;
+
+    final messageIndex = _messages.indexWhere(
+      (message) => message.id == messageId,
+    );
+    if (messageIndex == -1) return null;
+    return MessageReply.fromMessage(_messages[messageIndex]);
   }
 }

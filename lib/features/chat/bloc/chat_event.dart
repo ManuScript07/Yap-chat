@@ -73,3 +73,25 @@ class ChatMessagesReceived extends ChatEvent {
   @override
   List<Object?> get props => [messages];
 }
+
+class ChatReplySelected extends ChatEvent {
+  const ChatReplySelected(this.message);
+
+  final ChatMessage message;
+
+  @override
+  List<Object?> get props => [message];
+}
+
+class ChatReplyCleared extends ChatEvent {
+  const ChatReplyCleared();
+}
+
+class ChatMessageDeleteRequested extends ChatEvent {
+  const ChatMessageDeleteRequested(this.message);
+
+  final ChatMessage message;
+
+  @override
+  List<Object?> get props => [message];
+}

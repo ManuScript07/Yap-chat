@@ -54,8 +54,11 @@ class VoiceRecorderBar extends StatelessWidget {
       right: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            Row(
+              children: [
             GlassIconButton(
               icon: Icons.delete_outline_rounded,
               onTap: onDiscard,
@@ -114,6 +117,8 @@ class VoiceRecorderBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _SendVoiceButton(onTap: onSend, enabled: canFinish),
+              ],
+            ),
           ],
         ),
       ),

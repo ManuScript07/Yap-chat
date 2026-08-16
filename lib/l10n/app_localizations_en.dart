@@ -174,6 +174,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'The recording will be deleted and cannot be restored.';
 
   @override
+  String get chatActionCopy => 'Copy';
+
+  @override
+  String get chatActionDelete => 'Delete';
+
+  @override
+  String get chatActionReply => 'Reply';
+
+  @override
+  String chatReplyingTo(Object name) {
+    return 'Replying to $name';
+  }
+
+  @override
+  String get chatReplyYou => 'You';
+
+  @override
+  String get chatReplyPhoto => 'Photo';
+
+  @override
+  String get chatReplyAudio => 'Audio message';
+
+  @override
+  String get chatReplyLocation => 'Location';
+
+  @override
   String get voiceRecordingExitStay => 'Stay';
 
   @override

@@ -5,20 +5,40 @@ abstract interface class IChatRepository {
   Stream<List<ChatMessage>> getMessagesStream(String chatId);
 
   /// Отправка сообщения в чат.
-  Future<void> sendMessage(String chatId, String text);
+  Future<void> sendMessage(
+    String chatId,
+    String text, {
+    String? replyToMessageId,
+  });
 
   /// Отправка изображений в чат.
-  Future<void> sendImages(String chatId, List<String> imagePaths);
+  Future<void> sendImages(
+    String chatId,
+    List<String> imagePaths, {
+    String? replyToMessageId,
+  });
 
   Future<void> sendAudio(
     String chatId,
     String audioPath,
     Duration duration,
-    List<double> waveform,
-  );
+    List<double> waveform, {
+    String? replyToMessageId,
+  });
 
   /// Повторная отправка медиа-сообщения после ошибки.
   Future<void> retryImages(String chatId, ChatMessage message);
 
-  Future<void> sendLocation(String chatId, double latitude, double longitude);
+  Future<void> sendLocation(
+    String chatId,
+    double latitude,
+    double longitude, {
+    String? replyToMessageId,
+  });
+
+  Future<void> deleteMessage(
+    String chatId,
+    String messageId, {
+    required bool deleteForEveryone,
+  });
 }

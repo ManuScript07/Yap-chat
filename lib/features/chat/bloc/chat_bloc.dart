@@ -17,6 +17,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatMessageRetryRequested>(_onRetryRequested);
     on<ChatLocationSent>(_onLocationSent);
     on<ChatMessagesReceived>(_onMessagesReceived);
+    on<ChatReplySelected>(_onReplySelected);
+    on<ChatReplyCleared>(_onReplyCleared);
+    on<ChatMessageDeleteRequested>(_onMessageDeleteRequested);
   }
 
   Future<void> _onStarted(ChatStarted event, Emitter<ChatState> emit) async {
@@ -34,8 +37,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     if (event.text.trim().isEmpty) return;
 
+    final replyToMessageId = state.replyToMessage?.id;
+    emit(state.copyWith(clearReplyToMessage: true));
     try {
-      await _chatRepository.sendMessage(state.chatId, event.text);
+      await _chatRepository.sendMessage(
+        state.chatId,
+        event.text,
+        replyToMessageId: replyToMessageId,
+      );
     } catch (_) {
       emit(state.copyWith(status: ChatStatus.failure));
     }
@@ -47,8 +56,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     if (event.imagePaths.isEmpty) return;
 
+    final replyToMessageId = state.replyToMessage?.id;
+    emit(state.copyWith(clearReplyToMessage: true));
     try {
-      await _chatRepository.sendImages(state.chatId, event.imagePaths);
+      await _chatRepository.sendImages(
+        state.chatId,
+        event.imagePaths,
+        replyToMessageId: replyToMessageId,
+      );
     } catch (_) {
       emit(state.copyWith(status: ChatStatus.failure));
     }
@@ -74,12 +89,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatMessageAudioSent event,
     Emitter<ChatState> emit,
   ) async {
+    final replyToMessageId = state.replyToMessage?.id;
+    emit(state.copyWith(clearReplyToMessage: true));
     try {
       await _chatRepository.sendAudio(
         state.chatId,
         event.audioPath,
         event.duration,
         event.waveform,
+        replyToMessageId: replyToMessageId,
       );
     } catch (_) {
       emit(state.copyWith(status: ChatStatus.failure));
@@ -90,11 +108,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatLocationSent event,
     Emitter<ChatState> emit,
   ) async {
+    final replyToMessageId = state.replyToMessage?.id;
+    emit(state.copyWith(clearReplyToMessage: true));
     try {
       await _chatRepository.sendLocation(
         state.chatId,
         event.latitude,
         event.longitude,
+        replyToMessageId: replyToMessageId,
       );
     } catch (_) {
       emit(state.copyWith(status: ChatStatus.failure));
@@ -118,6 +139,32 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         initialMessageIds: initialIds,
       ),
     );
+  }
+
+  void _onReplySelected(ChatReplySelected event, Emitter<ChatState> emit) {
+    emit(state.copyWith(replyToMessage: event.message));
+  }
+
+  void _onReplyCleared(ChatReplyCleared event, Emitter<ChatState> emit) {
+    emit(state.copyWith(clearReplyToMessage: true));
+  }
+
+  Future<void> _onMessageDeleteRequested(
+    ChatMessageDeleteRequested event,
+    Emitter<ChatState> emit,
+  ) async {
+    try {
+      await _chatRepository.deleteMessage(
+        state.chatId,
+        event.message.id,
+        deleteForEveryone: event.message.isMine,
+      );
+      if (state.replyToMessage?.id == event.message.id) {
+        emit(state.copyWith(clearReplyToMessage: true));
+      }
+    } catch (_) {
+      emit(state.copyWith(status: ChatStatus.failure));
+    }
   }
 
   @override
