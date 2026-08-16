@@ -439,6 +439,162 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Сбросить'**
   String get voiceRecordingExitDiscard;
+
+  /// No description provided for @authWelcomeTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добро пожаловать в Yap Chat'**
+  String get authWelcomeTitle;
+
+  /// No description provided for @authWelcomeDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Общайтесь, делитесь моментами и оставайтесь на связи с близкими.'**
+  String get authWelcomeDescription;
+
+  /// No description provided for @authContinueWithYandex.
+  ///
+  /// In ru, this message translates to:
+  /// **'Продолжить с Яндекс ID'**
+  String get authContinueWithYandex;
+
+  /// No description provided for @authConsentHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'При первом входе мы перенесём доступные данные профиля из Яндекс ID.'**
+  String get authConsentHint;
+
+  /// No description provided for @authSignInFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось войти через Яндекс ID. Попробуйте ещё раз.'**
+  String get authSignInFailed;
+
+  /// No description provided for @authProfileSetupTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Завершение регистрации'**
+  String get authProfileSetupTitle;
+
+  /// No description provided for @authProfileSetupDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверьте данные из Яндекс ID и заполните недостающие поля.'**
+  String get authProfileSetupDescription;
+
+  /// No description provided for @authDisplayNameLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Имя'**
+  String get authDisplayNameLabel;
+
+  /// No description provided for @authUsernameLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Username'**
+  String get authUsernameLabel;
+
+  /// No description provided for @authUsernameHelper.
+  ///
+  /// In ru, this message translates to:
+  /// **'От 3 до 24 латинских букв, цифр или _. Можно оставить автоматически созданный.'**
+  String get authUsernameHelper;
+
+  /// No description provided for @authBirthDateLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Дата рождения'**
+  String get authBirthDateLabel;
+
+  /// No description provided for @authBirthDatePlaceholder.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите дату'**
+  String get authBirthDatePlaceholder;
+
+  /// No description provided for @authAcceptDocuments.
+  ///
+  /// In ru, this message translates to:
+  /// **'Я принимаю условия использования сервиса'**
+  String get authAcceptDocuments;
+
+  /// No description provided for @authTermsOfService.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пользовательское соглашение'**
+  String get authTermsOfService;
+
+  /// No description provided for @authDocumentsAnd.
+  ///
+  /// In ru, this message translates to:
+  /// **'и'**
+  String get authDocumentsAnd;
+
+  /// No description provided for @authPrivacyPolicy.
+  ///
+  /// In ru, this message translates to:
+  /// **'Политику конфиденциальности'**
+  String get authPrivacyPolicy;
+
+  /// No description provided for @authCompleteRegistration.
+  ///
+  /// In ru, this message translates to:
+  /// **'Завершить регистрацию'**
+  String get authCompleteRegistration;
+
+  /// No description provided for @authNameRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Укажите имя'**
+  String get authNameRequired;
+
+  /// No description provided for @authBirthDateRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Укажите дату рождения'**
+  String get authBirthDateRequired;
+
+  /// No description provided for @authDocumentsRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Необходимо принять соглашение и политику конфиденциальности'**
+  String get authDocumentsRequired;
+
+  /// No description provided for @authUsernameTaken.
+  ///
+  /// In ru, this message translates to:
+  /// **'Этот username уже занят'**
+  String get authUsernameTaken;
+
+  /// No description provided for @authUsernameInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Username должен содержать от 3 до 24 латинских букв, цифр или _'**
+  String get authUsernameInvalid;
+
+  /// No description provided for @authProfileSaveFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось сохранить профиль. Попробуйте ещё раз.'**
+  String get authProfileSaveFailed;
+
+  /// No description provided for @authLoadFailedTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить профиль'**
+  String get authLoadFailedTitle;
+
+  /// No description provided for @authLoadFailedDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверьте подключение и повторите попытку.'**
+  String get authLoadFailedDescription;
+
+  /// No description provided for @authSignOut.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выйти'**
+  String get authSignOut;
 }
 
 class _AppLocalizationsDelegate

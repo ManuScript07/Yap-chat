@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
 enum AppEnvironment { dev, prod }
@@ -13,14 +14,32 @@ class AppConfig {
     required this.preferences,
     required this.talker,
     required this.env,
+    this.supabaseClient,
   });
 
   final AppEnvironment environment;
   final SharedPreferences preferences;
   final Talker talker;
   final Map<String, String> env;
+  final SupabaseClient? supabaseClient;
 
   bool get isDev => environment == AppEnvironment.dev;
 
   String? get backendBaseUrl => env['BACKEND_BASE_URL'];
+
+  String get authRedirectUrl =>
+      env['AUTH_REDIRECT_URL']?.trim().isNotEmpty == true
+      ? env['AUTH_REDIRECT_URL']!.trim()
+      : 'yapchat://login-callback/';
+
+  SupabaseClient requireSupabaseClient() {
+    final client = supabaseClient;
+    if (client == null) {
+      throw StateError(
+        'Supabase is not configured. Add SUPABASE_URL and '
+        'SUPABASE_PUBLISHABLE_KEY to .env.',
+      );
+    }
+    return client;
+  }
 }

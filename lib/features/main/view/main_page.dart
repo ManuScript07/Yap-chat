@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/router/router.gr.dart';
+import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -12,36 +13,41 @@ class MainPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider<ChatsBloc>(
+      create: (context) =>
+          ChatsBloc(chatsRepository: context.read<IChatsRepository>())
+            ..add(const ChatsLoadStarted()),
+      child: const _MainView(),
+    );
+  }
+}
+
+class _MainView extends StatelessWidget {
+  const _MainView();
+
+  @override
+  Widget build(BuildContext context) {
     return AutoTabsRouter(
-      routes: const [
-        ChatsRoute(),
-        FriendsRoute(),
-        ProfileRoute(),
-      ],
+      routes: const [ChatsRoute(), FriendsRoute(), ProfileRoute()],
       transitionBuilder: (context, child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
 
         const chatsTabIndex = 0;
 
-
         final rootMediaQuery = MediaQuery.of(context);
 
-        final isKeyboardOpen =
-            rootMediaQuery.viewInsets.bottom > 0;
+        final isKeyboardOpen = rootMediaQuery.viewInsets.bottom > 0;
 
         final isSelectionMode = context.select<ChatsBloc, bool>(
-              (bloc) => bloc.state.isSelectionMode,
+          (bloc) => bloc.state.isSelectionMode,
         );
 
         return PopScope(
           canPop:
-          tabsRouter.activeIndex == chatsTabIndex &&
+              tabsRouter.activeIndex == chatsTabIndex &&
               !isKeyboardOpen &&
               !isSelectionMode,
           onPopInvokedWithResult: (didPop, result) {
@@ -52,11 +58,8 @@ class MainPage extends StatelessWidget {
               return;
             }
 
-            if (tabsRouter.activeIndex == chatsTabIndex &&
-                isSelectionMode) {
-              context.read<ChatsBloc>().add(
-                const ChatSelectionCleared(),
-              );
+            if (tabsRouter.activeIndex == chatsTabIndex && isSelectionMode) {
+              context.read<ChatsBloc>().add(const ChatSelectionCleared());
               return;
             }
 
@@ -69,13 +72,8 @@ class MainPage extends StatelessWidget {
             extendBody: true,
 
             body: MediaQuery(
-
               data: rootMediaQuery,
-              child: Stack(
-                children: [
-                  child,
-                ],
-              ),
+              child: Stack(children: [child]),
             ),
 
             bottomNavigationBar: FloatingNavigationBar(

@@ -13,11 +13,11 @@ class RepositoryContainer {
     required this.locationRepository,
     required this.audioRecorderRepository,
     required this.audioPlayerRepository,
+    required this.authRepository,
+    required this.profileRepository,
   });
 
-  factory RepositoryContainer.prod({
-    required AppConfig config,
-  }) {
+  factory RepositoryContainer.prod({required AppConfig config}) {
     return RepositoryContainer(
       chatsRepository: ChatsRepository(config: config),
       chatRepository: ChatRepository(config: config),
@@ -27,12 +27,17 @@ class RepositoryContainer {
       locationRepository: LocationRepository(),
       audioRecorderRepository: AudioRecorderRepository(),
       audioPlayerRepository: AudioPlayerRepository(),
+      authRepository: AuthRepository(
+        client: config.requireSupabaseClient(),
+        redirectUrl: config.authRedirectUrl,
+      ),
+      profileRepository: ProfileRepository(
+        client: config.requireSupabaseClient(),
+      ),
     );
   }
 
-  factory RepositoryContainer.dev({
-    required AppConfig config,
-  }) {
+  factory RepositoryContainer.dev({required AppConfig config}) {
     return RepositoryContainer(
       chatsRepository: MockChatsRepository(),
       chatRepository: MockChatRepository(),
@@ -42,6 +47,8 @@ class RepositoryContainer {
       locationRepository: LocationRepository(),
       audioRecorderRepository: AudioRecorderRepository(),
       audioPlayerRepository: AudioPlayerRepository(),
+      authRepository: MockAuthRepository(preferences: config.preferences),
+      profileRepository: MockProfileRepository(preferences: config.preferences),
     );
   }
 
@@ -51,4 +58,6 @@ class RepositoryContainer {
   final ILocationRepository locationRepository;
   final IAudioRecorderRepository audioRecorderRepository;
   final IAudioPlayerRepository audioPlayerRepository;
+  final IAuthRepository authRepository;
+  final IProfileRepository profileRepository;
 }

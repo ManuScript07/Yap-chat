@@ -1,4 +1,3 @@
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,18 +16,21 @@ class ChatsPage extends StatelessWidget {
       buildWhen: (previous, current) {
         final prevMuted = previous.chats
             .where((c) => previous.selectedChatIds.contains(c.id))
-            .firstOrNull?.isMuted;
+            .firstOrNull
+            ?.isMuted;
         final currMuted = current.chats
             .where((c) => current.selectedChatIds.contains(c.id))
-            .firstOrNull?.isMuted;
+            .firstOrNull
+            ?.isMuted;
 
         return previous.isSelectionMode != current.isSelectionMode ||
             previous.selectedChatIds.length != current.selectedChatIds.length ||
             prevMuted != currMuted;
       },
       builder: (context, state) {
-        final selectedChats = state.chats
-            .where((chat) => state.selectedChatIds.contains(chat.id));
+        final selectedChats = state.chats.where(
+          (chat) => state.selectedChatIds.contains(chat.id),
+        );
         final firstSelectedMuted = selectedChats.firstOrNull?.isMuted ?? false;
 
         return Scaffold(
@@ -37,29 +39,26 @@ class ChatsPage extends StatelessWidget {
           extendBodyBehindAppBar: true,
           appBar: state.isSelectionMode
               ? SelectionToolbar(
-            selectedCount: state.selectedChatIds.length,
-            onClose: () => context.read<ChatsBloc>().add(
-              const ChatSelectionCleared(),
-            ),
-            isMuted: firstSelectedMuted,
-            onToggleNotifications: () => context.read<ChatsBloc>().add(
-              const ChatsMuteToggled(),
-            ),
-            onMarkAsRead: () => context.read<ChatsBloc>().add(
-              const ChatsMarkedAsRead(),
-            ),
-            onDelete: () => context.read<ChatsBloc>().add(
-              const ChatsDeleted(),
-            ),
-          )
+                  selectedCount: state.selectedChatIds.length,
+                  onClose: () => context.read<ChatsBloc>().add(
+                    const ChatSelectionCleared(),
+                  ),
+                  isMuted: firstSelectedMuted,
+                  onToggleNotifications: () =>
+                      context.read<ChatsBloc>().add(const ChatsMuteToggled()),
+                  onMarkAsRead: () =>
+                      context.read<ChatsBloc>().add(const ChatsMarkedAsRead()),
+                  onDelete: () =>
+                      context.read<ChatsBloc>().add(const ChatsDeleted()),
+                )
               : PrimaryAppBar(
-                title: context.l10n.navChats,
-                actionIcon: Icons.add_comment_rounded,
-                onActionPressed: () {
-                  FocusScope.of(context).unfocus();
-                  context.router.push(const NewChatRoute());
-                },
-              ),
+                  title: context.l10n.navChats,
+                  actionIcon: Icons.add_comment_rounded,
+                  onActionPressed: () {
+                    FocusScope.of(context).unfocus();
+                    context.router.root.push(const NewChatRoute());
+                  },
+                ),
           body: const _ChatsBody(),
         );
       },
@@ -74,16 +73,14 @@ class _ChatsBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
 
-    debugPrint(
-      '''
+    debugPrint('''
 ════════ CHAT LAYOUT ════════
 padding.bottom: ${mediaQuery.padding.bottom}
 viewPadding.bottom: ${mediaQuery.viewPadding.bottom}
 viewInsets.bottom: ${mediaQuery.viewInsets.bottom}
 size.height: ${mediaQuery.size.height}
 ═════════════════════════════
-''',
-    );
+''');
 
     final keyboardHeight = mediaQuery.viewInsets.bottom;
     final isKeyboardOpen = keyboardHeight > 0;
@@ -96,35 +93,26 @@ size.height: ${mediaQuery.size.height}
     const searchBarHeight = 50.0;
     const contentExtraPadding = 16.0;
 
-
     final navigationSpace =
-        systemBottomPadding +
-            navBarBottomOffset +
-            navBarHeight;
+        systemBottomPadding + navBarBottomOffset + navBarHeight;
 
     final searchBarBottomOffset = isKeyboardOpen
         ? keyboardHeight + searchBarSpacing
         : navigationSpace + searchBarSpacing;
 
+    final contentBottomPadding =
+        searchBarBottomOffset + searchBarHeight + contentExtraPadding;
 
-    final contentBottomPadding = searchBarBottomOffset +
-        searchBarHeight +
-        contentExtraPadding;
-
-    final glowBottomOffset = isKeyboardOpen
-        ? keyboardHeight
-        : 0.0;
+    final glowBottomOffset = isKeyboardOpen ? keyboardHeight : 0.0;
 
     final isSelectionMode = context.select<ChatsBloc, bool>(
-          (bloc) => bloc.state.isSelectionMode,
+      (bloc) => bloc.state.isSelectionMode,
     );
 
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
-        _ChatsContent(
-          bottomPadding: contentBottomPadding,
-        ),
+        _ChatsContent(bottomPadding: contentBottomPadding),
 
         AnimatedPositioned(
           duration: Duration.zero,
@@ -144,9 +132,7 @@ size.height: ${mediaQuery.size.height}
           child: GlassSearchBar(
             hintText: context.l10n.searchHintChats,
             onChanged: (value) {
-              context.read<ChatsBloc>().add(
-                ChatsSearchChanged(value),
-              );
+              context.read<ChatsBloc>().add(ChatsSearchChanged(value));
             },
           ),
         ),
@@ -156,9 +142,7 @@ size.height: ${mediaQuery.size.height}
 }
 
 class _ChatsContent extends StatelessWidget {
-  const _ChatsContent({
-    required this.bottomPadding,
-  });
+  const _ChatsContent({required this.bottomPadding});
 
   final double bottomPadding;
 
@@ -166,7 +150,7 @@ class _ChatsContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ChatsBloc, ChatsState>(
       buildWhen: (previous, current) =>
-      previous.status != current.status ||
+          previous.status != current.status ||
           previous.filteredChats != current.filteredChats ||
           previous.selectedChatIds != current.selectedChatIds ||
           previous.isSelectionMode != current.isSelectionMode,
@@ -183,10 +167,7 @@ class _ChatsContent extends StatelessWidget {
             }
 
             return ListView.builder(
-              padding: EdgeInsets.only(
-                top: 130,
-                bottom: bottomPadding,
-              ),
+              padding: EdgeInsets.only(top: 130, bottom: bottomPadding),
               itemCount: state.filteredChats.length,
               itemBuilder: (context, index) {
                 final chat = state.filteredChats[index];
@@ -199,18 +180,18 @@ class _ChatsContent extends StatelessWidget {
                     FocusScope.of(context).unfocus();
 
                     if (state.isSelectionMode) {
-                      context
-                          .read<ChatsBloc>()
-                          .add(ChatSelectionToggled(chat.id));
+                      context.read<ChatsBloc>().add(
+                        ChatSelectionToggled(chat.id),
+                      );
                     } else {
-                      context.router.push(ChatRoute(chat: chat));
+                      context.router.root.push(ChatRoute(chat: chat));
                     }
                   },
                   onLongPress: () {
                     if (!state.isSelectionMode) {
-                      context
-                          .read<ChatsBloc>()
-                          .add(ChatSelectionToggled(chat.id));
+                      context.read<ChatsBloc>().add(
+                        ChatSelectionToggled(chat.id),
+                      );
                     }
                   },
                 );

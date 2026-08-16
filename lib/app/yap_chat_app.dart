@@ -7,15 +7,13 @@ import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
+import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 /// Корневой виджет приложения: держит роутер и конфигурацию MaterialApp.
 class App extends StatefulWidget {
-  const App({
-    super.key,
-    required this.config,
-  });
+  const App({super.key, required this.config});
 
   final AppConfig config;
 
@@ -45,13 +43,7 @@ class _AppContent extends StatefulWidget {
 }
 
 class _AppContentState extends State<_AppContent> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _restorePendingChat();
-    });
-  }
+  bool _pendingChatRestored = false;
 
   Future<void> _restorePendingChat() async {
     final repository = context.read<ILocalMediaRepository>();
@@ -74,18 +66,30 @@ class _AppContentState extends State<_AppContent> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Yap chat',
-      theme: theme,
-      restorationScopeId: 'yap-chat',
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      routerConfig: widget.router.config(),
+    return BlocListener<AuthBloc, AuthState>(
+      listenWhen: (previous, current) =>
+          previous.status != AuthStatus.authenticated &&
+          current.status == AuthStatus.authenticated,
+      listener: (context, state) {
+        if (_pendingChatRestored) return;
+        _pendingChatRestored = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _restorePendingChat();
+        });
+      },
+      child: MaterialApp.router(
+        title: 'Yap chat',
+        theme: theme,
+        restorationScopeId: 'yap-chat',
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        routerConfig: widget.router.config(),
+      ),
     );
   }
 }

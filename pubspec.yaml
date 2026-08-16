@@ -19,6 +19,7 @@ dependencies:
   saver_gallery: ^5.1.0
   google_fonts: ^8.2.1
   shared_preferences: ^2.5.5
+  supabase_flutter: ^2.17.2
   stream_transform: ^2.1.1
   talker_bloc_logger: ^5.1.20
   talker_flutter: ^5.1.20
@@ -60,6 +61,7 @@ flutter:
 
   assets:
     - .env
+    - assets/logo/
 
   fonts:
     - family: RobotoFlex

@@ -2,18 +2,14 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/repository_container.dart';
-import 'package:yap_chat/features/chats/chats.dart';
+import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 /// Центральная точка Dependency Injection.
 ///
 /// Здесь регистрируются репозитории по интерфейсам и глобальные BLoC/Cubit.
 class AppInitializer extends StatelessWidget {
-  const AppInitializer({
-    super.key,
-    required this.config,
-    required this.child,
-  });
+  const AppInitializer({super.key, required this.config, required this.child});
 
   final AppConfig config;
   final Widget child;
@@ -45,13 +41,20 @@ class AppInitializer extends StatelessWidget {
         RepositoryProvider<IAudioPlayerRepository>.value(
           value: repositories.audioPlayerRepository,
         ),
+        RepositoryProvider<IAuthRepository>.value(
+          value: repositories.authRepository,
+        ),
+        RepositoryProvider<IProfileRepository>.value(
+          value: repositories.profileRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider<ChatsBloc>(
-            create: (context) => ChatsBloc(
-              chatsRepository: context.read<IChatsRepository>(),
-            )..add(const ChatsLoadStarted()),
+          BlocProvider<AuthBloc>(
+            create: (context) => AuthBloc(
+              authRepository: context.read<IAuthRepository>(),
+              profileRepository: context.read<IProfileRepository>(),
+            )..add(const AuthStarted()),
           ),
         ],
         child: child,

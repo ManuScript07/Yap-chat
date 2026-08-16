@@ -225,4 +225,91 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get voiceRecordingExitDiscard => 'Сбросить';
+
+  @override
+  String get authWelcomeTitle => 'Добро пожаловать в Yap Chat';
+
+  @override
+  String get authWelcomeDescription =>
+      'Общайтесь, делитесь моментами и оставайтесь на связи с близкими.';
+
+  @override
+  String get authContinueWithYandex => 'Продолжить с Яндекс ID';
+
+  @override
+  String get authConsentHint =>
+      'При первом входе мы перенесём доступные данные профиля из Яндекс ID.';
+
+  @override
+  String get authSignInFailed =>
+      'Не удалось войти через Яндекс ID. Попробуйте ещё раз.';
+
+  @override
+  String get authProfileSetupTitle => 'Завершение регистрации';
+
+  @override
+  String get authProfileSetupDescription =>
+      'Проверьте данные из Яндекс ID и заполните недостающие поля.';
+
+  @override
+  String get authDisplayNameLabel => 'Имя';
+
+  @override
+  String get authUsernameLabel => 'Username';
+
+  @override
+  String get authUsernameHelper =>
+      'От 3 до 24 латинских букв, цифр или _. Можно оставить автоматически созданный.';
+
+  @override
+  String get authBirthDateLabel => 'Дата рождения';
+
+  @override
+  String get authBirthDatePlaceholder => 'Выберите дату';
+
+  @override
+  String get authAcceptDocuments => 'Я принимаю условия использования сервиса';
+
+  @override
+  String get authTermsOfService => 'Пользовательское соглашение';
+
+  @override
+  String get authDocumentsAnd => 'и';
+
+  @override
+  String get authPrivacyPolicy => 'Политику конфиденциальности';
+
+  @override
+  String get authCompleteRegistration => 'Завершить регистрацию';
+
+  @override
+  String get authNameRequired => 'Укажите имя';
+
+  @override
+  String get authBirthDateRequired => 'Укажите дату рождения';
+
+  @override
+  String get authDocumentsRequired =>
+      'Необходимо принять соглашение и политику конфиденциальности';
+
+  @override
+  String get authUsernameTaken => 'Этот username уже занят';
+
+  @override
+  String get authUsernameInvalid =>
+      'Username должен содержать от 3 до 24 латинских букв, цифр или _';
+
+  @override
+  String get authProfileSaveFailed =>
+      'Не удалось сохранить профиль. Попробуйте ещё раз.';
+
+  @override
+  String get authLoadFailedTitle => 'Не удалось загрузить профиль';
+
+  @override
+  String get authLoadFailedDescription =>
+      'Проверьте подключение и повторите попытку.';
+
+  @override
+  String get authSignOut => 'Выйти';
 }

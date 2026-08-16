@@ -21,7 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHintChats => 'search chats';
 
   @override
-  String get chatsMessagePrefixYou => 'Ты';
+  String get chatsMessagePrefixYou => 'You';
 
   @override
   String get timeJustNow => 'Just now';
@@ -219,4 +219,91 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceRecordingExitDiscard => 'Discard';
+
+  @override
+  String get authWelcomeTitle => 'Welcome to Yap Chat';
+
+  @override
+  String get authWelcomeDescription =>
+      'Chat, share moments, and stay connected with the people who matter.';
+
+  @override
+  String get authContinueWithYandex => 'Continue with Yandex ID';
+
+  @override
+  String get authConsentHint =>
+      'On your first sign-in, we will import available profile data from Yandex ID.';
+
+  @override
+  String get authSignInFailed =>
+      'Could not sign in with Yandex ID. Please try again.';
+
+  @override
+  String get authProfileSetupTitle => 'Complete registration';
+
+  @override
+  String get authProfileSetupDescription =>
+      'Review the data from Yandex ID and fill in the missing fields.';
+
+  @override
+  String get authDisplayNameLabel => 'Name';
+
+  @override
+  String get authUsernameLabel => 'Username';
+
+  @override
+  String get authUsernameHelper =>
+      'Use 3–24 Latin letters, digits, or _. You may keep the generated username.';
+
+  @override
+  String get authBirthDateLabel => 'Date of birth';
+
+  @override
+  String get authBirthDatePlaceholder => 'Select a date';
+
+  @override
+  String get authAcceptDocuments => 'I accept the terms of service';
+
+  @override
+  String get authTermsOfService => 'Terms of Service';
+
+  @override
+  String get authDocumentsAnd => 'and';
+
+  @override
+  String get authPrivacyPolicy => 'Privacy Policy';
+
+  @override
+  String get authCompleteRegistration => 'Complete registration';
+
+  @override
+  String get authNameRequired => 'Enter your name';
+
+  @override
+  String get authBirthDateRequired => 'Enter your date of birth';
+
+  @override
+  String get authDocumentsRequired =>
+      'You must accept the Terms of Service and Privacy Policy';
+
+  @override
+  String get authUsernameTaken => 'This username is already taken';
+
+  @override
+  String get authUsernameInvalid =>
+      'Username must contain 3–24 Latin letters, digits, or _';
+
+  @override
+  String get authProfileSaveFailed =>
+      'Could not save your profile. Please try again.';
+
+  @override
+  String get authLoadFailedTitle => 'Could not load your profile';
+
+  @override
+  String get authLoadFailedDescription =>
+      'Check your connection and try again.';
+
+  @override
+  String get authSignOut => 'Sign out';
 }
