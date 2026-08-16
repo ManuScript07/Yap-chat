@@ -206,6 +206,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatReplyLocation => 'Местоположение';
 
   @override
+  String readReceiptToday(Object time) {
+    return 'Прочитано сегодня в $time';
+  }
+
+  @override
+  String readReceiptYesterday(Object time) {
+    return 'Прочитано вчера в $time';
+  }
+
+  @override
+  String readReceiptDate(Object date, Object time) {
+    return 'Прочитано $date в $time';
+  }
+
+  @override
   String get voiceRecordingExitStay => 'Остаться';
 
   @override

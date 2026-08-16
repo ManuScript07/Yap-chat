@@ -58,6 +58,25 @@
   "chatReplyPhoto": "Photo",
   "chatReplyAudio": "Audio message",
   "chatReplyLocation": "Location",
+  "readReceiptToday": "Read today at {time}",
+  "@readReceiptToday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "readReceiptYesterday": "Read yesterday at {time}",
+  "@readReceiptYesterday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "readReceiptDate": "Read {date} at {time}",
+  "@readReceiptDate": {
+    "placeholders": {
+      "date": {},
+      "time": {}
+    }
+  },
   "voiceRecordingExitStay": "Stay",
   "voiceRecordingExitDiscard": "Discard"
 }

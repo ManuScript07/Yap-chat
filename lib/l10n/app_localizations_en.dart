@@ -200,6 +200,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatReplyLocation => 'Location';
 
   @override
+  String readReceiptToday(Object time) {
+    return 'Read today at $time';
+  }
+
+  @override
+  String readReceiptYesterday(Object time) {
+    return 'Read yesterday at $time';
+  }
+
+  @override
+  String readReceiptDate(Object date, Object time) {
+    return 'Read $date at $time';
+  }
+
+  @override
   String get voiceRecordingExitStay => 'Stay';
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/utils/formatters/time_formatter.dart';
 
 enum MessageAction { copy, reply, delete }
 
@@ -25,6 +26,7 @@ class _MessageActionsBottomSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPending = message.status == MessageStatus.sending ||
         message.status == MessageStatus.error;
+    final readAt = message.readAt;
 
     return Container(
       width: double.infinity,
@@ -56,6 +58,19 @@ class _MessageActionsBottomSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
+                if (message.isMine && readAt != null) ...[
+                  Text(
+                    TimeFormatter.formatReadReceipt(context, readAt),
+                    style: TextStyle(
+                      color: context.colorScheme.onSurface.withValues(
+                        alpha: 0.8,
+                      ),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (!isPending && message.type == MessageType.text)
                   _ActionTile(
                     icon: Icons.copy_rounded,

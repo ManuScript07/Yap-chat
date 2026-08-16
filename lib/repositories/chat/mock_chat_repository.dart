@@ -29,6 +29,7 @@ class MockChatRepository implements IChatRepository {
         timestamp: now.subtract(const Duration(minutes: 25)),
         isMine: true,
         status: MessageStatus.read,
+        readAt: now.subtract(const Duration(minutes: 12)),
       ),
       ChatMessage(
         id: 'reply-1',
@@ -65,6 +66,17 @@ class MockChatRepository implements IChatRepository {
         timestamp: DateTime(now.year, 6, 5, 14, 20),
         isMine: true,
         status: MessageStatus.read,
+        readAt: DateTime(now.year, 6, 5, 14, 24),
+      ),
+      ChatMessage(
+        id: '6',
+        chatId: '1',
+        senderId: 'me',
+        text: 'Сохранил основные договоренности по проекту.',
+        timestamp: DateTime(now.year - 1, 5, 27, 17, 40),
+        isMine: true,
+        status: MessageStatus.read,
+        readAt: DateTime(now.year - 1, 5, 27, 17, 45),
       ),
       // Прошлый год (24 августа 2024)
       ChatMessage(
@@ -129,6 +141,13 @@ class MockChatRepository implements IChatRepository {
       isMine: false,
       status: MessageStatus.sent,
     );
+    if (index != -1) {
+      _messages[index] = _messages[index].copyWith(
+        status: MessageStatus.read,
+        readAt: DateTime.now(),
+      );
+      _messagesController.add(List.unmodifiable(_messages));
+    }
     _messages.insert(0, responseMessage);
     _messagesController.add(List.unmodifiable(_messages));
   }

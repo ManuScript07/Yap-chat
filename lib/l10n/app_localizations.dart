@@ -410,6 +410,24 @@ abstract class AppLocalizations {
   /// **'Местоположение'**
   String get chatReplyLocation;
 
+  /// No description provided for @readReceiptToday.
+  ///
+  /// In ru, this message translates to:
+  /// **'Прочитано сегодня в {time}'**
+  String readReceiptToday(Object time);
+
+  /// No description provided for @readReceiptYesterday.
+  ///
+  /// In ru, this message translates to:
+  /// **'Прочитано вчера в {time}'**
+  String readReceiptYesterday(Object time);
+
+  /// No description provided for @readReceiptDate.
+  ///
+  /// In ru, this message translates to:
+  /// **'Прочитано {date} в {time}'**
+  String readReceiptDate(Object date, Object time);
+
   /// No description provided for @voiceRecordingExitStay.
   ///
   /// In ru, this message translates to:

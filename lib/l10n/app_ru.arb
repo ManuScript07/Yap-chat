@@ -58,6 +58,25 @@
   "chatReplyPhoto": "Фотография",
   "chatReplyAudio": "Аудиосообщение",
   "chatReplyLocation": "Местоположение",
+  "readReceiptToday": "Прочитано сегодня в {time}",
+  "@readReceiptToday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "readReceiptYesterday": "Прочитано вчера в {time}",
+  "@readReceiptYesterday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "readReceiptDate": "Прочитано {date} в {time}",
+  "@readReceiptDate": {
+    "placeholders": {
+      "date": {},
+      "time": {}
+    }
+  },
   "voiceRecordingExitStay": "Остаться",
   "voiceRecordingExitDiscard": "Сбросить"
 }
