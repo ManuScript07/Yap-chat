@@ -29,6 +29,9 @@ class ProfilePage extends StatelessWidget {
                 children: [
                   UserAvatar(
                     avatarUrl: profile?.avatarUrl,
+                    avatarImage: profile?.avatarBytes == null
+                        ? null
+                        : MemoryImage(profile!.avatarBytes!),
                     size: 96,
                     borderRadius: 28,
                   ),

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/auth/bloc/auth_event.dart';
 import 'package:yap_chat/features/auth/bloc/auth_state.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
+import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
@@ -85,20 +86,45 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         clearFailure: true,
       ),
     );
+    UserProfile? cachedProfile;
+    try {
+      cachedProfile = await _profileRepository.getCachedProfile(session.userId);
+      if (cachedProfile != null) {
+        emit(
+          state.copyWith(
+            status: _statusForProfile(cachedProfile),
+            session: session,
+            profile: cachedProfile,
+            isSubmitting: false,
+          ),
+        );
+      }
+    } catch (_) {
+      // Повреждённый кеш не должен блокировать загрузку актуального профиля.
+    }
+
     try {
       final profile = await _profileRepository.getOrCreateProfile(session);
-      final isComplete = profile.onboardingCompleted && profile.hasRequiredData;
       emit(
         state.copyWith(
-          status: isComplete
-              ? AuthStatus.authenticated
-              : AuthStatus.profileIncomplete,
+          status: _statusForProfile(profile),
           session: session,
           profile: profile,
           isSubmitting: false,
         ),
       );
     } catch (_) {
+      if (cachedProfile != null) {
+        emit(
+          state.copyWith(
+            status: _statusForProfile(cachedProfile),
+            session: session,
+            profile: cachedProfile,
+            isSubmitting: false,
+          ),
+        );
+        return;
+      }
       emit(
         state.copyWith(
           status: AuthStatus.failure,
@@ -134,6 +160,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         gender: event.gender,
         username: username,
         bio: event.bio,
+        avatarBytes: event.avatarBytes,
+        removeAvatar: event.removeAvatar,
       );
       emit(
         state.copyWith(
@@ -171,6 +199,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   void _onFailureCleared(AuthFailureCleared event, Emitter<AuthState> emit) {
     emit(state.copyWith(clearFailure: true));
+  }
+
+  AuthStatus _statusForProfile(UserProfile profile) {
+    return profile.onboardingCompleted && profile.hasRequiredData
+        ? AuthStatus.authenticated
+        : AuthStatus.profileIncomplete;
   }
 
   @override

@@ -175,7 +175,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                         ? null
                                         : authState.profile?.avatarUrl ??
                                               authState.session?.avatarUrl,
-                                    localAvatarBytes: _localAvatarBytes,
+                                    localAvatarBytes:
+                                        _localAvatarBytes ??
+                                        (_isAvatarRemoved
+                                            ? null
+                                            : authState.profile?.avatarBytes),
                                     onPick: _pickAvatar,
                                     onRemove: _removeAvatar,
                                   ),
@@ -307,6 +311,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     if (_localAvatarBytes != null) return true;
     if (_isAvatarRemoved) return false;
 
+    if (authState.profile?.avatarBytes != null) return true;
+
     final avatarUrl =
         authState.profile?.avatarUrl ?? authState.session?.avatarUrl;
     return avatarUrl?.isNotEmpty == true;
@@ -392,6 +398,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         birthDate: birthDate,
         gender: _gender ?? ProfileGender.unspecified,
         bio: _bioController.text,
+        avatarBytes: _localAvatarBytes,
+        removeAvatar: _isAvatarRemoved,
       ),
     );
   }

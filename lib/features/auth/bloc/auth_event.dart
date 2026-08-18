@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
@@ -33,6 +35,8 @@ final class AuthProfileSubmitted extends AuthEvent {
     required this.gender,
     this.username,
     this.bio,
+    this.avatarBytes,
+    this.removeAvatar = false,
   });
 
   final String displayName;
@@ -40,9 +44,19 @@ final class AuthProfileSubmitted extends AuthEvent {
   final ProfileGender gender;
   final String? username;
   final String? bio;
+  final Uint8List? avatarBytes;
+  final bool removeAvatar;
 
   @override
-  List<Object?> get props => [displayName, birthDate, gender, username, bio];
+  List<Object?> get props => [
+    displayName,
+    birthDate,
+    gender,
+    username,
+    bio,
+    avatarBytes,
+    removeAvatar,
+  ];
 }
 
 final class AuthSignOutRequested extends AuthEvent {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -23,6 +25,12 @@ class App extends StatefulWidget {
 
 class _AppState extends State<App> {
   final _appRouter = AppRouter();
+
+  @override
+  void dispose() {
+    unawaited(widget.config.database.close());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

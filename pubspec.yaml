@@ -12,6 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
   bloc_concurrency: ^0.3.0
+  drift: ^2.34.3
+  drift_flutter: ^0.3.1
   equatable: ^2.1.0
   flutter_dotenv: ^6.0.1
   flutter_bloc: ^9.1.1
@@ -19,6 +21,7 @@ dependencies:
   geolocator: ^14.0.3
   saver_gallery: ^5.1.0
   google_fonts: ^8.2.1
+  image: ^4.9.1
   shared_preferences: ^2.5.5
   supabase_flutter: ^2.17.2
   stream_transform: ^2.1.1
@@ -45,7 +48,8 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
   auto_route_generator: ^10.6.0
-  build_runner: ^2.4.15
+  build_runner: ^2.16.0
+  drift_dev: ^2.34.5
   flutter_launcher_icons: ^0.14.4
 
 flutter_launcher_icons:

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_bloc_logger/talker_bloc_logger.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/app/app.dart';
+import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/core/services/media_service.dart';
 import 'package:yap_chat/repositories/chat/local_media_repository.dart';
 
@@ -19,6 +20,7 @@ Future<void> main() async {
 
   final preferences = await SharedPreferences.getInstance();
   final talker = Talker();
+  final database = AppDatabase();
   final supabaseClient = await _initializeSupabase(dotenv.env);
 
   final localMediaRepository = LocalMediaRepository(preferences: preferences);
@@ -51,6 +53,7 @@ Future<void> main() async {
     preferences: preferences,
     talker: talker,
     env: Map.unmodifiable(dotenv.env),
+    database: database,
     supabaseClient: supabaseClient,
   );
 

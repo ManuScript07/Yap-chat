@@ -1,4 +1,5 @@
 import 'package:yap_chat/app/app_config.dart';
+import 'package:yap_chat/core/services/avatar_image_processor.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 /// Контейнер репозиториев приложения.
@@ -33,6 +34,11 @@ class RepositoryContainer {
       ),
       profileRepository: ProfileRepository(
         client: config.requireSupabaseClient(),
+        cache: ProfileCacheDataSource(database: config.database),
+        avatarStorage: AvatarStorageDataSource(
+          client: config.requireSupabaseClient(),
+          imageProcessor: const AvatarImageProcessor(),
+        ),
       ),
     );
   }

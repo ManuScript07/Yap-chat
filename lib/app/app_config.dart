@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:yap_chat/core/database/database.dart';
 
 enum AppEnvironment { dev, prod }
 
@@ -14,6 +15,7 @@ class AppConfig {
     required this.preferences,
     required this.talker,
     required this.env,
+    required this.database,
     this.supabaseClient,
   });
 
@@ -21,6 +23,7 @@ class AppConfig {
   final SharedPreferences preferences;
   final Talker talker;
   final Map<String, String> env;
+  final AppDatabase database;
   final SupabaseClient? supabaseClient;
 
   bool get isDev => environment == AppEnvironment.dev;

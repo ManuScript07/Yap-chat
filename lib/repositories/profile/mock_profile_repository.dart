@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
@@ -16,13 +17,20 @@ class MockProfileRepository implements IProfileRepository {
   final SharedPreferences _preferences;
 
   @override
+  Future<UserProfile?> getCachedProfile(String userId) async {
+    final saved = _preferences.getString(_storageKey);
+    if (saved == null) return null;
+
+    final profile = _profileFromJson(saved);
+    return profile.id == userId ? profile : null;
+  }
+
+  @override
   Future<UserProfile> getOrCreateProfile(AuthSession session) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     final saved = _preferences.getString(_storageKey);
     if (saved != null) {
-      final profile = UserProfile.fromMap(
-        Map<String, dynamic>.from(jsonDecode(saved) as Map),
-      );
+      final profile = _profileFromJson(saved);
       return _acceptMissingDocuments(profile);
     }
 
@@ -49,6 +57,8 @@ class MockProfileRepository implements IProfileRepository {
     required ProfileGender gender,
     String? username,
     String? bio,
+    Uint8List? avatarBytes,
+    bool removeAvatar = false,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
     final current = await getOrCreateProfile(AuthSession(userId: userId));
@@ -61,6 +71,11 @@ class MockProfileRepository implements IProfileRepository {
       gender: gender,
       bio: bio?.trim() ?? '',
       onboardingCompleted: true,
+      avatarBytes: avatarBytes,
+      clearAvatarUrl: removeAvatar || avatarBytes != null,
+      clearAvatarStoragePath: removeAvatar,
+      clearAvatarBytes: removeAvatar,
+      clearAvatarUpdatedAt: removeAvatar,
     );
     await _save(profile);
     return profile;
@@ -86,6 +101,9 @@ class MockProfileRepository implements IProfileRepository {
       displayName: profile.displayName,
       birthDate: profile.birthDate,
       avatarUrl: profile.avatarUrl,
+      avatarStoragePath: profile.avatarStoragePath,
+      avatarBytes: profile.avatarBytes,
+      avatarUpdatedAt: profile.avatarUpdatedAt,
       gender: profile.gender,
       bio: profile.bio,
       onboardingCompleted: profile.onboardingCompleted,
@@ -105,12 +123,25 @@ class MockProfileRepository implements IProfileRepository {
         'display_name': profile.displayName,
         'birth_date': profile.birthDate?.toIso8601String(),
         'avatar_url': profile.avatarUrl,
+        'avatar_storage_path': profile.avatarStoragePath,
+        'avatar_bytes': profile.avatarBytes == null
+            ? null
+            : base64Encode(profile.avatarBytes!),
+        'avatar_updated_at': profile.avatarUpdatedAt?.toIso8601String(),
         'gender': profile.gender.databaseValue,
         'bio': profile.bio,
         'onboarding_completed': profile.onboardingCompleted,
         'terms_accepted_at': profile.termsAcceptedAt?.toIso8601String(),
         'privacy_accepted_at': profile.privacyAcceptedAt?.toIso8601String(),
       }),
+    );
+  }
+
+  UserProfile _profileFromJson(String value) {
+    final map = Map<String, dynamic>.from(jsonDecode(value) as Map);
+    final encodedAvatar = map.remove('avatar_bytes') as String?;
+    return UserProfile.fromMap(map).copyWith(
+      avatarBytes: encodedAvatar == null ? null : base64Decode(encodedAvatar),
     );
   }
 }
