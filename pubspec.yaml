@@ -15,6 +15,7 @@ dependencies:
   equatable: ^2.1.0
   flutter_dotenv: ^6.0.1
   flutter_bloc: ^9.1.1
+  flutter_svg: ^2.3.0
   geolocator: ^14.0.3
   saver_gallery: ^5.1.0
   google_fonts: ^8.2.1

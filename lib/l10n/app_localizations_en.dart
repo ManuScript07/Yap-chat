@@ -221,7 +221,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceRecordingExitDiscard => 'Discard';
 
   @override
-  String get authWelcomeTitle => 'Welcome to Yap Chat';
+  String get authWelcomeTitle => 'Welcome';
+
+  @override
+  String get authSignInWith => 'Sign in with';
 
   @override
   String get authWelcomeDescription =>
@@ -235,6 +238,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'On your first sign-in, we will import available profile data from Yandex ID.';
 
   @override
+  String get authConsentPrefix =>
+      'By signing in and registering, you accept our';
+
+  @override
   String get authSignInFailed =>
       'Could not sign in with Yandex ID. Please try again.';
 
@@ -244,6 +251,54 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get authProfileSetupDescription =>
       'Review the data from Yandex ID and fill in the missing fields.';
+
+  @override
+  String get authOnboardingNameTitle => 'What\'s your name?';
+
+  @override
+  String get authOnboardingBirthDateTitle => 'When is your birthday?';
+
+  @override
+  String get authOnboardingBirthDateHint => 'We\'ll only show your age';
+
+  @override
+  String get authOnboardingGenderTitle => 'Who are you?';
+
+  @override
+  String get authOnboardingAvatarTitle => 'Add an avatar?';
+
+  @override
+  String get authOnboardingUsernameTitle => 'Choose a username.';
+
+  @override
+  String get authOnboardingUsernameHint => 'This is your unique username';
+
+  @override
+  String get authOnboardingBioTitle => 'Tell us about yourself';
+
+  @override
+  String get authOnboardingBioLabel => 'About me';
+
+  @override
+  String get authOnboardingSkip => 'Skip';
+
+  @override
+  String get authOnboardingReset => 'Reset';
+
+  @override
+  String get authAddImage => 'Add image';
+
+  @override
+  String get authOnboardingComplete => 'Finish';
+
+  @override
+  String get authBirthDateDay => 'DD';
+
+  @override
+  String get authBirthDateMonth => 'MM';
+
+  @override
+  String get authBirthDateYear => 'YYYY';
 
   @override
   String get authDisplayNameLabel => 'Name';
@@ -283,6 +338,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authBirthDateRequired => 'Enter your date of birth';
 
   @override
+  String get authBirthDateInvalid =>
+      'Enter a valid date of birth. You must be at least 14 years old.';
+
+  @override
   String get authDocumentsRequired =>
       'You must accept the Terms of Service and Privacy Policy';
 
@@ -306,4 +365,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authSignOut => 'Sign out';
+
+  @override
+  String get authBack => 'Back';
 }

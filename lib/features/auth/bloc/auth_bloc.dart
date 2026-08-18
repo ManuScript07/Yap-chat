@@ -131,9 +131,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         userId: session.userId,
         displayName: event.displayName,
         birthDate: event.birthDate,
-        acceptedTerms: event.acceptedTerms,
+        gender: event.gender,
         username: username,
-        avatarUrl: event.avatarUrl,
+        bio: event.bio,
       );
       emit(
         state.copyWith(

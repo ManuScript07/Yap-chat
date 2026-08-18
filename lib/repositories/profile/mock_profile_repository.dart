@@ -42,14 +42,10 @@ class MockProfileRepository implements IProfileRepository {
     required String userId,
     required String displayName,
     required DateTime birthDate,
-    required bool acceptedTerms,
+    required ProfileGender gender,
     String? username,
-    String? avatarUrl,
+    String? bio,
   }) async {
-    if (!acceptedTerms) {
-      throw StateError('Terms and privacy policy must be accepted.');
-    }
-
     await Future<void>.delayed(const Duration(milliseconds: 450));
     final now = DateTime.now().toUtc();
     final current = await getOrCreateProfile(AuthSession(userId: userId));
@@ -59,7 +55,8 @@ class MockProfileRepository implements IProfileRepository {
       username: username?.trim().isNotEmpty == true
           ? username!.trim().toLowerCase()
           : current.username,
-      avatarUrl: avatarUrl,
+      gender: gender,
+      bio: bio?.trim() ?? '',
       onboardingCompleted: true,
       termsAcceptedAt: now,
       privacyAcceptedAt: now,
@@ -85,6 +82,8 @@ class MockProfileRepository implements IProfileRepository {
         'display_name': profile.displayName,
         'birth_date': profile.birthDate?.toIso8601String(),
         'avatar_url': profile.avatarUrl,
+        'gender': profile.gender.databaseValue,
+        'bio': profile.bio,
         'onboarding_completed': profile.onboardingCompleted,
         'terms_accepted_at': profile.termsAcceptedAt?.toIso8601String(),
         'privacy_accepted_at': profile.privacyAcceptedAt?.toIso8601String(),

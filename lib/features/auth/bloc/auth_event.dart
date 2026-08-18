@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
+import 'package:yap_chat/features/profile/data/data.dart';
 
 sealed class AuthEvent extends Equatable {
   const AuthEvent();
@@ -29,25 +30,19 @@ final class AuthProfileSubmitted extends AuthEvent {
   const AuthProfileSubmitted({
     required this.displayName,
     required this.birthDate,
-    required this.acceptedTerms,
+    required this.gender,
     this.username,
-    this.avatarUrl,
+    this.bio,
   });
 
   final String displayName;
   final DateTime birthDate;
-  final bool acceptedTerms;
+  final ProfileGender gender;
   final String? username;
-  final String? avatarUrl;
+  final String? bio;
 
   @override
-  List<Object?> get props => [
-    displayName,
-    birthDate,
-    acceptedTerms,
-    username,
-    avatarUrl,
-  ];
+  List<Object?> get props => [displayName, birthDate, gender, username, bio];
 }
 
 final class AuthSignOutRequested extends AuthEvent {

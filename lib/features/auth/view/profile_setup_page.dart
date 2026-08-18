@@ -1,11 +1,13 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/auth/widgets/profile_setup_widgets.dart';
+import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -17,220 +19,371 @@ class ProfileSetupPage extends StatefulWidget {
 }
 
 class _ProfileSetupPageState extends State<ProfileSetupPage> {
+  static const _stepCount = 5;
+
+  late final PageController _pageController;
   late final TextEditingController _nameController;
-  late final TextEditingController _usernameController;
-  DateTime? _birthDate;
-  bool _acceptedTerms = false;
+  late final TextEditingController _dayController;
+  late final TextEditingController _monthController;
+  late final TextEditingController _yearController;
+  late final TextEditingController _bioController;
+  late final FocusNode _dayFocusNode;
+  late final FocusNode _monthFocusNode;
+  late final FocusNode _yearFocusNode;
+
+  var _currentStep = 0;
+  ProfileGender? _gender;
+  Uint8List? _localAvatarBytes;
+  var _isAvatarRemoved = false;
+  String? _validationError;
 
   @override
   void initState() {
     super.initState();
-    final authState = context.read<AuthBloc>().state;
+    final state = context.read<AuthBloc>().state;
+    final profile = state.profile;
+    final birthDate = profile?.birthDate ?? state.session?.birthDate;
+
+    _pageController = PageController();
     _nameController = TextEditingController(
-      text: authState.profile?.displayName ?? authState.session?.displayName,
+      text: profile?.displayName ?? state.session?.displayName,
     );
-    _usernameController = TextEditingController(
-      text: authState.profile?.username,
+    _dayController = TextEditingController(
+      text: birthDate == null ? '' : birthDate.day.toString().padLeft(2, '0'),
     );
-    _birthDate = authState.profile?.birthDate ?? authState.session?.birthDate;
+    _monthController = TextEditingController(
+      text: birthDate == null ? '' : birthDate.month.toString().padLeft(2, '0'),
+    );
+    _yearController = TextEditingController(
+      text: birthDate?.year.toString() ?? '',
+    );
+    _bioController = TextEditingController(text: profile?.bio);
+    _dayFocusNode = FocusNode();
+    _monthFocusNode = FocusNode();
+    _yearFocusNode = FocusNode();
+    _gender = profile?.gender == ProfileGender.unspecified
+        ? null
+        : profile?.gender;
   }
 
   @override
   void dispose() {
+    _pageController.dispose();
     _nameController.dispose();
-    _usernameController.dispose();
+    _dayController.dispose();
+    _monthController.dispose();
+    _yearController.dispose();
+    _bioController.dispose();
+    _dayFocusNode.dispose();
+    _monthFocusNode.dispose();
+    _yearFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
-    final locale = Localizations.localeOf(context).toLanguageTag();
 
     return BlocListener<AuthBloc, AuthState>(
       listenWhen: (previous, current) =>
           previous.failure != current.failure && current.failure != null,
       listener: (context, state) {
-        showAppSnackBar(
-          context,
-          message: _failureMessage(context, state.failure),
-          type: SnackBarType.error,
+        setState(
+          () => _validationError = _failureMessage(context, state.failure),
         );
         context.read<AuthBloc>().add(const AuthFailureCleared());
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(context.l10n.authProfileSetupTitle),
-          actions: [
-            IconButton(
-              tooltip: context.l10n.authSignOut,
-              onPressed: authState.isSubmitting
-                  ? null
-                  : () => context.read<AuthBloc>().add(
-                      const AuthSignOutRequested(),
-                    ),
-              icon: const Icon(Icons.logout_rounded),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: UserAvatar(
-                        avatarUrl:
-                            authState.profile?.avatarUrl ??
-                            authState.session?.avatarUrl,
-                        size: 96,
-                        borderRadius: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      context.l10n.authProfileSetupDescription,
-                      textAlign: TextAlign.center,
-                      style: context.textTheme.bodyLarge?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    TextField(
-                      controller: _nameController,
-                      textInputAction: TextInputAction.next,
-                      decoration: InputDecoration(
-                        labelText: context.l10n.authDisplayNameLabel,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _usernameController,
-                      autocorrect: false,
-                      textCapitalization: TextCapitalization.none,
-                      decoration: InputDecoration(
-                        labelText: context.l10n.authUsernameLabel,
-                        helperText: context.l10n.authUsernameHelper,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: _pickBirthDate,
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: context.l10n.authBirthDateLabel,
-                          suffixIcon: const Icon(Icons.calendar_month_rounded),
-                        ),
-                        child: Text(
-                          _birthDate == null
-                              ? context.l10n.authBirthDatePlaceholder
-                              : DateFormat.yMMMMd(locale).format(_birthDate!),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    CheckboxListTile(
-                      value: _acceptedTerms,
-                      onChanged: authState.isSubmitting
-                          ? null
-                          : (value) =>
-                                setState(() => _acceptedTerms = value ?? false),
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: Text(context.l10n.authAcceptDocuments),
-                      subtitle: Wrap(
-                        spacing: 4,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = math.min(520.0, constraints.maxWidth);
+
+              return Center(
+                child: SizedBox(
+                  width: contentWidth,
+                  child: Stack(
+                    children: [
+                      Column(
                         children: [
-                          _DocumentLink(
-                            label: context.l10n.authTermsOfService,
-                            envKey: 'TERMS_OF_SERVICE_URL',
+                          Expanded(
+                            child: PageView(
+                              controller: _pageController,
+                              physics: const NeverScrollableScrollPhysics(),
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentStep = index;
+                                  _validationError = null;
+                                });
+                              },
+                              children: [
+                                ProfileSetupStep(
+                                  title: context.l10n.authOnboardingNameTitle,
+                                  errorText: _currentStep == 0
+                                      ? _validationError
+                                      : null,
+                                  child: OnboardingTextField(
+                                    controller: _nameController,
+                                    label: context.l10n.authDisplayNameLabel,
+                                    maxLength: 30,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    textInputAction: TextInputAction.next,
+                                    onSubmitted: (_) => _next(),
+                                  ),
+                                ),
+                                ProfileSetupStep(
+                                  title:
+                                      context.l10n.authOnboardingBirthDateTitle,
+                                  subtitle:
+                                      context.l10n.authOnboardingBirthDateHint,
+                                  errorText: _currentStep == 1
+                                      ? _validationError ??
+                                            _birthDateValidationError
+                                      : null,
+                                  child: OnboardingBirthDateFields(
+                                    dayController: _dayController,
+                                    monthController: _monthController,
+                                    yearController: _yearController,
+                                    dayFocusNode: _dayFocusNode,
+                                    monthFocusNode: _monthFocusNode,
+                                    yearFocusNode: _yearFocusNode,
+                                    dayHint: context.l10n.authBirthDateDay,
+                                    monthHint: context.l10n.authBirthDateMonth,
+                                    yearHint: context.l10n.authBirthDateYear,
+                                    onChanged: _onBirthDateChanged,
+                                  ),
+                                ),
+                                ProfileSetupStep(
+                                  title: context.l10n.authOnboardingGenderTitle,
+                                  child: ProfileGenderPicker(
+                                    selectedGender: _gender,
+                                    resetLabel:
+                                        context.l10n.authOnboardingReset,
+                                    onSelected: (gender) {
+                                      setState(() => _gender = gender);
+                                    },
+                                    onReset: () {
+                                      setState(() => _gender = null);
+                                    },
+                                  ),
+                                ),
+                                ProfileSetupStep(
+                                  title: context.l10n.authOnboardingAvatarTitle,
+                                  child: ProfileAvatarPicker(
+                                    avatarUrl: _isAvatarRemoved
+                                        ? null
+                                        : authState.profile?.avatarUrl ??
+                                              authState.session?.avatarUrl,
+                                    localAvatarBytes: _localAvatarBytes,
+                                    onPick: _pickAvatar,
+                                    onRemove: _removeAvatar,
+                                  ),
+                                ),
+                                ProfileSetupStep(
+                                  title: context.l10n.authOnboardingBioTitle,
+                                  errorText: _currentStep == _stepCount - 1
+                                      ? _validationError
+                                      : null,
+                                  child: OnboardingTextField(
+                                    controller: _bioController,
+                                    label: context.l10n.authOnboardingBioLabel,
+                                    maxLength: 130,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          Text(
-                            context.l10n.authDocumentsAnd,
-                            style: context.textTheme.bodySmall,
-                          ),
-                          _DocumentLink(
-                            label: context.l10n.authPrivacyPolicy,
-                            envKey: 'PRIVACY_POLICY_URL',
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([
+                                _nameController,
+                                _dayController,
+                                _monthController,
+                                _yearController,
+                                _bioController,
+                              ]),
+                              builder: (context, _) => ProfileSetupNavigation(
+                                isFirstStep: _currentStep == 0,
+                                isLastStep: _currentStep == _stepCount - 1,
+                                showSkip:
+                                    _currentStep != _stepCount - 1 && _showSkip,
+                                isSubmitting: authState.isSubmitting,
+                                isNextEnabled:
+                                    _canProceed &&
+                                    (_currentStep != 1 ||
+                                        _birthDateValidationError == null),
+                                skipLabel: context.l10n.authOnboardingSkip,
+                                completeLabel:
+                                    context.l10n.authOnboardingComplete,
+                                onBack: _previous,
+                                onNext: _next,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 54,
-                      child: FilledButton(
-                        onPressed: authState.isSubmitting ? null : _submit,
-                        child: authState.isSubmitting
-                            ? SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: context.colorScheme.onPrimary,
+                      Positioned(
+                        top: 0,
+                        left: 16,
+                        child: TextButton(
+                          onPressed: authState.isSubmitting
+                              ? null
+                              : () => context.read<AuthBloc>().add(
+                                  const AuthSignOutRequested(),
                                 ),
-                              )
-                            : Text(context.l10n.authCompleteRegistration),
+                          style: TextButton.styleFrom(
+                            foregroundColor: context.colorScheme.onSurface,
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            textStyle: context.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: Text(context.l10n.authBack),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Future<void> _pickBirthDate() async {
-    final now = DateTime.now();
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _birthDate ?? DateTime(now.year - 18),
-      firstDate: DateTime(1900),
-      lastDate: now,
+  Future<void> _next() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (!_canProceed) {
+      setState(
+        () => _validationError = _currentStep == 0
+            ? context.l10n.authNameRequired
+            : context.l10n.authBirthDateInvalid,
+      );
+      return;
+    }
+
+    if (_currentStep == _stepCount - 1) {
+      _submit();
+      return;
+    }
+
+    setState(() => _validationError = null);
+    await _pageController.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
     );
-    if (!mounted || selected == null) return;
-    setState(() => _birthDate = selected);
+  }
+
+  Future<void> _previous() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await _pageController.previousPage(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  bool get _canProceed => switch (_currentStep) {
+    0 => _nameController.text.trim().isNotEmpty,
+    1 => _parseBirthDate() != null,
+    _ => true,
+  };
+
+  bool get _showSkip => switch (_currentStep) {
+    2 => _gender == null,
+    3 => _localAvatarBytes == null,
+    4 => _bioController.text.trim().isEmpty,
+    _ => false,
+  };
+
+  String? get _birthDateValidationError {
+    final day = int.tryParse(_dayController.text);
+    final month = int.tryParse(_monthController.text);
+    final year = int.tryParse(_yearController.text);
+
+    if (_dayController.text.length == 2 &&
+        (day == null || day < 1 || day > 31)) {
+      return context.l10n.authBirthDateInvalid;
+    }
+    if (_monthController.text.length == 2 &&
+        (month == null || month < 1 || month > 12)) {
+      return context.l10n.authBirthDateInvalid;
+    }
+    if (_yearController.text.length >= 2 && (year == null || year < 1900)) {
+      return context.l10n.authBirthDateInvalid;
+    }
+    if (_dayController.text.length == 2 &&
+        _monthController.text.length == 2 &&
+        _yearController.text.length == 4 &&
+        _parseBirthDate() == null) {
+      return context.l10n.authBirthDateInvalid;
+    }
+    return null;
+  }
+
+  DateTime? _parseBirthDate() {
+    final day = int.tryParse(_dayController.text);
+    final month = int.tryParse(_monthController.text);
+    final year = int.tryParse(_yearController.text);
+    if (day == null || month == null || year == null) return null;
+
+    final value = DateTime(year, month, day);
+    if (value.year != year || value.month != month || value.day != day) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    final age =
+        now.year -
+        value.year -
+        ((now.month < value.month ||
+                (now.month == value.month && now.day < value.day))
+            ? 1
+            : 0);
+    return age >= 14 ? value : null;
+  }
+
+  void _onBirthDateChanged() {
+    setState(() => _validationError = null);
+  }
+
+  Future<void> _pickAvatar() async {
+    final imageBytes = await MediaService.pickImageBytesFromGallery();
+    if (!mounted || imageBytes == null) return;
+    setState(() {
+      _localAvatarBytes = imageBytes;
+      _isAvatarRemoved = false;
+    });
+  }
+
+  void _removeAvatar() {
+    setState(() {
+      _localAvatarBytes = null;
+      _isAvatarRemoved = true;
+    });
   }
 
   void _submit() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      _showValidation(context.l10n.authNameRequired);
-      return;
-    }
-    final birthDate = _birthDate;
+    final birthDate = _parseBirthDate();
     if (birthDate == null) {
-      _showValidation(context.l10n.authBirthDateRequired);
-      return;
-    }
-    if (!_acceptedTerms) {
-      _showValidation(context.l10n.authDocumentsRequired);
+      setState(() => _validationError = context.l10n.authBirthDateInvalid);
       return;
     }
 
     context.read<AuthBloc>().add(
       AuthProfileSubmitted(
-        displayName: name,
+        displayName: _nameController.text.trim(),
         birthDate: birthDate,
-        acceptedTerms: true,
-        username: _usernameController.text,
-        avatarUrl:
-            context.read<AuthBloc>().state.profile?.avatarUrl ??
-            context.read<AuthBloc>().state.session?.avatarUrl,
+        gender: _gender ?? ProfileGender.unspecified,
+        bio: _bioController.text,
       ),
     );
-  }
-
-  void _showValidation(String message) {
-    showAppSnackBar(context, message: message, type: SnackBarType.error);
   }
 
   String _failureMessage(BuildContext context, AuthFailure? failure) {
@@ -239,33 +392,5 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       AuthFailure.invalidUsername => context.l10n.authUsernameInvalid,
       _ => context.l10n.authProfileSaveFailed,
     };
-  }
-}
-
-class _DocumentLink extends StatelessWidget {
-  const _DocumentLink({required this.label, required this.envKey});
-
-  final String label;
-  final String envKey;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () async {
-        final rawUrl = context.read<AppConfig>().env[envKey];
-        final url = rawUrl == null ? null : Uri.tryParse(rawUrl);
-        if (url != null) {
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-        }
-      },
-      child: Text(
-        label,
-        style: context.textTheme.bodySmall?.copyWith(
-          color: context.colorScheme.primary,
-          decoration: TextDecoration.underline,
-          decorationColor: context.colorScheme.primary,
-        ),
-      ),
-    );
   }
 }

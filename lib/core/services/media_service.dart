@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:path/path.dart' as path;
 
 import 'package:saver_gallery/saver_gallery.dart';
@@ -29,6 +31,15 @@ abstract class MediaService {
       imageQuality: 85,
     );
     return image?.path;
+  }
+
+  /// Открывает галерею и возвращает выбранное изображение для локального предпросмотра.
+  static Future<Uint8List?> pickImageBytesFromGallery() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    return image?.readAsBytes();
   }
 
   /// Возвращает результат камеры, потерянный при пересоздании Activity.

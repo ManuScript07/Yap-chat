@@ -227,7 +227,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get voiceRecordingExitDiscard => 'Сбросить';
 
   @override
-  String get authWelcomeTitle => 'Добро пожаловать в Yap Chat';
+  String get authWelcomeTitle => 'Добро пожаловать';
+
+  @override
+  String get authSignInWith => 'Войти с помощью';
 
   @override
   String get authWelcomeDescription =>
@@ -241,6 +244,9 @@ class AppLocalizationsRu extends AppLocalizations {
       'При первом входе мы перенесём доступные данные профиля из Яндекс ID.';
 
   @override
+  String get authConsentPrefix => 'При входе и регистрации вы принимаете наши';
+
+  @override
   String get authSignInFailed =>
       'Не удалось войти через Яндекс ID. Попробуйте ещё раз.';
 
@@ -250,6 +256,54 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get authProfileSetupDescription =>
       'Проверьте данные из Яндекс ID и заполните недостающие поля.';
+
+  @override
+  String get authOnboardingNameTitle => 'Как тебя зовут?';
+
+  @override
+  String get authOnboardingBirthDateTitle => 'А когда др?';
+
+  @override
+  String get authOnboardingBirthDateHint => 'Покажем только возраст';
+
+  @override
+  String get authOnboardingGenderTitle => 'Кто ты?';
+
+  @override
+  String get authOnboardingAvatarTitle => 'Добавим аву?';
+
+  @override
+  String get authOnboardingUsernameTitle => 'Придумай тег.';
+
+  @override
+  String get authOnboardingUsernameHint => 'Это уникальное имя пользователя';
+
+  @override
+  String get authOnboardingBioTitle => 'Напиши о себе';
+
+  @override
+  String get authOnboardingBioLabel => 'О себе';
+
+  @override
+  String get authOnboardingSkip => 'скип';
+
+  @override
+  String get authOnboardingReset => 'Сбросить';
+
+  @override
+  String get authAddImage => 'Добавить изображение';
+
+  @override
+  String get authOnboardingComplete => 'Завершить';
+
+  @override
+  String get authBirthDateDay => 'ДД';
+
+  @override
+  String get authBirthDateMonth => 'ММ';
+
+  @override
+  String get authBirthDateYear => 'ГГГГ';
 
   @override
   String get authDisplayNameLabel => 'Имя';
@@ -271,7 +325,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authAcceptDocuments => 'Я принимаю условия использования сервиса';
 
   @override
-  String get authTermsOfService => 'Пользовательское соглашение';
+  String get authTermsOfService => 'Условия обслуживания';
 
   @override
   String get authDocumentsAnd => 'и';
@@ -287,6 +341,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authBirthDateRequired => 'Укажите дату рождения';
+
+  @override
+  String get authBirthDateInvalid =>
+      'Введите корректную дату рождения. Вам должно быть не менее 14 лет.';
 
   @override
   String get authDocumentsRequired =>
@@ -312,4 +370,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authSignOut => 'Выйти';
+
+  @override
+  String get authBack => 'Назад';
 }

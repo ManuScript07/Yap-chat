@@ -20,6 +20,7 @@ class ProfileRepository implements IProfileRepository {
     }
 
     try {
+      final acceptedAt = DateTime.now().toUtc().toIso8601String();
       final created = await _client
           .from('profiles')
           .insert({
@@ -27,6 +28,8 @@ class ProfileRepository implements IProfileRepository {
             'display_name': session.displayName ?? '',
             'birth_date': session.birthDate?.toIso8601String().split('T').first,
             'avatar_url': session.avatarUrl,
+            'terms_accepted_at': acceptedAt,
+            'privacy_accepted_at': acceptedAt,
           })
           .select()
           .single();
@@ -38,7 +41,7 @@ class ProfileRepository implements IProfileRepository {
           .select()
           .eq('id', session.userId)
           .single();
-      return UserProfile.fromMap(profile);
+      return _fillMissingYandexData(UserProfile.fromMap(profile), session);
     }
   }
 
@@ -47,22 +50,17 @@ class ProfileRepository implements IProfileRepository {
     required String userId,
     required String displayName,
     required DateTime birthDate,
-    required bool acceptedTerms,
+    required ProfileGender gender,
     String? username,
-    String? avatarUrl,
+    String? bio,
   }) async {
-    if (!acceptedTerms) {
-      throw StateError('Terms and privacy policy must be accepted.');
-    }
-
     final normalizedUsername = username?.trim().toLowerCase();
     final update = <String, dynamic>{
       'display_name': displayName.trim(),
       'birth_date': birthDate.toIso8601String().split('T').first,
-      'avatar_url': avatarUrl,
+      'gender': gender.databaseValue,
+      'bio': bio?.trim() ?? '',
       'onboarding_completed': true,
-      'terms_accepted_at': DateTime.now().toUtc().toIso8601String(),
-      'privacy_accepted_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (normalizedUsername != null && normalizedUsername.isNotEmpty) {
       update['username'] = normalizedUsername;
@@ -98,6 +96,11 @@ class ProfileRepository implements IProfileRepository {
     }
     if (profile.avatarUrl == null && session.avatarUrl != null) {
       update['avatar_url'] = session.avatarUrl;
+    }
+    if (profile.termsAcceptedAt == null || profile.privacyAcceptedAt == null) {
+      final acceptedAt = DateTime.now().toUtc().toIso8601String();
+      update['terms_accepted_at'] = acceptedAt;
+      update['privacy_accepted_at'] = acceptedAt;
     }
     if (update.isEmpty) return profile;
 

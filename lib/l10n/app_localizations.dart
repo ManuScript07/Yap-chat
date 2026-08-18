@@ -443,8 +443,14 @@ abstract class AppLocalizations {
   /// No description provided for @authWelcomeTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Добро пожаловать в Yap Chat'**
+  /// **'Добро пожаловать'**
   String get authWelcomeTitle;
+
+  /// No description provided for @authSignInWith.
+  ///
+  /// In ru, this message translates to:
+  /// **'Войти с помощью'**
+  String get authSignInWith;
 
   /// No description provided for @authWelcomeDescription.
   ///
@@ -464,6 +470,12 @@ abstract class AppLocalizations {
   /// **'При первом входе мы перенесём доступные данные профиля из Яндекс ID.'**
   String get authConsentHint;
 
+  /// No description provided for @authConsentPrefix.
+  ///
+  /// In ru, this message translates to:
+  /// **'При входе и регистрации вы принимаете наши'**
+  String get authConsentPrefix;
+
   /// No description provided for @authSignInFailed.
   ///
   /// In ru, this message translates to:
@@ -481,6 +493,102 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Проверьте данные из Яндекс ID и заполните недостающие поля.'**
   String get authProfileSetupDescription;
+
+  /// No description provided for @authOnboardingNameTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Как тебя зовут?'**
+  String get authOnboardingNameTitle;
+
+  /// No description provided for @authOnboardingBirthDateTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'А когда др?'**
+  String get authOnboardingBirthDateTitle;
+
+  /// No description provided for @authOnboardingBirthDateHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Покажем только возраст'**
+  String get authOnboardingBirthDateHint;
+
+  /// No description provided for @authOnboardingGenderTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Кто ты?'**
+  String get authOnboardingGenderTitle;
+
+  /// No description provided for @authOnboardingAvatarTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавим аву?'**
+  String get authOnboardingAvatarTitle;
+
+  /// No description provided for @authOnboardingUsernameTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Придумай тег.'**
+  String get authOnboardingUsernameTitle;
+
+  /// No description provided for @authOnboardingUsernameHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Это уникальное имя пользователя'**
+  String get authOnboardingUsernameHint;
+
+  /// No description provided for @authOnboardingBioTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Напиши о себе'**
+  String get authOnboardingBioTitle;
+
+  /// No description provided for @authOnboardingBioLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'О себе'**
+  String get authOnboardingBioLabel;
+
+  /// No description provided for @authOnboardingSkip.
+  ///
+  /// In ru, this message translates to:
+  /// **'скип'**
+  String get authOnboardingSkip;
+
+  /// No description provided for @authOnboardingReset.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сбросить'**
+  String get authOnboardingReset;
+
+  /// No description provided for @authAddImage.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить изображение'**
+  String get authAddImage;
+
+  /// No description provided for @authOnboardingComplete.
+  ///
+  /// In ru, this message translates to:
+  /// **'Завершить'**
+  String get authOnboardingComplete;
+
+  /// No description provided for @authBirthDateDay.
+  ///
+  /// In ru, this message translates to:
+  /// **'ДД'**
+  String get authBirthDateDay;
+
+  /// No description provided for @authBirthDateMonth.
+  ///
+  /// In ru, this message translates to:
+  /// **'ММ'**
+  String get authBirthDateMonth;
+
+  /// No description provided for @authBirthDateYear.
+  ///
+  /// In ru, this message translates to:
+  /// **'ГГГГ'**
+  String get authBirthDateYear;
 
   /// No description provided for @authDisplayNameLabel.
   ///
@@ -521,7 +629,7 @@ abstract class AppLocalizations {
   /// No description provided for @authTermsOfService.
   ///
   /// In ru, this message translates to:
-  /// **'Пользовательское соглашение'**
+  /// **'Условия обслуживания'**
   String get authTermsOfService;
 
   /// No description provided for @authDocumentsAnd.
@@ -553,6 +661,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Укажите дату рождения'**
   String get authBirthDateRequired;
+
+  /// No description provided for @authBirthDateInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите корректную дату рождения. Вам должно быть не менее 14 лет.'**
+  String get authBirthDateInvalid;
 
   /// No description provided for @authDocumentsRequired.
   ///
@@ -595,6 +709,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Выйти'**
   String get authSignOut;
+
+  /// No description provided for @authBack.
+  ///
+  /// In ru, this message translates to:
+  /// **'Назад'**
+  String get authBack;
 }
 
 class _AppLocalizationsDelegate

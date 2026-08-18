@@ -5,6 +5,7 @@ class UserAvatar extends StatelessWidget {
   const UserAvatar({
     super.key,
     this.avatarUrl,
+    this.avatarImage,
     this.size = 48,
     this.borderRadius = 10,
     this.isOnline = false,
@@ -12,6 +13,7 @@ class UserAvatar extends StatelessWidget {
   });
 
   final String? avatarUrl;
+  final ImageProvider? avatarImage;
   final double size;
   final double borderRadius;
   final bool isOnline;
@@ -33,21 +35,16 @@ class UserAvatar extends StatelessWidget {
             width: size,
             height: size,
             color: surfaceColor,
-            child: avatarUrl != null && avatarUrl!.isNotEmpty
+            child: avatarImage != null
+                ? Image(image: avatarImage!, fit: BoxFit.cover)
+                : avatarUrl != null && avatarUrl!.isNotEmpty
                 ? Image.network(
-              avatarUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Icon(
-                Icons.person,
-                color: iconColor,
-                size: size * 0.65,
-              ),
-            )
-                : Icon(
-              Icons.person,
-              color: iconColor,
-              size: size * 0.65,
-            ),
+                    avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        Icon(Icons.person, color: iconColor, size: size * 0.65),
+                  )
+                : Icon(Icons.person, color: iconColor, size: size * 0.65),
           ),
         ),
         if (showOnlineBadge && isOnline)
@@ -60,10 +57,7 @@ class UserAvatar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: primaryBrandColor,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: backgroundColor,
-                  width: 2,
-                ),
+                border: Border.all(color: backgroundColor, width: 2),
               ),
             ),
           ),

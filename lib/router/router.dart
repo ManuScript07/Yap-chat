@@ -10,13 +10,40 @@ class AppRouter extends RootStackRouter {
       path: '/',
       page: AuthGateRoute.page,
       children: [
-        AutoRoute(path: '', page: SplashRoute.page),
-        AutoRoute(path: 'welcome', page: WelcomeRoute.page),
-        AutoRoute(path: 'profile-setup', page: ProfileSetupRoute.page),
-        AutoRoute(path: 'auth-failure', page: AuthFailureRoute.page),
-        AutoRoute(
+        CustomRoute(
+          path: '',
+          page: SplashRoute.page,
+          transitionsBuilder: _fade,
+          duration: const Duration(milliseconds: 180),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
+          path: 'welcome',
+          page: WelcomeRoute.page,
+          transitionsBuilder: _fade,
+          duration: const Duration(milliseconds: 180),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
+          path: 'profile-setup',
+          page: ProfileSetupRoute.page,
+          transitionsBuilder: _fade,
+          duration: const Duration(milliseconds: 180),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
+          path: 'auth-failure',
+          page: AuthFailureRoute.page,
+          transitionsBuilder: _fade,
+          duration: const Duration(milliseconds: 180),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
           path: 'app',
           page: MainRoute.page,
+          transitionsBuilder: _fade,
+          duration: const Duration(milliseconds: 180),
+          reverseDuration: const Duration(milliseconds: 150),
           children: [
             AutoRoute(path: 'chats', page: ChatsRoute.page),
             AutoRoute(path: 'friends', page: FriendsRoute.page),
@@ -60,4 +87,11 @@ class AppRouter extends RootStackRouter {
       child: FadeTransition(opacity: curvedAnimation, child: child),
     );
   }
+
+  static Widget _fade(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => FadeTransition(opacity: animation, child: child);
 }

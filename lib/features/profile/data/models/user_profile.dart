@@ -1,5 +1,20 @@
 import 'package:equatable/equatable.dart';
 
+enum ProfileGender {
+  male,
+  female,
+  unspecified;
+
+  String get databaseValue => name;
+
+  static ProfileGender fromDatabaseValue(String? value) {
+    return ProfileGender.values.firstWhere(
+      (gender) => gender.databaseValue == value,
+      orElse: () => ProfileGender.unspecified,
+    );
+  }
+}
+
 class UserProfile extends Equatable {
   const UserProfile({
     required this.id,
@@ -8,6 +23,8 @@ class UserProfile extends Equatable {
     required this.onboardingCompleted,
     this.birthDate,
     this.avatarUrl,
+    this.gender = ProfileGender.unspecified,
+    this.bio = '',
     this.termsAcceptedAt,
     this.privacyAcceptedAt,
   });
@@ -19,6 +36,8 @@ class UserProfile extends Equatable {
       displayName: map['display_name'] as String? ?? '',
       birthDate: DateTime.tryParse(map['birth_date'] as String? ?? ''),
       avatarUrl: map['avatar_url'] as String?,
+      gender: ProfileGender.fromDatabaseValue(map['gender'] as String?),
+      bio: map['bio'] as String? ?? '',
       onboardingCompleted: map['onboarding_completed'] as bool? ?? false,
       termsAcceptedAt: DateTime.tryParse(
         map['terms_accepted_at'] as String? ?? '',
@@ -34,6 +53,8 @@ class UserProfile extends Equatable {
   final String displayName;
   final DateTime? birthDate;
   final String? avatarUrl;
+  final ProfileGender gender;
+  final String bio;
   final bool onboardingCompleted;
   final DateTime? termsAcceptedAt;
   final DateTime? privacyAcceptedAt;
@@ -49,6 +70,8 @@ class UserProfile extends Equatable {
     String? displayName,
     DateTime? birthDate,
     String? avatarUrl,
+    ProfileGender? gender,
+    String? bio,
     bool? onboardingCompleted,
     DateTime? termsAcceptedAt,
     DateTime? privacyAcceptedAt,
@@ -59,6 +82,8 @@ class UserProfile extends Equatable {
       displayName: displayName ?? this.displayName,
       birthDate: birthDate ?? this.birthDate,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      gender: gender ?? this.gender,
+      bio: bio ?? this.bio,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       termsAcceptedAt: termsAcceptedAt ?? this.termsAcceptedAt,
       privacyAcceptedAt: privacyAcceptedAt ?? this.privacyAcceptedAt,
@@ -72,6 +97,8 @@ class UserProfile extends Equatable {
     displayName,
     birthDate,
     avatarUrl,
+    gender,
+    bio,
     onboardingCompleted,
     termsAcceptedAt,
     privacyAcceptedAt,

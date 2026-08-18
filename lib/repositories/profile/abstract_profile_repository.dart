@@ -8,9 +8,9 @@ abstract interface class IProfileRepository {
     required String userId,
     required String displayName,
     required DateTime birthDate,
-    required bool acceptedTerms,
+    required ProfileGender gender,
     String? username,
-    String? avatarUrl,
+    String? bio,
   });
 }
 
