@@ -6,7 +6,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/ui/ui.dart';
 
-class ProfileSetupStep extends StatelessWidget {
+class ProfileSetupStep extends StatefulWidget {
   const ProfileSetupStep({
     super.key,
     required this.title,
@@ -21,69 +21,129 @@ class ProfileSetupStep extends StatelessWidget {
   final Widget child;
 
   @override
+  State<ProfileSetupStep> createState() => _ProfileSetupStepState();
+}
+
+class _ProfileSetupStepState extends State<ProfileSetupStep> {
+  final _contentKey = GlobalKey();
+  final _layoutKey = GlobalKey();
+
+  Size? _layoutSize;
+  double? _contentTop;
+  var _isMeasurementScheduled = false;
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (_layoutSize != constraints.biggest) {
+          _layoutSize = constraints.biggest;
+          _contentTop = null;
+        }
+
         final titleSize = math.min(
           42.0,
           math.max(30.0, constraints.maxWidth * .1),
         );
+        final content = FittedBox(
+          key: _contentKey,
+          fit: BoxFit.scaleDown,
+          child: SizedBox(
+            width: math.min(448, constraints.maxWidth - 72),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.title,
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.displaySmall?.copyWith(
+                    color: context.colorScheme.onSurface,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.w800,
+                    height: 1.24,
+                    letterSpacing: .42,
+                  ),
+                ),
+                if (widget.subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.subtitle!,
+                    textAlign: TextAlign.center,
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      color: context.colorScheme.onSurfaceVariant,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      height: 1,
+                      letterSpacing: .5,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 56),
+                widget.child,
+                if (widget.errorText != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.errorText!,
+                    textAlign: TextAlign.center,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: context.colorScheme.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+        final isAnchored = _contentTop != null;
+
+        if (!isAnchored) _scheduleContentMeasurement();
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: SizedBox(
-                width: math.min(448, constraints.maxWidth - 72),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: context.textTheme.displaySmall?.copyWith(
-                        color: context.colorScheme.onSurface,
-                        fontSize: titleSize,
-                        fontWeight: FontWeight.w800,
-                        height: 1.24,
-                        letterSpacing: .42,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle!,
-                        textAlign: TextAlign.center,
-                        style: context.textTheme.bodyMedium?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          height: 1,
-                          letterSpacing: .5,
+          child: SizedBox.expand(
+            key: _layoutKey,
+            child: isAnchored
+                ? Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        top: _contentTop!,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: content,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 56),
-                    child,
-                    if (errorText != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        errorText!,
-                        textAlign: TextAlign.center,
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+                  )
+                : Center(child: content),
           ),
         );
       },
     );
+  }
+
+  void _scheduleContentMeasurement() {
+    if (_isMeasurementScheduled) return;
+    _isMeasurementScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isMeasurementScheduled = false;
+      if (!mounted) return;
+
+      final contentBox = _contentKey.currentContext?.findRenderObject();
+      final layoutBox = _layoutKey.currentContext?.findRenderObject();
+      if (contentBox is! RenderBox || layoutBox is! RenderBox) return;
+
+      final top = contentBox.localToGlobal(
+        Offset.zero,
+        ancestor: layoutBox,
+      ).dy;
+      if (_contentTop == top) return;
+      setState(() => _contentTop = top);
+    });
   }
 }
 
@@ -230,8 +290,8 @@ class ProfileAvatarPicker extends StatelessWidget {
         ),
         if (hasAvatar)
           Positioned(
-            top: -12,
-            right: -12,
+            top: 8,
+            right: 8,
             child: SizedBox.square(
               dimension: 42,
               child: IconButton(
@@ -280,7 +340,7 @@ class ProfileSetupNavigation extends StatelessWidget {
     final actionWidth = effectiveShowSkip
         ? 168.0
         : isLastStep
-        ? 184.0
+        ? 160.0
         : 95.0;
 
     return Row(
@@ -323,14 +383,18 @@ class ProfileSetupNavigation extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             if (effectiveShowSkip)
-                              Text(
-                                skipLabel,
-                                style: context.textTheme.headlineSmall?.copyWith(
-                                  color: context.colorScheme.onSurface,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1,
-                                  letterSpacing: .32,
+                              Transform.translate(
+                                offset: const Offset(0, -2),
+                                child: Text(
+                                  skipLabel,
+                                  style: context.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        color: context.colorScheme.onSurface,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1,
+                                        letterSpacing: .32,
+                                      ),
                                 ),
                               ),
                             if (isLastStep)
@@ -342,14 +406,13 @@ class ProfileSetupNavigation extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            if (effectiveShowSkip || isLastStep)
-                              const SizedBox(width: 4),
-                            Icon(
-                              isLastStep
-                                  ? Icons.check_rounded
-                                  : Icons.chevron_right_rounded,
-                              size: isLastStep ? 36 : 56,
-                            ),
+                            if (effectiveShowSkip)
+                              const SizedBox(width: 2),
+                            if (!isLastStep)
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                size: 56,
+                              ),
                           ],
                         ),
                       ),

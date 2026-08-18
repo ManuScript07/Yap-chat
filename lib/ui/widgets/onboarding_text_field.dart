@@ -66,6 +66,7 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
           textCapitalization: widget.textCapitalization,
           textInputAction: widget.textInputAction,
           onSubmitted: widget.onSubmitted,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           textAlignVertical: TextAlignVertical.center,
           style: context.textTheme.titleMedium?.copyWith(
             color: context.colorScheme.onSurface,
@@ -219,6 +220,7 @@ class _OnboardingDateFieldState extends State<_OnboardingDateField> {
         textAlign: TextAlign.center,
         textAlignVertical: TextAlignVertical.center,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
         onChanged: (value) {
           widget.onChanged();
           if (value.length == widget.maxLength) widget.onCompleted?.call();
@@ -285,34 +287,40 @@ class _OnboardingInputFrame extends StatelessWidget {
           width: 2,
         ),
       ),
-      child: Stack(
-        children: [
-          child,
-          if (counter != null)
-            Positioned(
-              top: 8,
-              right: 0,
-              child: IgnorePointer(
-                child: DefaultTextStyle(
-                  style:
-                      context.textTheme.bodyMedium?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
-                        fontSize: 16,
-                        height: 1,
-                        letterSpacing: .5,
-                      ) ??
-                      const TextStyle(),
-                  child: counter!,
+      child: counter == null
+          ? child
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                child,
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: IgnorePointer(
+                      child: DefaultTextStyle(
+                        style:
+                            context.textTheme.bodyMedium?.copyWith(
+                              color: context.colorScheme.onSurfaceVariant,
+                              fontSize: 16,
+                              height: 1,
+                              letterSpacing: .5,
+                            ) ??
+                            const TextStyle(),
+                        child: counter!,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-        ],
-      ),
     );
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
       child: content,
     );
   }

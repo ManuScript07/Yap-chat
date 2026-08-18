@@ -210,7 +210,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                 isFirstStep: _currentStep == 0,
                                 isLastStep: _currentStep == _stepCount - 1,
                                 showSkip:
-                                    _currentStep != _stepCount - 1 && _showSkip,
+                                    _currentStep != _stepCount - 1 &&
+                                    _showSkip(authState),
                                 isSubmitting: authState.isSubmitting,
                                 isNextEnabled:
                                     _canProceed &&
@@ -295,12 +296,21 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     _ => true,
   };
 
-  bool get _showSkip => switch (_currentStep) {
+  bool _showSkip(AuthState authState) => switch (_currentStep) {
     2 => _gender == null,
-    3 => _localAvatarBytes == null,
+    3 => !_hasAvatar(authState),
     4 => _bioController.text.trim().isEmpty,
     _ => false,
   };
+
+  bool _hasAvatar(AuthState authState) {
+    if (_localAvatarBytes != null) return true;
+    if (_isAvatarRemoved) return false;
+
+    final avatarUrl =
+        authState.profile?.avatarUrl ?? authState.session?.avatarUrl;
+    return avatarUrl?.isNotEmpty == true;
+  }
 
   String? get _birthDateValidationError {
     final day = int.tryParse(_dayController.text);

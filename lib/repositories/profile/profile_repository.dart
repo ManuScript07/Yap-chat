@@ -99,8 +99,12 @@ class ProfileRepository implements IProfileRepository {
     }
     if (profile.termsAcceptedAt == null || profile.privacyAcceptedAt == null) {
       final acceptedAt = DateTime.now().toUtc().toIso8601String();
-      update['terms_accepted_at'] = acceptedAt;
-      update['privacy_accepted_at'] = acceptedAt;
+      if (profile.termsAcceptedAt == null) {
+        update['terms_accepted_at'] = acceptedAt;
+      }
+      if (profile.privacyAcceptedAt == null) {
+        update['privacy_accepted_at'] = acceptedAt;
+      }
     }
     if (update.isEmpty) return profile;
 

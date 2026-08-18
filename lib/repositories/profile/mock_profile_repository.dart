@@ -20,11 +20,13 @@ class MockProfileRepository implements IProfileRepository {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     final saved = _preferences.getString(_storageKey);
     if (saved != null) {
-      return UserProfile.fromMap(
+      final profile = UserProfile.fromMap(
         Map<String, dynamic>.from(jsonDecode(saved) as Map),
       );
+      return _acceptMissingDocuments(profile);
     }
 
+    final acceptedAt = DateTime.now().toUtc();
     final profile = UserProfile(
       id: session.userId,
       username: _generateUsername(),
@@ -32,6 +34,8 @@ class MockProfileRepository implements IProfileRepository {
       birthDate: session.birthDate,
       avatarUrl: session.avatarUrl,
       onboardingCompleted: false,
+      termsAcceptedAt: acceptedAt,
+      privacyAcceptedAt: acceptedAt,
     );
     await _save(profile);
     return profile;
@@ -47,7 +51,6 @@ class MockProfileRepository implements IProfileRepository {
     String? bio,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
-    final now = DateTime.now().toUtc();
     final current = await getOrCreateProfile(AuthSession(userId: userId));
     final profile = current.copyWith(
       displayName: displayName.trim(),
@@ -58,8 +61,6 @@ class MockProfileRepository implements IProfileRepository {
       gender: gender,
       bio: bio?.trim() ?? '',
       onboardingCompleted: true,
-      termsAcceptedAt: now,
-      privacyAcceptedAt: now,
     );
     await _save(profile);
     return profile;
@@ -71,6 +72,28 @@ class MockProfileRepository implements IProfileRepository {
       8,
       (_) => _usernameCharacters[random.nextInt(_usernameCharacters.length)],
     ).join();
+  }
+
+  Future<UserProfile> _acceptMissingDocuments(UserProfile profile) async {
+    if (profile.termsAcceptedAt != null && profile.privacyAcceptedAt != null) {
+      return profile;
+    }
+
+    final acceptedAt = DateTime.now().toUtc();
+    final updated = UserProfile(
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      birthDate: profile.birthDate,
+      avatarUrl: profile.avatarUrl,
+      gender: profile.gender,
+      bio: profile.bio,
+      onboardingCompleted: profile.onboardingCompleted,
+      termsAcceptedAt: profile.termsAcceptedAt ?? acceptedAt,
+      privacyAcceptedAt: profile.privacyAcceptedAt ?? acceptedAt,
+    );
+    await _save(updated);
+    return updated;
   }
 
   Future<void> _save(UserProfile profile) {
