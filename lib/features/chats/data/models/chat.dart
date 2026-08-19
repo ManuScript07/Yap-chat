@@ -9,6 +9,7 @@ class Chat extends Equatable {
   final String userName;
   final String? avatarUrl;
   final String? avatarStoragePath;
+  final String? lastMessageId;
   final String lastMessage;
   final ChatPreviewType lastMessageType;
   final DateTime lastMessageTime;
@@ -24,6 +25,7 @@ class Chat extends Equatable {
     required this.userName,
     this.avatarUrl,
     this.avatarStoragePath,
+    this.lastMessageId,
     required this.lastMessage,
     this.lastMessageType = ChatPreviewType.text,
     required this.lastMessageTime,
@@ -40,6 +42,7 @@ class Chat extends Equatable {
     String? userName,
     String? avatarUrl,
     String? avatarStoragePath,
+    String? lastMessageId,
     String? lastMessage,
     ChatPreviewType? lastMessageType,
     DateTime? lastMessageTime,
@@ -55,6 +58,7 @@ class Chat extends Equatable {
       userName: userName ?? this.userName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
+      lastMessageId: lastMessageId ?? this.lastMessageId,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageType: lastMessageType ?? this.lastMessageType,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
@@ -73,6 +77,7 @@ class Chat extends Equatable {
     userName,
     avatarUrl,
     avatarStoragePath,
+    lastMessageId,
     lastMessage,
     lastMessageType,
     lastMessageTime,

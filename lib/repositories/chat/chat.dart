@@ -7,6 +7,8 @@ export 'audio_player_repository.dart';
 export 'audio_recorder_repository.dart';
 export 'abstract_local_media_repository.dart';
 export 'chat_repository.dart';
+export 'chat_message_hydrator.dart';
+export 'conversation_sync_service.dart';
 export 'mock_chat_repository.dart';
 export 'local_media_repository.dart';
 export 'abstract_location_repository.dart';

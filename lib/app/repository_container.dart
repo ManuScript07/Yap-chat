@@ -28,26 +28,44 @@ class RepositoryContainer {
       database: config.database,
       client: client,
     );
+    final chatsCache = ChatsCacheDataSource(
+      database: config.database,
+      userIdProvider: () => client.auth.currentUser!.id,
+    );
+    final chatCache = ChatCacheDataSource(
+      database: config.database,
+      userIdProvider: () => client.auth.currentUser!.id,
+    );
+    final chatsRemote = ChatsRemoteDataSource(client: client);
+    final chatRemote = ChatRemoteDataSource(client: client);
+    final messageHydrator = ChatMessageHydrator(
+      config: config,
+      remote: chatRemote,
+      mediaCache: mediaCache,
+    );
+    final conversationSync = ConversationSyncService(
+      cache: chatCache,
+      remote: chatRemote,
+      hydrator: messageHydrator,
+    );
     return RepositoryContainer(
       mediaCache: mediaCache,
       chatsRepository: ChatsRepository(
         config: config,
-        cache: ChatsCacheDataSource(
-          database: config.database,
-          userIdProvider: () => client.auth.currentUser!.id,
-        ),
-        remote: ChatsRemoteDataSource(client: client),
+        cache: chatsCache,
+        remote: chatsRemote,
         mediaCache: mediaCache,
+        chatCache: chatCache,
+        chatRemote: chatRemote,
+        conversationSync: conversationSync,
       ),
       chatRepository: ChatRepository(
         config: config,
-        cache: ChatCacheDataSource(
-          database: config.database,
-          userIdProvider: () => client.auth.currentUser!.id,
-        ),
-        remote: ChatRemoteDataSource(client: client),
+        cache: chatCache,
+        remote: chatRemote,
         mediaProcessor: const ChatMediaProcessor(),
         mediaCache: mediaCache,
+        syncService: conversationSync,
       ),
       localMediaRepository: LocalMediaRepository(
         preferences: config.preferences,

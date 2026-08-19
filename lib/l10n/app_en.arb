@@ -14,6 +14,18 @@
   "timeDaysAgo": "{count, plural, one{{count} day ago} other{{count} days ago}}",
   "failedToLoadChats": "Failed to load chats",
   "noChats": "You have no chats",
+  "chatsDeleteTitle": "{count, plural, =1{Delete chat?} other{Delete chats?}}",
+  "@chatsDeleteTitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "chatsDeleteConfirmation": "{count, plural, =1{The history will be deleted only for you.} other{The selected histories will be deleted only for you.}}",
+  "@chatsDeleteConfirmation": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "chatInputHint": "Type a message",
   "chatOnlineStatus": "Online",
   "chatOfflineStatus": "Offline",

@@ -72,6 +72,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noChats => 'You have no chats';
 
   @override
+  String chatsDeleteTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete chats?',
+      one: 'Delete chat?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatsDeleteConfirmation(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The selected histories will be deleted only for you.',
+      one: 'The history will be deleted only for you.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get chatInputHint => 'Type a message';
 
   @override

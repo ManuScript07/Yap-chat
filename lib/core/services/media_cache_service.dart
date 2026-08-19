@@ -134,6 +134,30 @@ class MediaCacheService {
     );
   }
 
+  Future<void> removeStorageFiles({
+    required String ownerUserId,
+    required String bucket,
+    required Iterable<String> storagePaths,
+    String? mimeType,
+  }) async {
+    for (final storagePath in storagePaths) {
+      final file = await _destinationFile(
+        ownerUserId,
+        bucket,
+        storagePath,
+        mimeType,
+      );
+      if (await file.exists()) await file.delete();
+    }
+  }
+
+  Future<void> removeLocalFiles(Iterable<String> paths) async {
+    for (final value in paths) {
+      final file = File(value);
+      if (await file.exists()) await file.delete();
+    }
+  }
+
   Future<void> clearUser(String ownerUserId) async {
     _trimTimers.remove(ownerUserId)?.cancel();
     final pending = await (_database.select(

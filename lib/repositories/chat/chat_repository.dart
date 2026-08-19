@@ -7,6 +7,7 @@ import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
+import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
 
 class ChatRepository implements IChatRepository {
@@ -16,15 +17,16 @@ class ChatRepository implements IChatRepository {
     required ChatRemoteDataSource remote,
     required ChatMediaProcessor mediaProcessor,
     required MediaCacheService mediaCache,
+    required ConversationSyncService syncService,
     Uuid uuid = const Uuid(),
   }) : _config = config,
        _cache = cache,
        _remote = remote,
        _mediaProcessor = mediaProcessor,
        _mediaCache = mediaCache,
+       _syncService = syncService,
        _uuid = uuid;
 
-  static const _pageSize = 60;
   static const _retryInterval = Duration(seconds: 20);
 
   final AppConfig _config;
@@ -32,37 +34,22 @@ class ChatRepository implements IChatRepository {
   final ChatRemoteDataSource _remote;
   final ChatMediaProcessor _mediaProcessor;
   final MediaCacheService _mediaCache;
+  final ConversationSyncService _syncService;
   final Uuid _uuid;
-  final Map<String, Future<void>> _activeSyncs = {};
   final Set<String> _deliveringOperationIds = {};
 
   @override
   Stream<List<ChatMessage>> getMessagesStream(String chatId) {
     late final StreamController<List<ChatMessage>> controller;
     StreamSubscription<List<ChatMessage>>? cacheSubscription;
-    StreamSubscription<void>? realtimeSubscription;
     Timer? retryTimer;
 
     controller = StreamController<List<ChatMessage>>(
       onListen: () {
+        _syncService.openConversation(chatId);
         cacheSubscription = _cache
             .watchMessages(chatId, currentUserId: _remote.currentUserId)
             .listen(controller.add, onError: controller.addError);
-        realtimeSubscription = _remote
-            .watchChanges(chatId)
-            .listen(
-              (_) {
-                unawaited(_synchronizeBestEffort(chatId));
-                unawaited(_retryPending(chatId));
-              },
-              onError: (Object error, StackTrace stackTrace) {
-                _config.talker.handle(
-                  error,
-                  stackTrace,
-                  'Chat realtime failed',
-                );
-              },
-            );
         retryTimer = Timer.periodic(
           _retryInterval,
           (_) => unawaited(_retryPending(chatId)),
@@ -70,9 +57,9 @@ class ChatRepository implements IChatRepository {
         unawaited(_initializeChat(chatId));
       },
       onCancel: () async {
+        _syncService.closeConversation(chatId);
         retryTimer?.cancel();
         await cacheSubscription?.cancel();
-        await realtimeSubscription?.cancel();
       },
     );
     return controller.stream;
@@ -81,17 +68,13 @@ class ChatRepository implements IChatRepository {
   Future<void> _initializeChat(String chatId) async {
     await _retryPending(chatId);
     try {
-      await _synchronize(chatId);
+      final messages = await _syncService.synchronizeRecent(chatId);
+      final hasUnreadIncoming = messages.any(
+        (message) => !message.isMine && message.readAt == null,
+      );
+      if (hasUnreadIncoming) await _remote.markAsRead(chatId);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Initial chat sync failed');
-    }
-  }
-
-  Future<void> _synchronizeBestEffort(String chatId) async {
-    try {
-      await _synchronize(chatId);
-    } catch (error, stackTrace) {
-      _config.talker.handle(error, stackTrace, 'Chat synchronization failed');
     }
   }
 
@@ -110,11 +93,11 @@ class ChatRepository implements IChatRepository {
       chatId,
       beforeTimestamp: oldest.timestamp,
       beforeMessageId: oldest.id,
-      pageSize: _pageSize,
+      pageSize: ConversationSyncService.pageSize,
     );
-    final hydrated = await _hydrateMessages(page);
+    final hydrated = await _syncService.hydrateAll(page);
     await _cache.upsertMessages(hydrated);
-    return page.length == _pageSize;
+    return page.length == ConversationSyncService.pageSize;
   }
 
   @override
@@ -217,7 +200,7 @@ class ChatRepository implements IChatRepository {
       deleteForEveryone: deleteForEveryone,
     );
     await _cache.removeMessage(messageId);
-    await _synchronize(chatId);
+    await _syncService.synchronizeRecent(chatId);
   }
 
   Future<void> _enqueue({
@@ -324,7 +307,7 @@ class ChatRepository implements IChatRepository {
           payload['audio_path'] as String?,
         );
       }
-      await _synchronize(operation.chatId);
+      await _syncService.synchronizeRecent(operation.chatId);
     } catch (error, stackTrace) {
       await _cache.markPendingFailure(operation.id, error);
       _config.talker.handle(error, stackTrace, 'Pending message upload failed');
@@ -425,71 +408,5 @@ class ChatRepository implements IChatRepository {
 
   String _attachmentId(String messageId, int position) {
     return _uuid.v5(Namespace.url.value, '$messageId:$position');
-  }
-
-  Future<void> _synchronize(String chatId) {
-    final active = _activeSyncs[chatId];
-    if (active != null) return active;
-    final sync = _performSync(chatId);
-    _activeSyncs[chatId] = sync;
-    return sync.whenComplete(() {
-      if (identical(_activeSyncs[chatId], sync)) _activeSyncs.remove(chatId);
-    });
-  }
-
-  Future<void> _performSync(String chatId) async {
-    final messages = await _remote.fetchMessages(chatId, pageSize: _pageSize);
-    final hydrated = await _hydrateMessages(messages);
-    await _cache.replaceRecentMessages(chatId, hydrated);
-    final hasUnreadIncoming = hydrated.any(
-      (message) => !message.isMine && message.readAt == null,
-    );
-    if (hasUnreadIncoming) await _remote.markAsRead(chatId);
-  }
-
-  Future<List<ChatMessage>> _hydrateMessages(List<ChatMessage> messages) async {
-    return Future.wait(messages.map(_hydrateMessage));
-  }
-
-  Future<ChatMessage> _hydrateMessage(ChatMessage message) async {
-    if (message.type == MessageType.image) {
-      final paths = <String>[];
-      for (var index = 0; index < message.mediaStoragePaths.length; index++) {
-        final storagePath = message.mediaStoragePaths[index];
-        try {
-          paths.add(
-            await _mediaCache.cacheStorageFile(
-              ownerUserId: _remote.currentUserId,
-              bucket: 'chat-images',
-              storagePath: storagePath,
-              mimeType: 'image/jpeg',
-            ),
-          );
-        } catch (error, stackTrace) {
-          _config.talker.handle(error, stackTrace, 'Image caching failed');
-          if (index < message.mediaUrls.length &&
-              message.mediaUrls[index].isNotEmpty) {
-            paths.add(message.mediaUrls[index]);
-          }
-        }
-      }
-      return message.copyWith(mediaUrls: paths);
-    }
-
-    final audioStoragePath = message.audioStoragePath;
-    if (message.type != MessageType.audio || audioStoragePath == null) {
-      return message;
-    }
-    try {
-      final localPath = await _mediaCache.cacheStorageFile(
-        ownerUserId: _remote.currentUserId,
-        bucket: 'chat-audio',
-        storagePath: audioStoragePath,
-      );
-      return message.copyWith(audioUrl: localPath);
-    } catch (error, stackTrace) {
-      _config.talker.handle(error, stackTrace, 'Audio caching failed');
-      return message;
-    }
   }
 }

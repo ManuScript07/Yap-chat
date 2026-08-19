@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -35,31 +34,6 @@ class ChatRemoteDataSource {
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
     return rows.map(_mapMessage).toList(growable: false);
-  }
-
-  Stream<void> watchChanges(String chatId) {
-    late final StreamController<void> controller;
-    RealtimeChannel? channel;
-    controller = StreamController<void>(
-      onListen: () {
-        channel =
-            _client
-                .channel(
-                  'chat:$chatId',
-                  opts: const RealtimeChannelConfig(private: true),
-                )
-                .onBroadcast(
-                  event: 'changed',
-                  callback: (_) => controller.add(null),
-                )
-              ..subscribe();
-      },
-      onCancel: () async {
-        final activeChannel = channel;
-        if (activeChannel != null) await _client.removeChannel(activeChannel);
-      },
-    );
-    return controller.stream;
   }
 
   Future<void> upload({

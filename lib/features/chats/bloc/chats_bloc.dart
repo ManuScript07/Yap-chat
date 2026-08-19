@@ -102,6 +102,8 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     final selectedIds = Set<String>.of(state.selectedChatIds);
     if (selectedIds.isEmpty) return;
 
+    emit(state.copyWith(selectedChatIds: const {}));
+
     try {
       await _chatsRepository.deleteChats(selectedIds);
       final chats = state.chats
@@ -112,12 +114,9 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         state.copyWith(
           chats: chats,
           filteredChats: _filterChats(chats, state.searchQuery),
-          selectedChatIds: const {},
         ),
       );
-    } catch (_) {
-      emit(state.copyWith(selectedChatIds: const {}));
-    }
+    } catch (_) {}
   }
 
   Future<void> _onMarkedAsRead(

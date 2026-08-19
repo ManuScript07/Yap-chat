@@ -78,6 +78,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noChats => 'У вас нет чатов';
 
   @override
+  String chatsDeleteTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Удалить чаты?',
+      one: 'Удалить чат?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatsDeleteConfirmation(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'История выбранных чатов удалится только у вас.',
+      one: 'История удалится только у вас.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get chatInputHint => 'Введите сообщение';
 
   @override

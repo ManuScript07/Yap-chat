@@ -5,6 +5,8 @@ import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 
 class ChatCacheDataSource {
+  static const pendingChatDeletionType = 'hide_conversation';
+
   const ChatCacheDataSource({
     required AppDatabase database,
     required String Function() userIdProvider,
@@ -145,7 +147,11 @@ class ChatCacheDataSource {
 
   Future<List<PendingMessageOperation>> readPendingOperations() async {
     final query = _database.select(_database.pendingChatOperations)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(_userIdProvider()) &
+            table.type.isIn(MessageType.values.map((type) => type.name)),
+      )
       ..orderBy([(table) => OrderingTerm.asc(table.createdAt)]);
     return (await query.get())
         .map(
@@ -191,6 +197,113 @@ class ChatCacheDataSource {
               table.ownerUserId.equals(_userIdProvider()) & table.id.equals(id),
         ))
         .go();
+  }
+
+  Future<void> putPendingChatDeletion({
+    required String id,
+    required String chatId,
+    required DateTime clearedAt,
+  }) {
+    return _database
+        .into(_database.pendingChatOperations)
+        .insertOnConflictUpdate(
+          PendingChatOperationsCompanion.insert(
+            ownerUserId: _userIdProvider(),
+            id: id,
+            chatId: chatId,
+            type: pendingChatDeletionType,
+            payloadJson: jsonEncode({
+              'cleared_at': clearedAt.toUtc().toIso8601String(),
+            }),
+            createdAt: clearedAt.toUtc(),
+          ),
+        );
+  }
+
+  Future<List<PendingChatDeletion>> readPendingChatDeletions() async {
+    final query = _database.select(_database.pendingChatOperations)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(_userIdProvider()) &
+            table.type.equals(pendingChatDeletionType),
+      )
+      ..orderBy([(table) => OrderingTerm.asc(table.createdAt)]);
+    return (await query.get())
+        .map((row) {
+          final payload = Map<String, dynamic>.from(
+            jsonDecode(row.payloadJson) as Map,
+          );
+          return PendingChatDeletion(
+            id: row.id,
+            chatId: row.chatId,
+            clearedAt:
+                DateTime.tryParse(
+                  payload['cleared_at'] as String? ?? '',
+                )?.toUtc() ??
+                row.createdAt.toUtc(),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<ConversationCacheFiles> clearConversations(Set<String> chatIds) async {
+    if (chatIds.isEmpty) return const ConversationCacheFiles();
+    final ownerUserId = _userIdProvider();
+    final messageRows =
+        await (_database.select(_database.cachedMessages)..where(
+              (table) =>
+                  table.ownerUserId.equals(ownerUserId) &
+                  table.chatId.isIn(chatIds),
+            ))
+            .get();
+    final pendingRows =
+        await (_database.select(_database.pendingChatOperations)..where(
+              (table) =>
+                  table.ownerUserId.equals(ownerUserId) &
+                  table.chatId.isIn(chatIds) &
+                  table.type.equals(pendingChatDeletionType).not(),
+            ))
+            .get();
+
+    final imageStoragePaths = <String>{};
+    final audioStoragePaths = <String>{};
+    for (final row in messageRows) {
+      imageStoragePaths.addAll(
+        List<String>.from(jsonDecode(row.mediaStoragePathsJson) as List),
+      );
+      final audioStoragePath = row.audioStoragePath;
+      if (audioStoragePath != null) audioStoragePaths.add(audioStoragePath);
+    }
+    final outboxAudioPaths = <String>{};
+    for (final row in pendingRows) {
+      final payload = jsonDecode(row.payloadJson);
+      if (payload is! Map) continue;
+      final audioPath = payload['audio_path'];
+      if (audioPath is String && audioPath.isNotEmpty) {
+        outboxAudioPaths.add(audioPath);
+      }
+    }
+
+    await _database.transaction(() async {
+      await (_database.delete(_database.cachedMessages)..where(
+            (table) =>
+                table.ownerUserId.equals(ownerUserId) &
+                table.chatId.isIn(chatIds),
+          ))
+          .go();
+      await (_database.delete(_database.pendingChatOperations)..where(
+            (table) =>
+                table.ownerUserId.equals(ownerUserId) &
+                table.chatId.isIn(chatIds) &
+                table.type.equals(pendingChatDeletionType).not(),
+          ))
+          .go();
+    });
+    return ConversationCacheFiles(
+      imageStoragePaths: imageStoragePaths,
+      audioStoragePaths: audioStoragePaths,
+      outboxAudioPaths: outboxAudioPaths,
+    );
   }
 
   Future<void> _upsertMessages(List<ChatMessage> messages) async {
@@ -291,4 +404,28 @@ class PendingMessageOperation {
   final DateTime createdAt;
   final int attempts;
   final String? lastError;
+}
+
+class PendingChatDeletion {
+  const PendingChatDeletion({
+    required this.id,
+    required this.chatId,
+    required this.clearedAt,
+  });
+
+  final String id;
+  final String chatId;
+  final DateTime clearedAt;
+}
+
+class ConversationCacheFiles {
+  const ConversationCacheFiles({
+    this.imageStoragePaths = const {},
+    this.audioStoragePaths = const {},
+    this.outboxAudioPaths = const {},
+  });
+
+  final Set<String> imageStoragePaths;
+  final Set<String> audioStoragePaths;
+  final Set<String> outboxAudioPaths;
 }

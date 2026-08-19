@@ -3,11 +3,22 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 
+class ConversationChange {
+  const ConversationChange({
+    required this.conversationId,
+    required this.reason,
+  });
+
+  final String? conversationId;
+  final String reason;
+}
+
 class ChatsRemoteDataSource {
-  const ChatsRemoteDataSource({required SupabaseClient client})
-    : _client = client;
+  ChatsRemoteDataSource({required SupabaseClient client}) : _client = client;
 
   final SupabaseClient _client;
+  StreamController<ConversationChange>? _changesController;
+  RealtimeChannel? _changesChannel;
 
   String get currentUserId {
     final id = _client.auth.currentUser?.id;
@@ -34,6 +45,7 @@ class ChatsRemoteDataSource {
                 ? row['peer_avatar_url'] as String?
                 : null,
             avatarStoragePath: storagePath,
+            lastMessageId: row['last_message_id'] as String?,
             lastMessage: row['last_message_text'] as String? ?? '',
             lastMessageType: _previewType(lastMessageType),
             lastMessageTime: lastMessageAt == null
@@ -48,35 +60,86 @@ class ChatsRemoteDataSource {
         .toList(growable: false);
   }
 
-  Stream<void> watchChanges() {
-    late final StreamController<void> controller;
-    RealtimeChannel? channel;
-    controller = StreamController<void>(
-      onListen: () {
-        channel =
-            _client
-                .channel(
-                  'user:$currentUserId:chats',
-                  opts: const RealtimeChannelConfig(private: true),
-                )
-                .onBroadcast(
-                  event: 'changed',
-                  callback: (_) => controller.add(null),
-                )
-              ..subscribe();
-      },
-      onCancel: () async {
-        final activeChannel = channel;
-        if (activeChannel != null) await _client.removeChannel(activeChannel);
-      },
-    );
-    return controller.stream;
+  Stream<ConversationChange> watchChanges() {
+    return (_changesController ??= StreamController<ConversationChange>.broadcast(
+      onListen: _startWatchingChanges,
+      onCancel: _stopWatchingChanges,
+    ))
+        .stream;
   }
 
-  Future<void> hideChats(Set<String> ids) => _client.rpc<void>(
-    'hide_conversations',
-    params: {'conversation_ids': ids.toList(growable: false)},
-  );
+  void _startWatchingChanges() {
+    if (_changesChannel != null) return;
+    final controller = _changesController;
+    if (controller == null || controller.isClosed) return;
+    _changesChannel =
+        _client
+            .channel(
+              'user:$currentUserId:chats',
+              opts: const RealtimeChannelConfig(private: true),
+            )
+            .onBroadcast(
+              event: 'changed',
+              callback: (event) {
+                final nested = event['payload'];
+                final payload = nested is Map
+                    ? Map<String, dynamic>.from(nested)
+                    : event;
+                final reason = payload['reason'] as String? ?? 'changed';
+                final conversationId = payload['conversation_id'];
+                if (conversationId is String) {
+                  controller.add(
+                    ConversationChange(
+                      conversationId: conversationId,
+                      reason: reason,
+                    ),
+                  );
+                }
+                final conversationIds = payload['conversation_ids'];
+                if (conversationIds is List) {
+                  for (final id in conversationIds.whereType<String>()) {
+                    controller.add(
+                      ConversationChange(
+                        conversationId: id,
+                        reason: reason,
+                      ),
+                    );
+                  }
+                }
+              },
+            )
+          ..subscribe((status, _) {
+            if (status == RealtimeSubscribeStatus.subscribed &&
+                !controller.isClosed) {
+              controller.add(
+                const ConversationChange(
+                  conversationId: null,
+                  reason: 'subscribed',
+                ),
+              );
+            }
+          });
+  }
+
+  Future<void> _stopWatchingChanges() async {
+    final channel = _changesChannel;
+    _changesChannel = null;
+    if (channel != null) {
+      await _client.removeChannel(channel);
+    }
+    if (_changesController?.hasListener ?? false) {
+      _startWatchingChanges();
+    }
+  }
+
+  Future<void> hideChats(Set<String> ids, {required DateTime clearedAt}) =>
+      _client.rpc<void>(
+        'hide_conversations',
+        params: {
+          'conversation_ids': ids.toList(growable: false),
+          'cleared_before': clearedAt.toUtc().toIso8601String(),
+        },
+      );
 
   Future<void> markAsRead(Set<String> ids) => _client.rpc<void>(
     'mark_conversations_read',

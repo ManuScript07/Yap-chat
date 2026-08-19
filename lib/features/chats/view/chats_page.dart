@@ -48,8 +48,18 @@ class ChatsPage extends StatelessWidget {
                       context.read<ChatsBloc>().add(const ChatsMuteToggled()),
                   onMarkAsRead: () =>
                       context.read<ChatsBloc>().add(const ChatsMarkedAsRead()),
-                  onDelete: () =>
-                      context.read<ChatsBloc>().add(const ChatsDeleted()),
+                  onDelete: () async {
+                    final count = state.selectedChatIds.length;
+                    final confirmed = await showConfirmationDialog(
+                      context,
+                      title: context.l10n.chatsDeleteTitle(count),
+                      content: context.l10n.chatsDeleteConfirmation(count),
+                      confirmLabel: context.l10n.chatActionDelete,
+                    );
+                    if (confirmed == true && context.mounted) {
+                      context.read<ChatsBloc>().add(const ChatsDeleted());
+                    }
+                  },
                 )
               : PrimaryAppBar(
                   title: context.l10n.navChats,

@@ -176,6 +176,18 @@ abstract class AppLocalizations {
   /// **'У вас нет чатов'**
   String get noChats;
 
+  /// No description provided for @chatsDeleteTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, =1{Удалить чат?} other{Удалить чаты?}}'**
+  String chatsDeleteTitle(int count);
+
+  /// No description provided for @chatsDeleteConfirmation.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, =1{История удалится только у вас.} other{История выбранных чатов удалится только у вас.}}'**
+  String chatsDeleteConfirmation(int count);
+
   /// No description provided for @chatInputHint.
   ///
   /// In ru, this message translates to:
