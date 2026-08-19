@@ -31,6 +31,7 @@ class CachedChats extends Table {
   TextColumn get peerDisplayName => text()();
   TextColumn get peerAvatarUrl => text().nullable()();
   TextColumn get peerAvatarStoragePath => text().nullable()();
+  TextColumn get lastMessageId => text().nullable()();
   TextColumn get lastMessage => text()();
   TextColumn get lastMessageType => text()();
   DateTimeColumn get lastMessageTime => dateTime()();
@@ -105,7 +106,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -115,6 +116,9 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(cachedChats);
         await migrator.createTable(cachedMessages);
         await migrator.createTable(pendingChatOperations);
+      }
+      if (from >= 2 && from < 3) {
+        await migrator.addColumn(cachedChats, cachedChats.lastMessageId);
       }
     },
   );

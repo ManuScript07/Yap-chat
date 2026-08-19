@@ -26,7 +26,10 @@ class ChatCacheDataSource {
             table.ownerUserId.equals(_userIdProvider()) &
             table.chatId.equals(chatId),
       )
-      ..orderBy([(table) => OrderingTerm.desc(table.timestamp)]);
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.id),
+      ]);
     return query.watch().map(
       (rows) =>
           List.unmodifiable(rows.map((row) => _mapMessage(row, currentUserId))),
@@ -43,7 +46,10 @@ class ChatCacheDataSource {
             table.ownerUserId.equals(_userIdProvider()) &
             table.chatId.equals(chatId),
       )
-      ..orderBy([(table) => OrderingTerm.desc(table.timestamp)]);
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.id),
+      ]);
     return (await query.get())
         .map((row) => _mapMessage(row, currentUserId))
         .toList(growable: false);

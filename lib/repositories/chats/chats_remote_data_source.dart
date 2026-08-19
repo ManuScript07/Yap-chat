@@ -72,7 +72,8 @@ class ChatsRemoteDataSource {
     if (_changesChannel != null) return;
     final controller = _changesController;
     if (controller == null || controller.isClosed) return;
-    _changesChannel =
+    late final RealtimeChannel channel;
+    channel =
         _client
             .channel(
               'user:$currentUserId:chats',
@@ -81,6 +82,7 @@ class ChatsRemoteDataSource {
             .onBroadcast(
               event: 'changed',
               callback: (event) {
+                if (!identical(_changesChannel, channel)) return;
                 final nested = event['payload'];
                 final payload = nested is Map
                     ? Map<String, dynamic>.from(nested)
@@ -107,18 +109,26 @@ class ChatsRemoteDataSource {
                   }
                 }
               },
-            )
-          ..subscribe((status, _) {
-            if (status == RealtimeSubscribeStatus.subscribed &&
-                !controller.isClosed) {
-              controller.add(
-                const ConversationChange(
-                  conversationId: null,
-                  reason: 'subscribed',
-                ),
-              );
-            }
-          });
+            );
+    _changesChannel = channel;
+    channel.subscribe((status, _) {
+      if (!identical(_changesChannel, channel) || controller.isClosed) return;
+      switch (status) {
+        case RealtimeSubscribeStatus.subscribed:
+          controller.add(
+            const ConversationChange(
+              conversationId: null,
+              reason: 'subscribed',
+            ),
+          );
+        case RealtimeSubscribeStatus.closed:
+          _changesChannel = null;
+          if (controller.hasListener) _startWatchingChanges();
+        case RealtimeSubscribeStatus.channelError:
+        case RealtimeSubscribeStatus.timedOut:
+          break;
+      }
+    });
   }
 
   Future<void> _stopWatchingChanges() async {

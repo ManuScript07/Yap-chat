@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
+import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
@@ -30,6 +31,8 @@ class ChatsRepository implements IChatsRepository {
        _conversationSync = conversationSync,
        _uuid = uuid;
 
+  static const _reconciliationInterval = Duration(seconds: 20);
+
   final AppConfig _config;
   final ChatsCacheDataSource _cache;
   final ChatsRemoteDataSource _remote;
@@ -40,12 +43,15 @@ class ChatsRepository implements IChatsRepository {
   final Uuid _uuid;
   Future<void>? _activeSync;
   Future<void>? _activeDeletionRetry;
+  Future<void> _changeQueue = Future<void>.value();
+  bool _reconciliationQueued = false;
 
   @override
   Stream<List<Chat>> watchChats() {
     late final StreamController<List<Chat>> controller;
     StreamSubscription<List<Chat>>? cacheSubscription;
     StreamSubscription<ConversationChange>? realtimeSubscription;
+    Timer? reconciliationTimer;
 
     controller = StreamController<List<Chat>>(
       onListen: () {
@@ -54,14 +60,19 @@ class ChatsRepository implements IChatsRepository {
           onError: controller.addError,
         );
         realtimeSubscription = _remote.watchChanges().listen(
-          (change) => unawaited(_handleChange(change, controller)),
+          (change) => _enqueueChange(change, controller),
           onError: (Object error, StackTrace stackTrace) {
             _config.talker.handle(error, stackTrace, 'Chats realtime failed');
           },
         );
         unawaited(_initialize(controller));
+        reconciliationTimer = Timer.periodic(
+          _reconciliationInterval,
+          (_) => _enqueueReconciliation(controller),
+        );
       },
       onCancel: () async {
+        reconciliationTimer?.cancel();
         await cacheSubscription?.cancel();
         await realtimeSubscription?.cancel();
       },
@@ -95,9 +106,11 @@ class ChatsRepository implements IChatsRepository {
       );
     }
 
+    await _waitForSynchronizationIdle();
     await _cache.remove(ids);
     await _clearLocalConversations(ids);
     await _retryPendingDeletions();
+    await _synchronize(ensureLatestMessages: true);
   }
 
   @override
@@ -129,6 +142,41 @@ class ChatsRepository implements IChatsRepository {
     await _synchronizeSafely(controller, ensureLatestMessages: true);
   }
 
+  void _enqueueChange(
+    ConversationChange change,
+    StreamController<List<Chat>> controller,
+  ) {
+    _changeQueue = _changeQueue
+        .then((_) => _handleChange(change, controller))
+        .catchError((Object error, StackTrace stackTrace) {
+          _config.talker.handle(
+            error,
+            stackTrace,
+            'Conversation change handling failed',
+          );
+        });
+  }
+
+  void _enqueueReconciliation(StreamController<List<Chat>> controller) {
+    if (_reconciliationQueued) return;
+    _reconciliationQueued = true;
+    _changeQueue = _changeQueue
+        .then(
+          (_) => _synchronizeSafely(
+            controller,
+            ensureLatestMessages: true,
+          ),
+        )
+        .whenComplete(() => _reconciliationQueued = false)
+        .catchError((Object error, StackTrace stackTrace) {
+          _config.talker.handle(
+            error,
+            stackTrace,
+            'Periodic chats reconciliation failed',
+          );
+        });
+  }
+
   Future<void> _handleChange(
     ConversationChange change,
     StreamController<List<Chat>> controller,
@@ -158,7 +206,7 @@ class ChatsRepository implements IChatsRepository {
     }
     await _synchronizeSafely(
       controller,
-      ensureLatestMessages: change.reason == 'hidden',
+      ensureLatestMessages: true,
     );
   }
 
@@ -207,6 +255,7 @@ class ChatsRepository implements IChatsRepository {
         await _remote.hideChats({
           deletion.chatId,
         }, clearedAt: deletion.clearedAt);
+        await _waitForSynchronizationIdle();
         await _chatCache.removePendingOperation(deletion.id);
       } catch (error, stackTrace) {
         _config.talker.handle(
@@ -224,6 +273,11 @@ class ChatsRepository implements IChatsRepository {
     if (activeSync != null) {
       await activeSync;
       if (!ensureLatestMessages) return;
+      final newerSync = _activeSync;
+      if (newerSync != null && !identical(newerSync, activeSync)) {
+        await newerSync;
+        return;
+      }
     }
     final sync = _performSync(ensureLatestMessages: ensureLatestMessages);
     _activeSync = sync;
@@ -241,29 +295,78 @@ class ChatsRepository implements IChatsRepository {
         .where((chat) => !pendingChatIds.contains(chat.id))
         .toList(growable: false);
     final hydrated = await Future.wait(visibleChats.map(_hydrateAvatar));
-    await _cache.replaceAll(hydrated);
-    if (!ensureLatestMessages) return;
-
-    for (final chat in hydrated) {
-      final lastMessageId = chat.lastMessageId;
-      if (lastMessageId == null) continue;
-      final cached = await _chatCache.readMessage(
-        lastMessageId,
-        currentUserId: _chatRemote.currentUserId,
-      );
-      if (cached == null || _conversationSync.isConversationOpen(chat.id)) {
-        await _synchronizeConversation(chat.id);
+    if (ensureLatestMessages) {
+      for (final chat in hydrated) {
+        final lastMessageId = chat.lastMessageId;
+        if (lastMessageId == null) continue;
+        final cached = await _chatCache.readMessage(
+          lastMessageId,
+          currentUserId: _chatRemote.currentUserId,
+        );
+        if (cached == null || _conversationSync.isConversationOpen(chat.id)) {
+          try {
+            await _synchronizeConversation(chat.id);
+          } catch (error, stackTrace) {
+            _config.talker.handle(
+              error,
+              stackTrace,
+              'Conversation reconciliation failed',
+            );
+          }
+        }
       }
     }
+    final reconciled = await Future.wait(hydrated.map(_mergeLocalPreview));
+    await _cache.replaceAll(reconciled);
   }
 
   Future<void> _synchronizeConversation(String chatId) async {
-    final messages = await _conversationSync.synchronizeRecent(chatId);
+    final messages = await _conversationSync.synchronizeRecent(
+      chatId,
+      refreshAfterActive: true,
+    );
     if (!_conversationSync.isConversationOpen(chatId)) return;
     final hasUnreadIncoming = messages.any(
       (message) => !message.isMine && message.readAt == null,
     );
     if (hasUnreadIncoming) await _chatRemote.markAsRead(chatId);
+  }
+
+  Future<void> _waitForSynchronizationIdle() async {
+    while (true) {
+      final active = _activeSync;
+      if (active == null) return;
+      await active;
+    }
+  }
+
+  Future<Chat> _mergeLocalPreview(Chat chat) async {
+    final messages = await _chatCache.readMessages(
+      chat.id,
+      currentUserId: _chatRemote.currentUserId,
+    );
+    final latest = messages.firstOrNull;
+    if (latest == null) return chat;
+    final isPending =
+        latest.status == MessageStatus.sending ||
+        latest.status == MessageStatus.error;
+    final matchesServer = latest.id == chat.lastMessageId;
+    final isNewerPending =
+        isPending && !latest.timestamp.isBefore(chat.lastMessageTime);
+    if (!matchesServer && !isNewerPending) return chat;
+
+    return chat.copyWith(
+      lastMessageId: latest.id,
+      lastMessage: latest.text,
+      lastMessageType: switch (latest.type) {
+        MessageType.image => ChatPreviewType.image,
+        MessageType.audio => ChatPreviewType.audio,
+        MessageType.location => ChatPreviewType.location,
+        MessageType.text => ChatPreviewType.text,
+      },
+      lastMessageTime: latest.timestamp,
+      isLastMessageFromMe: latest.isMine,
+    );
   }
 
   Future<Chat> _hydrateAvatar(Chat chat) async {

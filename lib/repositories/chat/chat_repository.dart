@@ -193,6 +193,7 @@ class ChatRepository implements IChatRepository {
     if (pending != null) {
       await _cache.removePendingOperation(messageId);
       await _cache.removeMessage(messageId);
+      await _syncService.refreshLocalPreview(chatId);
       return;
     }
     await _remote.deleteMessage(
@@ -200,7 +201,7 @@ class ChatRepository implements IChatRepository {
       deleteForEveryone: deleteForEveryone,
     );
     await _cache.removeMessage(messageId);
-    await _syncService.synchronizeRecent(chatId);
+    await _syncService.synchronizeRecent(chatId, refreshAfterActive: true);
   }
 
   Future<void> _enqueue({
@@ -253,6 +254,7 @@ class ChatRepository implements IChatRepository {
       },
     );
     await _cache.upsertMessage(message, isPending: true);
+    await _syncService.reflectLocalMessage(message);
     await _cache.putPendingOperation(operation);
     await _deliver(operation);
   }
@@ -307,7 +309,10 @@ class ChatRepository implements IChatRepository {
           payload['audio_path'] as String?,
         );
       }
-      await _syncService.synchronizeRecent(operation.chatId);
+      await _syncService.synchronizeRecent(
+        operation.chatId,
+        refreshAfterActive: true,
+      );
     } catch (error, stackTrace) {
       await _cache.markPendingFailure(operation.id, error);
       _config.talker.handle(error, stackTrace, 'Pending message upload failed');

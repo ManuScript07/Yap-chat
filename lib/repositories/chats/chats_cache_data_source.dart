@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:yap_chat/core/database/database.dart';
+import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 
 class ChatsCacheDataSource {
@@ -84,6 +85,23 @@ class ChatsCacheDataSource {
     });
   }
 
+  Future<void> updateLastMessage(ChatMessage message) async {
+    await (_database.update(_database.cachedChats)..where(
+          (table) =>
+              table.ownerUserId.equals(_userIdProvider()) &
+              table.id.equals(message.chatId),
+        ))
+        .write(
+          CachedChatsCompanion(
+            lastMessageId: Value(message.id),
+            lastMessage: Value(message.text),
+            lastMessageType: Value(_previewType(message.type).name),
+            lastMessageTime: Value(message.timestamp),
+            isLastMessageFromMe: Value(message.isMine),
+          ),
+        );
+  }
+
   Chat _mapRow(CachedChat row) {
     return Chat(
       id: row.id,
@@ -92,6 +110,7 @@ class ChatsCacheDataSource {
       userName: row.peerDisplayName,
       avatarUrl: row.peerAvatarUrl,
       avatarStoragePath: row.peerAvatarStoragePath,
+      lastMessageId: row.lastMessageId,
       lastMessage: row.lastMessage,
       lastMessageType: ChatPreviewType.values.byName(row.lastMessageType),
       lastMessageTime: row.lastMessageTime,
@@ -111,6 +130,7 @@ class ChatsCacheDataSource {
       peerDisplayName: chat.userName,
       peerAvatarUrl: Value(chat.avatarUrl),
       peerAvatarStoragePath: Value(chat.avatarStoragePath),
+      lastMessageId: Value(chat.lastMessageId),
       lastMessage: chat.lastMessage,
       lastMessageType: chat.lastMessageType.name,
       lastMessageTime: chat.lastMessageTime,
@@ -119,5 +139,14 @@ class ChatsCacheDataSource {
       isMuted: chat.isMuted,
       cachedAt: DateTime.now().toUtc(),
     );
+  }
+
+  ChatPreviewType _previewType(MessageType type) {
+    return switch (type) {
+      MessageType.image => ChatPreviewType.image,
+      MessageType.audio => ChatPreviewType.audio,
+      MessageType.location => ChatPreviewType.location,
+      MessageType.text => ChatPreviewType.text,
+    };
   }
 }

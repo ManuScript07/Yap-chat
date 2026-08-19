@@ -47,6 +47,7 @@ class RepositoryContainer {
       cache: chatCache,
       remote: chatRemote,
       hydrator: messageHydrator,
+      chatsCache: chatsCache,
     );
     return RepositoryContainer(
       mediaCache: mediaCache,

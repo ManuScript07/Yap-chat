@@ -945,6 +945,17 @@ class $CachedChatsTable extends CachedChats
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _lastMessageIdMeta = const VerificationMeta(
+    'lastMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> lastMessageId = GeneratedColumn<String>(
+    'last_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lastMessageMeta = const VerificationMeta(
     'lastMessage',
   );
@@ -1037,6 +1048,7 @@ class $CachedChatsTable extends CachedChats
     peerDisplayName,
     peerAvatarUrl,
     peerAvatarStoragePath,
+    lastMessageId,
     lastMessage,
     lastMessageType,
     lastMessageTime,
@@ -1118,6 +1130,15 @@ class $CachedChatsTable extends CachedChats
         peerAvatarStoragePath.isAcceptableOrUnknown(
           data['peer_avatar_storage_path']!,
           _peerAvatarStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_message_id')) {
+      context.handle(
+        _lastMessageIdMeta,
+        lastMessageId.isAcceptableOrUnknown(
+          data['last_message_id']!,
+          _lastMessageIdMeta,
         ),
       );
     }
@@ -1229,6 +1250,10 @@ class $CachedChatsTable extends CachedChats
         DriftSqlType.string,
         data['${effectivePrefix}peer_avatar_storage_path'],
       ),
+      lastMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_message_id'],
+      ),
       lastMessage: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}last_message'],
@@ -1274,6 +1299,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
   final String peerDisplayName;
   final String? peerAvatarUrl;
   final String? peerAvatarStoragePath;
+  final String? lastMessageId;
   final String lastMessage;
   final String lastMessageType;
   final DateTime lastMessageTime;
@@ -1289,6 +1315,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     required this.peerDisplayName,
     this.peerAvatarUrl,
     this.peerAvatarStoragePath,
+    this.lastMessageId,
     required this.lastMessage,
     required this.lastMessageType,
     required this.lastMessageTime,
@@ -1310,6 +1337,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     }
     if (!nullToAbsent || peerAvatarStoragePath != null) {
       map['peer_avatar_storage_path'] = Variable<String>(peerAvatarStoragePath);
+    }
+    if (!nullToAbsent || lastMessageId != null) {
+      map['last_message_id'] = Variable<String>(lastMessageId);
     }
     map['last_message'] = Variable<String>(lastMessage);
     map['last_message_type'] = Variable<String>(lastMessageType);
@@ -1334,6 +1364,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       peerAvatarStoragePath: peerAvatarStoragePath == null && nullToAbsent
           ? const Value.absent()
           : Value(peerAvatarStoragePath),
+      lastMessageId: lastMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastMessageId),
       lastMessage: Value(lastMessage),
       lastMessageType: Value(lastMessageType),
       lastMessageTime: Value(lastMessageTime),
@@ -1359,6 +1392,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       peerAvatarStoragePath: serializer.fromJson<String?>(
         json['peerAvatarStoragePath'],
       ),
+      lastMessageId: serializer.fromJson<String?>(json['lastMessageId']),
       lastMessage: serializer.fromJson<String>(json['lastMessage']),
       lastMessageType: serializer.fromJson<String>(json['lastMessageType']),
       lastMessageTime: serializer.fromJson<DateTime>(json['lastMessageTime']),
@@ -1383,6 +1417,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       'peerAvatarStoragePath': serializer.toJson<String?>(
         peerAvatarStoragePath,
       ),
+      'lastMessageId': serializer.toJson<String?>(lastMessageId),
       'lastMessage': serializer.toJson<String>(lastMessage),
       'lastMessageType': serializer.toJson<String>(lastMessageType),
       'lastMessageTime': serializer.toJson<DateTime>(lastMessageTime),
@@ -1401,6 +1436,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     String? peerDisplayName,
     Value<String?> peerAvatarUrl = const Value.absent(),
     Value<String?> peerAvatarStoragePath = const Value.absent(),
+    Value<String?> lastMessageId = const Value.absent(),
     String? lastMessage,
     String? lastMessageType,
     DateTime? lastMessageTime,
@@ -1420,6 +1456,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     peerAvatarStoragePath: peerAvatarStoragePath.present
         ? peerAvatarStoragePath.value
         : this.peerAvatarStoragePath,
+    lastMessageId: lastMessageId.present
+        ? lastMessageId.value
+        : this.lastMessageId,
     lastMessage: lastMessage ?? this.lastMessage,
     lastMessageType: lastMessageType ?? this.lastMessageType,
     lastMessageTime: lastMessageTime ?? this.lastMessageTime,
@@ -1447,6 +1486,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       peerAvatarStoragePath: data.peerAvatarStoragePath.present
           ? data.peerAvatarStoragePath.value
           : this.peerAvatarStoragePath,
+      lastMessageId: data.lastMessageId.present
+          ? data.lastMessageId.value
+          : this.lastMessageId,
       lastMessage: data.lastMessage.present
           ? data.lastMessage.value
           : this.lastMessage,
@@ -1477,6 +1519,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ..write('peerDisplayName: $peerDisplayName, ')
           ..write('peerAvatarUrl: $peerAvatarUrl, ')
           ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
+          ..write('lastMessageId: $lastMessageId, ')
           ..write('lastMessage: $lastMessage, ')
           ..write('lastMessageType: $lastMessageType, ')
           ..write('lastMessageTime: $lastMessageTime, ')
@@ -1497,6 +1540,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     peerDisplayName,
     peerAvatarUrl,
     peerAvatarStoragePath,
+    lastMessageId,
     lastMessage,
     lastMessageType,
     lastMessageTime,
@@ -1516,6 +1560,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           other.peerDisplayName == this.peerDisplayName &&
           other.peerAvatarUrl == this.peerAvatarUrl &&
           other.peerAvatarStoragePath == this.peerAvatarStoragePath &&
+          other.lastMessageId == this.lastMessageId &&
           other.lastMessage == this.lastMessage &&
           other.lastMessageType == this.lastMessageType &&
           other.lastMessageTime == this.lastMessageTime &&
@@ -1533,6 +1578,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
   final Value<String> peerDisplayName;
   final Value<String?> peerAvatarUrl;
   final Value<String?> peerAvatarStoragePath;
+  final Value<String?> lastMessageId;
   final Value<String> lastMessage;
   final Value<String> lastMessageType;
   final Value<DateTime> lastMessageTime;
@@ -1549,6 +1595,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     this.peerDisplayName = const Value.absent(),
     this.peerAvatarUrl = const Value.absent(),
     this.peerAvatarStoragePath = const Value.absent(),
+    this.lastMessageId = const Value.absent(),
     this.lastMessage = const Value.absent(),
     this.lastMessageType = const Value.absent(),
     this.lastMessageTime = const Value.absent(),
@@ -1566,6 +1613,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     required String peerDisplayName,
     this.peerAvatarUrl = const Value.absent(),
     this.peerAvatarStoragePath = const Value.absent(),
+    this.lastMessageId = const Value.absent(),
     required String lastMessage,
     required String lastMessageType,
     required DateTime lastMessageTime,
@@ -1594,6 +1642,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Expression<String>? peerDisplayName,
     Expression<String>? peerAvatarUrl,
     Expression<String>? peerAvatarStoragePath,
+    Expression<String>? lastMessageId,
     Expression<String>? lastMessage,
     Expression<String>? lastMessageType,
     Expression<DateTime>? lastMessageTime,
@@ -1612,6 +1661,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       if (peerAvatarUrl != null) 'peer_avatar_url': peerAvatarUrl,
       if (peerAvatarStoragePath != null)
         'peer_avatar_storage_path': peerAvatarStoragePath,
+      if (lastMessageId != null) 'last_message_id': lastMessageId,
       if (lastMessage != null) 'last_message': lastMessage,
       if (lastMessageType != null) 'last_message_type': lastMessageType,
       if (lastMessageTime != null) 'last_message_time': lastMessageTime,
@@ -1632,6 +1682,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Value<String>? peerDisplayName,
     Value<String?>? peerAvatarUrl,
     Value<String?>? peerAvatarStoragePath,
+    Value<String?>? lastMessageId,
     Value<String>? lastMessage,
     Value<String>? lastMessageType,
     Value<DateTime>? lastMessageTime,
@@ -1650,6 +1701,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       peerAvatarUrl: peerAvatarUrl ?? this.peerAvatarUrl,
       peerAvatarStoragePath:
           peerAvatarStoragePath ?? this.peerAvatarStoragePath,
+      lastMessageId: lastMessageId ?? this.lastMessageId,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageType: lastMessageType ?? this.lastMessageType,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
@@ -1686,6 +1738,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       map['peer_avatar_storage_path'] = Variable<String>(
         peerAvatarStoragePath.value,
       );
+    }
+    if (lastMessageId.present) {
+      map['last_message_id'] = Variable<String>(lastMessageId.value);
     }
     if (lastMessage.present) {
       map['last_message'] = Variable<String>(lastMessage.value);
@@ -1726,6 +1781,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
           ..write('peerDisplayName: $peerDisplayName, ')
           ..write('peerAvatarUrl: $peerAvatarUrl, ')
           ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
+          ..write('lastMessageId: $lastMessageId, ')
           ..write('lastMessage: $lastMessage, ')
           ..write('lastMessageType: $lastMessageType, ')
           ..write('lastMessageTime: $lastMessageTime, ')
@@ -3971,6 +4027,7 @@ typedef $$CachedChatsTableCreateCompanionBuilder =
       required String peerDisplayName,
       Value<String?> peerAvatarUrl,
       Value<String?> peerAvatarStoragePath,
+      Value<String?> lastMessageId,
       required String lastMessage,
       required String lastMessageType,
       required DateTime lastMessageTime,
@@ -3989,6 +4046,7 @@ typedef $$CachedChatsTableUpdateCompanionBuilder =
       Value<String> peerDisplayName,
       Value<String?> peerAvatarUrl,
       Value<String?> peerAvatarStoragePath,
+      Value<String?> lastMessageId,
       Value<String> lastMessage,
       Value<String> lastMessageType,
       Value<DateTime> lastMessageTime,
@@ -4040,6 +4098,11 @@ class $$CachedChatsTableFilterComposer
 
   ColumnFilters<String> get peerAvatarStoragePath => $composableBuilder(
     column: $table.peerAvatarStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastMessageId => $composableBuilder(
+    column: $table.lastMessageId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4123,6 +4186,11 @@ class $$CachedChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lastMessageId => $composableBuilder(
+    column: $table.lastMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get lastMessage => $composableBuilder(
     column: $table.lastMessage,
     builder: (column) => ColumnOrderings(column),
@@ -4199,6 +4267,11 @@ class $$CachedChatsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get lastMessageId => $composableBuilder(
+    column: $table.lastMessageId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get lastMessage => $composableBuilder(
     column: $table.lastMessage,
     builder: (column) => column,
@@ -4269,6 +4342,7 @@ class $$CachedChatsTableTableManager
                 Value<String> peerDisplayName = const Value.absent(),
                 Value<String?> peerAvatarUrl = const Value.absent(),
                 Value<String?> peerAvatarStoragePath = const Value.absent(),
+                Value<String?> lastMessageId = const Value.absent(),
                 Value<String> lastMessage = const Value.absent(),
                 Value<String> lastMessageType = const Value.absent(),
                 Value<DateTime> lastMessageTime = const Value.absent(),
@@ -4285,6 +4359,7 @@ class $$CachedChatsTableTableManager
                 peerDisplayName: peerDisplayName,
                 peerAvatarUrl: peerAvatarUrl,
                 peerAvatarStoragePath: peerAvatarStoragePath,
+                lastMessageId: lastMessageId,
                 lastMessage: lastMessage,
                 lastMessageType: lastMessageType,
                 lastMessageTime: lastMessageTime,
@@ -4303,6 +4378,7 @@ class $$CachedChatsTableTableManager
                 required String peerDisplayName,
                 Value<String?> peerAvatarUrl = const Value.absent(),
                 Value<String?> peerAvatarStoragePath = const Value.absent(),
+                Value<String?> lastMessageId = const Value.absent(),
                 required String lastMessage,
                 required String lastMessageType,
                 required DateTime lastMessageTime,
@@ -4319,6 +4395,7 @@ class $$CachedChatsTableTableManager
                 peerDisplayName: peerDisplayName,
                 peerAvatarUrl: peerAvatarUrl,
                 peerAvatarStoragePath: peerAvatarStoragePath,
+                lastMessageId: lastMessageId,
                 lastMessage: lastMessage,
                 lastMessageType: lastMessageType,
                 lastMessageTime: lastMessageTime,

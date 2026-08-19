@@ -77,8 +77,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       }
       return;
     }
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
+    if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(presence.disconnect());
     }
