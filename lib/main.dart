@@ -82,7 +82,9 @@ Future<SupabaseClient?> _initializeSupabase(Map<String, String> env) async {
 
 AppEnvironment _resolveEnvironment(Map<String, String> env) {
   final rawEnvironment = env['APP_ENV']?.trim().toLowerCase();
-  return rawEnvironment == 'prod' || rawEnvironment == 'production'
-      ? AppEnvironment.prod
-      : AppEnvironment.dev;
+  return switch (rawEnvironment) {
+    'prod' || 'production' => AppEnvironment.prod,
+    'local' => AppEnvironment.local,
+    _ => AppEnvironment.dev,
+  };
 }

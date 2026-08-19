@@ -77,6 +77,7 @@ class RepositoryContainer {
       authRepository: AuthRepository(
         client: client,
         redirectUrl: config.authRedirectUrl,
+        useAnonymousSignIn: config.isLocal,
       ),
       profileRepository: ProfileRepository(
         client: client,

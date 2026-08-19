@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/core/database/database.dart';
 
-enum AppEnvironment { dev, prod }
+enum AppEnvironment { dev, local, prod }
 
 /// Низкоуровневые зависимости приложения: SDK, клиенты, логгер и env-настройки.
 ///
@@ -27,6 +27,8 @@ class AppConfig {
   final SupabaseClient? supabaseClient;
 
   bool get isDev => environment == AppEnvironment.dev;
+
+  bool get isLocal => environment == AppEnvironment.local;
 
   String? get backendBaseUrl => env['BACKEND_BASE_URL'];
 

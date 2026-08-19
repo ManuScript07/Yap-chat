@@ -4,12 +4,17 @@ import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/repositories/auth/abstract_auth_repository.dart';
 
 class AuthRepository implements IAuthRepository {
-  AuthRepository({required SupabaseClient client, required String redirectUrl})
-    : _client = client,
-      _redirectUrl = redirectUrl;
+  AuthRepository({
+    required SupabaseClient client,
+    required String redirectUrl,
+    bool useAnonymousSignIn = false,
+  }) : _client = client,
+       _redirectUrl = redirectUrl,
+       _useAnonymousSignIn = useAnonymousSignIn;
 
   final SupabaseClient _client;
   final String _redirectUrl;
+  final bool _useAnonymousSignIn;
 
   @override
   AuthSession? get currentSession => _mapSession(_client.auth.currentSession);
@@ -33,6 +38,10 @@ class AuthRepository implements IAuthRepository {
 
   @override
   Future<void> signInWithYandex() async {
+    if (_useAnonymousSignIn) {
+      await _client.auth.signInAnonymously();
+      return;
+    }
     await _client.auth.signInWithOAuth(
       OAuthProvider('custom:yandex'),
       redirectTo: kIsWeb ? null : _redirectUrl,
