@@ -28,11 +28,19 @@ class ChatsCacheDataSource {
 
   Future<void> replaceAll(List<Chat> chats) async {
     await _database.transaction(() async {
-      await (_database.delete(
-        _database.cachedChats,
-      )..where((table) => table.ownerUserId.equals(_userIdProvider()))).go();
+      final ownerUserId = _userIdProvider();
+      final ids = chats.map((chat) => chat.id).toSet();
+      final deleteQuery = _database.delete(_database.cachedChats)
+        ..where(
+          (table) =>
+              table.ownerUserId.equals(ownerUserId) &
+              (ids.isEmpty ? const Constant(true) : table.id.isNotIn(ids)),
+        );
+      await deleteQuery.go();
       for (final chat in chats) {
-        await _database.into(_database.cachedChats).insert(_companion(chat));
+        await _database
+            .into(_database.cachedChats)
+            .insertOnConflictUpdate(_companion(chat));
       }
     });
   }

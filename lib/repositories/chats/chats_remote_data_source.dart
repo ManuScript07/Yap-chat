@@ -20,14 +20,6 @@ class ChatsRemoteDataSource {
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
-    final avatarUrls = await _createSignedUrls(
-      rows
-          .map((row) => row['peer_avatar_storage_path'] as String?)
-          .whereType<String>()
-          .toSet(),
-      bucket: 'avatars',
-    );
-
     return rows
         .map((row) {
           final storagePath = row['peer_avatar_storage_path'] as String?;
@@ -40,7 +32,7 @@ class ChatsRemoteDataSource {
             userName: row['peer_display_name'] as String? ?? '',
             avatarUrl: storagePath == null
                 ? row['peer_avatar_url'] as String?
-                : avatarUrls[storagePath],
+                : null,
             avatarStoragePath: storagePath,
             lastMessage: row['last_message_text'] as String? ?? '',
             lastMessageType: _previewType(lastMessageType),
@@ -95,21 +87,6 @@ class ChatsRemoteDataSource {
     'toggle_conversations_mute',
     params: {'conversation_ids': ids.toList(growable: false)},
   );
-
-  Future<Map<String, String>> _createSignedUrls(
-    Set<String> paths, {
-    required String bucket,
-  }) async {
-    if (paths.isEmpty) return const {};
-    final results = await _client.storage
-        .from(bucket)
-        .createSignedUrlsResult(paths.toList(growable: false), 60 * 60 * 24);
-    return {
-      for (final result in results)
-        if (result case SignedUrlSuccess(:final path, :final signedUrl))
-          path: signedUrl,
-    };
-  }
 
   ChatPreviewType _previewType(String? value) {
     return switch (value) {

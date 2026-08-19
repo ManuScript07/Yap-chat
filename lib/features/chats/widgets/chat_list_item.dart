@@ -23,10 +23,11 @@ class ChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
-    final presence = context.watch<PresenceCubit>().state;
     final isOnline = chat.peerId.isEmpty
         ? chat.isOnline
-        : presence.isOnline(chat.peerId);
+        : context.select<PresenceCubit, bool>(
+            (cubit) => cubit.state.isOnline(chat.peerId),
+          );
 
     return InkWell(
       onTap: onTap,

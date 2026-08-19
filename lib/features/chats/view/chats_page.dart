@@ -174,6 +174,7 @@ class _ChatsContent extends StatelessWidget {
                 final isSelected = state.selectedChatIds.contains(chat.id);
 
                 return ChatListItem(
+                  key: ValueKey(chat.id),
                   chat: chat,
                   isSelected: isSelected,
                   onTap: () {

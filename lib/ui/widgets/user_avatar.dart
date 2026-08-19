@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 
@@ -38,9 +40,10 @@ class UserAvatar extends StatelessWidget {
             child: avatarImage != null
                 ? Image(image: avatarImage!, fit: BoxFit.cover)
                 : avatarUrl != null && avatarUrl!.isNotEmpty
-                ? Image.network(
-                    avatarUrl!,
+                ? Image(
+                    image: _provider(avatarUrl!),
                     fit: BoxFit.cover,
+                    gaplessPlayback: true,
                     errorBuilder: (_, _, _) =>
                         Icon(Icons.person, color: iconColor, size: size * 0.65),
                   )
@@ -63,5 +66,12 @@ class UserAvatar extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  ImageProvider _provider(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https')
+        ? NetworkImage(value)
+        : FileImage(File(value));
   }
 }

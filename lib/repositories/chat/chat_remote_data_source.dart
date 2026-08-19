@@ -34,26 +34,7 @@ class ChatRemoteDataSource {
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
-    final imagePaths = <String>{};
-    final audioPaths = <String>{};
-    for (final row in rows) {
-      for (final attachment in _attachments(row)) {
-        final path = attachment['storage_path'] as String?;
-        if (path == null) continue;
-        if (attachment['kind'] == 'image') {
-          imagePaths.add(path);
-        } else if (attachment['kind'] == 'audio') {
-          audioPaths.add(path);
-        }
-      }
-    }
-    final signedUrls = {
-      ...await _createSignedUrls(imagePaths, bucket: 'chat-images'),
-      ...await _createSignedUrls(audioPaths, bucket: 'chat-audio'),
-    };
-    return rows
-        .map((row) => _mapMessage(row, signedUrls))
-        .toList(growable: false);
+    return rows.map(_mapMessage).toList(growable: false);
   }
 
   Stream<void> watchChanges(String chatId) {
@@ -157,10 +138,7 @@ class ChatRemoteDataSource {
         .toList(growable: false);
   }
 
-  ChatMessage _mapMessage(
-    Map<String, dynamic> row,
-    Map<String, String> signedUrls,
-  ) {
+  ChatMessage _mapMessage(Map<String, dynamic> row) {
     final attachments = _attachments(row);
     final imageAttachments = attachments
         .where((item) => item['kind'] == 'image')
@@ -184,18 +162,13 @@ class ChatRemoteDataSource {
           ? MessageStatus.read
           : MessageStatus.sent,
       type: MessageType.values.byName(row['type'] as String),
-      mediaUrls: imageAttachments
-          .map((item) => signedUrls[item['storage_path']] ?? '')
-          .where((url) => url.isNotEmpty)
-          .toList(growable: false),
+      mediaUrls: const [],
       mediaStoragePaths: imageAttachments
           .map((item) => item['storage_path'] as String)
           .toList(growable: false),
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
-      audioUrl: audioAttachment == null
-          ? null
-          : signedUrls[audioAttachment['storage_path']],
+      audioUrl: null,
       audioStoragePath: audioAttachment?['storage_path'] as String?,
       audioDuration: audioAttachment?['duration_ms'] == null
           ? null
@@ -218,20 +191,5 @@ class ChatRemoteDataSource {
           ? null
           : DateTime.parse(readAtValue).toLocal(),
     );
-  }
-
-  Future<Map<String, String>> _createSignedUrls(
-    Set<String> paths, {
-    required String bucket,
-  }) async {
-    if (paths.isEmpty) return const {};
-    final results = await _client.storage
-        .from(bucket)
-        .createSignedUrlsResult(paths.toList(growable: false), 60 * 60 * 24);
-    return {
-      for (final result in results)
-        if (result case SignedUrlSuccess(:final path, :final signedUrl))
-          path: signedUrl,
-    };
   }
 }

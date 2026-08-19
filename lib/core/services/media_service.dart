@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as path;
@@ -60,10 +61,43 @@ abstract class MediaService {
 
   /// Сохраняет локальный файл или URL изображения в системную галерею Android.
   static Future<bool> saveImageToGallery(String imagePath) async {
-    final fileName = path.basename(imagePath);
+    final uri = Uri.tryParse(imagePath);
+    final isNetworkImage =
+        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    if (isNetworkImage) {
+      final networkUri = uri;
+      final client = HttpClient();
+      try {
+        final request = await client.getUrl(networkUri);
+        final response = await request.close();
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          return false;
+        }
+        final bytes = await response.fold<BytesBuilder>(
+          BytesBuilder(copy: false),
+          (builder, chunk) => builder..add(chunk),
+        );
+        final result = await SaverGallery.saveImage(
+          bytes.takeBytes(),
+          fileName: 'yap_chat_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          albumPath: 'DCIM/Camera',
+          skipIfExists: false,
+        );
+        return result.isSuccess;
+      } finally {
+        client.close(force: true);
+      }
+    }
+
+    final file = File(imagePath);
+    if (!await file.exists()) return false;
+    final extension = path.extension(file.path).toLowerCase();
+    final safeExtension = extension.isEmpty ? '.jpg' : extension;
+    final fileName =
+        'yap_chat_${DateTime.now().millisecondsSinceEpoch}$safeExtension';
 
     final result = await SaverGallery.saveFile(
-      filePath: imagePath,
+      filePath: file.path,
       fileName: fileName,
       albumPath: 'DCIM/Camera',
       skipIfExists: false,

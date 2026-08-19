@@ -9,13 +9,16 @@ void main() {
 
   group('AuthBloc', () {
     late AuthBloc bloc;
+    late List<String> clearedUserIds;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
+      clearedUserIds = [];
       bloc = AuthBloc(
         authRepository: MockAuthRepository(preferences: preferences),
         profileRepository: MockProfileRepository(preferences: preferences),
+        clearUserCache: (userId) async => clearedUserIds.add(userId),
       );
     });
 
@@ -80,6 +83,7 @@ void main() {
         onTimeout: () => throw StateError('Signed out not emitted: $states'),
       );
       expect(bloc.state.session, isNull);
+      expect(clearedUserIds, hasLength(1));
 
       final reauthenticated = bloc.stream.firstWhere(
         (state) => state.status == AuthStatus.authenticated,
@@ -90,7 +94,10 @@ void main() {
         onTimeout: () => throw StateError('Authenticated not emitted: $states'),
       );
       expect(reauthenticatedState.profile?.termsAcceptedAt, termsAcceptedAt);
-      expect(reauthenticatedState.profile?.privacyAcceptedAt, privacyAcceptedAt);
+      expect(
+        reauthenticatedState.profile?.privacyAcceptedAt,
+        privacyAcceptedAt,
+      );
     });
   });
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/chat_media_processor.dart';
+import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
@@ -14,11 +15,13 @@ class ChatRepository implements IChatRepository {
     required ChatCacheDataSource cache,
     required ChatRemoteDataSource remote,
     required ChatMediaProcessor mediaProcessor,
+    required MediaCacheService mediaCache,
     Uuid uuid = const Uuid(),
   }) : _config = config,
        _cache = cache,
        _remote = remote,
        _mediaProcessor = mediaProcessor,
+       _mediaCache = mediaCache,
        _uuid = uuid;
 
   static const _pageSize = 60;
@@ -28,6 +31,7 @@ class ChatRepository implements IChatRepository {
   final ChatCacheDataSource _cache;
   final ChatRemoteDataSource _remote;
   final ChatMediaProcessor _mediaProcessor;
+  final MediaCacheService _mediaCache;
   final Uuid _uuid;
   final Map<String, Future<void>> _activeSyncs = {};
   final Set<String> _deliveringOperationIds = {};
@@ -108,7 +112,8 @@ class ChatRepository implements IChatRepository {
       beforeMessageId: oldest.id,
       pageSize: _pageSize,
     );
-    await _cache.upsertMessages(page);
+    final hydrated = await _hydrateMessages(page);
+    await _cache.upsertMessages(hydrated);
     return page.length == _pageSize;
   }
 
@@ -345,6 +350,21 @@ class ChatRepository implements IChatRepository {
         bytes: processed.bytes,
         contentType: processed.mimeType,
       );
+      try {
+        await _mediaCache.storeBytes(
+          ownerUserId: _remote.currentUserId,
+          bucket: 'chat-images',
+          storagePath: storagePath,
+          bytes: processed.bytes,
+          mimeType: processed.mimeType,
+        );
+      } catch (error, stackTrace) {
+        _config.talker.handle(
+          error,
+          stackTrace,
+          'Uploaded image caching failed',
+        );
+      }
       attachments.add({
         'id': attachmentId,
         'position': index,
@@ -375,6 +395,17 @@ class ChatRepository implements IChatRepository {
       bytes: bytes,
       contentType: mimeType,
     );
+    try {
+      await _mediaCache.storeFile(
+        ownerUserId: _remote.currentUserId,
+        bucket: 'chat-audio',
+        storagePath: storagePath,
+        sourcePath: sourcePath,
+        mimeType: mimeType,
+      );
+    } catch (error, stackTrace) {
+      _config.talker.handle(error, stackTrace, 'Uploaded audio caching failed');
+    }
     return {
       'id': attachmentId,
       'position': 0,
@@ -408,10 +439,57 @@ class ChatRepository implements IChatRepository {
 
   Future<void> _performSync(String chatId) async {
     final messages = await _remote.fetchMessages(chatId, pageSize: _pageSize);
-    await _cache.replaceRecentMessages(chatId, messages);
-    final hasUnreadIncoming = messages.any(
+    final hydrated = await _hydrateMessages(messages);
+    await _cache.replaceRecentMessages(chatId, hydrated);
+    final hasUnreadIncoming = hydrated.any(
       (message) => !message.isMine && message.readAt == null,
     );
     if (hasUnreadIncoming) await _remote.markAsRead(chatId);
+  }
+
+  Future<List<ChatMessage>> _hydrateMessages(List<ChatMessage> messages) async {
+    return Future.wait(messages.map(_hydrateMessage));
+  }
+
+  Future<ChatMessage> _hydrateMessage(ChatMessage message) async {
+    if (message.type == MessageType.image) {
+      final paths = <String>[];
+      for (var index = 0; index < message.mediaStoragePaths.length; index++) {
+        final storagePath = message.mediaStoragePaths[index];
+        try {
+          paths.add(
+            await _mediaCache.cacheStorageFile(
+              ownerUserId: _remote.currentUserId,
+              bucket: 'chat-images',
+              storagePath: storagePath,
+              mimeType: 'image/jpeg',
+            ),
+          );
+        } catch (error, stackTrace) {
+          _config.talker.handle(error, stackTrace, 'Image caching failed');
+          if (index < message.mediaUrls.length &&
+              message.mediaUrls[index].isNotEmpty) {
+            paths.add(message.mediaUrls[index]);
+          }
+        }
+      }
+      return message.copyWith(mediaUrls: paths);
+    }
+
+    final audioStoragePath = message.audioStoragePath;
+    if (message.type != MessageType.audio || audioStoragePath == null) {
+      return message;
+    }
+    try {
+      final localPath = await _mediaCache.cacheStorageFile(
+        ownerUserId: _remote.currentUserId,
+        bucket: 'chat-audio',
+        storagePath: audioStoragePath,
+      );
+      return message.copyWith(audioUrl: localPath);
+    } catch (error, stackTrace) {
+      _config.talker.handle(error, stackTrace, 'Audio caching failed');
+      return message;
+    }
   }
 }

@@ -12,8 +12,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({
     required IAuthRepository authRepository,
     required IProfileRepository profileRepository,
+    Future<void> Function(String userId)? clearUserCache,
   }) : _authRepository = authRepository,
        _profileRepository = profileRepository,
+       _clearUserCache = clearUserCache,
        super(const AuthState()) {
     on<AuthStarted>(_onStarted, transformer: restartable());
     on<YandexSignInRequested>(
@@ -31,6 +33,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   final IAuthRepository _authRepository;
   final IProfileRepository _profileRepository;
+  final Future<void> Function(String userId)? _clearUserCache;
   StreamSubscription<AuthSession?>? _sessionSubscription;
 
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
@@ -185,9 +188,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthSignOutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    final userId = state.session?.userId;
     emit(state.copyWith(isSubmitting: true, clearFailure: true));
     try {
       await _authRepository.signOut();
+      if (userId != null) {
+        try {
+          await _clearUserCache?.call(userId);
+        } catch (_) {
+          // Выход не должен отменяться из-за ошибки очистки локального кеша.
+        }
+      }
     } catch (_) {
       emit(state.copyWith(failure: AuthFailure.signOut, isSubmitting: false));
     }

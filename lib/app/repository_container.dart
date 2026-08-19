@@ -1,6 +1,7 @@
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/avatar_image_processor.dart';
 import 'package:yap_chat/core/services/chat_media_processor.dart';
+import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 /// Контейнер репозиториев приложения.
@@ -9,6 +10,7 @@ import 'package:yap_chat/repositories/repositories.dart';
 /// делается фабриками [prod] и [dev].
 class RepositoryContainer {
   const RepositoryContainer({
+    required this.mediaCache,
     required this.chatsRepository,
     required this.chatRepository,
     required this.localMediaRepository,
@@ -22,7 +24,12 @@ class RepositoryContainer {
 
   factory RepositoryContainer.prod({required AppConfig config}) {
     final client = config.requireSupabaseClient();
+    final mediaCache = MediaCacheService(
+      database: config.database,
+      client: client,
+    );
     return RepositoryContainer(
+      mediaCache: mediaCache,
       chatsRepository: ChatsRepository(
         config: config,
         cache: ChatsCacheDataSource(
@@ -30,6 +37,7 @@ class RepositoryContainer {
           userIdProvider: () => client.auth.currentUser!.id,
         ),
         remote: ChatsRemoteDataSource(client: client),
+        mediaCache: mediaCache,
       ),
       chatRepository: ChatRepository(
         config: config,
@@ -39,6 +47,7 @@ class RepositoryContainer {
         ),
         remote: ChatRemoteDataSource(client: client),
         mediaProcessor: const ChatMediaProcessor(),
+        mediaCache: mediaCache,
       ),
       localMediaRepository: LocalMediaRepository(
         preferences: config.preferences,
@@ -63,7 +72,12 @@ class RepositoryContainer {
   }
 
   factory RepositoryContainer.dev({required AppConfig config}) {
+    final mediaCache = MediaCacheService(
+      database: config.database,
+      client: config.supabaseClient,
+    );
     return RepositoryContainer(
+      mediaCache: mediaCache,
       chatsRepository: MockChatsRepository(),
       chatRepository: MockChatRepository(),
       localMediaRepository: LocalMediaRepository(
@@ -78,6 +92,7 @@ class RepositoryContainer {
     );
   }
 
+  final MediaCacheService mediaCache;
   final IChatsRepository chatsRepository;
   final IChatRepository chatRepository;
   final ILocalMediaRepository localMediaRepository;
@@ -87,4 +102,9 @@ class RepositoryContainer {
   final IAuthRepository authRepository;
   final IProfileRepository profileRepository;
   final IPresenceRepository presenceRepository;
+
+  Future<void> dispose() async {
+    mediaCache.dispose();
+    await presenceRepository.disconnect();
+  }
 }
