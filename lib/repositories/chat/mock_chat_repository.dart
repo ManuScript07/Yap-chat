@@ -102,6 +102,9 @@ class MockChatRepository implements IChatRepository {
   }
 
   @override
+  Future<bool> loadMoreMessages(String chatId) async => false;
+
+  @override
   Future<void> sendMessage(
     String chatId,
     String text, {

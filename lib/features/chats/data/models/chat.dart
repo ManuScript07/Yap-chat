@@ -1,10 +1,16 @@
 import 'package:equatable/equatable.dart';
 
+enum ChatPreviewType { text, image, audio, location }
+
 class Chat extends Equatable {
   final String id;
+  final String peerId;
+  final String peerUsername;
   final String userName;
   final String? avatarUrl;
+  final String? avatarStoragePath;
   final String lastMessage;
+  final ChatPreviewType lastMessageType;
   final DateTime lastMessageTime;
   final int unreadCount;
   final bool isOnline;
@@ -13,9 +19,13 @@ class Chat extends Equatable {
 
   const Chat({
     required this.id,
+    this.peerId = '',
+    this.peerUsername = '',
     required this.userName,
     this.avatarUrl,
+    this.avatarStoragePath,
     required this.lastMessage,
+    this.lastMessageType = ChatPreviewType.text,
     required this.lastMessageTime,
     required this.unreadCount,
     required this.isOnline,
@@ -25,9 +35,13 @@ class Chat extends Equatable {
 
   Chat copyWith({
     String? id,
+    String? peerId,
+    String? peerUsername,
     String? userName,
     String? avatarUrl,
+    String? avatarStoragePath,
     String? lastMessage,
+    ChatPreviewType? lastMessageType,
     DateTime? lastMessageTime,
     int? unreadCount,
     bool? isOnline,
@@ -36,9 +50,13 @@ class Chat extends Equatable {
   }) {
     return Chat(
       id: id ?? this.id,
+      peerId: peerId ?? this.peerId,
+      peerUsername: peerUsername ?? this.peerUsername,
       userName: userName ?? this.userName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
       lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageType: lastMessageType ?? this.lastMessageType,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline ?? this.isOnline,
@@ -50,9 +68,13 @@ class Chat extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    peerId,
+    peerUsername,
     userName,
     avatarUrl,
+    avatarStoragePath,
     lastMessage,
+    lastMessageType,
     lastMessageTime,
     unreadCount,
     isOnline,

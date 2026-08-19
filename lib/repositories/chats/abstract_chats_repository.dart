@@ -1,6 +1,9 @@
 import 'package:yap_chat/features/chats/data/data.dart';
 
 abstract interface class IChatsRepository {
+  /// Cache-first поток, который автоматически синхронизируется с сервером.
+  Stream<List<Chat>> watchChats();
+
   /// Загружает полный список чатов из источника данных.
   Future<List<Chat>> getChats();
 

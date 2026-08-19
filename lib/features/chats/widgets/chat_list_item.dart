@@ -3,6 +3,8 @@ import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/utils/utils.dart';
 import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yap_chat/features/presence/presence.dart';
 
 class ChatListItem extends StatelessWidget {
   const ChatListItem({
@@ -21,6 +23,10 @@ class ChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
+    final presence = context.watch<PresenceCubit>().state;
+    final isOnline = chat.peerId.isEmpty
+        ? chat.isOnline
+        : presence.isOnline(chat.peerId);
 
     return InkWell(
       onTap: onTap,
@@ -35,7 +41,7 @@ class ChatListItem extends StatelessWidget {
                 avatarUrl: chat.avatarUrl,
                 size: 56,
                 borderRadius: 10,
-                isOnline: chat.isOnline,
+                isOnline: isOnline,
                 showOnlineBadge: true,
               ),
               const SizedBox(width: 16),
@@ -56,6 +62,13 @@ class ChatListItem extends StatelessWidget {
     final primaryTextColor = context.colorScheme.onSurface;
     final secondaryTextColor = context.colorScheme.onSurfaceVariant;
 
+    final preview = switch (chat.lastMessageType) {
+      ChatPreviewType.image => context.l10n.chatReplyPhoto,
+      ChatPreviewType.audio => context.l10n.chatReplyAudio,
+      ChatPreviewType.location => context.l10n.chatReplyLocation,
+      ChatPreviewType.text => chat.lastMessage,
+    };
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -66,7 +79,7 @@ class ChatListItem extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         Text(
-          '$messagePrefix${chat.lastMessage}',
+          '$messagePrefix$preview',
           style: AppTextStyles.messagePreview.copyWith(
             color: secondaryTextColor,
           ),

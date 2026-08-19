@@ -866,15 +866,2713 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
   }
 }
 
+class $CachedChatsTable extends CachedChats
+    with TableInfo<$CachedChatsTable, CachedChat> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedChatsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerIdMeta = const VerificationMeta('peerId');
+  @override
+  late final GeneratedColumn<String> peerId = GeneratedColumn<String>(
+    'peer_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerUsernameMeta = const VerificationMeta(
+    'peerUsername',
+  );
+  @override
+  late final GeneratedColumn<String> peerUsername = GeneratedColumn<String>(
+    'peer_username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerDisplayNameMeta = const VerificationMeta(
+    'peerDisplayName',
+  );
+  @override
+  late final GeneratedColumn<String> peerDisplayName = GeneratedColumn<String>(
+    'peer_display_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerAvatarUrlMeta = const VerificationMeta(
+    'peerAvatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> peerAvatarUrl = GeneratedColumn<String>(
+    'peer_avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _peerAvatarStoragePathMeta =
+      const VerificationMeta('peerAvatarStoragePath');
+  @override
+  late final GeneratedColumn<String> peerAvatarStoragePath =
+      GeneratedColumn<String>(
+        'peer_avatar_storage_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastMessageMeta = const VerificationMeta(
+    'lastMessage',
+  );
+  @override
+  late final GeneratedColumn<String> lastMessage = GeneratedColumn<String>(
+    'last_message',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastMessageTypeMeta = const VerificationMeta(
+    'lastMessageType',
+  );
+  @override
+  late final GeneratedColumn<String> lastMessageType = GeneratedColumn<String>(
+    'last_message_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastMessageTimeMeta = const VerificationMeta(
+    'lastMessageTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastMessageTime =
+      GeneratedColumn<DateTime>(
+        'last_message_time',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _unreadCountMeta = const VerificationMeta(
+    'unreadCount',
+  );
+  @override
+  late final GeneratedColumn<int> unreadCount = GeneratedColumn<int>(
+    'unread_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isLastMessageFromMeMeta =
+      const VerificationMeta('isLastMessageFromMe');
+  @override
+  late final GeneratedColumn<bool> isLastMessageFromMe = GeneratedColumn<bool>(
+    'is_last_message_from_me',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_last_message_from_me" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _isMutedMeta = const VerificationMeta(
+    'isMuted',
+  );
+  @override
+  late final GeneratedColumn<bool> isMuted = GeneratedColumn<bool>(
+    'is_muted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_muted" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    id,
+    peerId,
+    peerUsername,
+    peerDisplayName,
+    peerAvatarUrl,
+    peerAvatarStoragePath,
+    lastMessage,
+    lastMessageType,
+    lastMessageTime,
+    unreadCount,
+    isLastMessageFromMe,
+    isMuted,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_chats';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedChat> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('peer_id')) {
+      context.handle(
+        _peerIdMeta,
+        peerId.isAcceptableOrUnknown(data['peer_id']!, _peerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_peerIdMeta);
+    }
+    if (data.containsKey('peer_username')) {
+      context.handle(
+        _peerUsernameMeta,
+        peerUsername.isAcceptableOrUnknown(
+          data['peer_username']!,
+          _peerUsernameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_peerUsernameMeta);
+    }
+    if (data.containsKey('peer_display_name')) {
+      context.handle(
+        _peerDisplayNameMeta,
+        peerDisplayName.isAcceptableOrUnknown(
+          data['peer_display_name']!,
+          _peerDisplayNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_peerDisplayNameMeta);
+    }
+    if (data.containsKey('peer_avatar_url')) {
+      context.handle(
+        _peerAvatarUrlMeta,
+        peerAvatarUrl.isAcceptableOrUnknown(
+          data['peer_avatar_url']!,
+          _peerAvatarUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('peer_avatar_storage_path')) {
+      context.handle(
+        _peerAvatarStoragePathMeta,
+        peerAvatarStoragePath.isAcceptableOrUnknown(
+          data['peer_avatar_storage_path']!,
+          _peerAvatarStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_message')) {
+      context.handle(
+        _lastMessageMeta,
+        lastMessage.isAcceptableOrUnknown(
+          data['last_message']!,
+          _lastMessageMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastMessageMeta);
+    }
+    if (data.containsKey('last_message_type')) {
+      context.handle(
+        _lastMessageTypeMeta,
+        lastMessageType.isAcceptableOrUnknown(
+          data['last_message_type']!,
+          _lastMessageTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastMessageTypeMeta);
+    }
+    if (data.containsKey('last_message_time')) {
+      context.handle(
+        _lastMessageTimeMeta,
+        lastMessageTime.isAcceptableOrUnknown(
+          data['last_message_time']!,
+          _lastMessageTimeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastMessageTimeMeta);
+    }
+    if (data.containsKey('unread_count')) {
+      context.handle(
+        _unreadCountMeta,
+        unreadCount.isAcceptableOrUnknown(
+          data['unread_count']!,
+          _unreadCountMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_unreadCountMeta);
+    }
+    if (data.containsKey('is_last_message_from_me')) {
+      context.handle(
+        _isLastMessageFromMeMeta,
+        isLastMessageFromMe.isAcceptableOrUnknown(
+          data['is_last_message_from_me']!,
+          _isLastMessageFromMeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_isLastMessageFromMeMeta);
+    }
+    if (data.containsKey('is_muted')) {
+      context.handle(
+        _isMutedMeta,
+        isMuted.isAcceptableOrUnknown(data['is_muted']!, _isMutedMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_isMutedMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, id};
+  @override
+  CachedChat map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedChat(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      peerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_id'],
+      )!,
+      peerUsername: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_username'],
+      )!,
+      peerDisplayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_display_name'],
+      )!,
+      peerAvatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_avatar_url'],
+      ),
+      peerAvatarStoragePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_avatar_storage_path'],
+      ),
+      lastMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_message'],
+      )!,
+      lastMessageType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_message_type'],
+      )!,
+      lastMessageTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_message_time'],
+      )!,
+      unreadCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unread_count'],
+      )!,
+      isLastMessageFromMe: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_last_message_from_me'],
+      )!,
+      isMuted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_muted'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedChatsTable createAlias(String alias) {
+    return $CachedChatsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedChat extends DataClass implements Insertable<CachedChat> {
+  final String ownerUserId;
+  final String id;
+  final String peerId;
+  final String peerUsername;
+  final String peerDisplayName;
+  final String? peerAvatarUrl;
+  final String? peerAvatarStoragePath;
+  final String lastMessage;
+  final String lastMessageType;
+  final DateTime lastMessageTime;
+  final int unreadCount;
+  final bool isLastMessageFromMe;
+  final bool isMuted;
+  final DateTime cachedAt;
+  const CachedChat({
+    required this.ownerUserId,
+    required this.id,
+    required this.peerId,
+    required this.peerUsername,
+    required this.peerDisplayName,
+    this.peerAvatarUrl,
+    this.peerAvatarStoragePath,
+    required this.lastMessage,
+    required this.lastMessageType,
+    required this.lastMessageTime,
+    required this.unreadCount,
+    required this.isLastMessageFromMe,
+    required this.isMuted,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['id'] = Variable<String>(id);
+    map['peer_id'] = Variable<String>(peerId);
+    map['peer_username'] = Variable<String>(peerUsername);
+    map['peer_display_name'] = Variable<String>(peerDisplayName);
+    if (!nullToAbsent || peerAvatarUrl != null) {
+      map['peer_avatar_url'] = Variable<String>(peerAvatarUrl);
+    }
+    if (!nullToAbsent || peerAvatarStoragePath != null) {
+      map['peer_avatar_storage_path'] = Variable<String>(peerAvatarStoragePath);
+    }
+    map['last_message'] = Variable<String>(lastMessage);
+    map['last_message_type'] = Variable<String>(lastMessageType);
+    map['last_message_time'] = Variable<DateTime>(lastMessageTime);
+    map['unread_count'] = Variable<int>(unreadCount);
+    map['is_last_message_from_me'] = Variable<bool>(isLastMessageFromMe);
+    map['is_muted'] = Variable<bool>(isMuted);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedChatsCompanion toCompanion(bool nullToAbsent) {
+    return CachedChatsCompanion(
+      ownerUserId: Value(ownerUserId),
+      id: Value(id),
+      peerId: Value(peerId),
+      peerUsername: Value(peerUsername),
+      peerDisplayName: Value(peerDisplayName),
+      peerAvatarUrl: peerAvatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(peerAvatarUrl),
+      peerAvatarStoragePath: peerAvatarStoragePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(peerAvatarStoragePath),
+      lastMessage: Value(lastMessage),
+      lastMessageType: Value(lastMessageType),
+      lastMessageTime: Value(lastMessageTime),
+      unreadCount: Value(unreadCount),
+      isLastMessageFromMe: Value(isLastMessageFromMe),
+      isMuted: Value(isMuted),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedChat.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedChat(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      id: serializer.fromJson<String>(json['id']),
+      peerId: serializer.fromJson<String>(json['peerId']),
+      peerUsername: serializer.fromJson<String>(json['peerUsername']),
+      peerDisplayName: serializer.fromJson<String>(json['peerDisplayName']),
+      peerAvatarUrl: serializer.fromJson<String?>(json['peerAvatarUrl']),
+      peerAvatarStoragePath: serializer.fromJson<String?>(
+        json['peerAvatarStoragePath'],
+      ),
+      lastMessage: serializer.fromJson<String>(json['lastMessage']),
+      lastMessageType: serializer.fromJson<String>(json['lastMessageType']),
+      lastMessageTime: serializer.fromJson<DateTime>(json['lastMessageTime']),
+      unreadCount: serializer.fromJson<int>(json['unreadCount']),
+      isLastMessageFromMe: serializer.fromJson<bool>(
+        json['isLastMessageFromMe'],
+      ),
+      isMuted: serializer.fromJson<bool>(json['isMuted']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'id': serializer.toJson<String>(id),
+      'peerId': serializer.toJson<String>(peerId),
+      'peerUsername': serializer.toJson<String>(peerUsername),
+      'peerDisplayName': serializer.toJson<String>(peerDisplayName),
+      'peerAvatarUrl': serializer.toJson<String?>(peerAvatarUrl),
+      'peerAvatarStoragePath': serializer.toJson<String?>(
+        peerAvatarStoragePath,
+      ),
+      'lastMessage': serializer.toJson<String>(lastMessage),
+      'lastMessageType': serializer.toJson<String>(lastMessageType),
+      'lastMessageTime': serializer.toJson<DateTime>(lastMessageTime),
+      'unreadCount': serializer.toJson<int>(unreadCount),
+      'isLastMessageFromMe': serializer.toJson<bool>(isLastMessageFromMe),
+      'isMuted': serializer.toJson<bool>(isMuted),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedChat copyWith({
+    String? ownerUserId,
+    String? id,
+    String? peerId,
+    String? peerUsername,
+    String? peerDisplayName,
+    Value<String?> peerAvatarUrl = const Value.absent(),
+    Value<String?> peerAvatarStoragePath = const Value.absent(),
+    String? lastMessage,
+    String? lastMessageType,
+    DateTime? lastMessageTime,
+    int? unreadCount,
+    bool? isLastMessageFromMe,
+    bool? isMuted,
+    DateTime? cachedAt,
+  }) => CachedChat(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    id: id ?? this.id,
+    peerId: peerId ?? this.peerId,
+    peerUsername: peerUsername ?? this.peerUsername,
+    peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+    peerAvatarUrl: peerAvatarUrl.present
+        ? peerAvatarUrl.value
+        : this.peerAvatarUrl,
+    peerAvatarStoragePath: peerAvatarStoragePath.present
+        ? peerAvatarStoragePath.value
+        : this.peerAvatarStoragePath,
+    lastMessage: lastMessage ?? this.lastMessage,
+    lastMessageType: lastMessageType ?? this.lastMessageType,
+    lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+    unreadCount: unreadCount ?? this.unreadCount,
+    isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
+    isMuted: isMuted ?? this.isMuted,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedChat copyWithCompanion(CachedChatsCompanion data) {
+    return CachedChat(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      id: data.id.present ? data.id.value : this.id,
+      peerId: data.peerId.present ? data.peerId.value : this.peerId,
+      peerUsername: data.peerUsername.present
+          ? data.peerUsername.value
+          : this.peerUsername,
+      peerDisplayName: data.peerDisplayName.present
+          ? data.peerDisplayName.value
+          : this.peerDisplayName,
+      peerAvatarUrl: data.peerAvatarUrl.present
+          ? data.peerAvatarUrl.value
+          : this.peerAvatarUrl,
+      peerAvatarStoragePath: data.peerAvatarStoragePath.present
+          ? data.peerAvatarStoragePath.value
+          : this.peerAvatarStoragePath,
+      lastMessage: data.lastMessage.present
+          ? data.lastMessage.value
+          : this.lastMessage,
+      lastMessageType: data.lastMessageType.present
+          ? data.lastMessageType.value
+          : this.lastMessageType,
+      lastMessageTime: data.lastMessageTime.present
+          ? data.lastMessageTime.value
+          : this.lastMessageTime,
+      unreadCount: data.unreadCount.present
+          ? data.unreadCount.value
+          : this.unreadCount,
+      isLastMessageFromMe: data.isLastMessageFromMe.present
+          ? data.isLastMessageFromMe.value
+          : this.isLastMessageFromMe,
+      isMuted: data.isMuted.present ? data.isMuted.value : this.isMuted,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChat(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('peerId: $peerId, ')
+          ..write('peerUsername: $peerUsername, ')
+          ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('peerAvatarUrl: $peerAvatarUrl, ')
+          ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
+          ..write('lastMessage: $lastMessage, ')
+          ..write('lastMessageType: $lastMessageType, ')
+          ..write('lastMessageTime: $lastMessageTime, ')
+          ..write('unreadCount: $unreadCount, ')
+          ..write('isLastMessageFromMe: $isLastMessageFromMe, ')
+          ..write('isMuted: $isMuted, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    id,
+    peerId,
+    peerUsername,
+    peerDisplayName,
+    peerAvatarUrl,
+    peerAvatarStoragePath,
+    lastMessage,
+    lastMessageType,
+    lastMessageTime,
+    unreadCount,
+    isLastMessageFromMe,
+    isMuted,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedChat &&
+          other.ownerUserId == this.ownerUserId &&
+          other.id == this.id &&
+          other.peerId == this.peerId &&
+          other.peerUsername == this.peerUsername &&
+          other.peerDisplayName == this.peerDisplayName &&
+          other.peerAvatarUrl == this.peerAvatarUrl &&
+          other.peerAvatarStoragePath == this.peerAvatarStoragePath &&
+          other.lastMessage == this.lastMessage &&
+          other.lastMessageType == this.lastMessageType &&
+          other.lastMessageTime == this.lastMessageTime &&
+          other.unreadCount == this.unreadCount &&
+          other.isLastMessageFromMe == this.isLastMessageFromMe &&
+          other.isMuted == this.isMuted &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
+  final Value<String> ownerUserId;
+  final Value<String> id;
+  final Value<String> peerId;
+  final Value<String> peerUsername;
+  final Value<String> peerDisplayName;
+  final Value<String?> peerAvatarUrl;
+  final Value<String?> peerAvatarStoragePath;
+  final Value<String> lastMessage;
+  final Value<String> lastMessageType;
+  final Value<DateTime> lastMessageTime;
+  final Value<int> unreadCount;
+  final Value<bool> isLastMessageFromMe;
+  final Value<bool> isMuted;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedChatsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.id = const Value.absent(),
+    this.peerId = const Value.absent(),
+    this.peerUsername = const Value.absent(),
+    this.peerDisplayName = const Value.absent(),
+    this.peerAvatarUrl = const Value.absent(),
+    this.peerAvatarStoragePath = const Value.absent(),
+    this.lastMessage = const Value.absent(),
+    this.lastMessageType = const Value.absent(),
+    this.lastMessageTime = const Value.absent(),
+    this.unreadCount = const Value.absent(),
+    this.isLastMessageFromMe = const Value.absent(),
+    this.isMuted = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedChatsCompanion.insert({
+    required String ownerUserId,
+    required String id,
+    required String peerId,
+    required String peerUsername,
+    required String peerDisplayName,
+    this.peerAvatarUrl = const Value.absent(),
+    this.peerAvatarStoragePath = const Value.absent(),
+    required String lastMessage,
+    required String lastMessageType,
+    required DateTime lastMessageTime,
+    required int unreadCount,
+    required bool isLastMessageFromMe,
+    required bool isMuted,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       id = Value(id),
+       peerId = Value(peerId),
+       peerUsername = Value(peerUsername),
+       peerDisplayName = Value(peerDisplayName),
+       lastMessage = Value(lastMessage),
+       lastMessageType = Value(lastMessageType),
+       lastMessageTime = Value(lastMessageTime),
+       unreadCount = Value(unreadCount),
+       isLastMessageFromMe = Value(isLastMessageFromMe),
+       isMuted = Value(isMuted),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedChat> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? id,
+    Expression<String>? peerId,
+    Expression<String>? peerUsername,
+    Expression<String>? peerDisplayName,
+    Expression<String>? peerAvatarUrl,
+    Expression<String>? peerAvatarStoragePath,
+    Expression<String>? lastMessage,
+    Expression<String>? lastMessageType,
+    Expression<DateTime>? lastMessageTime,
+    Expression<int>? unreadCount,
+    Expression<bool>? isLastMessageFromMe,
+    Expression<bool>? isMuted,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (id != null) 'id': id,
+      if (peerId != null) 'peer_id': peerId,
+      if (peerUsername != null) 'peer_username': peerUsername,
+      if (peerDisplayName != null) 'peer_display_name': peerDisplayName,
+      if (peerAvatarUrl != null) 'peer_avatar_url': peerAvatarUrl,
+      if (peerAvatarStoragePath != null)
+        'peer_avatar_storage_path': peerAvatarStoragePath,
+      if (lastMessage != null) 'last_message': lastMessage,
+      if (lastMessageType != null) 'last_message_type': lastMessageType,
+      if (lastMessageTime != null) 'last_message_time': lastMessageTime,
+      if (unreadCount != null) 'unread_count': unreadCount,
+      if (isLastMessageFromMe != null)
+        'is_last_message_from_me': isLastMessageFromMe,
+      if (isMuted != null) 'is_muted': isMuted,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedChatsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? id,
+    Value<String>? peerId,
+    Value<String>? peerUsername,
+    Value<String>? peerDisplayName,
+    Value<String?>? peerAvatarUrl,
+    Value<String?>? peerAvatarStoragePath,
+    Value<String>? lastMessage,
+    Value<String>? lastMessageType,
+    Value<DateTime>? lastMessageTime,
+    Value<int>? unreadCount,
+    Value<bool>? isLastMessageFromMe,
+    Value<bool>? isMuted,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedChatsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      id: id ?? this.id,
+      peerId: peerId ?? this.peerId,
+      peerUsername: peerUsername ?? this.peerUsername,
+      peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+      peerAvatarUrl: peerAvatarUrl ?? this.peerAvatarUrl,
+      peerAvatarStoragePath:
+          peerAvatarStoragePath ?? this.peerAvatarStoragePath,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageType: lastMessageType ?? this.lastMessageType,
+      lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
+      isMuted: isMuted ?? this.isMuted,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (peerId.present) {
+      map['peer_id'] = Variable<String>(peerId.value);
+    }
+    if (peerUsername.present) {
+      map['peer_username'] = Variable<String>(peerUsername.value);
+    }
+    if (peerDisplayName.present) {
+      map['peer_display_name'] = Variable<String>(peerDisplayName.value);
+    }
+    if (peerAvatarUrl.present) {
+      map['peer_avatar_url'] = Variable<String>(peerAvatarUrl.value);
+    }
+    if (peerAvatarStoragePath.present) {
+      map['peer_avatar_storage_path'] = Variable<String>(
+        peerAvatarStoragePath.value,
+      );
+    }
+    if (lastMessage.present) {
+      map['last_message'] = Variable<String>(lastMessage.value);
+    }
+    if (lastMessageType.present) {
+      map['last_message_type'] = Variable<String>(lastMessageType.value);
+    }
+    if (lastMessageTime.present) {
+      map['last_message_time'] = Variable<DateTime>(lastMessageTime.value);
+    }
+    if (unreadCount.present) {
+      map['unread_count'] = Variable<int>(unreadCount.value);
+    }
+    if (isLastMessageFromMe.present) {
+      map['is_last_message_from_me'] = Variable<bool>(
+        isLastMessageFromMe.value,
+      );
+    }
+    if (isMuted.present) {
+      map['is_muted'] = Variable<bool>(isMuted.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('peerId: $peerId, ')
+          ..write('peerUsername: $peerUsername, ')
+          ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('peerAvatarUrl: $peerAvatarUrl, ')
+          ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
+          ..write('lastMessage: $lastMessage, ')
+          ..write('lastMessageType: $lastMessageType, ')
+          ..write('lastMessageTime: $lastMessageTime, ')
+          ..write('unreadCount: $unreadCount, ')
+          ..write('isLastMessageFromMe: $isLastMessageFromMe, ')
+          ..write('isMuted: $isMuted, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedMessagesTable extends CachedMessages
+    with TableInfo<$CachedMessagesTable, CachedMessage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedMessagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _senderIdMeta = const VerificationMeta(
+    'senderId',
+  );
+  @override
+  late final GeneratedColumn<String> senderId = GeneratedColumn<String>(
+    'sender_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageTextMeta = const VerificationMeta(
+    'messageText',
+  );
+  @override
+  late final GeneratedColumn<String> messageText = GeneratedColumn<String>(
+    'message_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timestampMeta = const VerificationMeta(
+    'timestamp',
+  );
+  @override
+  late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
+    'timestamp',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mediaUrlsJsonMeta = const VerificationMeta(
+    'mediaUrlsJson',
+  );
+  @override
+  late final GeneratedColumn<String> mediaUrlsJson = GeneratedColumn<String>(
+    'media_urls_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mediaStoragePathsJsonMeta =
+      const VerificationMeta('mediaStoragePathsJson');
+  @override
+  late final GeneratedColumn<String> mediaStoragePathsJson =
+      GeneratedColumn<String>(
+        'media_storage_paths_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _latitudeMeta = const VerificationMeta(
+    'latitude',
+  );
+  @override
+  late final GeneratedColumn<double> latitude = GeneratedColumn<double>(
+    'latitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _longitudeMeta = const VerificationMeta(
+    'longitude',
+  );
+  @override
+  late final GeneratedColumn<double> longitude = GeneratedColumn<double>(
+    'longitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioUrlMeta = const VerificationMeta(
+    'audioUrl',
+  );
+  @override
+  late final GeneratedColumn<String> audioUrl = GeneratedColumn<String>(
+    'audio_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioStoragePathMeta = const VerificationMeta(
+    'audioStoragePath',
+  );
+  @override
+  late final GeneratedColumn<String> audioStoragePath = GeneratedColumn<String>(
+    'audio_storage_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioDurationMsMeta = const VerificationMeta(
+    'audioDurationMs',
+  );
+  @override
+  late final GeneratedColumn<int> audioDurationMs = GeneratedColumn<int>(
+    'audio_duration_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioWaveformJsonMeta = const VerificationMeta(
+    'audioWaveformJson',
+  );
+  @override
+  late final GeneratedColumn<String> audioWaveformJson =
+      GeneratedColumn<String>(
+        'audio_waveform_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _replyMessageIdMeta = const VerificationMeta(
+    'replyMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> replyMessageId = GeneratedColumn<String>(
+    'reply_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _replySenderIdMeta = const VerificationMeta(
+    'replySenderId',
+  );
+  @override
+  late final GeneratedColumn<String> replySenderId = GeneratedColumn<String>(
+    'reply_sender_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _replyTypeMeta = const VerificationMeta(
+    'replyType',
+  );
+  @override
+  late final GeneratedColumn<String> replyType = GeneratedColumn<String>(
+    'reply_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _replyTextMeta = const VerificationMeta(
+    'replyText',
+  );
+  @override
+  late final GeneratedColumn<String> replyText = GeneratedColumn<String>(
+    'reply_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _readAtMeta = const VerificationMeta('readAt');
+  @override
+  late final GeneratedColumn<DateTime> readAt = GeneratedColumn<DateTime>(
+    'read_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isPendingMeta = const VerificationMeta(
+    'isPending',
+  );
+  @override
+  late final GeneratedColumn<bool> isPending = GeneratedColumn<bool>(
+    'is_pending',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_pending" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    id,
+    chatId,
+    senderId,
+    messageText,
+    timestamp,
+    status,
+    type,
+    mediaUrlsJson,
+    mediaStoragePathsJson,
+    latitude,
+    longitude,
+    audioUrl,
+    audioStoragePath,
+    audioDurationMs,
+    audioWaveformJson,
+    replyMessageId,
+    replySenderId,
+    replyType,
+    replyText,
+    readAt,
+    isPending,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_messages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedMessage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('sender_id')) {
+      context.handle(
+        _senderIdMeta,
+        senderId.isAcceptableOrUnknown(data['sender_id']!, _senderIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_senderIdMeta);
+    }
+    if (data.containsKey('message_text')) {
+      context.handle(
+        _messageTextMeta,
+        messageText.isAcceptableOrUnknown(
+          data['message_text']!,
+          _messageTextMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_messageTextMeta);
+    }
+    if (data.containsKey('timestamp')) {
+      context.handle(
+        _timestampMeta,
+        timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timestampMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('media_urls_json')) {
+      context.handle(
+        _mediaUrlsJsonMeta,
+        mediaUrlsJson.isAcceptableOrUnknown(
+          data['media_urls_json']!,
+          _mediaUrlsJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_mediaUrlsJsonMeta);
+    }
+    if (data.containsKey('media_storage_paths_json')) {
+      context.handle(
+        _mediaStoragePathsJsonMeta,
+        mediaStoragePathsJson.isAcceptableOrUnknown(
+          data['media_storage_paths_json']!,
+          _mediaStoragePathsJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_mediaStoragePathsJsonMeta);
+    }
+    if (data.containsKey('latitude')) {
+      context.handle(
+        _latitudeMeta,
+        latitude.isAcceptableOrUnknown(data['latitude']!, _latitudeMeta),
+      );
+    }
+    if (data.containsKey('longitude')) {
+      context.handle(
+        _longitudeMeta,
+        longitude.isAcceptableOrUnknown(data['longitude']!, _longitudeMeta),
+      );
+    }
+    if (data.containsKey('audio_url')) {
+      context.handle(
+        _audioUrlMeta,
+        audioUrl.isAcceptableOrUnknown(data['audio_url']!, _audioUrlMeta),
+      );
+    }
+    if (data.containsKey('audio_storage_path')) {
+      context.handle(
+        _audioStoragePathMeta,
+        audioStoragePath.isAcceptableOrUnknown(
+          data['audio_storage_path']!,
+          _audioStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_duration_ms')) {
+      context.handle(
+        _audioDurationMsMeta,
+        audioDurationMs.isAcceptableOrUnknown(
+          data['audio_duration_ms']!,
+          _audioDurationMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_waveform_json')) {
+      context.handle(
+        _audioWaveformJsonMeta,
+        audioWaveformJson.isAcceptableOrUnknown(
+          data['audio_waveform_json']!,
+          _audioWaveformJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_audioWaveformJsonMeta);
+    }
+    if (data.containsKey('reply_message_id')) {
+      context.handle(
+        _replyMessageIdMeta,
+        replyMessageId.isAcceptableOrUnknown(
+          data['reply_message_id']!,
+          _replyMessageIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reply_sender_id')) {
+      context.handle(
+        _replySenderIdMeta,
+        replySenderId.isAcceptableOrUnknown(
+          data['reply_sender_id']!,
+          _replySenderIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reply_type')) {
+      context.handle(
+        _replyTypeMeta,
+        replyType.isAcceptableOrUnknown(data['reply_type']!, _replyTypeMeta),
+      );
+    }
+    if (data.containsKey('reply_text')) {
+      context.handle(
+        _replyTextMeta,
+        replyText.isAcceptableOrUnknown(data['reply_text']!, _replyTextMeta),
+      );
+    }
+    if (data.containsKey('read_at')) {
+      context.handle(
+        _readAtMeta,
+        readAt.isAcceptableOrUnknown(data['read_at']!, _readAtMeta),
+      );
+    }
+    if (data.containsKey('is_pending')) {
+      context.handle(
+        _isPendingMeta,
+        isPending.isAcceptableOrUnknown(data['is_pending']!, _isPendingMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_isPendingMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, id};
+  @override
+  CachedMessage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedMessage(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      senderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sender_id'],
+      )!,
+      messageText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_text'],
+      )!,
+      timestamp: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}timestamp'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      mediaUrlsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_urls_json'],
+      )!,
+      mediaStoragePathsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_storage_paths_json'],
+      )!,
+      latitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}latitude'],
+      ),
+      longitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}longitude'],
+      ),
+      audioUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_url'],
+      ),
+      audioStoragePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_storage_path'],
+      ),
+      audioDurationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}audio_duration_ms'],
+      ),
+      audioWaveformJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_waveform_json'],
+      )!,
+      replyMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_message_id'],
+      ),
+      replySenderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_sender_id'],
+      ),
+      replyType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_type'],
+      ),
+      replyText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_text'],
+      ),
+      readAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}read_at'],
+      ),
+      isPending: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_pending'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedMessagesTable createAlias(String alias) {
+    return $CachedMessagesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedMessage extends DataClass implements Insertable<CachedMessage> {
+  final String ownerUserId;
+  final String id;
+  final String chatId;
+  final String senderId;
+  final String messageText;
+  final DateTime timestamp;
+  final String status;
+  final String type;
+  final String mediaUrlsJson;
+  final String mediaStoragePathsJson;
+  final double? latitude;
+  final double? longitude;
+  final String? audioUrl;
+  final String? audioStoragePath;
+  final int? audioDurationMs;
+  final String audioWaveformJson;
+  final String? replyMessageId;
+  final String? replySenderId;
+  final String? replyType;
+  final String? replyText;
+  final DateTime? readAt;
+  final bool isPending;
+  final DateTime cachedAt;
+  const CachedMessage({
+    required this.ownerUserId,
+    required this.id,
+    required this.chatId,
+    required this.senderId,
+    required this.messageText,
+    required this.timestamp,
+    required this.status,
+    required this.type,
+    required this.mediaUrlsJson,
+    required this.mediaStoragePathsJson,
+    this.latitude,
+    this.longitude,
+    this.audioUrl,
+    this.audioStoragePath,
+    this.audioDurationMs,
+    required this.audioWaveformJson,
+    this.replyMessageId,
+    this.replySenderId,
+    this.replyType,
+    this.replyText,
+    this.readAt,
+    required this.isPending,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['id'] = Variable<String>(id);
+    map['chat_id'] = Variable<String>(chatId);
+    map['sender_id'] = Variable<String>(senderId);
+    map['message_text'] = Variable<String>(messageText);
+    map['timestamp'] = Variable<DateTime>(timestamp);
+    map['status'] = Variable<String>(status);
+    map['type'] = Variable<String>(type);
+    map['media_urls_json'] = Variable<String>(mediaUrlsJson);
+    map['media_storage_paths_json'] = Variable<String>(mediaStoragePathsJson);
+    if (!nullToAbsent || latitude != null) {
+      map['latitude'] = Variable<double>(latitude);
+    }
+    if (!nullToAbsent || longitude != null) {
+      map['longitude'] = Variable<double>(longitude);
+    }
+    if (!nullToAbsent || audioUrl != null) {
+      map['audio_url'] = Variable<String>(audioUrl);
+    }
+    if (!nullToAbsent || audioStoragePath != null) {
+      map['audio_storage_path'] = Variable<String>(audioStoragePath);
+    }
+    if (!nullToAbsent || audioDurationMs != null) {
+      map['audio_duration_ms'] = Variable<int>(audioDurationMs);
+    }
+    map['audio_waveform_json'] = Variable<String>(audioWaveformJson);
+    if (!nullToAbsent || replyMessageId != null) {
+      map['reply_message_id'] = Variable<String>(replyMessageId);
+    }
+    if (!nullToAbsent || replySenderId != null) {
+      map['reply_sender_id'] = Variable<String>(replySenderId);
+    }
+    if (!nullToAbsent || replyType != null) {
+      map['reply_type'] = Variable<String>(replyType);
+    }
+    if (!nullToAbsent || replyText != null) {
+      map['reply_text'] = Variable<String>(replyText);
+    }
+    if (!nullToAbsent || readAt != null) {
+      map['read_at'] = Variable<DateTime>(readAt);
+    }
+    map['is_pending'] = Variable<bool>(isPending);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedMessagesCompanion toCompanion(bool nullToAbsent) {
+    return CachedMessagesCompanion(
+      ownerUserId: Value(ownerUserId),
+      id: Value(id),
+      chatId: Value(chatId),
+      senderId: Value(senderId),
+      messageText: Value(messageText),
+      timestamp: Value(timestamp),
+      status: Value(status),
+      type: Value(type),
+      mediaUrlsJson: Value(mediaUrlsJson),
+      mediaStoragePathsJson: Value(mediaStoragePathsJson),
+      latitude: latitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(latitude),
+      longitude: longitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(longitude),
+      audioUrl: audioUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioUrl),
+      audioStoragePath: audioStoragePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioStoragePath),
+      audioDurationMs: audioDurationMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioDurationMs),
+      audioWaveformJson: Value(audioWaveformJson),
+      replyMessageId: replyMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyMessageId),
+      replySenderId: replySenderId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replySenderId),
+      replyType: replyType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyType),
+      replyText: replyText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyText),
+      readAt: readAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readAt),
+      isPending: Value(isPending),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedMessage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedMessage(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      id: serializer.fromJson<String>(json['id']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      senderId: serializer.fromJson<String>(json['senderId']),
+      messageText: serializer.fromJson<String>(json['messageText']),
+      timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+      status: serializer.fromJson<String>(json['status']),
+      type: serializer.fromJson<String>(json['type']),
+      mediaUrlsJson: serializer.fromJson<String>(json['mediaUrlsJson']),
+      mediaStoragePathsJson: serializer.fromJson<String>(
+        json['mediaStoragePathsJson'],
+      ),
+      latitude: serializer.fromJson<double?>(json['latitude']),
+      longitude: serializer.fromJson<double?>(json['longitude']),
+      audioUrl: serializer.fromJson<String?>(json['audioUrl']),
+      audioStoragePath: serializer.fromJson<String?>(json['audioStoragePath']),
+      audioDurationMs: serializer.fromJson<int?>(json['audioDurationMs']),
+      audioWaveformJson: serializer.fromJson<String>(json['audioWaveformJson']),
+      replyMessageId: serializer.fromJson<String?>(json['replyMessageId']),
+      replySenderId: serializer.fromJson<String?>(json['replySenderId']),
+      replyType: serializer.fromJson<String?>(json['replyType']),
+      replyText: serializer.fromJson<String?>(json['replyText']),
+      readAt: serializer.fromJson<DateTime?>(json['readAt']),
+      isPending: serializer.fromJson<bool>(json['isPending']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'id': serializer.toJson<String>(id),
+      'chatId': serializer.toJson<String>(chatId),
+      'senderId': serializer.toJson<String>(senderId),
+      'messageText': serializer.toJson<String>(messageText),
+      'timestamp': serializer.toJson<DateTime>(timestamp),
+      'status': serializer.toJson<String>(status),
+      'type': serializer.toJson<String>(type),
+      'mediaUrlsJson': serializer.toJson<String>(mediaUrlsJson),
+      'mediaStoragePathsJson': serializer.toJson<String>(mediaStoragePathsJson),
+      'latitude': serializer.toJson<double?>(latitude),
+      'longitude': serializer.toJson<double?>(longitude),
+      'audioUrl': serializer.toJson<String?>(audioUrl),
+      'audioStoragePath': serializer.toJson<String?>(audioStoragePath),
+      'audioDurationMs': serializer.toJson<int?>(audioDurationMs),
+      'audioWaveformJson': serializer.toJson<String>(audioWaveformJson),
+      'replyMessageId': serializer.toJson<String?>(replyMessageId),
+      'replySenderId': serializer.toJson<String?>(replySenderId),
+      'replyType': serializer.toJson<String?>(replyType),
+      'replyText': serializer.toJson<String?>(replyText),
+      'readAt': serializer.toJson<DateTime?>(readAt),
+      'isPending': serializer.toJson<bool>(isPending),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedMessage copyWith({
+    String? ownerUserId,
+    String? id,
+    String? chatId,
+    String? senderId,
+    String? messageText,
+    DateTime? timestamp,
+    String? status,
+    String? type,
+    String? mediaUrlsJson,
+    String? mediaStoragePathsJson,
+    Value<double?> latitude = const Value.absent(),
+    Value<double?> longitude = const Value.absent(),
+    Value<String?> audioUrl = const Value.absent(),
+    Value<String?> audioStoragePath = const Value.absent(),
+    Value<int?> audioDurationMs = const Value.absent(),
+    String? audioWaveformJson,
+    Value<String?> replyMessageId = const Value.absent(),
+    Value<String?> replySenderId = const Value.absent(),
+    Value<String?> replyType = const Value.absent(),
+    Value<String?> replyText = const Value.absent(),
+    Value<DateTime?> readAt = const Value.absent(),
+    bool? isPending,
+    DateTime? cachedAt,
+  }) => CachedMessage(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    id: id ?? this.id,
+    chatId: chatId ?? this.chatId,
+    senderId: senderId ?? this.senderId,
+    messageText: messageText ?? this.messageText,
+    timestamp: timestamp ?? this.timestamp,
+    status: status ?? this.status,
+    type: type ?? this.type,
+    mediaUrlsJson: mediaUrlsJson ?? this.mediaUrlsJson,
+    mediaStoragePathsJson: mediaStoragePathsJson ?? this.mediaStoragePathsJson,
+    latitude: latitude.present ? latitude.value : this.latitude,
+    longitude: longitude.present ? longitude.value : this.longitude,
+    audioUrl: audioUrl.present ? audioUrl.value : this.audioUrl,
+    audioStoragePath: audioStoragePath.present
+        ? audioStoragePath.value
+        : this.audioStoragePath,
+    audioDurationMs: audioDurationMs.present
+        ? audioDurationMs.value
+        : this.audioDurationMs,
+    audioWaveformJson: audioWaveformJson ?? this.audioWaveformJson,
+    replyMessageId: replyMessageId.present
+        ? replyMessageId.value
+        : this.replyMessageId,
+    replySenderId: replySenderId.present
+        ? replySenderId.value
+        : this.replySenderId,
+    replyType: replyType.present ? replyType.value : this.replyType,
+    replyText: replyText.present ? replyText.value : this.replyText,
+    readAt: readAt.present ? readAt.value : this.readAt,
+    isPending: isPending ?? this.isPending,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedMessage copyWithCompanion(CachedMessagesCompanion data) {
+    return CachedMessage(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      id: data.id.present ? data.id.value : this.id,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      senderId: data.senderId.present ? data.senderId.value : this.senderId,
+      messageText: data.messageText.present
+          ? data.messageText.value
+          : this.messageText,
+      timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+      status: data.status.present ? data.status.value : this.status,
+      type: data.type.present ? data.type.value : this.type,
+      mediaUrlsJson: data.mediaUrlsJson.present
+          ? data.mediaUrlsJson.value
+          : this.mediaUrlsJson,
+      mediaStoragePathsJson: data.mediaStoragePathsJson.present
+          ? data.mediaStoragePathsJson.value
+          : this.mediaStoragePathsJson,
+      latitude: data.latitude.present ? data.latitude.value : this.latitude,
+      longitude: data.longitude.present ? data.longitude.value : this.longitude,
+      audioUrl: data.audioUrl.present ? data.audioUrl.value : this.audioUrl,
+      audioStoragePath: data.audioStoragePath.present
+          ? data.audioStoragePath.value
+          : this.audioStoragePath,
+      audioDurationMs: data.audioDurationMs.present
+          ? data.audioDurationMs.value
+          : this.audioDurationMs,
+      audioWaveformJson: data.audioWaveformJson.present
+          ? data.audioWaveformJson.value
+          : this.audioWaveformJson,
+      replyMessageId: data.replyMessageId.present
+          ? data.replyMessageId.value
+          : this.replyMessageId,
+      replySenderId: data.replySenderId.present
+          ? data.replySenderId.value
+          : this.replySenderId,
+      replyType: data.replyType.present ? data.replyType.value : this.replyType,
+      replyText: data.replyText.present ? data.replyText.value : this.replyText,
+      readAt: data.readAt.present ? data.readAt.value : this.readAt,
+      isPending: data.isPending.present ? data.isPending.value : this.isPending,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMessage(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('chatId: $chatId, ')
+          ..write('senderId: $senderId, ')
+          ..write('messageText: $messageText, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('status: $status, ')
+          ..write('type: $type, ')
+          ..write('mediaUrlsJson: $mediaUrlsJson, ')
+          ..write('mediaStoragePathsJson: $mediaStoragePathsJson, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('audioUrl: $audioUrl, ')
+          ..write('audioStoragePath: $audioStoragePath, ')
+          ..write('audioDurationMs: $audioDurationMs, ')
+          ..write('audioWaveformJson: $audioWaveformJson, ')
+          ..write('replyMessageId: $replyMessageId, ')
+          ..write('replySenderId: $replySenderId, ')
+          ..write('replyType: $replyType, ')
+          ..write('replyText: $replyText, ')
+          ..write('readAt: $readAt, ')
+          ..write('isPending: $isPending, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    ownerUserId,
+    id,
+    chatId,
+    senderId,
+    messageText,
+    timestamp,
+    status,
+    type,
+    mediaUrlsJson,
+    mediaStoragePathsJson,
+    latitude,
+    longitude,
+    audioUrl,
+    audioStoragePath,
+    audioDurationMs,
+    audioWaveformJson,
+    replyMessageId,
+    replySenderId,
+    replyType,
+    replyText,
+    readAt,
+    isPending,
+    cachedAt,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedMessage &&
+          other.ownerUserId == this.ownerUserId &&
+          other.id == this.id &&
+          other.chatId == this.chatId &&
+          other.senderId == this.senderId &&
+          other.messageText == this.messageText &&
+          other.timestamp == this.timestamp &&
+          other.status == this.status &&
+          other.type == this.type &&
+          other.mediaUrlsJson == this.mediaUrlsJson &&
+          other.mediaStoragePathsJson == this.mediaStoragePathsJson &&
+          other.latitude == this.latitude &&
+          other.longitude == this.longitude &&
+          other.audioUrl == this.audioUrl &&
+          other.audioStoragePath == this.audioStoragePath &&
+          other.audioDurationMs == this.audioDurationMs &&
+          other.audioWaveformJson == this.audioWaveformJson &&
+          other.replyMessageId == this.replyMessageId &&
+          other.replySenderId == this.replySenderId &&
+          other.replyType == this.replyType &&
+          other.replyText == this.replyText &&
+          other.readAt == this.readAt &&
+          other.isPending == this.isPending &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
+  final Value<String> ownerUserId;
+  final Value<String> id;
+  final Value<String> chatId;
+  final Value<String> senderId;
+  final Value<String> messageText;
+  final Value<DateTime> timestamp;
+  final Value<String> status;
+  final Value<String> type;
+  final Value<String> mediaUrlsJson;
+  final Value<String> mediaStoragePathsJson;
+  final Value<double?> latitude;
+  final Value<double?> longitude;
+  final Value<String?> audioUrl;
+  final Value<String?> audioStoragePath;
+  final Value<int?> audioDurationMs;
+  final Value<String> audioWaveformJson;
+  final Value<String?> replyMessageId;
+  final Value<String?> replySenderId;
+  final Value<String?> replyType;
+  final Value<String?> replyText;
+  final Value<DateTime?> readAt;
+  final Value<bool> isPending;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedMessagesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.id = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.senderId = const Value.absent(),
+    this.messageText = const Value.absent(),
+    this.timestamp = const Value.absent(),
+    this.status = const Value.absent(),
+    this.type = const Value.absent(),
+    this.mediaUrlsJson = const Value.absent(),
+    this.mediaStoragePathsJson = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.audioUrl = const Value.absent(),
+    this.audioStoragePath = const Value.absent(),
+    this.audioDurationMs = const Value.absent(),
+    this.audioWaveformJson = const Value.absent(),
+    this.replyMessageId = const Value.absent(),
+    this.replySenderId = const Value.absent(),
+    this.replyType = const Value.absent(),
+    this.replyText = const Value.absent(),
+    this.readAt = const Value.absent(),
+    this.isPending = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedMessagesCompanion.insert({
+    required String ownerUserId,
+    required String id,
+    required String chatId,
+    required String senderId,
+    required String messageText,
+    required DateTime timestamp,
+    required String status,
+    required String type,
+    required String mediaUrlsJson,
+    required String mediaStoragePathsJson,
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.audioUrl = const Value.absent(),
+    this.audioStoragePath = const Value.absent(),
+    this.audioDurationMs = const Value.absent(),
+    required String audioWaveformJson,
+    this.replyMessageId = const Value.absent(),
+    this.replySenderId = const Value.absent(),
+    this.replyType = const Value.absent(),
+    this.replyText = const Value.absent(),
+    this.readAt = const Value.absent(),
+    required bool isPending,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       id = Value(id),
+       chatId = Value(chatId),
+       senderId = Value(senderId),
+       messageText = Value(messageText),
+       timestamp = Value(timestamp),
+       status = Value(status),
+       type = Value(type),
+       mediaUrlsJson = Value(mediaUrlsJson),
+       mediaStoragePathsJson = Value(mediaStoragePathsJson),
+       audioWaveformJson = Value(audioWaveformJson),
+       isPending = Value(isPending),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedMessage> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? id,
+    Expression<String>? chatId,
+    Expression<String>? senderId,
+    Expression<String>? messageText,
+    Expression<DateTime>? timestamp,
+    Expression<String>? status,
+    Expression<String>? type,
+    Expression<String>? mediaUrlsJson,
+    Expression<String>? mediaStoragePathsJson,
+    Expression<double>? latitude,
+    Expression<double>? longitude,
+    Expression<String>? audioUrl,
+    Expression<String>? audioStoragePath,
+    Expression<int>? audioDurationMs,
+    Expression<String>? audioWaveformJson,
+    Expression<String>? replyMessageId,
+    Expression<String>? replySenderId,
+    Expression<String>? replyType,
+    Expression<String>? replyText,
+    Expression<DateTime>? readAt,
+    Expression<bool>? isPending,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (id != null) 'id': id,
+      if (chatId != null) 'chat_id': chatId,
+      if (senderId != null) 'sender_id': senderId,
+      if (messageText != null) 'message_text': messageText,
+      if (timestamp != null) 'timestamp': timestamp,
+      if (status != null) 'status': status,
+      if (type != null) 'type': type,
+      if (mediaUrlsJson != null) 'media_urls_json': mediaUrlsJson,
+      if (mediaStoragePathsJson != null)
+        'media_storage_paths_json': mediaStoragePathsJson,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (audioUrl != null) 'audio_url': audioUrl,
+      if (audioStoragePath != null) 'audio_storage_path': audioStoragePath,
+      if (audioDurationMs != null) 'audio_duration_ms': audioDurationMs,
+      if (audioWaveformJson != null) 'audio_waveform_json': audioWaveformJson,
+      if (replyMessageId != null) 'reply_message_id': replyMessageId,
+      if (replySenderId != null) 'reply_sender_id': replySenderId,
+      if (replyType != null) 'reply_type': replyType,
+      if (replyText != null) 'reply_text': replyText,
+      if (readAt != null) 'read_at': readAt,
+      if (isPending != null) 'is_pending': isPending,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedMessagesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? id,
+    Value<String>? chatId,
+    Value<String>? senderId,
+    Value<String>? messageText,
+    Value<DateTime>? timestamp,
+    Value<String>? status,
+    Value<String>? type,
+    Value<String>? mediaUrlsJson,
+    Value<String>? mediaStoragePathsJson,
+    Value<double?>? latitude,
+    Value<double?>? longitude,
+    Value<String?>? audioUrl,
+    Value<String?>? audioStoragePath,
+    Value<int?>? audioDurationMs,
+    Value<String>? audioWaveformJson,
+    Value<String?>? replyMessageId,
+    Value<String?>? replySenderId,
+    Value<String?>? replyType,
+    Value<String?>? replyText,
+    Value<DateTime?>? readAt,
+    Value<bool>? isPending,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedMessagesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      senderId: senderId ?? this.senderId,
+      messageText: messageText ?? this.messageText,
+      timestamp: timestamp ?? this.timestamp,
+      status: status ?? this.status,
+      type: type ?? this.type,
+      mediaUrlsJson: mediaUrlsJson ?? this.mediaUrlsJson,
+      mediaStoragePathsJson:
+          mediaStoragePathsJson ?? this.mediaStoragePathsJson,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      audioUrl: audioUrl ?? this.audioUrl,
+      audioStoragePath: audioStoragePath ?? this.audioStoragePath,
+      audioDurationMs: audioDurationMs ?? this.audioDurationMs,
+      audioWaveformJson: audioWaveformJson ?? this.audioWaveformJson,
+      replyMessageId: replyMessageId ?? this.replyMessageId,
+      replySenderId: replySenderId ?? this.replySenderId,
+      replyType: replyType ?? this.replyType,
+      replyText: replyText ?? this.replyText,
+      readAt: readAt ?? this.readAt,
+      isPending: isPending ?? this.isPending,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (senderId.present) {
+      map['sender_id'] = Variable<String>(senderId.value);
+    }
+    if (messageText.present) {
+      map['message_text'] = Variable<String>(messageText.value);
+    }
+    if (timestamp.present) {
+      map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (mediaUrlsJson.present) {
+      map['media_urls_json'] = Variable<String>(mediaUrlsJson.value);
+    }
+    if (mediaStoragePathsJson.present) {
+      map['media_storage_paths_json'] = Variable<String>(
+        mediaStoragePathsJson.value,
+      );
+    }
+    if (latitude.present) {
+      map['latitude'] = Variable<double>(latitude.value);
+    }
+    if (longitude.present) {
+      map['longitude'] = Variable<double>(longitude.value);
+    }
+    if (audioUrl.present) {
+      map['audio_url'] = Variable<String>(audioUrl.value);
+    }
+    if (audioStoragePath.present) {
+      map['audio_storage_path'] = Variable<String>(audioStoragePath.value);
+    }
+    if (audioDurationMs.present) {
+      map['audio_duration_ms'] = Variable<int>(audioDurationMs.value);
+    }
+    if (audioWaveformJson.present) {
+      map['audio_waveform_json'] = Variable<String>(audioWaveformJson.value);
+    }
+    if (replyMessageId.present) {
+      map['reply_message_id'] = Variable<String>(replyMessageId.value);
+    }
+    if (replySenderId.present) {
+      map['reply_sender_id'] = Variable<String>(replySenderId.value);
+    }
+    if (replyType.present) {
+      map['reply_type'] = Variable<String>(replyType.value);
+    }
+    if (replyText.present) {
+      map['reply_text'] = Variable<String>(replyText.value);
+    }
+    if (readAt.present) {
+      map['read_at'] = Variable<DateTime>(readAt.value);
+    }
+    if (isPending.present) {
+      map['is_pending'] = Variable<bool>(isPending.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMessagesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('chatId: $chatId, ')
+          ..write('senderId: $senderId, ')
+          ..write('messageText: $messageText, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('status: $status, ')
+          ..write('type: $type, ')
+          ..write('mediaUrlsJson: $mediaUrlsJson, ')
+          ..write('mediaStoragePathsJson: $mediaStoragePathsJson, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('audioUrl: $audioUrl, ')
+          ..write('audioStoragePath: $audioStoragePath, ')
+          ..write('audioDurationMs: $audioDurationMs, ')
+          ..write('audioWaveformJson: $audioWaveformJson, ')
+          ..write('replyMessageId: $replyMessageId, ')
+          ..write('replySenderId: $replySenderId, ')
+          ..write('replyType: $replyType, ')
+          ..write('replyText: $replyText, ')
+          ..write('readAt: $readAt, ')
+          ..write('isPending: $isPending, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PendingChatOperationsTable extends PendingChatOperations
+    with TableInfo<$PendingChatOperationsTable, PendingChatOperation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingChatOperationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    id,
+    chatId,
+    type,
+    payloadJson,
+    attempts,
+    lastError,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_chat_operations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingChatOperation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, id};
+  @override
+  PendingChatOperation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingChatOperation(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingChatOperationsTable createAlias(String alias) {
+    return $PendingChatOperationsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingChatOperation extends DataClass
+    implements Insertable<PendingChatOperation> {
+  final String ownerUserId;
+  final String id;
+  final String chatId;
+  final String type;
+  final String payloadJson;
+  final int attempts;
+  final String? lastError;
+  final DateTime createdAt;
+  const PendingChatOperation({
+    required this.ownerUserId,
+    required this.id,
+    required this.chatId,
+    required this.type,
+    required this.payloadJson,
+    required this.attempts,
+    this.lastError,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['id'] = Variable<String>(id);
+    map['chat_id'] = Variable<String>(chatId);
+    map['type'] = Variable<String>(type);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['attempts'] = Variable<int>(attempts);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PendingChatOperationsCompanion toCompanion(bool nullToAbsent) {
+    return PendingChatOperationsCompanion(
+      ownerUserId: Value(ownerUserId),
+      id: Value(id),
+      chatId: Value(chatId),
+      type: Value(type),
+      payloadJson: Value(payloadJson),
+      attempts: Value(attempts),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PendingChatOperation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingChatOperation(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      id: serializer.fromJson<String>(json['id']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      type: serializer.fromJson<String>(json['type']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'id': serializer.toJson<String>(id),
+      'chatId': serializer.toJson<String>(chatId),
+      'type': serializer.toJson<String>(type),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'attempts': serializer.toJson<int>(attempts),
+      'lastError': serializer.toJson<String?>(lastError),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PendingChatOperation copyWith({
+    String? ownerUserId,
+    String? id,
+    String? chatId,
+    String? type,
+    String? payloadJson,
+    int? attempts,
+    Value<String?> lastError = const Value.absent(),
+    DateTime? createdAt,
+  }) => PendingChatOperation(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    id: id ?? this.id,
+    chatId: chatId ?? this.chatId,
+    type: type ?? this.type,
+    payloadJson: payloadJson ?? this.payloadJson,
+    attempts: attempts ?? this.attempts,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PendingChatOperation copyWithCompanion(PendingChatOperationsCompanion data) {
+    return PendingChatOperation(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      id: data.id.present ? data.id.value : this.id,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      type: data.type.present ? data.type.value : this.type,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingChatOperation(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('chatId: $chatId, ')
+          ..write('type: $type, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('attempts: $attempts, ')
+          ..write('lastError: $lastError, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    id,
+    chatId,
+    type,
+    payloadJson,
+    attempts,
+    lastError,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingChatOperation &&
+          other.ownerUserId == this.ownerUserId &&
+          other.id == this.id &&
+          other.chatId == this.chatId &&
+          other.type == this.type &&
+          other.payloadJson == this.payloadJson &&
+          other.attempts == this.attempts &&
+          other.lastError == this.lastError &&
+          other.createdAt == this.createdAt);
+}
+
+class PendingChatOperationsCompanion
+    extends UpdateCompanion<PendingChatOperation> {
+  final Value<String> ownerUserId;
+  final Value<String> id;
+  final Value<String> chatId;
+  final Value<String> type;
+  final Value<String> payloadJson;
+  final Value<int> attempts;
+  final Value<String?> lastError;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const PendingChatOperationsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.id = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingChatOperationsCompanion.insert({
+    required String ownerUserId,
+    required String id,
+    required String chatId,
+    required String type,
+    required String payloadJson,
+    this.attempts = const Value.absent(),
+    this.lastError = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       id = Value(id),
+       chatId = Value(chatId),
+       type = Value(type),
+       payloadJson = Value(payloadJson),
+       createdAt = Value(createdAt);
+  static Insertable<PendingChatOperation> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? id,
+    Expression<String>? chatId,
+    Expression<String>? type,
+    Expression<String>? payloadJson,
+    Expression<int>? attempts,
+    Expression<String>? lastError,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (id != null) 'id': id,
+      if (chatId != null) 'chat_id': chatId,
+      if (type != null) 'type': type,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (attempts != null) 'attempts': attempts,
+      if (lastError != null) 'last_error': lastError,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingChatOperationsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? id,
+    Value<String>? chatId,
+    Value<String>? type,
+    Value<String>? payloadJson,
+    Value<int>? attempts,
+    Value<String?>? lastError,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PendingChatOperationsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      type: type ?? this.type,
+      payloadJson: payloadJson ?? this.payloadJson,
+      attempts: attempts ?? this.attempts,
+      lastError: lastError ?? this.lastError,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingChatOperationsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('chatId: $chatId, ')
+          ..write('type: $type, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('attempts: $attempts, ')
+          ..write('lastError: $lastError, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CachedProfilesTable cachedProfiles = $CachedProfilesTable(this);
+  late final $CachedChatsTable cachedChats = $CachedChatsTable(this);
+  late final $CachedMessagesTable cachedMessages = $CachedMessagesTable(this);
+  late final $PendingChatOperationsTable pendingChatOperations =
+      $PendingChatOperationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [cachedProfiles];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    cachedProfiles,
+    cachedChats,
+    cachedMessages,
+    pendingChatOperations,
+  ];
 }
 
 typedef $$CachedProfilesTableCreateCompanionBuilder =
@@ -1264,10 +3962,1249 @@ typedef $$CachedProfilesTableProcessedTableManager =
       CachedProfile,
       PrefetchHooks Function()
     >;
+typedef $$CachedChatsTableCreateCompanionBuilder =
+    CachedChatsCompanion Function({
+      required String ownerUserId,
+      required String id,
+      required String peerId,
+      required String peerUsername,
+      required String peerDisplayName,
+      Value<String?> peerAvatarUrl,
+      Value<String?> peerAvatarStoragePath,
+      required String lastMessage,
+      required String lastMessageType,
+      required DateTime lastMessageTime,
+      required int unreadCount,
+      required bool isLastMessageFromMe,
+      required bool isMuted,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedChatsTableUpdateCompanionBuilder =
+    CachedChatsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> id,
+      Value<String> peerId,
+      Value<String> peerUsername,
+      Value<String> peerDisplayName,
+      Value<String?> peerAvatarUrl,
+      Value<String?> peerAvatarStoragePath,
+      Value<String> lastMessage,
+      Value<String> lastMessageType,
+      Value<DateTime> lastMessageTime,
+      Value<int> unreadCount,
+      Value<bool> isLastMessageFromMe,
+      Value<bool> isMuted,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedChatsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedChatsTable> {
+  $$CachedChatsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerId => $composableBuilder(
+    column: $table.peerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerUsername => $composableBuilder(
+    column: $table.peerUsername,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerAvatarUrl => $composableBuilder(
+    column: $table.peerAvatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerAvatarStoragePath => $composableBuilder(
+    column: $table.peerAvatarStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastMessage => $composableBuilder(
+    column: $table.lastMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastMessageType => $composableBuilder(
+    column: $table.lastMessageType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastMessageTime => $composableBuilder(
+    column: $table.lastMessageTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unreadCount => $composableBuilder(
+    column: $table.unreadCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isLastMessageFromMe => $composableBuilder(
+    column: $table.isLastMessageFromMe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isMuted => $composableBuilder(
+    column: $table.isMuted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedChatsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedChatsTable> {
+  $$CachedChatsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerId => $composableBuilder(
+    column: $table.peerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerUsername => $composableBuilder(
+    column: $table.peerUsername,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerAvatarUrl => $composableBuilder(
+    column: $table.peerAvatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerAvatarStoragePath => $composableBuilder(
+    column: $table.peerAvatarStoragePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastMessage => $composableBuilder(
+    column: $table.lastMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastMessageType => $composableBuilder(
+    column: $table.lastMessageType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastMessageTime => $composableBuilder(
+    column: $table.lastMessageTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unreadCount => $composableBuilder(
+    column: $table.unreadCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isLastMessageFromMe => $composableBuilder(
+    column: $table.isLastMessageFromMe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isMuted => $composableBuilder(
+    column: $table.isMuted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedChatsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedChatsTable> {
+  $$CachedChatsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get peerId =>
+      $composableBuilder(column: $table.peerId, builder: (column) => column);
+
+  GeneratedColumn<String> get peerUsername => $composableBuilder(
+    column: $table.peerUsername,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerAvatarUrl => $composableBuilder(
+    column: $table.peerAvatarUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerAvatarStoragePath => $composableBuilder(
+    column: $table.peerAvatarStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastMessage => $composableBuilder(
+    column: $table.lastMessage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastMessageType => $composableBuilder(
+    column: $table.lastMessageType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastMessageTime => $composableBuilder(
+    column: $table.lastMessageTime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get unreadCount => $composableBuilder(
+    column: $table.unreadCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isLastMessageFromMe => $composableBuilder(
+    column: $table.isLastMessageFromMe,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isMuted =>
+      $composableBuilder(column: $table.isMuted, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedChatsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedChatsTable,
+          CachedChat,
+          $$CachedChatsTableFilterComposer,
+          $$CachedChatsTableOrderingComposer,
+          $$CachedChatsTableAnnotationComposer,
+          $$CachedChatsTableCreateCompanionBuilder,
+          $$CachedChatsTableUpdateCompanionBuilder,
+          (
+            CachedChat,
+            BaseReferences<_$AppDatabase, $CachedChatsTable, CachedChat>,
+          ),
+          CachedChat,
+          PrefetchHooks Function()
+        > {
+  $$CachedChatsTableTableManager(_$AppDatabase db, $CachedChatsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedChatsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedChatsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedChatsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> peerId = const Value.absent(),
+                Value<String> peerUsername = const Value.absent(),
+                Value<String> peerDisplayName = const Value.absent(),
+                Value<String?> peerAvatarUrl = const Value.absent(),
+                Value<String?> peerAvatarStoragePath = const Value.absent(),
+                Value<String> lastMessage = const Value.absent(),
+                Value<String> lastMessageType = const Value.absent(),
+                Value<DateTime> lastMessageTime = const Value.absent(),
+                Value<int> unreadCount = const Value.absent(),
+                Value<bool> isLastMessageFromMe = const Value.absent(),
+                Value<bool> isMuted = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatsCompanion(
+                ownerUserId: ownerUserId,
+                id: id,
+                peerId: peerId,
+                peerUsername: peerUsername,
+                peerDisplayName: peerDisplayName,
+                peerAvatarUrl: peerAvatarUrl,
+                peerAvatarStoragePath: peerAvatarStoragePath,
+                lastMessage: lastMessage,
+                lastMessageType: lastMessageType,
+                lastMessageTime: lastMessageTime,
+                unreadCount: unreadCount,
+                isLastMessageFromMe: isLastMessageFromMe,
+                isMuted: isMuted,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String id,
+                required String peerId,
+                required String peerUsername,
+                required String peerDisplayName,
+                Value<String?> peerAvatarUrl = const Value.absent(),
+                Value<String?> peerAvatarStoragePath = const Value.absent(),
+                required String lastMessage,
+                required String lastMessageType,
+                required DateTime lastMessageTime,
+                required int unreadCount,
+                required bool isLastMessageFromMe,
+                required bool isMuted,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatsCompanion.insert(
+                ownerUserId: ownerUserId,
+                id: id,
+                peerId: peerId,
+                peerUsername: peerUsername,
+                peerDisplayName: peerDisplayName,
+                peerAvatarUrl: peerAvatarUrl,
+                peerAvatarStoragePath: peerAvatarStoragePath,
+                lastMessage: lastMessage,
+                lastMessageType: lastMessageType,
+                lastMessageTime: lastMessageTime,
+                unreadCount: unreadCount,
+                isLastMessageFromMe: isLastMessageFromMe,
+                isMuted: isMuted,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedChatsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedChatsTable,
+      CachedChat,
+      $$CachedChatsTableFilterComposer,
+      $$CachedChatsTableOrderingComposer,
+      $$CachedChatsTableAnnotationComposer,
+      $$CachedChatsTableCreateCompanionBuilder,
+      $$CachedChatsTableUpdateCompanionBuilder,
+      (
+        CachedChat,
+        BaseReferences<_$AppDatabase, $CachedChatsTable, CachedChat>,
+      ),
+      CachedChat,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedMessagesTableCreateCompanionBuilder =
+    CachedMessagesCompanion Function({
+      required String ownerUserId,
+      required String id,
+      required String chatId,
+      required String senderId,
+      required String messageText,
+      required DateTime timestamp,
+      required String status,
+      required String type,
+      required String mediaUrlsJson,
+      required String mediaStoragePathsJson,
+      Value<double?> latitude,
+      Value<double?> longitude,
+      Value<String?> audioUrl,
+      Value<String?> audioStoragePath,
+      Value<int?> audioDurationMs,
+      required String audioWaveformJson,
+      Value<String?> replyMessageId,
+      Value<String?> replySenderId,
+      Value<String?> replyType,
+      Value<String?> replyText,
+      Value<DateTime?> readAt,
+      required bool isPending,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedMessagesTableUpdateCompanionBuilder =
+    CachedMessagesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> id,
+      Value<String> chatId,
+      Value<String> senderId,
+      Value<String> messageText,
+      Value<DateTime> timestamp,
+      Value<String> status,
+      Value<String> type,
+      Value<String> mediaUrlsJson,
+      Value<String> mediaStoragePathsJson,
+      Value<double?> latitude,
+      Value<double?> longitude,
+      Value<String?> audioUrl,
+      Value<String?> audioStoragePath,
+      Value<int?> audioDurationMs,
+      Value<String> audioWaveformJson,
+      Value<String?> replyMessageId,
+      Value<String?> replySenderId,
+      Value<String?> replyType,
+      Value<String?> replyText,
+      Value<DateTime?> readAt,
+      Value<bool> isPending,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedMessagesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedMessagesTable> {
+  $$CachedMessagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get senderId => $composableBuilder(
+    column: $table.senderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageText => $composableBuilder(
+    column: $table.messageText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get timestamp => $composableBuilder(
+    column: $table.timestamp,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaUrlsJson => $composableBuilder(
+    column: $table.mediaUrlsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaStoragePathsJson => $composableBuilder(
+    column: $table.mediaStoragePathsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioUrl => $composableBuilder(
+    column: $table.audioUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioStoragePath => $composableBuilder(
+    column: $table.audioStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get audioDurationMs => $composableBuilder(
+    column: $table.audioDurationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioWaveformJson => $composableBuilder(
+    column: $table.audioWaveformJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyMessageId => $composableBuilder(
+    column: $table.replyMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replySenderId => $composableBuilder(
+    column: $table.replySenderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyType => $composableBuilder(
+    column: $table.replyType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyText => $composableBuilder(
+    column: $table.replyText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get readAt => $composableBuilder(
+    column: $table.readAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPending => $composableBuilder(
+    column: $table.isPending,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedMessagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedMessagesTable> {
+  $$CachedMessagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get senderId => $composableBuilder(
+    column: $table.senderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageText => $composableBuilder(
+    column: $table.messageText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get timestamp => $composableBuilder(
+    column: $table.timestamp,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaUrlsJson => $composableBuilder(
+    column: $table.mediaUrlsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaStoragePathsJson => $composableBuilder(
+    column: $table.mediaStoragePathsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioUrl => $composableBuilder(
+    column: $table.audioUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioStoragePath => $composableBuilder(
+    column: $table.audioStoragePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get audioDurationMs => $composableBuilder(
+    column: $table.audioDurationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioWaveformJson => $composableBuilder(
+    column: $table.audioWaveformJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyMessageId => $composableBuilder(
+    column: $table.replyMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replySenderId => $composableBuilder(
+    column: $table.replySenderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyType => $composableBuilder(
+    column: $table.replyType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyText => $composableBuilder(
+    column: $table.replyText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get readAt => $composableBuilder(
+    column: $table.readAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isPending => $composableBuilder(
+    column: $table.isPending,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedMessagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedMessagesTable> {
+  $$CachedMessagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<String> get senderId =>
+      $composableBuilder(column: $table.senderId, builder: (column) => column);
+
+  GeneratedColumn<String> get messageText => $composableBuilder(
+    column: $table.messageText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get timestamp =>
+      $composableBuilder(column: $table.timestamp, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get mediaUrlsJson => $composableBuilder(
+    column: $table.mediaUrlsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mediaStoragePathsJson => $composableBuilder(
+    column: $table.mediaStoragePathsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get latitude =>
+      $composableBuilder(column: $table.latitude, builder: (column) => column);
+
+  GeneratedColumn<double> get longitude =>
+      $composableBuilder(column: $table.longitude, builder: (column) => column);
+
+  GeneratedColumn<String> get audioUrl =>
+      $composableBuilder(column: $table.audioUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get audioStoragePath => $composableBuilder(
+    column: $table.audioStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get audioDurationMs => $composableBuilder(
+    column: $table.audioDurationMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get audioWaveformJson => $composableBuilder(
+    column: $table.audioWaveformJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replyMessageId => $composableBuilder(
+    column: $table.replyMessageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replySenderId => $composableBuilder(
+    column: $table.replySenderId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replyType =>
+      $composableBuilder(column: $table.replyType, builder: (column) => column);
+
+  GeneratedColumn<String> get replyText =>
+      $composableBuilder(column: $table.replyText, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get readAt =>
+      $composableBuilder(column: $table.readAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPending =>
+      $composableBuilder(column: $table.isPending, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedMessagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedMessagesTable,
+          CachedMessage,
+          $$CachedMessagesTableFilterComposer,
+          $$CachedMessagesTableOrderingComposer,
+          $$CachedMessagesTableAnnotationComposer,
+          $$CachedMessagesTableCreateCompanionBuilder,
+          $$CachedMessagesTableUpdateCompanionBuilder,
+          (
+            CachedMessage,
+            BaseReferences<_$AppDatabase, $CachedMessagesTable, CachedMessage>,
+          ),
+          CachedMessage,
+          PrefetchHooks Function()
+        > {
+  $$CachedMessagesTableTableManager(
+    _$AppDatabase db,
+    $CachedMessagesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedMessagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedMessagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedMessagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<String> senderId = const Value.absent(),
+                Value<String> messageText = const Value.absent(),
+                Value<DateTime> timestamp = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> mediaUrlsJson = const Value.absent(),
+                Value<String> mediaStoragePathsJson = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
+                Value<String?> audioUrl = const Value.absent(),
+                Value<String?> audioStoragePath = const Value.absent(),
+                Value<int?> audioDurationMs = const Value.absent(),
+                Value<String> audioWaveformJson = const Value.absent(),
+                Value<String?> replyMessageId = const Value.absent(),
+                Value<String?> replySenderId = const Value.absent(),
+                Value<String?> replyType = const Value.absent(),
+                Value<String?> replyText = const Value.absent(),
+                Value<DateTime?> readAt = const Value.absent(),
+                Value<bool> isPending = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMessagesCompanion(
+                ownerUserId: ownerUserId,
+                id: id,
+                chatId: chatId,
+                senderId: senderId,
+                messageText: messageText,
+                timestamp: timestamp,
+                status: status,
+                type: type,
+                mediaUrlsJson: mediaUrlsJson,
+                mediaStoragePathsJson: mediaStoragePathsJson,
+                latitude: latitude,
+                longitude: longitude,
+                audioUrl: audioUrl,
+                audioStoragePath: audioStoragePath,
+                audioDurationMs: audioDurationMs,
+                audioWaveformJson: audioWaveformJson,
+                replyMessageId: replyMessageId,
+                replySenderId: replySenderId,
+                replyType: replyType,
+                replyText: replyText,
+                readAt: readAt,
+                isPending: isPending,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String id,
+                required String chatId,
+                required String senderId,
+                required String messageText,
+                required DateTime timestamp,
+                required String status,
+                required String type,
+                required String mediaUrlsJson,
+                required String mediaStoragePathsJson,
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
+                Value<String?> audioUrl = const Value.absent(),
+                Value<String?> audioStoragePath = const Value.absent(),
+                Value<int?> audioDurationMs = const Value.absent(),
+                required String audioWaveformJson,
+                Value<String?> replyMessageId = const Value.absent(),
+                Value<String?> replySenderId = const Value.absent(),
+                Value<String?> replyType = const Value.absent(),
+                Value<String?> replyText = const Value.absent(),
+                Value<DateTime?> readAt = const Value.absent(),
+                required bool isPending,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMessagesCompanion.insert(
+                ownerUserId: ownerUserId,
+                id: id,
+                chatId: chatId,
+                senderId: senderId,
+                messageText: messageText,
+                timestamp: timestamp,
+                status: status,
+                type: type,
+                mediaUrlsJson: mediaUrlsJson,
+                mediaStoragePathsJson: mediaStoragePathsJson,
+                latitude: latitude,
+                longitude: longitude,
+                audioUrl: audioUrl,
+                audioStoragePath: audioStoragePath,
+                audioDurationMs: audioDurationMs,
+                audioWaveformJson: audioWaveformJson,
+                replyMessageId: replyMessageId,
+                replySenderId: replySenderId,
+                replyType: replyType,
+                replyText: replyText,
+                readAt: readAt,
+                isPending: isPending,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedMessagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedMessagesTable,
+      CachedMessage,
+      $$CachedMessagesTableFilterComposer,
+      $$CachedMessagesTableOrderingComposer,
+      $$CachedMessagesTableAnnotationComposer,
+      $$CachedMessagesTableCreateCompanionBuilder,
+      $$CachedMessagesTableUpdateCompanionBuilder,
+      (
+        CachedMessage,
+        BaseReferences<_$AppDatabase, $CachedMessagesTable, CachedMessage>,
+      ),
+      CachedMessage,
+      PrefetchHooks Function()
+    >;
+typedef $$PendingChatOperationsTableCreateCompanionBuilder =
+    PendingChatOperationsCompanion Function({
+      required String ownerUserId,
+      required String id,
+      required String chatId,
+      required String type,
+      required String payloadJson,
+      Value<int> attempts,
+      Value<String?> lastError,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$PendingChatOperationsTableUpdateCompanionBuilder =
+    PendingChatOperationsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> id,
+      Value<String> chatId,
+      Value<String> type,
+      Value<String> payloadJson,
+      Value<int> attempts,
+      Value<String?> lastError,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$PendingChatOperationsTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingChatOperationsTable> {
+  $$PendingChatOperationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingChatOperationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingChatOperationsTable> {
+  $$PendingChatOperationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingChatOperationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingChatOperationsTable> {
+  $$PendingChatOperationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$PendingChatOperationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingChatOperationsTable,
+          PendingChatOperation,
+          $$PendingChatOperationsTableFilterComposer,
+          $$PendingChatOperationsTableOrderingComposer,
+          $$PendingChatOperationsTableAnnotationComposer,
+          $$PendingChatOperationsTableCreateCompanionBuilder,
+          $$PendingChatOperationsTableUpdateCompanionBuilder,
+          (
+            PendingChatOperation,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingChatOperationsTable,
+              PendingChatOperation
+            >,
+          ),
+          PendingChatOperation,
+          PrefetchHooks Function()
+        > {
+  $$PendingChatOperationsTableTableManager(
+    _$AppDatabase db,
+    $PendingChatOperationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingChatOperationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$PendingChatOperationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PendingChatOperationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingChatOperationsCompanion(
+                ownerUserId: ownerUserId,
+                id: id,
+                chatId: chatId,
+                type: type,
+                payloadJson: payloadJson,
+                attempts: attempts,
+                lastError: lastError,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String id,
+                required String chatId,
+                required String type,
+                required String payloadJson,
+                Value<int> attempts = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PendingChatOperationsCompanion.insert(
+                ownerUserId: ownerUserId,
+                id: id,
+                chatId: chatId,
+                type: type,
+                payloadJson: payloadJson,
+                attempts: attempts,
+                lastError: lastError,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingChatOperationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingChatOperationsTable,
+      PendingChatOperation,
+      $$PendingChatOperationsTableFilterComposer,
+      $$PendingChatOperationsTableOrderingComposer,
+      $$PendingChatOperationsTableAnnotationComposer,
+      $$PendingChatOperationsTableCreateCompanionBuilder,
+      $$PendingChatOperationsTableUpdateCompanionBuilder,
+      (
+        PendingChatOperation,
+        BaseReferences<
+          _$AppDatabase,
+          $PendingChatOperationsTable,
+          PendingChatOperation
+        >,
+      ),
+      PendingChatOperation,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$CachedProfilesTableTableManager get cachedProfiles =>
       $$CachedProfilesTableTableManager(_db, _db.cachedProfiles);
+  $$CachedChatsTableTableManager get cachedChats =>
+      $$CachedChatsTableTableManager(_db, _db.cachedChats);
+  $$CachedMessagesTableTableManager get cachedMessages =>
+      $$CachedMessagesTableTableManager(_db, _db.cachedMessages);
+  $$PendingChatOperationsTableTableManager get pendingChatOperations =>
+      $$PendingChatOperationsTableTableManager(_db, _db.pendingChatOperations);
 }

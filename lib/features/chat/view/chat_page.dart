@@ -7,6 +7,7 @@ import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
+import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -126,6 +127,10 @@ class _ChatViewState extends State<_ChatView> {
     final headerHeight = 64.0 + topSafeArea;
 
     final backgroundColor = context.scaffoldBackgroundColor;
+    final presence = context.watch<PresenceCubit>().state;
+    final isOnline = widget.chat.peerId.isEmpty
+        ? widget.chat.isOnline
+        : presence.isOnline(widget.chat.peerId);
 
     return BlocListener<VoiceRecorderCubit, VoiceRecorderState>(
       listenWhen: (previous, current) =>
@@ -186,7 +191,7 @@ class _ChatViewState extends State<_ChatView> {
                     right: 0,
                     child: ChatAppBar(
                       userName: widget.chat.userName,
-                      isOnline: widget.chat.isOnline,
+                      isOnline: isOnline,
                       avatarUrl: widget.chat.avatarUrl,
                       onBack: () {
                         Navigator.of(context).maybePop();
@@ -288,10 +293,10 @@ class _KeyboardAwareInput extends StatelessWidget {
                       switchOutCurve: Curves.easeInCubic,
                       transitionBuilder: (child, animation) => FadeTransition(
                         opacity: animation,
-                    child: SizeTransition(
-                      sizeFactor: animation,
-                      alignment: Alignment.topCenter,
-                      child: child,
+                        child: SizeTransition(
+                          sizeFactor: animation,
+                          alignment: Alignment.topCenter,
+                          child: child,
                         ),
                       ),
                       child: state.hasPendingRecording
@@ -432,6 +437,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
 
   Set<String> _knownMessageIds = {};
   bool _initialMessagesLoaded = false;
+  DateTime? _latestKnownTimestamp;
 
   // Для отслеживания направления скролла
   double _lastOffset = 0.0;
@@ -458,6 +464,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
     if (!widget.controller.hasClients || _isAnimatingToBottom) return;
 
     final offset = widget.controller.offset;
+    if (offset >= widget.controller.position.maxScrollExtent - 320) {
+      context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
+    }
     final isAtBottom = offset <= 20;
 
     // Если достигли низа — всегда прячем кнопку и сбрасываем счетчик
@@ -501,15 +510,23 @@ class _ChatMessagesState extends State<_ChatMessages> {
 
     if (!_initialMessagesLoaded) {
       _knownMessageIds = currentIds;
+      _latestKnownTimestamp = messages.firstOrNull?.timestamp;
       _initialMessagesLoaded = true;
       return;
     }
 
+    final previousLatestTimestamp = _latestKnownTimestamp;
     final newMessages = messages
-        .where((message) => !_knownMessageIds.contains(message.id))
+        .where(
+          (message) =>
+              !_knownMessageIds.contains(message.id) &&
+              (previousLatestTimestamp == null ||
+                  !message.timestamp.isBefore(previousLatestTimestamp)),
+        )
         .toList();
 
     _knownMessageIds = currentIds;
+    _latestKnownTimestamp = messages.firstOrNull?.timestamp;
 
     if (newMessages.isEmpty) return;
 

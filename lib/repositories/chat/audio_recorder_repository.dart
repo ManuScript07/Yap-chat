@@ -30,10 +30,7 @@ class AudioRecorderRepository implements IAudioRecorderRepository {
 
   @override
   Future<void> startRecording() async {
-    await _recorder.start(
-      _recordConfig,
-      path: await _createOutputPath(),
-    );
+    await _recorder.start(_recordConfig, path: await _createOutputPath());
   }
 
   @override
@@ -67,9 +64,8 @@ class AudioRecorderRepository implements IAudioRecorderRepository {
   }
 
   Future<String> _createOutputPath() async {
-    final fileName = 'voice_${DateTime.now().microsecondsSinceEpoch}${
-      kIsWeb ? '.wav' : '.m4a'
-    }';
+    final fileName =
+        'voice_${DateTime.now().microsecondsSinceEpoch}${kIsWeb ? '.webm' : '.m4a'}';
     if (kIsWeb) return fileName;
 
     final directory = await getTemporaryDirectory();
@@ -79,15 +75,16 @@ class AudioRecorderRepository implements IAudioRecorderRepository {
   RecordConfig get _recordConfig {
     if (kIsWeb) {
       return const RecordConfig(
-        encoder: AudioEncoder.wav,
-        sampleRate: 44100,
+        encoder: AudioEncoder.opus,
+        bitRate: 64000,
+        sampleRate: 48000,
         numChannels: 1,
       );
     }
 
     return const RecordConfig(
       encoder: AudioEncoder.aacLc,
-      bitRate: 128000,
+      bitRate: 96000,
       sampleRate: 44100,
       numChannels: 1,
     );

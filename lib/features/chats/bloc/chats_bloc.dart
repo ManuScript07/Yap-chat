@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chats/bloc/bloc.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chats/chats.dart';
 import 'package:stream_transform/stream_transform.dart';
-
 
 EventTransformer<Event> debounce<Event>(Duration duration) {
   return (events, mapper) {
@@ -14,9 +15,7 @@ EventTransformer<Event> debounce<Event>(Duration duration) {
 
 /// Координирует загрузку, поиск и bulk-действия над чатами.
 class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
-  ChatsBloc({
-    required this._chatsRepository,
-  }) : super(const ChatsState()) {
+  ChatsBloc({required this._chatsRepository}) : super(const ChatsState()) {
     on<ChatsLoadStarted>(_onLoadStarted);
     on<ChatsSearchChanged>(
       _onSearchChanged,
@@ -27,9 +26,12 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     on<ChatsDeleted>(_onDeleted);
     on<ChatsMarkedAsRead>(_onMarkedAsRead);
     on<ChatsMuteToggled>(_onMuteToggled);
+    on<ChatsSubscriptionUpdated>(_onSubscriptionUpdated);
+    on<ChatsSubscriptionFailed>(_onSubscriptionFailed);
   }
 
   final IChatsRepository _chatsRepository;
+  StreamSubscription<List<Chat>>? _chatsSubscription;
 
   Future<void> _onLoadStarted(
     ChatsLoadStarted event,
@@ -37,18 +39,31 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
   ) async {
     emit(state.copyWith(status: ChatsStatus.loading));
 
-    try {
-      final chats = await _chatsRepository.getChats();
-      emit(
-        state.copyWith(
-          status: ChatsStatus.success,
-          chats: chats,
-          filteredChats: _filterChats(chats, state.searchQuery),
-        ),
-      );
-    } catch (_) {
-      emit(state.copyWith(status: ChatsStatus.failure));
-    }
+    await _chatsSubscription?.cancel();
+    _chatsSubscription = _chatsRepository.watchChats().listen(
+      (chats) => add(ChatsSubscriptionUpdated(chats)),
+      onError: (_, _) => add(const ChatsSubscriptionFailed()),
+    );
+  }
+
+  void _onSubscriptionUpdated(
+    ChatsSubscriptionUpdated event,
+    Emitter<ChatsState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        status: ChatsStatus.success,
+        chats: event.chats,
+        filteredChats: _filterChats(event.chats, state.searchQuery),
+      ),
+    );
+  }
+
+  void _onSubscriptionFailed(
+    ChatsSubscriptionFailed event,
+    Emitter<ChatsState> emit,
+  ) {
+    emit(state.copyWith(status: ChatsStatus.failure));
   }
 
   Future<void> _onSearchChanged(
@@ -83,10 +98,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     emit(state.copyWith(selectedChatIds: const {}));
   }
 
-  Future<void> _onDeleted(
-    ChatsDeleted event,
-    Emitter<ChatsState> emit,
-  ) async {
+  Future<void> _onDeleted(ChatsDeleted event, Emitter<ChatsState> emit) async {
     final selectedIds = Set<String>.of(state.selectedChatIds);
     if (selectedIds.isEmpty) return;
 
@@ -104,7 +116,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         ),
       );
     } catch (_) {
-      emit(state.copyWith(status: ChatsStatus.failure));
+      emit(state.copyWith(selectedChatIds: const {}));
     }
   }
 
@@ -130,7 +142,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         ),
       );
     } catch (_) {
-      emit(state.copyWith(status: ChatsStatus.failure));
+      emit(state.copyWith(selectedChatIds: const {}));
     }
   }
 
@@ -156,7 +168,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         ),
       );
     } catch (_) {
-      emit(state.copyWith(status: ChatsStatus.failure));
+      emit(state.copyWith(selectedChatIds: const {}));
     }
   }
 
@@ -179,5 +191,11 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     return chats
         .where((chat) => chat.userName.toLowerCase().contains(normalizedQuery))
         .toList(growable: false);
+  }
+
+  @override
+  Future<void> close() async {
+    await _chatsSubscription?.cancel();
+    return super.close();
   }
 }

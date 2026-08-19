@@ -10,6 +10,8 @@ class ChatState extends Equatable {
   final String chatId;
   final Set<String> initialMessageIds;
   final ChatMessage? replyToMessage;
+  final bool isLoadingMore;
+  final bool hasMoreMessages;
 
   const ChatState({
     this.status = ChatStatus.initial,
@@ -18,6 +20,8 @@ class ChatState extends Equatable {
     this.chatId = '',
     this.initialMessageIds = const {},
     this.replyToMessage,
+    this.isLoadingMore = false,
+    this.hasMoreMessages = true,
   });
 
   ChatState copyWith({
@@ -28,6 +32,8 @@ class ChatState extends Equatable {
     Set<String>? initialMessageIds,
     ChatMessage? replyToMessage,
     bool clearReplyToMessage = false,
+    bool? isLoadingMore,
+    bool? hasMoreMessages,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -38,16 +44,20 @@ class ChatState extends Equatable {
       replyToMessage: clearReplyToMessage
           ? null
           : replyToMessage ?? this.replyToMessage,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
     );
   }
 
   @override
   List<Object?> get props => [
-        status,
-        messages,
-        isSending,
-        chatId,
-        initialMessageIds,
-        replyToMessage,
-      ];
+    status,
+    messages,
+    isSending,
+    chatId,
+    initialMessageIds,
+    replyToMessage,
+    isLoadingMore,
+    hasMoreMessages,
+  ];
 }

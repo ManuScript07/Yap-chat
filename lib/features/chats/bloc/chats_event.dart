@@ -1,3 +1,5 @@
+import 'package:yap_chat/features/chats/data/data.dart';
+
 sealed class ChatsEvent {
   const ChatsEvent();
 }
@@ -32,4 +34,14 @@ final class ChatsMarkedAsRead extends ChatsEvent {
 
 final class ChatsMuteToggled extends ChatsEvent {
   const ChatsMuteToggled();
+}
+
+final class ChatsSubscriptionUpdated extends ChatsEvent {
+  const ChatsSubscriptionUpdated(this.chats);
+
+  final List<Chat> chats;
+}
+
+final class ChatsSubscriptionFailed extends ChatsEvent {
+  const ChatsSubscriptionFailed();
 }

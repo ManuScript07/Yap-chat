@@ -82,6 +82,11 @@ class MockChatsRepository implements IChatsRepository {
   static const _networkDelay = Duration(milliseconds: 0);
 
   @override
+  Stream<List<Chat>> watchChats() async* {
+    yield await getChats();
+  }
+
+  @override
   Future<List<Chat>> getChats() async {
     await Future<void>.delayed(_networkDelay);
     return List.unmodifiable(_chats);

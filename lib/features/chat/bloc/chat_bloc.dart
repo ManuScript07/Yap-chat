@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/chat_event.dart';
 import 'package:yap_chat/features/chat/bloc/chat_state.dart';
@@ -20,6 +21,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatReplySelected>(_onReplySelected);
     on<ChatReplyCleared>(_onReplyCleared);
     on<ChatMessageDeleteRequested>(_onMessageDeleteRequested);
+    on<ChatOlderMessagesRequested>(
+      _onOlderMessagesRequested,
+      transformer: droppable(),
+    );
   }
 
   Future<void> _onStarted(ChatStarted event, Emitter<ChatState> emit) async {
@@ -147,6 +152,20 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   void _onReplyCleared(ChatReplyCleared event, Emitter<ChatState> emit) {
     emit(state.copyWith(clearReplyToMessage: true));
+  }
+
+  Future<void> _onOlderMessagesRequested(
+    ChatOlderMessagesRequested event,
+    Emitter<ChatState> emit,
+  ) async {
+    if (state.isLoadingMore || !state.hasMoreMessages) return;
+    emit(state.copyWith(isLoadingMore: true));
+    try {
+      final hasMore = await _chatRepository.loadMoreMessages(state.chatId);
+      emit(state.copyWith(isLoadingMore: false, hasMoreMessages: hasMore));
+    } catch (_) {
+      emit(state.copyWith(isLoadingMore: false));
+    }
   }
 
   Future<void> _onMessageDeleteRequested(

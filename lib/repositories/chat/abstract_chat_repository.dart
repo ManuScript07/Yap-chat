@@ -4,6 +4,9 @@ abstract interface class IChatRepository {
   /// Подписка на поток сообщений конкретного чата.
   Stream<List<ChatMessage>> getMessagesStream(String chatId);
 
+  /// Загружает следующую страницу более старых сообщений.
+  Future<bool> loadMoreMessages(String chatId);
+
   /// Отправка сообщения в чат.
   Future<void> sendMessage(
     String chatId,

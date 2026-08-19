@@ -74,6 +74,10 @@ class ChatMessagesReceived extends ChatEvent {
   List<Object?> get props => [messages];
 }
 
+class ChatOlderMessagesRequested extends ChatEvent {
+  const ChatOlderMessagesRequested();
+}
+
 class ChatReplySelected extends ChatEvent {
   const ChatReplySelected(this.message);
 

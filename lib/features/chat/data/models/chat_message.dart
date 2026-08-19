@@ -15,9 +15,11 @@ class ChatMessage extends Equatable {
   final MessageStatus status;
   final MessageType type;
   final List<String> mediaUrls;
+  final List<String> mediaStoragePaths;
   final double? latitude;
   final double? longitude;
   final String? audioUrl;
+  final String? audioStoragePath;
   final Duration? audioDuration;
   final List<double> audioWaveform;
   final MessageReply? replyTo;
@@ -33,9 +35,11 @@ class ChatMessage extends Equatable {
     this.status = MessageStatus.sent,
     this.type = MessageType.text,
     this.mediaUrls = const [],
+    this.mediaStoragePaths = const [],
     this.latitude,
     this.longitude,
     this.audioUrl,
+    this.audioStoragePath,
     this.audioDuration,
     this.audioWaveform = const [],
     this.replyTo,
@@ -52,9 +56,11 @@ class ChatMessage extends Equatable {
     MessageStatus? status,
     MessageType? type,
     List<String>? mediaUrls,
+    List<String>? mediaStoragePaths,
     double? latitude,
     double? longitude,
     String? audioUrl,
+    String? audioStoragePath,
     Duration? audioDuration,
     List<double>? audioWaveform,
     MessageReply? replyTo,
@@ -72,9 +78,11 @@ class ChatMessage extends Equatable {
       status: status ?? this.status,
       type: type ?? this.type,
       mediaUrls: mediaUrls ?? this.mediaUrls,
+      mediaStoragePaths: mediaStoragePaths ?? this.mediaStoragePaths,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       audioUrl: audioUrl ?? this.audioUrl,
+      audioStoragePath: audioStoragePath ?? this.audioStoragePath,
       audioDuration: audioDuration ?? this.audioDuration,
       audioWaveform: audioWaveform ?? this.audioWaveform,
       replyTo: clearReplyTo ? null : replyTo ?? this.replyTo,
@@ -84,21 +92,23 @@ class ChatMessage extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        chatId,
-        senderId,
-        text,
-        timestamp,
-        isMine,
-        status,
-        type,
-        mediaUrls,
-        latitude,
-        longitude,
-        audioUrl,
-        audioDuration,
-        audioWaveform,
-        replyTo,
-        readAt,
-      ];
+    id,
+    chatId,
+    senderId,
+    text,
+    timestamp,
+    isMine,
+    status,
+    type,
+    mediaUrls,
+    mediaStoragePaths,
+    latitude,
+    longitude,
+    audioUrl,
+    audioStoragePath,
+    audioDuration,
+    audioWaveform,
+    replyTo,
+    readAt,
+  ];
 }

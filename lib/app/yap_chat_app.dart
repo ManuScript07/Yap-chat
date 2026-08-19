@@ -10,6 +10,7 @@ import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -50,8 +51,38 @@ class _AppContent extends StatefulWidget {
   State<_AppContent> createState() => _AppContentState();
 }
 
-class _AppContentState extends State<_AppContent> {
+class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _pendingChatRestored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final presence = context.read<PresenceCubit>();
+    if (state == AppLifecycleState.resumed) {
+      final authState = context.read<AuthBloc>().state;
+      final userId = authState.session?.userId;
+      if (authState.status == AuthStatus.authenticated && userId != null) {
+        unawaited(presence.connect(userId));
+      }
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(presence.disconnect());
+    }
+  }
 
   Future<void> _restorePendingChat() async {
     final repository = context.read<ILocalMediaRepository>();
@@ -76,9 +107,16 @@ class _AppContentState extends State<_AppContent> {
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listenWhen: (previous, current) =>
-          previous.status != AuthStatus.authenticated &&
-          current.status == AuthStatus.authenticated,
+          previous.status != current.status ||
+          previous.session?.userId != current.session?.userId,
       listener: (context, state) {
+        final userId = state.session?.userId;
+        if (state.status == AuthStatus.authenticated && userId != null) {
+          unawaited(context.read<PresenceCubit>().connect(userId));
+        } else {
+          unawaited(context.read<PresenceCubit>().disconnect());
+        }
+        if (state.status != AuthStatus.authenticated) return;
         if (_pendingChatRestored) return;
         _pendingChatRestored = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
