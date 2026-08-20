@@ -110,6 +110,12 @@ class MockChatsRepository implements IChatsRepository {
     _replaceSelected(ids, (chat) => chat.copyWith(isMuted: !chat.isMuted));
   }
 
+  @override
+  Future<void> pauseRealtime() async {}
+
+  @override
+  Future<void> resumeRealtime() async {}
+
   void _replaceSelected(Set<String> ids, Chat Function(Chat chat) update) {
     for (var index = 0; index < _chats.length; index++) {
       final chat = _chats[index];

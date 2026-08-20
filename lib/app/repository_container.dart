@@ -36,7 +36,10 @@ class RepositoryContainer {
       database: config.database,
       userIdProvider: () => client.auth.currentUser!.id,
     );
-    final chatsRemote = ChatsRemoteDataSource(client: client);
+    final chatsRemote = ChatsRemoteDataSource(
+      client: client,
+      talker: config.talker,
+    );
     final chatRemote = ChatRemoteDataSource(client: client);
     final messageHydrator = ChatMessageHydrator(
       config: config,
@@ -87,7 +90,10 @@ class RepositoryContainer {
           imageProcessor: const AvatarImageProcessor(),
         ),
       ),
-      presenceRepository: PresenceRepository(client: client),
+      presenceRepository: PresenceRepository(
+        client: client,
+        talker: config.talker,
+      ),
     );
   }
 
@@ -125,6 +131,10 @@ class RepositoryContainer {
 
   Future<void> dispose() async {
     mediaCache.dispose();
-    await presenceRepository.disconnect();
+    await Future.wait([
+      chatsRepository.pauseRealtime(),
+      chatRepository.pauseNetwork(),
+      presenceRepository.disconnect(),
+    ]);
   }
 }

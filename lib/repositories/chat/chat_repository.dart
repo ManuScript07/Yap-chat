@@ -37,6 +37,7 @@ class ChatRepository implements IChatRepository {
   final ConversationSyncService _syncService;
   final Uuid _uuid;
   final Set<String> _deliveringOperationIds = {};
+  bool _isNetworkPaused = false;
 
   @override
   Stream<List<ChatMessage>> getMessagesStream(String chatId) {
@@ -50,10 +51,9 @@ class ChatRepository implements IChatRepository {
         cacheSubscription = _cache
             .watchMessages(chatId, currentUserId: _remote.currentUserId)
             .listen(controller.add, onError: controller.addError);
-        retryTimer = Timer.periodic(
-          _retryInterval,
-          (_) => unawaited(_retryPending(chatId)),
-        );
+        retryTimer = Timer.periodic(_retryInterval, (_) {
+          if (!_isNetworkPaused) unawaited(_retryPending(chatId));
+        });
         unawaited(_initializeChat(chatId));
       },
       onCancel: () async {
@@ -76,6 +76,18 @@ class ChatRepository implements IChatRepository {
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Initial chat sync failed');
     }
+  }
+
+  @override
+  Future<void> synchronizeOpenChats() async {
+    _isNetworkPaused = false;
+    final chatIds = _syncService.openConversationIds;
+    await Future.wait(chatIds.map(_initializeChat));
+  }
+
+  @override
+  Future<void> pauseNetwork() async {
+    _isNetworkPaused = true;
   }
 
   @override

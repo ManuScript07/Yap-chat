@@ -27,14 +27,9 @@ class PresenceCubit extends Cubit<PresenceState> {
   final IPresenceRepository _repository;
   late final StreamSubscription<Set<String>> _subscription;
 
-  Future<void> connect(String userId) => _repository.connect(userId);
-
-  Future<void> disconnect() => _repository.disconnect();
-
   @override
   Future<void> close() async {
     await _subscription.cancel();
-    await _repository.disconnect();
     return super.close();
   }
 }

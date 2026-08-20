@@ -45,6 +45,7 @@ class ChatsRepository implements IChatsRepository {
   Future<void>? _activeDeletionRetry;
   Future<void> _changeQueue = Future<void>.value();
   bool _reconciliationQueued = false;
+  bool _isRealtimePaused = false;
 
   @override
   Stream<List<Chat>> watchChats() {
@@ -66,10 +67,9 @@ class ChatsRepository implements IChatsRepository {
           },
         );
         unawaited(_initialize(controller));
-        reconciliationTimer = Timer.periodic(
-          _reconciliationInterval,
-          (_) => _enqueueReconciliation(controller),
-        );
+        reconciliationTimer = Timer.periodic(_reconciliationInterval, (_) {
+          if (!_isRealtimePaused) _enqueueReconciliation(controller);
+        });
       },
       onCancel: () async {
         reconciliationTimer?.cancel();
@@ -137,6 +137,20 @@ class ChatsRepository implements IChatsRepository {
     }
   }
 
+  @override
+  Future<void> pauseRealtime() {
+    _isRealtimePaused = true;
+    return _remote.pauseChanges();
+  }
+
+  @override
+  Future<void> resumeRealtime() async {
+    _isRealtimePaused = false;
+    await _remote.resumeChanges();
+    await _retryPendingDeletions();
+    await _synchronize(ensureLatestMessages: true);
+  }
+
   Future<void> _initialize(StreamController<List<Chat>> controller) async {
     await _retryPendingDeletions();
     await _synchronizeSafely(controller, ensureLatestMessages: true);
@@ -161,12 +175,7 @@ class ChatsRepository implements IChatsRepository {
     if (_reconciliationQueued) return;
     _reconciliationQueued = true;
     _changeQueue = _changeQueue
-        .then(
-          (_) => _synchronizeSafely(
-            controller,
-            ensureLatestMessages: true,
-          ),
-        )
+        .then((_) => _synchronizeSafely(controller, ensureLatestMessages: true))
         .whenComplete(() => _reconciliationQueued = false)
         .catchError((Object error, StackTrace stackTrace) {
           _config.talker.handle(

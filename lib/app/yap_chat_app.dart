@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/app_initializer.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
@@ -10,7 +11,6 @@ import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/auth/auth.dart';
-import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -68,18 +68,15 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final presence = context.read<PresenceCubit>();
+    final connections = context.read<AppConnectionCoordinator>();
     if (state == AppLifecycleState.resumed) {
-      final authState = context.read<AuthBloc>().state;
-      final userId = authState.session?.userId;
-      if (authState.status == AuthStatus.authenticated && userId != null) {
-        unawaited(presence.connect(userId));
-      }
+      unawaited(connections.setForeground(true));
       return;
     }
     if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      unawaited(presence.disconnect());
+      unawaited(connections.setForeground(false));
     }
   }
 
@@ -111,9 +108,17 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       listener: (context, state) {
         final userId = state.session?.userId;
         if (state.status == AuthStatus.authenticated && userId != null) {
-          unawaited(context.read<PresenceCubit>().connect(userId));
-        } else {
-          unawaited(context.read<PresenceCubit>().disconnect());
+          unawaited(
+            context.read<AppConnectionCoordinator>().setAuthenticatedUser(
+              userId,
+            ),
+          );
+        } else if (state.status == AuthStatus.unauthenticated ||
+            state.status == AuthStatus.profileIncomplete ||
+            state.status == AuthStatus.failure) {
+          unawaited(
+            context.read<AppConnectionCoordinator>().setAuthenticatedUser(null),
+          );
         }
         if (state.status != AuthStatus.authenticated) return;
         if (_pendingChatRestored) return;

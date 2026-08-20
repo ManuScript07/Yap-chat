@@ -15,4 +15,10 @@ abstract interface class IChatsRepository {
 
   /// Переключает mute-состояние у выбранных чатов.
   Future<void> toggleMute(Set<String> ids);
+
+  /// Останавливает Realtime-канал, сохраняя локальную подписку на кеш.
+  Future<void> pauseRealtime();
+
+  /// Пересоздаёт Realtime-канал и сразу сверяет кеш с сервером.
+  Future<void> resumeRealtime();
 }

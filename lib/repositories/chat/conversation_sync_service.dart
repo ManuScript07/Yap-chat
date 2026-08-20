@@ -28,6 +28,9 @@ class ConversationSyncService {
     return (_openConversationCounts[chatId] ?? 0) > 0;
   }
 
+  Set<String> get openConversationIds =>
+      Set<String>.unmodifiable(_openConversationCounts.keys);
+
   void openConversation(String chatId) {
     _openConversationCounts.update(
       chatId,

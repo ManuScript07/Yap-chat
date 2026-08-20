@@ -44,4 +44,10 @@ abstract interface class IChatRepository {
     String messageId, {
     required bool deleteForEveryone,
   });
+
+  /// Немедленно синхронизирует все чаты, открытые в текущем дереве UI.
+  Future<void> synchronizeOpenChats();
+
+  /// Приостанавливает фоновые повторы отправки до возвращения приложения.
+  Future<void> pauseNetwork();
 }

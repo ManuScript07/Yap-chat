@@ -289,6 +289,12 @@ class MockChatRepository implements IChatRepository {
     _messagesController.add(List.unmodifiable(_messages));
   }
 
+  @override
+  Future<void> synchronizeOpenChats() async {}
+
+  @override
+  Future<void> pauseNetwork() async {}
+
   MessageReply? _createReply(String? messageId) {
     if (messageId == null) return null;
 

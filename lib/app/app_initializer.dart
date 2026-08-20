@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/repository_container.dart';
 import 'package:yap_chat/features/auth/auth.dart';
@@ -23,6 +24,7 @@ class AppInitializer extends StatefulWidget {
 
 class _AppInitializerState extends State<AppInitializer> {
   late final RepositoryContainer _repositories;
+  late final AppConnectionCoordinator _connectionCoordinator;
 
   @override
   void initState() {
@@ -30,11 +32,20 @@ class _AppInitializerState extends State<AppInitializer> {
     _repositories = widget.config.isDev
         ? RepositoryContainer.dev(config: widget.config)
         : RepositoryContainer.prod(config: widget.config);
+    _connectionCoordinator = AppConnectionCoordinator(
+      chatsRepository: _repositories.chatsRepository,
+      chatRepository: _repositories.chatRepository,
+      presenceRepository: _repositories.presenceRepository,
+      talker: widget.config.talker,
+    );
   }
 
   @override
   void dispose() {
-    unawaited(_repositories.dispose());
+    unawaited(() async {
+      await _connectionCoordinator.dispose();
+      await _repositories.dispose();
+    }());
     super.dispose();
   }
 
@@ -43,6 +54,9 @@ class _AppInitializerState extends State<AppInitializer> {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppConfig>.value(value: widget.config),
+        RepositoryProvider<AppConnectionCoordinator>.value(
+          value: _connectionCoordinator,
+        ),
         RepositoryProvider<IChatsRepository>.value(
           value: _repositories.chatsRepository,
         ),
