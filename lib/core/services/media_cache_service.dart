@@ -61,6 +61,15 @@ class MediaCacheService {
     });
   }
 
+  Future<String?> findStorageFile({
+    required String ownerUserId,
+    required String bucket,
+    required String storagePath,
+    String? mimeType,
+  }) {
+    return _readExisting(ownerUserId, bucket, storagePath, mimeType);
+  }
+
   Future<String> cacheNetworkFile({
     required String ownerUserId,
     required String url,

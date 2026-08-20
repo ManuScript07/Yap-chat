@@ -213,10 +213,7 @@ class ChatsRepository implements IChatsRepository {
         );
       }
     }
-    await _synchronizeSafely(
-      controller,
-      ensureLatestMessages: true,
-    );
+    await _synchronizeSafely(controller);
   }
 
   Future<void> _clearLocalConversations(Set<String> ids) async {

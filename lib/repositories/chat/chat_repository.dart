@@ -339,17 +339,45 @@ class ChatRepository implements IChatRepository {
     final sourcePaths = List<String>.from(
       operation.payload['image_paths'] as List? ?? const [],
     );
-    final attachments = <Map<String, dynamic>>[];
-    for (var index = 0; index < sourcePaths.length; index++) {
-      final processed = await _mediaProcessor.processImage(sourcePaths[index]);
-      final attachmentId = _attachmentId(operation.id, index);
-      final storagePath = _storagePath(operation, '$index.jpg');
-      await _remote.upload(
-        bucket: 'chat-images',
-        storagePath: storagePath,
-        bytes: processed.bytes,
-        contentType: processed.mimeType,
-      );
+    final attachments = List<Map<String, dynamic>?>.filled(
+      sourcePaths.length,
+      null,
+    );
+    const parallelUploads = 2;
+    for (
+      var offset = 0;
+      offset < sourcePaths.length;
+      offset += parallelUploads
+    ) {
+      final end = (offset + parallelUploads).clamp(0, sourcePaths.length);
+      await Future.wait([
+        for (var index = offset; index < end; index++)
+          _uploadImage(
+            operation,
+            sourcePaths[index],
+            index,
+          ).then((attachment) => attachments[index] = attachment),
+      ]);
+    }
+    return attachments.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> _uploadImage(
+    PendingMessageOperation operation,
+    String sourcePath,
+    int index,
+  ) async {
+    final storagePath = _storagePath(operation, '$index.jpg');
+    final cachedPath = await _mediaCache.findStorageFile(
+      ownerUserId: _remote.currentUserId,
+      bucket: 'chat-images',
+      storagePath: storagePath,
+      mimeType: 'image/jpeg',
+    );
+    final processed = await _mediaProcessor.processImage(
+      cachedPath ?? sourcePath,
+    );
+    if (cachedPath == null) {
       try {
         await _mediaCache.storeBytes(
           ownerUserId: _remote.currentUserId,
@@ -362,21 +390,26 @@ class ChatRepository implements IChatRepository {
         _config.talker.handle(
           error,
           stackTrace,
-          'Uploaded image caching failed',
+          'Prepared image caching failed',
         );
       }
-      attachments.add({
-        'id': attachmentId,
-        'position': index,
-        'kind': 'image',
-        'storage_path': storagePath,
-        'mime_type': processed.mimeType,
-        'size_bytes': processed.bytes.lengthInBytes,
-        'width': processed.width,
-        'height': processed.height,
-      });
     }
-    return attachments;
+    await _remote.upload(
+      bucket: 'chat-images',
+      storagePath: storagePath,
+      bytes: processed.bytes,
+      contentType: processed.mimeType,
+    );
+    return {
+      'id': _attachmentId(operation.id, index),
+      'position': index,
+      'kind': 'image',
+      'storage_path': storagePath,
+      'mime_type': processed.mimeType,
+      'size_bytes': processed.bytes.lengthInBytes,
+      'width': processed.width,
+      'height': processed.height,
+    };
   }
 
   Future<Map<String, dynamic>> _uploadAudio(

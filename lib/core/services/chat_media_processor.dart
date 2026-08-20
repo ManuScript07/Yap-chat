@@ -11,6 +11,7 @@ class ChatMediaProcessor {
   static const maxImageBytes = 2 * 1024 * 1024;
   static const maxAudioBytes = 5 * 1024 * 1024;
   static const maxSourceImageBytes = 40 * 1024 * 1024;
+  static const maxImageDimension = 2048;
 
   Future<ProcessedChatImage> processImage(String sourcePath) async {
     final bytes = await File(sourcePath).readAsBytes();
@@ -129,40 +130,46 @@ class ChatMediaException implements Exception {
 }
 
 ProcessedChatImage _compressChatImage(Uint8List sourceBytes) {
+  final jpegInfo = image.JpegDecoder().startDecode(sourceBytes);
+  if (jpegInfo != null &&
+      jpegInfo.width <= ChatMediaProcessor.maxImageDimension &&
+      jpegInfo.height <= ChatMediaProcessor.maxImageDimension &&
+      sourceBytes.lengthInBytes <= ChatMediaProcessor.maxImageBytes) {
+    return ProcessedChatImage(
+      bytes: sourceBytes,
+      width: jpegInfo.width,
+      height: jpegInfo.height,
+    );
+  }
+
   final decoded = image.decodeImage(sourceBytes);
   if (decoded == null) {
     throw const ChatMediaException('Unsupported image format');
   }
   final oriented = image.bakeOrientation(decoded);
-  const attempts = <(int, int)>[
-    (2560, 92),
-    (2304, 90),
-    (2048, 88),
-    (1920, 86),
-    (1728, 84),
-    (1536, 82),
-    (1280, 80),
-    (1080, 76),
-  ];
-  ProcessedChatImage? smallest;
-  for (final (maxDimension, quality) in attempts) {
-    final resized = _resizeToFit(oriented, maxDimension);
-    final bytes = Uint8List.fromList(
-      image.encodeJpg(resized, quality: quality),
-    );
-    final result = ProcessedChatImage(
-      bytes: bytes,
-      width: resized.width,
-      height: resized.height,
-    );
-    smallest = result;
-    if (bytes.lengthInBytes <= ChatMediaProcessor.maxImageBytes) return result;
+  final primary = _resizeToFit(oriented, ChatMediaProcessor.maxImageDimension);
+  final primaryResult = _encodeToLimit(primary, const [88, 82, 76, 70]);
+  if (primaryResult != null) return primaryResult;
+
+  final compact = _resizeToFit(oriented, 1600);
+  final compactResult = _encodeToLimit(compact, const [78, 72, 66]);
+  if (compactResult != null) return compactResult;
+
+  throw const ChatMediaException('Image cannot fit the upload limit');
+}
+
+ProcessedChatImage? _encodeToLimit(image.Image source, List<int> qualities) {
+  for (final quality in qualities) {
+    final bytes = Uint8List.fromList(image.encodeJpg(source, quality: quality));
+    if (bytes.lengthInBytes <= ChatMediaProcessor.maxImageBytes) {
+      return ProcessedChatImage(
+        bytes: bytes,
+        width: source.width,
+        height: source.height,
+      );
+    }
   }
-  if (smallest == null ||
-      smallest.bytes.lengthInBytes > ChatMediaProcessor.maxImageBytes) {
-    throw const ChatMediaException('Image cannot fit the upload limit');
-  }
-  return smallest;
+  return null;
 }
 
 image.Image _resizeToFit(image.Image source, int maxDimension) {

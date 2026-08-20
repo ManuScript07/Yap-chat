@@ -6,6 +6,7 @@ class AvatarImageProcessor {
 
   static const maxSourceBytes = 20 * 1024 * 1024;
   static const targetUploadBytes = 1800 * 1024;
+  static const maxDimension = 1440;
 
   Future<Uint8List> compress(Uint8List sourceBytes) {
     if (sourceBytes.lengthInBytes > maxSourceBytes) {
@@ -25,39 +26,43 @@ class AvatarImageException implements Exception {
 }
 
 Uint8List _compressAvatar(Uint8List sourceBytes) {
+  final jpegInfo = image.JpegDecoder().startDecode(sourceBytes);
+  if (jpegInfo != null &&
+      jpegInfo.width <= AvatarImageProcessor.maxDimension &&
+      jpegInfo.height <= AvatarImageProcessor.maxDimension &&
+      sourceBytes.lengthInBytes <= AvatarImageProcessor.targetUploadBytes) {
+    return sourceBytes;
+  }
+
   final decoded = image.decodeImage(sourceBytes);
   if (decoded == null) {
     throw const AvatarImageException('Unsupported avatar image');
   }
 
   final oriented = image.bakeOrientation(decoded);
-  const attempts = <(int, int)>[
-    (1440, 90),
-    (1280, 88),
-    (1024, 86),
-    (896, 82),
-    (768, 78),
-    (640, 72),
-    (512, 65),
-  ];
+  final primary = _resizeToFit(oriented, AvatarImageProcessor.maxDimension);
+  final primaryResult = _encodeToLimit(primary, const [88, 82, 76, 70]);
+  if (primaryResult.fits) return primaryResult.bytes;
 
-  Uint8List? smallest;
-  for (final (maxDimension, quality) in attempts) {
-    final resized = _resizeToFit(oriented, maxDimension);
-    final encoded = Uint8List.fromList(
-      image.encodeJpg(resized, quality: quality),
-    );
-    smallest = encoded;
+  final compact = _resizeToFit(oriented, 1024);
+  final compactResult = _encodeToLimit(compact, const [78, 70, 64]);
+  if (compactResult.fits) return compactResult.bytes;
+
+  throw const AvatarImageException('Avatar cannot fit the upload limit');
+}
+
+({Uint8List bytes, bool fits}) _encodeToLimit(
+  image.Image source,
+  List<int> qualities,
+) {
+  late Uint8List encoded;
+  for (final quality in qualities) {
+    encoded = Uint8List.fromList(image.encodeJpg(source, quality: quality));
     if (encoded.lengthInBytes <= AvatarImageProcessor.targetUploadBytes) {
-      return encoded;
+      return (bytes: encoded, fits: true);
     }
   }
-
-  if (smallest == null ||
-      smallest.lengthInBytes > AvatarImageProcessor.targetUploadBytes) {
-    throw const AvatarImageException('Avatar cannot fit the upload limit');
-  }
-  return smallest;
+  return (bytes: encoded, fits: false);
 }
 
 image.Image _resizeToFit(image.Image source, int maxDimension) {

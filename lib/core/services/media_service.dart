@@ -9,6 +9,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 abstract class MediaService {
   static final ImagePicker _picker = ImagePicker();
+  static const _chatImageMaxDimension = 2048.0;
+  static const _avatarImageMaxDimension = 1440.0;
+  static const _imageQuality = 88;
 
   /// Открывает системную камеру.
   static Future<String?> takePhoto() async {
@@ -17,7 +20,9 @@ abstract class MediaService {
     if (status.isGranted) {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        maxWidth: _chatImageMaxDimension,
+        maxHeight: _chatImageMaxDimension,
+        imageQuality: _imageQuality,
       );
       return photo?.path;
     }
@@ -29,7 +34,9 @@ abstract class MediaService {
   static Future<String?> pickFromGallery() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 85,
+      maxWidth: _chatImageMaxDimension,
+      maxHeight: _chatImageMaxDimension,
+      imageQuality: _imageQuality,
     );
     return image?.path;
   }
@@ -38,7 +45,9 @@ abstract class MediaService {
   static Future<Uint8List?> pickImageBytesFromGallery() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 85,
+      maxWidth: _avatarImageMaxDimension,
+      maxHeight: _avatarImageMaxDimension,
+      imageQuality: _imageQuality,
     );
     return image?.readAsBytes();
   }

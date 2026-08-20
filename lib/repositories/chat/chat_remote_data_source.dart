@@ -52,6 +52,7 @@ class ChatRemoteDataSource {
               contentType: contentType,
               cacheControl: '31536000',
             ),
+            retryAttempts: 2,
           );
     } on StorageException catch (error) {
       final isAlreadyUploaded =
