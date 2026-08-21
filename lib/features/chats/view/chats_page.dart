@@ -69,7 +69,11 @@ class ChatsPage extends StatelessWidget {
                   actionIcon: Icons.add_comment_rounded,
                   onActionPressed: () {
                     FocusScope.of(context).unfocus();
-                    context.router.root.push(const NewChatRoute());
+                    final authRouter = context.router.root
+                        .innerRouterOf<StackRouter>(AuthGateRoute.name);
+                    if (authRouter != null) {
+                      unawaited(authRouter.push(const NewChatRoute()));
+                    }
                   },
                 ),
           body: const _ChatsBody(),

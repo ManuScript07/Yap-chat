@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -75,15 +76,17 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       loadChat: chatsRepository.getChatById,
       navigateToChat: (chat) async {
         if (!mounted) return;
+        final authRouter = await _authenticatedRouter;
+        if (!mounted || authRouter == null) return;
 
         final chatRoute = ChatRoute(
           key: ValueKey('chat:${chat.id}'),
           chat: chat,
         );
-        if (_hasActiveChatRoute) {
-          unawaited(widget.router.popAndPush<Object?, Object?>(chatRoute));
+        if (_hasActiveChatRoute(authRouter)) {
+          unawaited(authRouter.popAndPush<Object?, Object?>(chatRoute));
         } else {
-          unawaited(widget.router.push<Object?>(chatRoute));
+          unawaited(authRouter.push<Object?>(chatRoute));
         }
         await WidgetsBinding.instance.endOfFrame;
       },
@@ -142,18 +145,37 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   }
 
   bool _isConversationVisible(String conversationId) {
-    final rootStack = widget.router.stackData;
-    if (rootStack.isEmpty) return false;
+    final authRouter = _authRouter;
+    if (authRouter == null) return false;
 
-    final route = rootStack.last;
+    final stack = authRouter.stackData;
+    if (stack.isEmpty) return false;
+
+    final route = stack.last;
     if (route.name != ChatRoute.name) return false;
 
     return route.argsAs<ChatRouteArgs>().chat.id == conversationId;
   }
 
-  bool get _hasActiveChatRoute {
-    final rootStack = widget.router.stackData;
-    return rootStack.isNotEmpty && rootStack.last.name == ChatRoute.name;
+  StackRouter? get _authRouter =>
+      widget.router.innerRouterOf<StackRouter>(AuthGateRoute.name);
+
+  Future<StackRouter?> get _authenticatedRouter async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final router = _authRouter;
+      if (router != null &&
+          router.stackData.isNotEmpty &&
+          router.stackData.first.name == MainRoute.name) {
+        return router;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    return null;
+  }
+
+  bool _hasActiveChatRoute(StackRouter authRouter) {
+    final stack = authRouter.stackData;
+    return stack.isNotEmpty && stack.last.name == ChatRoute.name;
   }
 
   @override

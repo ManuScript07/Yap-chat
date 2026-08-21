@@ -2,9 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/router/router.gr.dart';
 
-List<NavigatorObserver> createAppNavigatorObservers() => [
-  AutoRouteObserver(),
-];
+List<NavigatorObserver> createAppNavigatorObservers() => [AutoRouteObserver()];
 
 @AutoRouterConfig()
 class AppRouter extends RootStackRouter {
@@ -54,21 +52,21 @@ class AppRouter extends RootStackRouter {
             AutoRoute(path: 'profile', page: ProfileRoute.page),
           ],
         ),
+        CustomRoute(
+          path: 'chat',
+          page: ChatRoute.page,
+          transitionsBuilder: _slideRightWithFade,
+          duration: const Duration(milliseconds: 200),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
+          path: 'new-chat',
+          page: NewChatRoute.page,
+          transitionsBuilder: _slideRightWithFade,
+          duration: const Duration(milliseconds: 200),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
       ],
-    ),
-    CustomRoute(
-      path: '/chat',
-      page: ChatRoute.page,
-      transitionsBuilder: _slideRightWithFade,
-      duration: const Duration(milliseconds: 200),
-      reverseDuration: const Duration(milliseconds: 150),
-    ),
-    CustomRoute(
-      path: '/new-chat',
-      page: NewChatRoute.page,
-      transitionsBuilder: _slideRightWithFade,
-      duration: const Duration(milliseconds: 200),
-      reverseDuration: const Duration(milliseconds: 150),
     ),
   ];
 
