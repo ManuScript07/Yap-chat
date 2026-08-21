@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:yap_chat/app/chat_navigation_coordinator.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/app_initializer.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
-import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
@@ -54,11 +55,47 @@ class _AppContent extends StatefulWidget {
 
 class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _pendingChatRestored = false;
+  late final ChatNavigationCoordinator _chatNavigator;
+  bool _dependenciesInitialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_dependenciesInitialized) return;
+    _dependenciesInitialized = true;
+
+    final chatsRepository = context.read<IChatsRepository>();
+    final talker = context.read<AppConfig>().talker;
+    _chatNavigator = ChatNavigationCoordinator(
+      loadChat: chatsRepository.getChatById,
+      navigateToChat: (chat) async {
+        await _showChatsTab();
+        if (!mounted) return;
+
+        final chatRoute = ChatRoute(
+          key: ValueKey('chat:${chat.id}'),
+          chat: chat,
+        );
+        if (_hasActiveChatRoute) {
+          unawaited(widget.router.popAndPush<Object?, Object?>(chatRoute));
+        } else {
+          widget.router.removeUntil(
+            (route) => route.name == AuthGateRoute.name,
+          );
+          unawaited(widget.router.push<Object?>(chatRoute));
+        }
+        await WidgetsBinding.instance.endOfFrame;
+      },
+      isConversationVisible: _isConversationVisible,
+      isActive: () => mounted,
+      onError: talker.handle,
+    );
   }
 
   @override
@@ -93,36 +130,54 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     final pendingChatId = await repository.consumePendingChatId();
     if (!mounted || pendingChatId == null) return;
 
-    final chats = await context.read<IChatsRepository>().getChats();
-    final chat = _findChat(chats, pendingChatId);
-    if (!mounted || chat == null) return;
-
-    await widget.router.push(ChatRoute(chat: chat));
+    await _chatNavigator.openById(pendingChatId);
   }
 
-  Chat? _findChat(List<Chat> chats, String chatId) {
-    for (final chat in chats) {
-      if (chat.id == chatId) return chat;
-    }
-    return null;
-  }
-
-  Future<void> _openNotificationChat(String conversationId) async {
+  void _openNotificationChat(String conversationId) {
     final notifications = context.read<NotificationsCubit>();
-    if (notifications.state.activeConversationId == conversationId) {
-      notifications.navigationHandled();
+    if (notifications.state.pendingConversationId != conversationId) return;
+
+    notifications.navigationHandled(conversationId);
+    if (notifications.state.activeConversationId == conversationId ||
+        _isConversationVisible(conversationId)) {
       return;
     }
 
-    final chatsRepository = context.read<IChatsRepository>();
-    try {
-      final chats = await chatsRepository.getChats();
-      final chat = _findChat(chats, conversationId);
-      if (!mounted || chat == null) return;
-      await widget.router.push(ChatRoute(chat: chat));
-    } finally {
-      notifications.navigationHandled();
+    unawaited(_chatNavigator.openById(conversationId));
+  }
+
+  bool _isConversationVisible(String conversationId) {
+    final rootStack = widget.router.stackData;
+    if (rootStack.isEmpty) return false;
+
+    final route = rootStack.last;
+    if (route.name != ChatRoute.name) return false;
+
+    return route.argsAs<ChatRouteArgs>().chat.id == conversationId;
+  }
+
+  bool get _hasActiveChatRoute {
+    final rootStack = widget.router.stackData;
+    return rootStack.isNotEmpty && rootStack.last.name == ChatRoute.name;
+  }
+
+  Future<void> _showChatsTab() async {
+    var tabsRouter = _mainTabsRouter;
+    if (tabsRouter == null) {
+      await WidgetsBinding.instance.endOfFrame;
+      tabsRouter = _mainTabsRouter;
     }
+
+    if (tabsRouter != null && tabsRouter.activeIndex != 0) {
+      tabsRouter.setActiveIndex(0);
+    }
+  }
+
+  TabsRouter? get _mainTabsRouter {
+    final authRouter = widget.router.innerRouterOf<StackRouter>(
+      AuthGateRoute.name,
+    );
+    return authRouter?.innerRouterOf<TabsRouter>(MainRoute.name);
   }
 
   @override
@@ -171,24 +226,26 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
           listener: (context, state) {
             final conversationId = state.pendingConversationId;
             if (conversationId != null) {
-              unawaited(_openNotificationChat(conversationId));
+              _openNotificationChat(conversationId);
             }
           },
         ),
       ],
-      child: MaterialApp.router(
-        title: 'Yap chat',
-        theme: theme,
-        restorationScopeId: 'yap-chat',
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: widget.router.config(
-          navigatorObservers: createAppNavigatorObservers,
+      child: RepositoryProvider<ChatNavigationCoordinator>.value(
+        value: _chatNavigator,
+        child: MaterialApp.router(
+          title: 'Yap chat',
+          theme: theme,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: widget.router.config(
+            navigatorObservers: createAppNavigatorObservers,
+          ),
         ),
       ),
     );

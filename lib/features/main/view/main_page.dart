@@ -27,6 +27,8 @@ class _MainView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const chatsTabIndex = 0;
+
     return AutoTabsRouter(
       routes: const [ChatsRoute(), FriendsRoute(), ProfileRoute()],
       transitionBuilder: (context, child, animation) {
@@ -34,8 +36,6 @@ class _MainView extends StatelessWidget {
       },
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
-
-        const chatsTabIndex = 0;
 
         final rootMediaQuery = MediaQuery.of(context);
 

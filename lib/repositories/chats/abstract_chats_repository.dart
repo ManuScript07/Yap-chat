@@ -7,6 +7,8 @@ abstract interface class IChatsRepository {
   /// Загружает полный список чатов из источника данных.
   Future<List<Chat>> getChats();
 
+  Future<Chat?> getChatById(String chatId);
+
   /// Удаляет выбранные чаты по их идентификаторам.
   Future<void> deleteChats(Set<String> ids);
 

@@ -95,6 +95,24 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
+  Future<Chat?> getChatById(String chatId) async {
+    final normalizedChatId = chatId.trim();
+    if (normalizedChatId.isEmpty) return null;
+
+    final cachedChat = _findChat(await _cache.read(), normalizedChatId);
+    if (cachedChat != null) return cachedChat;
+
+    try {
+      await _synchronize(ensureLatestMessages: true);
+    } catch (error, stackTrace) {
+      _config.talker.handle(error, stackTrace, 'Chat lookup failed');
+      return null;
+    }
+
+    return _findChat(await _cache.read(), normalizedChatId);
+  }
+
+  @override
   Future<void> deleteChats(Set<String> ids) async {
     if (ids.isEmpty) return;
     final clearedAt = DateTime.now().toUtc();
@@ -411,5 +429,12 @@ class ChatsRepository implements IChatsRepository {
         controller.addError(error, stackTrace);
       }
     }
+  }
+
+  Chat? _findChat(List<Chat> chats, String chatId) {
+    for (final chat in chats) {
+      if (chat.id == chatId) return chat;
+    }
+    return null;
   }
 }

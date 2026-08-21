@@ -93,6 +93,15 @@ class MockChatsRepository implements IChatsRepository {
   }
 
   @override
+  Future<Chat?> getChatById(String chatId) async {
+    await Future<void>.delayed(_networkDelay);
+    for (final chat in _chats) {
+      if (chat.id == chatId) return chat;
+    }
+    return null;
+  }
+
+  @override
   Future<void> deleteChats(Set<String> ids) async {
     await Future<void>.delayed(_networkDelay);
     _chats.removeWhere((chat) => ids.contains(chat.id));

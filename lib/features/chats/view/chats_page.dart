@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/router/router.gr.dart';
@@ -195,7 +198,9 @@ class _ChatsContent extends StatelessWidget {
                         ChatSelectionToggled(chat.id),
                       );
                     } else {
-                      context.router.root.push(ChatRoute(chat: chat));
+                      unawaited(
+                        context.read<ChatNavigationCoordinator>().open(chat),
+                      );
                     }
                   },
                   onLongPress: () {

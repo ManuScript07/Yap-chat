@@ -46,7 +46,8 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     return _repository.setAppForeground(isForeground);
   }
 
-  void navigationHandled() {
+  void navigationHandled(String conversationId) {
+    if (state.pendingConversationId != conversationId) return;
     emit(state.copyWith(clearPendingConversation: true));
   }
 
