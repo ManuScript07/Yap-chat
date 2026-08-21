@@ -395,4 +395,22 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authBack => 'Назад';
+
+  @override
+  String get notificationsChannelName => 'Сообщения';
+
+  @override
+  String get notificationsChannelDescription => 'Новые сообщения в чатах';
+
+  @override
+  String get notificationYou => 'Ты';
+
+  @override
+  String get notificationPhoto => 'Фотография';
+
+  @override
+  String get notificationAudio => 'Голосовое сообщение';
+
+  @override
+  String get notificationLocation => 'Местоположение';
 }

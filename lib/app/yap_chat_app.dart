@@ -11,6 +11,7 @@ import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -69,14 +70,21 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final connections = context.read<AppConnectionCoordinator>();
+    final notifications = context.read<NotificationsCubit>();
     if (state == AppLifecycleState.resumed) {
       unawaited(connections.setForeground(true));
+      unawaited(notifications.setAppForeground(true));
+      return;
+    }
+    if (state == AppLifecycleState.inactive) {
+      unawaited(notifications.setAppForeground(false));
       return;
     }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       unawaited(connections.setForeground(false));
+      unawaited(notifications.setAppForeground(false));
     }
   }
 
@@ -99,34 +107,75 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     return null;
   }
 
+  Future<void> _openNotificationChat(String conversationId) async {
+    final notifications = context.read<NotificationsCubit>();
+    if (notifications.state.activeConversationId == conversationId) {
+      notifications.navigationHandled();
+      return;
+    }
+
+    final chatsRepository = context.read<IChatsRepository>();
+    try {
+      final chats = await chatsRepository.getChats();
+      final chat = _findChat(chats, conversationId);
+      if (!mounted || chat == null) return;
+      await widget.router.push(ChatRoute(chat: chat));
+    } finally {
+      notifications.navigationHandled();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listenWhen: (previous, current) =>
-          previous.status != current.status ||
-          previous.session?.userId != current.session?.userId,
-      listener: (context, state) {
-        final userId = state.session?.userId;
-        if (state.status == AuthStatus.authenticated && userId != null) {
-          unawaited(
-            context.read<AppConnectionCoordinator>().setAuthenticatedUser(
-              userId,
-            ),
-          );
-        } else if (state.status == AuthStatus.unauthenticated ||
-            state.status == AuthStatus.profileIncomplete ||
-            state.status == AuthStatus.failure) {
-          unawaited(
-            context.read<AppConnectionCoordinator>().setAuthenticatedUser(null),
-          );
-        }
-        if (state.status != AuthStatus.authenticated) return;
-        if (_pendingChatRestored) return;
-        _pendingChatRestored = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _restorePendingChat();
-        });
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<AuthBloc, AuthState>(
+          listenWhen: (previous, current) =>
+              previous.status != current.status ||
+              previous.session?.userId != current.session?.userId,
+          listener: (context, state) {
+            final userId = state.session?.userId;
+            if (state.status == AuthStatus.authenticated && userId != null) {
+              unawaited(
+                context.read<AppConnectionCoordinator>().setAuthenticatedUser(
+                  userId,
+                ),
+              );
+              unawaited(
+                context.read<NotificationsCubit>().setAuthenticatedUser(userId),
+              );
+            } else if (state.status == AuthStatus.unauthenticated ||
+                state.status == AuthStatus.profileIncomplete ||
+                state.status == AuthStatus.failure) {
+              unawaited(
+                context.read<AppConnectionCoordinator>().setAuthenticatedUser(
+                  null,
+                ),
+              );
+              unawaited(
+                context.read<NotificationsCubit>().setAuthenticatedUser(null),
+              );
+            }
+            if (state.status != AuthStatus.authenticated) return;
+            if (_pendingChatRestored) return;
+            _pendingChatRestored = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _restorePendingChat();
+            });
+          },
+        ),
+        BlocListener<NotificationsCubit, NotificationsState>(
+          listenWhen: (previous, current) =>
+              previous.pendingConversationId != current.pendingConversationId &&
+              current.pendingConversationId != null,
+          listener: (context, state) {
+            final conversationId = state.pendingConversationId;
+            if (conversationId != null) {
+              unawaited(_openNotificationChat(conversationId));
+            }
+          },
+        ),
+      ],
       child: MaterialApp.router(
         title: 'Yap chat',
         theme: theme,
@@ -138,7 +187,9 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: widget.router.config(),
+        routerConfig: widget.router.config(
+          navigatorObservers: createAppNavigatorObservers,
+        ),
       ),
     );
   }

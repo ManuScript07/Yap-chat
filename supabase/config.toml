@@ -375,6 +375,9 @@ allow_dynamic_registration = false
 [functions.yandex-userinfo]
 verify_jwt = false
 
+[functions.push-message]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

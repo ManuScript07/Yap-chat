@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -17,6 +18,7 @@ class AppConfig {
     required this.env,
     required this.database,
     this.supabaseClient,
+    this.firebaseMessaging,
   });
 
   final AppEnvironment environment;
@@ -25,6 +27,7 @@ class AppConfig {
   final Map<String, String> env;
   final AppDatabase database;
   final SupabaseClient? supabaseClient;
+  final FirebaseMessaging? firebaseMessaging;
 
   bool get isDev => environment == AppEnvironment.dev;
 

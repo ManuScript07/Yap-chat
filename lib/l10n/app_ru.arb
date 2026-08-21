@@ -136,5 +136,11 @@
   "authLoadFailedTitle": "Не удалось загрузить профиль",
   "authLoadFailedDescription": "Проверьте подключение и повторите попытку.",
   "authSignOut": "Выйти",
-  "authBack": "Назад"
+  "authBack": "Назад",
+  "notificationsChannelName": "Сообщения",
+  "notificationsChannelDescription": "Новые сообщения в чатах",
+  "notificationYou": "Ты",
+  "notificationPhoto": "Фотография",
+  "notificationAudio": "Голосовое сообщение",
+  "notificationLocation": "Местоположение"
 }

@@ -136,5 +136,11 @@
   "authLoadFailedTitle": "Could not load your profile",
   "authLoadFailedDescription": "Check your connection and try again.",
   "authSignOut": "Sign out",
-  "authBack": "Back"
+  "authBack": "Back",
+  "notificationsChannelName": "Messages",
+  "notificationsChannelDescription": "New chat messages",
+  "notificationYou": "You",
+  "notificationPhoto": "Photo",
+  "notificationAudio": "Voice message",
+  "notificationLocation": "Location"
 }

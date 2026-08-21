@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,6 +10,7 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
+import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -47,8 +50,10 @@ class _ChatView extends StatefulWidget {
   State<_ChatView> createState() => _ChatViewState();
 }
 
-class _ChatViewState extends State<_ChatView> {
+class _ChatViewState extends State<_ChatView>
+    with AutoRouteAwareStateMixin<_ChatView> {
   late final ScrollController _scrollController;
+  NotificationsCubit? _notificationsCubit;
 
   @override
   void initState() {
@@ -60,7 +65,30 @@ class _ChatViewState extends State<_ChatView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _notificationsCubit ??= context.read<NotificationsCubit>();
+    unawaited(_notificationsCubit!.setActiveConversation(widget.chat.id));
+  }
+
+  @override
+  void didPush() {
+    unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+  }
+
+  @override
+  void didPopNext() {
+    unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+  }
+
+  @override
+  void didPushNext() {
+    unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
+  }
+
+  @override
   void dispose() {
+    unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     _scrollController.dispose();
     super.dispose();
   }

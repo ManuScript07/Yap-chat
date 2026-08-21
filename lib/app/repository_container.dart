@@ -20,6 +20,7 @@ class RepositoryContainer {
     required this.authRepository,
     required this.profileRepository,
     required this.presenceRepository,
+    required this.pushNotificationsRepository,
   });
 
   factory RepositoryContainer.prod({required AppConfig config}) {
@@ -94,6 +95,15 @@ class RepositoryContainer {
         client: client,
         talker: config.talker,
       ),
+      pushNotificationsRepository:
+          config.isLocal || config.firebaseMessaging == null
+          ? const MockPushNotificationsRepository()
+          : PushNotificationsRepository(
+              client: client,
+              messaging: config.firebaseMessaging!,
+              preferences: config.preferences,
+              talker: config.talker,
+            ),
     );
   }
 
@@ -115,6 +125,7 @@ class RepositoryContainer {
       authRepository: MockAuthRepository(preferences: config.preferences),
       profileRepository: MockProfileRepository(preferences: config.preferences),
       presenceRepository: MockPresenceRepository(),
+      pushNotificationsRepository: const MockPushNotificationsRepository(),
     );
   }
 
@@ -128,6 +139,7 @@ class RepositoryContainer {
   final IAuthRepository authRepository;
   final IProfileRepository profileRepository;
   final IPresenceRepository presenceRepository;
+  final IPushNotificationsRepository pushNotificationsRepository;
 
   Future<void> dispose() async {
     mediaCache.dispose();
@@ -135,6 +147,7 @@ class RepositoryContainer {
       chatsRepository.pauseRealtime(),
       chatRepository.pauseNetwork(),
       presenceRepository.disconnect(),
+      pushNotificationsRepository.dispose(),
     ]);
   }
 }

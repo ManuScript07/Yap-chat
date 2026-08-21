@@ -7,6 +7,7 @@ import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/repository_container.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/presence/presence.dart';
+import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 /// Центральная точка Dependency Injection.
@@ -84,6 +85,9 @@ class _AppInitializerState extends State<AppInitializer> {
         RepositoryProvider<IPresenceRepository>.value(
           value: _repositories.presenceRepository,
         ),
+        RepositoryProvider<IPushNotificationsRepository>.value(
+          value: _repositories.pushNotificationsRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -92,11 +96,19 @@ class _AppInitializerState extends State<AppInitializer> {
               authRepository: context.read<IAuthRepository>(),
               profileRepository: context.read<IProfileRepository>(),
               clearUserCache: _repositories.mediaCache.clearUser,
+              beforeSignOut:
+                  _repositories.pushNotificationsRepository
+                      .unregisterCurrentDevice,
             )..add(const AuthStarted()),
           ),
           BlocProvider<PresenceCubit>(
             create: (context) =>
                 PresenceCubit(repository: context.read<IPresenceRepository>()),
+          ),
+          BlocProvider<NotificationsCubit>(
+            create: (context) => NotificationsCubit(
+              repository: context.read<IPushNotificationsRepository>(),
+            ),
           ),
         ],
         child: widget.child,

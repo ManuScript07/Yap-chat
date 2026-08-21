@@ -48,3 +48,7 @@ app.*.map.json
 .artifacts/
 /.env
 /node_modules/
+
+# Server-only push credentials
+/firebase-service-account*.json
+/supabase/.env.push.local

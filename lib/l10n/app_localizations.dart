@@ -727,6 +727,42 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Назад'**
   String get authBack;
+
+  /// No description provided for @notificationsChannelName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сообщения'**
+  String get notificationsChannelName;
+
+  /// No description provided for @notificationsChannelDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новые сообщения в чатах'**
+  String get notificationsChannelDescription;
+
+  /// No description provided for @notificationYou.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ты'**
+  String get notificationYou;
+
+  /// No description provided for @notificationPhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'Фотография'**
+  String get notificationPhoto;
+
+  /// No description provided for @notificationAudio.
+  ///
+  /// In ru, this message translates to:
+  /// **'Голосовое сообщение'**
+  String get notificationAudio;
+
+  /// No description provided for @notificationLocation.
+  ///
+  /// In ru, this message translates to:
+  /// **'Местоположение'**
+  String get notificationLocation;
 }
 
 class _AppLocalizationsDelegate

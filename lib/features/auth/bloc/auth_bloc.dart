@@ -13,9 +13,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required IAuthRepository authRepository,
     required IProfileRepository profileRepository,
     Future<void> Function(String userId)? clearUserCache,
+    Future<void> Function()? beforeSignOut,
   }) : _authRepository = authRepository,
        _profileRepository = profileRepository,
        _clearUserCache = clearUserCache,
+       _beforeSignOut = beforeSignOut,
        super(const AuthState()) {
     on<AuthStarted>(_onStarted, transformer: restartable());
     on<YandexSignInRequested>(
@@ -34,6 +36,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final IAuthRepository _authRepository;
   final IProfileRepository _profileRepository;
   final Future<void> Function(String userId)? _clearUserCache;
+  final Future<void> Function()? _beforeSignOut;
   StreamSubscription<AuthSession?>? _sessionSubscription;
 
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
@@ -191,6 +194,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final userId = state.session?.userId;
     emit(state.copyWith(isSubmitting: true, clearFailure: true));
     try {
+      try {
+        await _beforeSignOut?.call();
+      } catch (_) {
+        // Ошибка отписки от push не должна блокировать выход из аккаунта.
+      }
       await _authRepository.signOut();
       if (userId != null) {
         try {

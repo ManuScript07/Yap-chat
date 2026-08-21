@@ -390,4 +390,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authBack => 'Back';
+
+  @override
+  String get notificationsChannelName => 'Messages';
+
+  @override
+  String get notificationsChannelDescription => 'New chat messages';
+
+  @override
+  String get notificationYou => 'You';
+
+  @override
+  String get notificationPhoto => 'Photo';
+
+  @override
+  String get notificationAudio => 'Voice message';
+
+  @override
+  String get notificationLocation => 'Location';
 }
