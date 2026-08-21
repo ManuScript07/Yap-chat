@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -75,7 +74,6 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     _chatNavigator = ChatNavigationCoordinator(
       loadChat: chatsRepository.getChatById,
       navigateToChat: (chat) async {
-        await _showChatsTab();
         if (!mounted) return;
 
         final chatRoute = ChatRoute(
@@ -85,9 +83,6 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
         if (_hasActiveChatRoute) {
           unawaited(widget.router.popAndPush<Object?, Object?>(chatRoute));
         } else {
-          widget.router.removeUntil(
-            (route) => route.name == AuthGateRoute.name,
-          );
           unawaited(widget.router.push<Object?>(chatRoute));
         }
         await WidgetsBinding.instance.endOfFrame;
@@ -159,25 +154,6 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool get _hasActiveChatRoute {
     final rootStack = widget.router.stackData;
     return rootStack.isNotEmpty && rootStack.last.name == ChatRoute.name;
-  }
-
-  Future<void> _showChatsTab() async {
-    var tabsRouter = _mainTabsRouter;
-    if (tabsRouter == null) {
-      await WidgetsBinding.instance.endOfFrame;
-      tabsRouter = _mainTabsRouter;
-    }
-
-    if (tabsRouter != null && tabsRouter.activeIndex != 0) {
-      tabsRouter.setActiveIndex(0);
-    }
-  }
-
-  TabsRouter? get _mainTabsRouter {
-    final authRouter = widget.router.innerRouterOf<StackRouter>(
-      AuthGateRoute.name,
-    );
-    return authRouter?.innerRouterOf<TabsRouter>(MainRoute.name);
   }
 
   @override
