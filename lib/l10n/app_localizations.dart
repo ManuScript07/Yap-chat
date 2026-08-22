@@ -206,6 +206,24 @@ abstract class AppLocalizations {
   /// **'Не в сети'**
   String get chatOfflineStatus;
 
+  /// No description provided for @chatLastSeenToday.
+  ///
+  /// In ru, this message translates to:
+  /// **'Был(а) в {time}'**
+  String chatLastSeenToday(Object time);
+
+  /// No description provided for @chatLastSeenYesterday.
+  ///
+  /// In ru, this message translates to:
+  /// **'Был(а) вчера в {time}'**
+  String chatLastSeenYesterday(Object time);
+
+  /// No description provided for @chatLastSeenDate.
+  ///
+  /// In ru, this message translates to:
+  /// **'Был(а) {date} в {time}'**
+  String chatLastSeenDate(Object date, Object time);
+
   /// No description provided for @chatAddPhoto.
   ///
   /// In ru, this message translates to:

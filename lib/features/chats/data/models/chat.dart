@@ -15,6 +15,8 @@ class Chat extends Equatable {
   final DateTime lastMessageTime;
   final int unreadCount;
   final bool isOnline;
+  final DateTime? lastSeenAt;
+  final bool showsLastSeen;
   final bool isLastMessageFromMe;
   final bool isMuted;
 
@@ -31,6 +33,8 @@ class Chat extends Equatable {
     required this.lastMessageTime,
     required this.unreadCount,
     required this.isOnline,
+    this.lastSeenAt,
+    this.showsLastSeen = true,
     required this.isLastMessageFromMe,
     this.isMuted = false,
   });
@@ -48,6 +52,8 @@ class Chat extends Equatable {
     DateTime? lastMessageTime,
     int? unreadCount,
     bool? isOnline,
+    DateTime? lastSeenAt,
+    bool? showsLastSeen,
     bool? isLastMessageFromMe,
     bool? isMuted,
   }) {
@@ -64,6 +70,8 @@ class Chat extends Equatable {
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline ?? this.isOnline,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      showsLastSeen: showsLastSeen ?? this.showsLastSeen,
       isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
       isMuted: isMuted ?? this.isMuted,
     );
@@ -83,6 +91,8 @@ class Chat extends Equatable {
     lastMessageTime,
     unreadCount,
     isOnline,
+    lastSeenAt,
+    showsLastSeen,
     isLastMessageFromMe,
     isMuted,
   ];

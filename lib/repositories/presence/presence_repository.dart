@@ -87,7 +87,9 @@ class PresenceRepository implements IPresenceRepository {
               ? RealtimeSubscribeStatus.timedOut
               : RealtimeSubscribeStatus.channelError,
         );
+        return;
       }
+      unawaited(_touchLastSeen());
     } catch (error, stackTrace) {
       _talker.handle(error, stackTrace, 'Presence tracking failed');
       _handleChannelFailure(
@@ -95,6 +97,14 @@ class PresenceRepository implements IPresenceRepository {
         userId,
         RealtimeSubscribeStatus.channelError,
       );
+    }
+  }
+
+  Future<void> _touchLastSeen() async {
+    try {
+      await _client.rpc<void>('touch_last_seen');
+    } catch (error, stackTrace) {
+      _talker.handle(error, stackTrace, 'Last seen update failed');
     }
   }
 
@@ -171,6 +181,7 @@ class PresenceRepository implements IPresenceRepository {
     required bool untrack,
   }) async {
     if (untrack) {
+      await _touchLastSeen();
       try {
         await channel.untrack();
       } catch (_) {}

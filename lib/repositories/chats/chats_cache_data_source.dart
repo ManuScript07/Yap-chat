@@ -116,6 +116,8 @@ class ChatsCacheDataSource {
       lastMessageTime: row.lastMessageTime,
       unreadCount: row.unreadCount,
       isOnline: false,
+      lastSeenAt: row.lastSeenAt,
+      showsLastSeen: row.showsLastSeen,
       isLastMessageFromMe: row.isLastMessageFromMe,
       isMuted: row.isMuted,
     );
@@ -137,6 +139,8 @@ class ChatsCacheDataSource {
       unreadCount: chat.unreadCount,
       isLastMessageFromMe: chat.isLastMessageFromMe,
       isMuted: chat.isMuted,
+      lastSeenAt: Value(chat.lastSeenAt),
+      showsLastSeen: Value(chat.showsLastSeen),
       cachedAt: DateTime.now().toUtc(),
     );
   }

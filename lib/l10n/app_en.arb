@@ -29,6 +29,25 @@
   "chatInputHint": "Type a message",
   "chatOnlineStatus": "Online",
   "chatOfflineStatus": "Offline",
+  "chatLastSeenToday": "Last seen at {time}",
+  "@chatLastSeenToday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "chatLastSeenYesterday": "Last seen yesterday at {time}",
+  "@chatLastSeenYesterday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "chatLastSeenDate": "Last seen {date} at {time}",
+  "@chatLastSeenDate": {
+    "placeholders": {
+      "date": {},
+      "time": {}
+    }
+  },
   "chatAddPhoto": "Add photo",
   "chatActionCamera": "Camera",
   "chatActionGallery": "Gallery",

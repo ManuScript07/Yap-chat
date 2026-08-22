@@ -38,6 +38,8 @@ class CachedChats extends Table {
   IntColumn get unreadCount => integer()();
   BoolColumn get isLastMessageFromMe => boolean()();
   BoolColumn get isMuted => boolean()();
+  DateTimeColumn get lastSeenAt => dateTime().nullable()();
+  BoolColumn get showsLastSeen => boolean().withDefault(const Constant(true))();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
@@ -106,7 +108,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -119,6 +121,12 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from >= 2 && from < 3) {
         await migrator.addColumn(cachedChats, cachedChats.lastMessageId);
+      }
+      if (from < 4) {
+        await migrator.addColumn(cachedChats, cachedChats.lastSeenAt);
+      }
+      if (from < 5) {
+        await migrator.addColumn(cachedChats, cachedChats.showsLastSeen);
       }
     },
   );

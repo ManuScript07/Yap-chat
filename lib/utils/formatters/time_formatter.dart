@@ -72,4 +72,26 @@ abstract class TimeFormatter {
     ).format(date);
     return context.l10n.readReceiptDate(formattedDate, time);
   }
+
+  static String formatLastSeen(BuildContext context, DateTime date) {
+    final now = DateTime.now();
+    final localeName = Localizations.localeOf(context).languageCode;
+    final nowDate = DateTime(now.year, now.month, now.day);
+    final targetDate = DateTime(date.year, date.month, date.day);
+    final calendarDaysAgo = nowDate.difference(targetDate).inDays;
+    final time = DateFormat('HH:mm', localeName).format(date);
+
+    if (calendarDaysAgo == 0) {
+      return context.l10n.chatLastSeenToday(time);
+    }
+    if (calendarDaysAgo == 1) {
+      return context.l10n.chatLastSeenYesterday(time);
+    }
+
+    final formattedDate = DateFormat(
+      date.year == now.year ? 'd MMMM' : 'd MMMM yyyy',
+      localeName,
+    ).format(date);
+    return context.l10n.chatLastSeenDate(formattedDate, time);
+  }
 }

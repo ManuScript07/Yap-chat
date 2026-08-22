@@ -29,6 +29,25 @@
   "chatInputHint": "Введите сообщение",
   "chatOnlineStatus": "В сети",
   "chatOfflineStatus": "Не в сети",
+  "chatLastSeenToday": "Был(а) в {time}",
+  "@chatLastSeenToday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "chatLastSeenYesterday": "Был(а) вчера в {time}",
+  "@chatLastSeenYesterday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "chatLastSeenDate": "Был(а) {date} в {time}",
+  "@chatLastSeenDate": {
+    "placeholders": {
+      "date": {},
+      "time": {}
+    }
+  },
   "chatAddPhoto": "Добавить фото",
   "chatActionCamera": "Камера",
   "chatActionGallery": "Галерея",

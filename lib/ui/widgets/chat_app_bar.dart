@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
 import 'package:yap_chat/ui/widgets/user_avatar.dart';
+import 'package:yap_chat/utils/utils.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   const ChatAppBar({
     super.key,
     required this.userName,
     required this.isOnline,
+    this.lastSeenAt,
+    this.showsLastSeen = true,
     this.avatarUrl,
     this.onBack,
   });
 
   final String userName;
   final bool isOnline;
+  final DateTime? lastSeenAt;
+  final bool showsLastSeen;
   final String? avatarUrl;
   final VoidCallback? onBack;
 
@@ -37,11 +42,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             onTap: onBack ?? () => Navigator.of(context).pop(),
           ),
           const SizedBox(width: 16),
-          UserAvatar(
-            avatarUrl: avatarUrl,
-            size: 48,
-            borderRadius: 10,
-          ),
+          UserAvatar(avatarUrl: avatarUrl, size: 48, borderRadius: 10),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -61,14 +62,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isOnline
-                      ? context.l10n.chatOnlineStatus
-                      : context.l10n.chatOfflineStatus,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.2,
-                    color: onSurface,
-                  ),
+                  _statusText(context),
+                  style: TextStyle(fontSize: 14, height: 1.2, color: onSurface),
                 ),
               ],
             ),
@@ -76,6 +71,14 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
     );
+  }
+
+  String _statusText(BuildContext context) {
+    if (isOnline) return context.l10n.chatOnlineStatus;
+    if (!showsLastSeen) return context.l10n.chatOfflineStatus;
+    final lastSeenAt = this.lastSeenAt;
+    if (lastSeenAt == null) return context.l10n.chatOfflineStatus;
+    return TimeFormatter.formatLastSeen(context, lastSeenAt);
   }
 
   @override

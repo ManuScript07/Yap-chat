@@ -50,6 +50,8 @@ class ChatsRemoteDataSource {
           final storagePath = row['peer_avatar_storage_path'] as String?;
           final lastMessageAt = row['last_message_at'] as String?;
           final lastMessageType = row['last_message_type'] as String?;
+          final lastSeenAt = row['peer_last_seen_at'] as String?;
+          final showsLastSeen = row['peer_shows_last_seen'] as bool? ?? true;
           return Chat(
             id: row['id'] as String,
             peerId: row['peer_id'] as String,
@@ -67,6 +69,10 @@ class ChatsRemoteDataSource {
                 : DateTime.parse(lastMessageAt).toLocal(),
             unreadCount: (row['unread_count'] as num?)?.toInt() ?? 0,
             isOnline: false,
+            lastSeenAt: lastSeenAt == null
+                ? null
+                : DateTime.parse(lastSeenAt).toLocal(),
+            showsLastSeen: showsLastSeen,
             isLastMessageFromMe: row['last_message_sender_id'] == currentUserId,
             isMuted: row['is_muted'] as bool? ?? false,
           );

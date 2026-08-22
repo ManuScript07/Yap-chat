@@ -109,6 +109,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatOfflineStatus => 'Не в сети';
 
   @override
+  String chatLastSeenToday(Object time) {
+    return 'Был(а) в $time';
+  }
+
+  @override
+  String chatLastSeenYesterday(Object time) {
+    return 'Был(а) вчера в $time';
+  }
+
+  @override
+  String chatLastSeenDate(Object date, Object time) {
+    return 'Был(а) $date в $time';
+  }
+
+  @override
   String get chatAddPhoto => 'Добавить фото';
 
   @override

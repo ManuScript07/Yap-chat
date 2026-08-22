@@ -1028,6 +1028,32 @@ class $CachedChatsTable extends CachedChats
       'CHECK ("is_muted" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSeenAt = GeneratedColumn<DateTime>(
+    'last_seen_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _showsLastSeenMeta = const VerificationMeta(
+    'showsLastSeen',
+  );
+  @override
+  late final GeneratedColumn<bool> showsLastSeen = GeneratedColumn<bool>(
+    'shows_last_seen',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("shows_last_seen" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -1055,6 +1081,8 @@ class $CachedChatsTable extends CachedChats
     unreadCount,
     isLastMessageFromMe,
     isMuted,
+    lastSeenAt,
+    showsLastSeen,
     cachedAt,
   ];
   @override
@@ -1205,6 +1233,24 @@ class $CachedChatsTable extends CachedChats
     } else if (isInserting) {
       context.missing(_isMutedMeta);
     }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shows_last_seen')) {
+      context.handle(
+        _showsLastSeenMeta,
+        showsLastSeen.isAcceptableOrUnknown(
+          data['shows_last_seen']!,
+          _showsLastSeenMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -1278,6 +1324,14 @@ class $CachedChatsTable extends CachedChats
         DriftSqlType.bool,
         data['${effectivePrefix}is_muted'],
       )!,
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_seen_at'],
+      ),
+      showsLastSeen: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}shows_last_seen'],
+      )!,
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -1306,6 +1360,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
   final int unreadCount;
   final bool isLastMessageFromMe;
   final bool isMuted;
+  final DateTime? lastSeenAt;
+  final bool showsLastSeen;
   final DateTime cachedAt;
   const CachedChat({
     required this.ownerUserId,
@@ -1322,6 +1378,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     required this.unreadCount,
     required this.isLastMessageFromMe,
     required this.isMuted,
+    this.lastSeenAt,
+    required this.showsLastSeen,
     required this.cachedAt,
   });
   @override
@@ -1347,6 +1405,10 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     map['unread_count'] = Variable<int>(unreadCount);
     map['is_last_message_from_me'] = Variable<bool>(isLastMessageFromMe);
     map['is_muted'] = Variable<bool>(isMuted);
+    if (!nullToAbsent || lastSeenAt != null) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    }
+    map['shows_last_seen'] = Variable<bool>(showsLastSeen);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -1373,6 +1435,10 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       unreadCount: Value(unreadCount),
       isLastMessageFromMe: Value(isLastMessageFromMe),
       isMuted: Value(isMuted),
+      lastSeenAt: lastSeenAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSeenAt),
+      showsLastSeen: Value(showsLastSeen),
       cachedAt: Value(cachedAt),
     );
   }
@@ -1401,6 +1467,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
         json['isLastMessageFromMe'],
       ),
       isMuted: serializer.fromJson<bool>(json['isMuted']),
+      lastSeenAt: serializer.fromJson<DateTime?>(json['lastSeenAt']),
+      showsLastSeen: serializer.fromJson<bool>(json['showsLastSeen']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -1424,6 +1492,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       'unreadCount': serializer.toJson<int>(unreadCount),
       'isLastMessageFromMe': serializer.toJson<bool>(isLastMessageFromMe),
       'isMuted': serializer.toJson<bool>(isMuted),
+      'lastSeenAt': serializer.toJson<DateTime?>(lastSeenAt),
+      'showsLastSeen': serializer.toJson<bool>(showsLastSeen),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -1443,6 +1513,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     int? unreadCount,
     bool? isLastMessageFromMe,
     bool? isMuted,
+    Value<DateTime?> lastSeenAt = const Value.absent(),
+    bool? showsLastSeen,
     DateTime? cachedAt,
   }) => CachedChat(
     ownerUserId: ownerUserId ?? this.ownerUserId,
@@ -1465,6 +1537,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     unreadCount: unreadCount ?? this.unreadCount,
     isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
     isMuted: isMuted ?? this.isMuted,
+    lastSeenAt: lastSeenAt.present ? lastSeenAt.value : this.lastSeenAt,
+    showsLastSeen: showsLastSeen ?? this.showsLastSeen,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedChat copyWithCompanion(CachedChatsCompanion data) {
@@ -1505,6 +1579,12 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ? data.isLastMessageFromMe.value
           : this.isLastMessageFromMe,
       isMuted: data.isMuted.present ? data.isMuted.value : this.isMuted,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+      showsLastSeen: data.showsLastSeen.present
+          ? data.showsLastSeen.value
+          : this.showsLastSeen,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -1526,6 +1606,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ..write('unreadCount: $unreadCount, ')
           ..write('isLastMessageFromMe: $isLastMessageFromMe, ')
           ..write('isMuted: $isMuted, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('showsLastSeen: $showsLastSeen, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -1547,6 +1629,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     unreadCount,
     isLastMessageFromMe,
     isMuted,
+    lastSeenAt,
+    showsLastSeen,
     cachedAt,
   );
   @override
@@ -1567,6 +1651,8 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           other.unreadCount == this.unreadCount &&
           other.isLastMessageFromMe == this.isLastMessageFromMe &&
           other.isMuted == this.isMuted &&
+          other.lastSeenAt == this.lastSeenAt &&
+          other.showsLastSeen == this.showsLastSeen &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -1585,6 +1671,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
   final Value<int> unreadCount;
   final Value<bool> isLastMessageFromMe;
   final Value<bool> isMuted;
+  final Value<DateTime?> lastSeenAt;
+  final Value<bool> showsLastSeen;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedChatsCompanion({
@@ -1602,6 +1690,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     this.unreadCount = const Value.absent(),
     this.isLastMessageFromMe = const Value.absent(),
     this.isMuted = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.showsLastSeen = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1620,6 +1710,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     required int unreadCount,
     required bool isLastMessageFromMe,
     required bool isMuted,
+    this.lastSeenAt = const Value.absent(),
+    this.showsLastSeen = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -1649,6 +1741,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Expression<int>? unreadCount,
     Expression<bool>? isLastMessageFromMe,
     Expression<bool>? isMuted,
+    Expression<DateTime>? lastSeenAt,
+    Expression<bool>? showsLastSeen,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -1669,6 +1763,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       if (isLastMessageFromMe != null)
         'is_last_message_from_me': isLastMessageFromMe,
       if (isMuted != null) 'is_muted': isMuted,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (showsLastSeen != null) 'shows_last_seen': showsLastSeen,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1689,6 +1785,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Value<int>? unreadCount,
     Value<bool>? isLastMessageFromMe,
     Value<bool>? isMuted,
+    Value<DateTime?>? lastSeenAt,
+    Value<bool>? showsLastSeen,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -1708,6 +1806,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       unreadCount: unreadCount ?? this.unreadCount,
       isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
       isMuted: isMuted ?? this.isMuted,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      showsLastSeen: showsLastSeen ?? this.showsLastSeen,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1762,6 +1862,12 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     if (isMuted.present) {
       map['is_muted'] = Variable<bool>(isMuted.value);
     }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
+    }
+    if (showsLastSeen.present) {
+      map['shows_last_seen'] = Variable<bool>(showsLastSeen.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -1788,6 +1894,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
           ..write('unreadCount: $unreadCount, ')
           ..write('isLastMessageFromMe: $isLastMessageFromMe, ')
           ..write('isMuted: $isMuted, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('showsLastSeen: $showsLastSeen, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4034,6 +4142,8 @@ typedef $$CachedChatsTableCreateCompanionBuilder =
       required int unreadCount,
       required bool isLastMessageFromMe,
       required bool isMuted,
+      Value<DateTime?> lastSeenAt,
+      Value<bool> showsLastSeen,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -4053,6 +4163,8 @@ typedef $$CachedChatsTableUpdateCompanionBuilder =
       Value<int> unreadCount,
       Value<bool> isLastMessageFromMe,
       Value<bool> isMuted,
+      Value<DateTime?> lastSeenAt,
+      Value<bool> showsLastSeen,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -4133,6 +4245,16 @@ class $$CachedChatsTableFilterComposer
 
   ColumnFilters<bool> get isMuted => $composableBuilder(
     column: $table.isMuted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get showsLastSeen => $composableBuilder(
+    column: $table.showsLastSeen,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4221,6 +4343,16 @@ class $$CachedChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get showsLastSeen => $composableBuilder(
+    column: $table.showsLastSeen,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4300,6 +4432,16 @@ class $$CachedChatsTableAnnotationComposer
   GeneratedColumn<bool> get isMuted =>
       $composableBuilder(column: $table.isMuted, builder: (column) => column);
 
+  GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get showsLastSeen => $composableBuilder(
+    column: $table.showsLastSeen,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
 }
@@ -4349,6 +4491,8 @@ class $$CachedChatsTableTableManager
                 Value<int> unreadCount = const Value.absent(),
                 Value<bool> isLastMessageFromMe = const Value.absent(),
                 Value<bool> isMuted = const Value.absent(),
+                Value<DateTime?> lastSeenAt = const Value.absent(),
+                Value<bool> showsLastSeen = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedChatsCompanion(
@@ -4366,6 +4510,8 @@ class $$CachedChatsTableTableManager
                 unreadCount: unreadCount,
                 isLastMessageFromMe: isLastMessageFromMe,
                 isMuted: isMuted,
+                lastSeenAt: lastSeenAt,
+                showsLastSeen: showsLastSeen,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -4385,6 +4531,8 @@ class $$CachedChatsTableTableManager
                 required int unreadCount,
                 required bool isLastMessageFromMe,
                 required bool isMuted,
+                Value<DateTime?> lastSeenAt = const Value.absent(),
+                Value<bool> showsLastSeen = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedChatsCompanion.insert(
@@ -4402,6 +4550,8 @@ class $$CachedChatsTableTableManager
                 unreadCount: unreadCount,
                 isLastMessageFromMe: isLastMessageFromMe,
                 isMuted: isMuted,
+                lastSeenAt: lastSeenAt,
+                showsLastSeen: showsLastSeen,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),

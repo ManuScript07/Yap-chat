@@ -103,6 +103,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatOfflineStatus => 'Offline';
 
   @override
+  String chatLastSeenToday(Object time) {
+    return 'Last seen at $time';
+  }
+
+  @override
+  String chatLastSeenYesterday(Object time) {
+    return 'Last seen yesterday at $time';
+  }
+
+  @override
+  String chatLastSeenDate(Object date, Object time) {
+    return 'Last seen $date at $time';
+  }
+
+  @override
   String get chatAddPhoto => 'Add photo';
 
   @override

@@ -54,11 +54,13 @@ class _ChatViewState extends State<_ChatView>
     with AutoRouteAwareStateMixin<_ChatView> {
   late final ScrollController _scrollController;
   NotificationsCubit? _notificationsCubit;
+  late DateTime? _lastSeenAt;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _lastSeenAt = widget.chat.lastSeenAt;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreLostAttachment();
     });
@@ -160,78 +162,93 @@ class _ChatViewState extends State<_ChatView>
         ? widget.chat.isOnline
         : presence.isOnline(widget.chat.peerId);
 
-    return BlocListener<VoiceRecorderCubit, VoiceRecorderState>(
+    return BlocListener<PresenceCubit, PresenceState>(
       listenWhen: (previous, current) =>
-          previous.permissionStatus != current.permissionStatus &&
-          current.permissionStatus != null,
-      listener: (context, state) async {
-        final permissionStatus = state.permissionStatus;
-        if (permissionStatus == null) return;
-
-        await showPermissionDeniedDialog(
-          context,
-          title: context.l10n.microphonePermissionDenied,
-          content: context.l10n.microphonePermissionSettingsDescription,
-          onOpenSettings: () {
-            context.read<VoiceRecorderCubit>().openAppSettings();
-          },
-        );
-
-        if (context.mounted) {
-          await context.read<VoiceRecorderCubit>().clearPermissionFeedback();
+          previous.isOnline(widget.chat.peerId) &&
+          !current.isOnline(widget.chat.peerId),
+      listener: (context, state) {
+        if (!context.mounted ||
+            state.isOnline(widget.chat.peerId) ||
+            !widget.chat.showsLastSeen) {
+          return;
         }
+        setState(() => _lastSeenAt = DateTime.now());
       },
-      child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-        builder: (context, voiceState) => _ChatPopScope(
-          voiceState: voiceState,
-          child: Scaffold(
-            backgroundColor: backgroundColor,
-            resizeToAvoidBottomInset: false,
-            body: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () {
-                FocusManager.instance.primaryFocus?.unfocus();
-              },
-              child: Stack(
-                children: [
-                  _ChatMessages(
-                    controller: _scrollController,
-                    chat: widget.chat,
-                    headerHeight: headerHeight,
-                    inputBarHeight: inputBarHeight,
-                    canOpenMessageMenu:
-                        voiceState.status != VoiceRecorderStatus.recording,
-                    onMessageLongPress: _showMessageActions,
-                  ),
-                  _GradientOverlay(
-                    height: headerHeight + 20,
-                    isTop: true,
-                    backgroundColor: backgroundColor,
-                  ),
-                  _GradientOverlay(
-                    height: inputBarHeight + 20,
-                    isTop: false,
-                    backgroundColor: backgroundColor,
-                  ),
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: ChatAppBar(
-                      userName: widget.chat.userName,
-                      isOnline: isOnline,
-                      avatarUrl: widget.chat.avatarUrl,
-                      onBack: () {
-                        Navigator.of(context).maybePop();
-                      },
+      child: BlocListener<VoiceRecorderCubit, VoiceRecorderState>(
+        listenWhen: (previous, current) =>
+            previous.permissionStatus != current.permissionStatus &&
+            current.permissionStatus != null,
+        listener: (context, state) async {
+          final permissionStatus = state.permissionStatus;
+          if (permissionStatus == null) return;
+
+          await showPermissionDeniedDialog(
+            context,
+            title: context.l10n.microphonePermissionDenied,
+            content: context.l10n.microphonePermissionSettingsDescription,
+            onOpenSettings: () {
+              context.read<VoiceRecorderCubit>().openAppSettings();
+            },
+          );
+
+          if (context.mounted) {
+            await context.read<VoiceRecorderCubit>().clearPermissionFeedback();
+          }
+        },
+        child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+          builder: (context, voiceState) => _ChatPopScope(
+            voiceState: voiceState,
+            child: Scaffold(
+              backgroundColor: backgroundColor,
+              resizeToAvoidBottomInset: false,
+              body: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                },
+                child: Stack(
+                  children: [
+                    _ChatMessages(
+                      controller: _scrollController,
+                      chat: widget.chat,
+                      headerHeight: headerHeight,
+                      inputBarHeight: inputBarHeight,
+                      canOpenMessageMenu:
+                          voiceState.status != VoiceRecorderStatus.recording,
+                      onMessageLongPress: _showMessageActions,
                     ),
-                  ),
-                  _KeyboardAwareInput(
-                    chatId: widget.chat.id,
-                    peerName: widget.chat.userName,
-                    onMessageSent: _scrollToBottom,
-                  ),
-                ],
+                    _GradientOverlay(
+                      height: headerHeight + 20,
+                      isTop: true,
+                      backgroundColor: backgroundColor,
+                    ),
+                    _GradientOverlay(
+                      height: inputBarHeight + 20,
+                      isTop: false,
+                      backgroundColor: backgroundColor,
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: ChatAppBar(
+                        userName: widget.chat.userName,
+                        isOnline: isOnline,
+                        lastSeenAt: _lastSeenAt,
+                        showsLastSeen: widget.chat.showsLastSeen,
+                        avatarUrl: widget.chat.avatarUrl,
+                        onBack: () {
+                          Navigator.of(context).maybePop();
+                        },
+                      ),
+                    ),
+                    _KeyboardAwareInput(
+                      chatId: widget.chat.id,
+                      peerName: widget.chat.userName,
+                      onMessageSent: _scrollToBottom,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
