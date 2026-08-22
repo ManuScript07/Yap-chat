@@ -105,6 +105,7 @@ class AndroidNotificationService {
       channelId,
       l10n.notificationsChannelName,
       channelDescription: l10n.notificationsChannelDescription,
+      icon: 'ic_notification',
       importance: Importance.high,
       priority: Priority.high,
       category: AndroidNotificationCategory.message,

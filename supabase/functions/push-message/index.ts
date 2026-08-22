@@ -269,6 +269,7 @@ async function deliver(
             ttl: '604800s',
             notification: {
               channel_id: 'chat_messages',
+              icon: 'ic_notification',
               notification_priority: 'PRIORITY_HIGH',
               visibility: 'PRIVATE',
             },
