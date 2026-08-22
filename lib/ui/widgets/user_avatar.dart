@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
 
 class UserAvatar extends StatelessWidget {
   const UserAvatar({
@@ -50,20 +51,24 @@ class UserAvatar extends StatelessWidget {
                 : Icon(Icons.person, color: iconColor, size: size * 0.65),
           ),
         ),
-        if (showOnlineBadge && isOnline)
-          Positioned(
-            right: -2,
-            bottom: -2,
-            child: Container(
-              width: size * 0.32,
-              height: size * 0.32,
-              decoration: BoxDecoration(
-                color: primaryBrandColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: backgroundColor, width: 2),
-              ),
-            ),
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: AnimatedStatusSwitcher(
+            child: showOnlineBadge && isOnline
+                ? Container(
+                    key: const ValueKey('online-badge'),
+                    width: size * 0.32,
+                    height: size * 0.32,
+                    decoration: BoxDecoration(
+                      color: primaryBrandColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: backgroundColor, width: 2),
+                    ),
+                  )
+                : const SizedBox(key: ValueKey('online-badge-hidden')),
           ),
+        ),
       ],
     );
   }

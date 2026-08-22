@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
 import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
 import 'package:yap_chat/ui/widgets/user_avatar.dart';
 import 'package:yap_chat/utils/utils.dart';
@@ -27,6 +28,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     final topPadding = MediaQuery.paddingOf(context).top;
     final onSurface = context.colorScheme.onSurface;
     final surface = context.colorScheme.surface;
+    final statusText = _statusText(context);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -61,9 +63,16 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  _statusText(context),
-                  style: TextStyle(fontSize: 14, height: 1.2, color: onSurface),
+                AnimatedStatusSwitcher(
+                  child: Text(
+                    statusText,
+                    key: ValueKey(statusText),
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.2,
+                      color: onSurface,
+                    ),
+                  ),
                 ),
               ],
             ),

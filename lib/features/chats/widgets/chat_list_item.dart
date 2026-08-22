@@ -79,13 +79,16 @@ class ChatListItem extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        Text(
-          '$messagePrefix$preview',
-          style: AppTextStyles.messagePreview.copyWith(
-            color: secondaryTextColor,
+        AnimatedStatusSwitcher(
+          child: Text(
+            '$messagePrefix$preview',
+            key: ValueKey('$messagePrefix$preview'),
+            style: AppTextStyles.messagePreview.copyWith(
+              color: secondaryTextColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -93,7 +96,9 @@ class ChatListItem extends StatelessWidget {
 
   Widget _buildMetadata(BuildContext context) {
     final secondaryTextColor = context.colorScheme.onSurfaceVariant;
-    final primaryBrandColor = context.colorScheme.primary;
+    final badgeColor = chat.isMuted
+        ? context.colorScheme.onSurfaceVariant
+        : context.colorScheme.primary;
     final badgeTextColor = context.scaffoldBackgroundColor;
 
     return Column(
@@ -104,22 +109,11 @@ class ChatListItem extends StatelessWidget {
           style: AppTextStyles.metadata.copyWith(color: secondaryTextColor),
         ),
         const SizedBox(height: 8),
-        if (chat.unreadCount > 0)
-          Container(
-            width: 25,
-            height: 25,
-            decoration: BoxDecoration(
-              color: primaryBrandColor,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '${chat.unreadCount}',
-              style: AppTextStyles.badgeText.copyWith(color: badgeTextColor),
-            ),
-          )
-        else
-          const SizedBox(height: 25),
+        AnimatedUnreadBadge(
+          count: chat.unreadCount,
+          color: badgeColor,
+          textColor: badgeTextColor,
+        ),
       ],
     );
   }

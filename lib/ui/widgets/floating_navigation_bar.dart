@@ -3,8 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:yap_chat/core/core.dart';
-
-
+import 'package:yap_chat/ui/widgets/animated_unread_badge.dart';
 
 class FloatingNavigationBar extends StatelessWidget {
   const FloatingNavigationBar({
@@ -31,27 +30,25 @@ class FloatingNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    debugPrint(
-      '''
+    debugPrint('''
 ════════ NAV LAYOUT ════════
 padding.bottom: ${MediaQuery.paddingOf(context).bottom}
 viewPadding.bottom: ${MediaQuery.viewPaddingOf(context).bottom}
 viewInsets.bottom: ${MediaQuery.viewInsetsOf(context).bottom}
 ═══════════════════════════
-''',
-    );
+''');
 
     final screenWidth = MediaQuery.of(context).size.width;
 
     final navBarWidth = math.min(screenWidth * 0.7, 380.0);
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
-    final backgroundColor = context.scaffoldBackgroundColor.withValues(alpha: 0.9);
+    final backgroundColor = context.scaffoldBackgroundColor.withValues(
+      alpha: 0.9,
+    );
     final borderColor = context.colorScheme.outline;
     final activeColor = context.colorScheme.onSurface;
     final inactiveColor = context.colorScheme.outline;
-
 
     return Padding(
       padding: EdgeInsets.only(
@@ -72,10 +69,7 @@ viewInsets.bottom: ${MediaQuery.viewInsetsOf(context).bottom}
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(
-                    color: borderColor,
-                    width: 0,
-                  ),
+                  border: Border.all(color: borderColor, width: 0),
                 ),
                 child: Row(
                   children: List.generate(items.length, (index) {
@@ -92,10 +86,27 @@ viewInsets.bottom: ${MediaQuery.viewInsetsOf(context).bottom}
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              isSelected ? item.activeIcon : item.icon,
-                              size: 28,
-                              color: isSelected ? activeColor : inactiveColor,
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  isSelected ? item.activeIcon : item.icon,
+                                  size: 28,
+                                  color: isSelected
+                                      ? activeColor
+                                      : inactiveColor,
+                                ),
+                                Positioned(
+                                  right: -12,
+                                  top: -9,
+                                  child: AnimatedUnreadBadge(
+                                    count: item.unreadCount,
+                                    color: context.colorScheme.primary,
+                                    textColor: context.scaffoldBackgroundColor,
+                                    size: 22,
+                                  ),
+                                ),
+                              ],
                             ),
                             SizedBox(height: iconTextSpacing),
                             Text(
@@ -131,9 +142,11 @@ class FloatingNavigationBarItem {
     required this.icon,
     required this.activeIcon,
     required this.label,
+    this.unreadCount = 0,
   });
 
   final IconData icon;
   final IconData activeIcon;
   final String label;
+  final int unreadCount;
 }

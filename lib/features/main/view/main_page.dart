@@ -44,6 +44,11 @@ class _MainView extends StatelessWidget {
         final isSelectionMode = context.select<ChatsBloc, bool>(
           (bloc) => bloc.state.isSelectionMode,
         );
+        final unreadChatsCount = context.select<ChatsBloc, int>(
+          (bloc) => bloc.state.chats
+              .where((chat) => !chat.isMuted)
+              .fold(0, (total, chat) => total + chat.unreadCount),
+        );
 
         return PopScope(
           canPop:
@@ -84,6 +89,7 @@ class _MainView extends StatelessWidget {
                   icon: Icons.sms_outlined,
                   activeIcon: Icons.sms_rounded,
                   label: context.l10n.navChats,
+                  unreadCount: unreadChatsCount,
                 ),
                 FloatingNavigationBarItem(
                   icon: Icons.mood_outlined,

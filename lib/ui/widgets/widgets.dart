@@ -1,4 +1,6 @@
 export 'floating_navigation_bar.dart';
+export 'animated_status_switcher.dart';
+export 'animated_unread_badge.dart';
 export 'bottom_ambient_glow.dart';
 export 'glass_search_bar.dart';
 export 'selection_toolbar.dart';
