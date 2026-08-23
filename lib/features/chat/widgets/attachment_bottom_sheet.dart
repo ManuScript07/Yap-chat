@@ -228,32 +228,48 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                         ),
                       ),
 
-                      if (hasMedia) ...[
-                        SizedBox(height: isLandscape ? 12 : 20),
-                        SizedBox(
-                          height: isLandscape ? 100 : 138,
-                          child: ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _localMedia.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              final path = _localMedia[index];
-                              final isSelected = _selectedImages.contains(path);
-                              return KeyedSubtree(
-                                key: ValueKey('recent-media:$path'),
-                                child: _MediaCard(
-                                  path: path,
-                                  isSelected: isSelected,
-                                  isLandscape: isLandscape,
-                                  onTap: () => _toggleSelection(path),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: hasMedia
+                            ? Column(
+                                key: const ValueKey('recent_media_visible'),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(height: isLandscape ? 12 : 20),
+                                  SizedBox(
+                                    height: isLandscape ? 100 : 138,
+                                    child: ListView.separated(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: _localMedia.length,
+                                      separatorBuilder: (_, _) =>
+                                          const SizedBox(width: 12),
+                                      itemBuilder: (context, index) {
+                                        final path = _localMedia[index];
+                                        final isSelected = _selectedImages
+                                            .contains(path);
+                                        return KeyedSubtree(
+                                          key: ValueKey('recent-media:$path'),
+                                          child: _MediaCard(
+                                            path: path,
+                                            isSelected: isSelected,
+                                            isLandscape: isLandscape,
+                                            onTap: () => _toggleSelection(path),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const SizedBox(
+                                key: ValueKey('recent_media_hidden'),
+                              ),
+                      ),
                     ],
                   ),
                 ),

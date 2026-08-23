@@ -181,27 +181,27 @@ class _MediaAlbum extends StatelessWidget {
               ),
             ),
           if (isError)
-            Material(
-              color: context.scaffoldBackgroundColor,
-              child: InkWell(
-                onTap: () => context.read<ChatBloc>().add(
-                  ChatMessageRetryRequested(message),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
+            ColoredBox(
+              color: context.scaffoldBackgroundColor.withValues(alpha: 0.4),
+              child: Center(
+                child: Material(
+                  color: context.colorScheme.primary,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => context.read<ChatBloc>().add(
+                      ChatMessageRetryRequested(message),
+                    ),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Icon(
                         Icons.refresh_rounded,
                         color: context.colorScheme.surface,
-                        size: 32,
+                        size: 28,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        context.l10n.repeat,
-                        style: TextStyle(color: context.colorScheme.surface),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -212,6 +212,8 @@ class _MediaAlbum extends StatelessWidget {
   }
 
   void _openGallery(BuildContext context, int index) {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ChatMediaGalleryPage(

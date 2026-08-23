@@ -144,6 +144,7 @@ class ChatsPage extends StatelessWidget {
                                 title: context.l10n.navChats,
                                 actionIcon: Icons.add_comment_rounded,
                                 onActionPressed: () {
+                                  FocusManager.instance.primaryFocus?.unfocus();
                                   FocusScope.of(context).unfocus();
                                   final authRouter = context.router.root
                                       .innerRouterOf<StackRouter>(
@@ -292,6 +293,7 @@ class _ChatsContent extends StatelessWidget {
                   chat: chat,
                   isSelected: isSelected,
                   onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
                     FocusScope.of(context).unfocus();
 
                     if (state.isSelectionMode) {

@@ -20,14 +20,18 @@ class GlassSearchBar extends StatefulWidget {
   State<GlassSearchBar> createState() => _GlassSearchBarState();
 }
 
-class _GlassSearchBarState extends State<GlassSearchBar> {
+class _GlassSearchBarState extends State<GlassSearchBar>
+    with WidgetsBindingObserver {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   bool _showClearButton = false;
+  double _lastKeyboardInset = 0;
+  bool _hasKeyboardInset = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = widget.controller ?? TextEditingController();
     _focusNode = widget.focusNode ?? FocusNode();
 
@@ -35,7 +39,44 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hasKeyboardInset) {
+      _lastKeyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+      _hasKeyboardInset = true;
+    }
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+
+    final view = View.maybeOf(context);
+    if (view == null) return;
+
+    final keyboardInset = MediaQueryData.fromView(view).viewInsets.bottom;
+    _handleKeyboardInsetChanged(keyboardInset);
+  }
+
+  void _handleKeyboardInsetChanged(double keyboardInset) {
+    final wasKeyboardOpen = _lastKeyboardInset > 0;
+    _lastKeyboardInset = keyboardInset;
+
+    if (wasKeyboardOpen && keyboardInset <= 0) {
+      _clearFocus();
+    }
+  }
+
+  void _clearFocus() {
+    _focusNode.unfocus();
+    if (mounted) {
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (widget.controller == null) {
       _controller.dispose();
     } else {
@@ -59,6 +100,19 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
   Widget build(BuildContext context) {
     final mainColor = context.colorScheme.onSurface;
     final systemPadding = MediaQuery.paddingOf(context);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    // Some Android versions update MediaQuery one frame after the platform
+    // metrics callback. Keep the same transition guard here as a fallback.
+    if (_hasKeyboardInset &&
+        _lastKeyboardInset > 0 &&
+        keyboardInset <= 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _clearFocus();
+      });
+    }
+    _lastKeyboardInset = keyboardInset;
+    _hasKeyboardInset = true;
 
     return Padding(
       padding: EdgeInsets.only(

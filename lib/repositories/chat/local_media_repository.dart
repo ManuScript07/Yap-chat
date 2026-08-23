@@ -14,6 +14,7 @@ class LocalMediaRepository implements ILocalMediaRepository {
   static const _storageKey = 'recent_chat_media_paths';
   static const _pendingStorageKey = 'pending_chat_media_path';
   static const _pendingChatStorageKey = 'pending_chat_id';
+  static const maxRecentMediaCount = 50;
 
   @override
   Future<String?> persistMedia(String sourcePath) async {
@@ -31,7 +32,10 @@ class LocalMediaRepository implements ILocalMediaRepository {
     final current = getRecentMediaPaths()
         .where((storedPath) => File(storedPath).existsSync())
         .toList();
-    final updated = [destination.path, ...current].take(20).toList();
+    final updated = [
+      destination.path,
+      ...current,
+    ].take(maxRecentMediaCount).toList();
     await _prefs.setStringList(_storageKey, updated);
     return destination.path;
   }

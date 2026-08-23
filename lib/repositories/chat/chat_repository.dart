@@ -326,6 +326,9 @@ class ChatRepository implements IChatRepository {
         refreshAfterActive: true,
       );
     } catch (error, stackTrace) {
+      if (operation.type == MessageType.image.name) {
+        await _cache.markMessageStatus(operation.id, MessageStatus.error);
+      }
       await _cache.markPendingFailure(operation.id, error);
       _config.talker.handle(error, stackTrace, 'Pending message upload failed');
     } finally {

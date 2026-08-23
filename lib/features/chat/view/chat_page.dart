@@ -51,15 +51,18 @@ class _ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<_ChatView>
-    with AutoRouteAwareStateMixin<_ChatView> {
+    with AutoRouteAwareStateMixin<_ChatView>, WidgetsBindingObserver {
   late final ScrollController _scrollController;
   NotificationsCubit? _notificationsCubit;
   late DateTime? _lastSeenAt;
   double? _composerHeight;
+  double _lastKeyboardInset = 0;
+  bool _hasKeyboardInset = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController();
     _lastSeenAt = widget.chat.lastSeenAt;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,8 +73,28 @@ class _ChatViewState extends State<_ChatView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_hasKeyboardInset) {
+      _lastKeyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+      _hasKeyboardInset = true;
+    }
     _notificationsCubit ??= context.read<NotificationsCubit>();
     unawaited(_notificationsCubit!.setActiveConversation(widget.chat.id));
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+
+    final view = View.maybeOf(context);
+    if (view == null) return;
+
+    final keyboardInset = MediaQueryData.fromView(view).viewInsets.bottom;
+    final wasKeyboardOpen = _lastKeyboardInset > 0;
+    _lastKeyboardInset = keyboardInset;
+
+    if (wasKeyboardOpen && keyboardInset <= 0) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
   }
 
   @override
@@ -91,6 +114,7 @@ class _ChatViewState extends State<_ChatView>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     _scrollController.dispose();
     super.dispose();
@@ -283,6 +307,8 @@ class _KeyboardAwareInput extends StatelessWidget {
   final ValueChanged<double> onHeightChanged;
 
   Future<void> _openAttachmentSheet(BuildContext context) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final selection = await showAttachmentBottomSheet(
       context,
       chatId: chatId,

@@ -59,6 +59,7 @@ class _MainView extends StatelessWidget {
             if (didPop) return;
 
             if (isKeyboardOpen) {
+              FocusManager.instance.primaryFocus?.unfocus();
               FocusScope.of(context).unfocus();
               return;
             }
