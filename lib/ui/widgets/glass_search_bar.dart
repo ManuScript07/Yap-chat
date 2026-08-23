@@ -58,9 +58,13 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
   @override
   Widget build(BuildContext context) {
     final mainColor = context.colorScheme.onSurface;
+    final systemPadding = MediaQuery.paddingOf(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: EdgeInsets.only(
+        left: 16 + systemPadding.left,
+        right: 16 + systemPadding.right,
+      ),
       child: SizedBox(
         width: double.infinity,
         height: 50,
@@ -118,18 +122,18 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
                     ),
                     suffixIcon: _showClearButton
                         ? IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: mainColor,
-                        size: 26,
-                      ),
-                      onPressed: () {
-                        _controller.clear();
-                        widget.onChanged?.call('');
-                      },
-                    )
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: mainColor,
+                              size: 26,
+                            ),
+                            onPressed: () {
+                              _controller.clear();
+                              widget.onChanged?.call('');
+                            },
+                          )
                         : null,
                   ),
                 ),

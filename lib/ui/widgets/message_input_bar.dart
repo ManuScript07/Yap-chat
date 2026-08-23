@@ -95,13 +95,19 @@ class _MessageInputBarState extends State<MessageInputBar> {
 
     final mainColor = colorScheme.onSurface;
     final primaryColor = colorScheme.primary;
+    final systemPadding = MediaQuery.paddingOf(context);
 
     return SafeArea(
       top: false,
       left: false,
       right: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: EdgeInsets.fromLTRB(
+          systemPadding.left + 16,
+          8,
+          systemPadding.right + 16,
+          8,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

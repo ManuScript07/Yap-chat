@@ -31,6 +31,23 @@ class ChatsPage extends StatelessWidget {
             prevMuted != currMuted;
       },
       builder: (context, state) {
+        final mediaQuery = MediaQuery.of(context);
+        final isLandscapeKeyboard =
+            mediaQuery.orientation == Orientation.landscape &&
+            mediaQuery.viewInsets.bottom > 0;
+        const appBarHeight = 130.0;
+        const searchBarHeight = 50.0;
+        const searchBarSpacing = 16.0;
+        final searchBarTop =
+            mediaQuery.size.height -
+            mediaQuery.viewInsets.bottom -
+            searchBarSpacing -
+            searchBarHeight;
+        final hideAppBarForKeyboard =
+            !state.isSelectionMode &&
+            isLandscapeKeyboard &&
+            searchBarTop < appBarHeight;
+
         final selectedChats = state.chats.where(
           (chat) => state.selectedChatIds.contains(chat.id),
         );
@@ -40,7 +57,9 @@ class ChatsPage extends StatelessWidget {
           resizeToAvoidBottomInset: false,
           backgroundColor: context.scaffoldBackgroundColor,
           extendBodyBehindAppBar: true,
-          appBar: state.isSelectionMode
+          appBar: hideAppBarForKeyboard
+              ? null
+              : state.isSelectionMode
               ? SelectionToolbar(
                   selectedCount: state.selectedChatIds.length,
                   onClose: () => context.read<ChatsBloc>().add(

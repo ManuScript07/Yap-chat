@@ -87,6 +87,8 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final systemPadding = MediaQuery.paddingOf(context);
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _overlayStyle,
       child: Scaffold(
@@ -121,9 +123,9 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                 },
               ),
               Positioned(
-                top: MediaQuery.paddingOf(context).top + 16,
-                left: 16,
-                right: 16,
+                top: systemPadding.top + 16,
+                left: systemPadding.left + 16,
+                right: systemPadding.right + 16,
                 child: Row(
                   children: [
                     GlassIconButton(

@@ -313,6 +313,7 @@ class _KeyboardAwareInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+    final systemPadding = MediaQuery.paddingOf(context);
 
     return Positioned(
       left: 0,
@@ -333,7 +334,10 @@ class _KeyboardAwareInput extends StatelessWidget {
                     children: [
                       if (chatState.replyToMessage case final reply?) ...[
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: EdgeInsets.only(
+                            left: systemPadding.left + 16,
+                            right: systemPadding.right + 16,
+                          ),
                           child: ReplyComposerPreview(
                             message: reply,
                             peerName: peerName,
@@ -745,7 +749,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
-                right: 16,
+                right: 16 + MediaQuery.paddingOf(context).right,
                 bottom:
                     widget.composerHeight +
                     MediaQuery.viewInsetsOf(context).bottom +
@@ -817,6 +821,7 @@ class _MessagesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
+    final systemPadding = MediaQuery.paddingOf(context);
 
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
 
@@ -904,7 +909,12 @@ class _MessagesList extends StatelessWidget {
           color: isHighlighted
               ? context.colorScheme.primary.withValues(alpha: 0.42)
               : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: EdgeInsets.only(
+            left: systemPadding.left + 16,
+            right: systemPadding.right + 16,
+            top: 4,
+            bottom: 4,
+          ),
           child: switch (item) {
             MessageItemElement(:final message) => MessageBubble(
               message: message,

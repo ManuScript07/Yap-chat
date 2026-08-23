@@ -47,13 +47,19 @@ class VoiceRecorderBar extends StatelessWidget {
               playbackDuration.inMilliseconds;
     final foreground = context.colorScheme.onSurface;
     final canFinish = !isRecording || state.canFinishRecording;
+    final systemPadding = MediaQuery.paddingOf(context);
 
     return SafeArea(
       top: false,
       left: false,
       right: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: EdgeInsets.fromLTRB(
+          systemPadding.left + 16,
+          8,
+          systemPadding.right + 16,
+          8,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

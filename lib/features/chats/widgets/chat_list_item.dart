@@ -23,6 +23,7 @@ class ChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
+    final systemPadding = MediaQuery.paddingOf(context);
     final isOnline = chat.peerId.isEmpty
         ? chat.isOnline
         : context.select<PresenceCubit, bool>(
@@ -35,7 +36,12 @@ class ChatListItem extends StatelessWidget {
       child: Container(
         color: isSelected ? selectionColor : Colors.transparent,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: EdgeInsets.only(
+            left: 16 + systemPadding.left,
+            right: 16 + systemPadding.right,
+            top: 14,
+            bottom: 14,
+          ),
           child: Row(
             children: [
               UserAvatar(

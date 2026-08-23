@@ -25,17 +25,17 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
+    final systemPadding = MediaQuery.paddingOf(context);
     final onSurface = context.colorScheme.onSurface;
     final surface = context.colorScheme.surface;
     final statusText = _statusText(context);
 
     return Padding(
       padding: EdgeInsets.only(
-        top: topPadding + 8,
+        top: systemPadding.top + 8,
         bottom: 8,
-        left: 16,
-        right: 16,
+        left: systemPadding.left + 16,
+        right: systemPadding.right + 16,
       ),
       child: Row(
         children: [
