@@ -71,6 +71,7 @@ flutter:
   assets:
     - .env
     - assets/logo/
+    - assets/images/empty_chat.svg
 
   fonts:
     - family: RobotoFlex

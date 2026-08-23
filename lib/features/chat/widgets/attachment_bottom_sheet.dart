@@ -60,6 +60,7 @@ class _AttachmentBottomSheet extends StatefulWidget {
 
 class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
   final Set<String> _selectedImages = {};
+  bool _isLocationLoading = false;
 
   // Список содержит только пути к локальным файлам (камера + галерея)
   final List<String> _localMedia = [];
@@ -218,7 +219,10 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                               icon: Icons.near_me,
                               label: l10n.chatActionLocation,
                               isLandscape: isLandscape,
-                              onTap: _handleLocationAction,
+                              isLoading: _isLocationLoading,
+                              onTap: _isLocationLoading
+                                  ? null
+                                  : _handleLocationAction,
                             ),
                           ],
                         ),
@@ -316,12 +320,17 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
   }
 
   Future<void> _handleLocationAction() async {
+    if (_isLocationLoading) return;
+
+    setState(() => _isLocationLoading = true);
+
     final locationRepository = context.read<ILocationRepository>();
     late final Position position;
 
     try {
       position = await locationRepository.getCurrentPosition();
     } on LocationServiceDisabledFailure {
+      if (mounted) setState(() => _isLocationLoading = false);
       if (!mounted) return;
 
       await showPermissionDeniedDialog(
@@ -332,6 +341,7 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
       );
       return;
     } on LocationPermissionPermanentlyDeniedFailure {
+      if (mounted) setState(() => _isLocationLoading = false);
       if (!mounted) return;
 
       await showPermissionDeniedDialog(
@@ -342,6 +352,7 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
       );
       return;
     } on LocationPermissionDeniedFailure {
+      if (mounted) setState(() => _isLocationLoading = false);
       if (!mounted) return;
 
       showAppSnackBar(
@@ -350,6 +361,10 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
         type: SnackBarType.error,
       );
       return;
+    } finally {
+      if (mounted && _isLocationLoading) {
+        setState(() => _isLocationLoading = false);
+      }
     }
 
     if (!mounted) return;
@@ -380,12 +395,14 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.isLandscape = false,
+    this.isLoading = false,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isLandscape;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -406,7 +423,16 @@ class _ActionButton extends StatelessWidget {
               width: size,
               height: size,
               alignment: Alignment.center,
-              child: Icon(icon, size: iconSize, color: colorScheme.primary),
+              child: isLoading
+                  ? SizedBox(
+                      width: iconSize,
+                      height: iconSize,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 4,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  : Icon(icon, size: iconSize, color: colorScheme.primary),
             ),
           ),
         ),

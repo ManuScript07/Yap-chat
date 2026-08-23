@@ -13,3 +13,4 @@ export 'permission_denied_dialog.dart';
 export 'app_snack_bar.dart';
 export 'confirmation_dialog.dart';
 export 'onboarding_text_field.dart';
+export 'empty_chat_state.dart';

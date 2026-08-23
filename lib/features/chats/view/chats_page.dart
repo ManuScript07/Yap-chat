@@ -38,6 +38,9 @@ class ChatsPage extends StatelessWidget {
         const appBarHeight = 130.0;
         const searchBarHeight = 50.0;
         const searchBarSpacing = 16.0;
+        const navigationBarHeight = 70.0;
+        const navigationBarBottomOffset = 0.0;
+        const snackBarSearchGap = 8.0;
         final searchBarTop =
             mediaQuery.size.height -
             mediaQuery.viewInsets.bottom -
@@ -47,6 +50,13 @@ class ChatsPage extends StatelessWidget {
             !state.isSelectionMode &&
             isLandscapeKeyboard &&
             searchBarTop < appBarHeight;
+        final notificationSnackBarBottomMargin =
+            mediaQuery.viewPadding.bottom +
+            navigationBarHeight +
+            navigationBarBottomOffset +
+            searchBarHeight +
+            searchBarSpacing +
+            snackBarSearchGap;
 
         final selectedChats = state.chats.where(
           (chat) => state.selectedChatIds.contains(chat.id),
@@ -103,7 +113,7 @@ class ChatsPage extends StatelessWidget {
                                               .chatsNotificationsDisabled,
                                     type: SnackBarType.info,
                                     bottomMargin:
-                                        mediaQuery.viewPadding.bottom + 112,
+                                        notificationSnackBarBottomMargin,
                                   );
                                 },
                                 onMarkAsRead: () => context
@@ -243,6 +253,7 @@ class _ChatsContent extends StatelessWidget {
       buildWhen: (previous, current) =>
           previous.status != current.status ||
           previous.filteredChats != current.filteredChats ||
+          previous.searchQuery != current.searchQuery ||
           previous.selectedChatIds != current.selectedChatIds ||
           previous.isSelectionMode != current.isSelectionMode,
       builder: (context, state) {
@@ -254,7 +265,19 @@ class _ChatsContent extends StatelessWidget {
             return Center(child: Text(context.l10n.failedToLoadChats));
           case ChatsStatus.success:
             if (state.filteredChats.isEmpty) {
-              return Center(child: Text(context.l10n.noChats));
+              final isSearchResultEmpty = state.searchQuery.trim().isNotEmpty;
+
+              return AnimatedPadding(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutQuad,
+                padding: EdgeInsets.only(top: 130, bottom: bottomPadding),
+                child: EmptyChatState(
+                  showImage: !isSearchResultEmpty,
+                  message: isSearchResultEmpty
+                      ? context.l10n.chatsNoSearchResults
+                      : context.l10n.noChats,
+                ),
+              );
             }
 
             return ListView.builder(

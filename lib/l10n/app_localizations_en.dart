@@ -72,6 +72,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noChats => 'You have no chats';
 
   @override
+  String get chatsNoSearchResults => 'Nothing found';
+
+  @override
   String chatsDeleteTitle(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -138,7 +141,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatSelectFiles => 'Select files';
 
   @override
-  String get noMessages => 'No messages';
+  String get noMessages => 'nothing here yet';
 
   @override
   String get permissionDenied => 'Permission denied';

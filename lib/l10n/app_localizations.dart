@@ -176,6 +176,12 @@ abstract class AppLocalizations {
   /// **'У вас нет чатов'**
   String get noChats;
 
+  /// No description provided for @chatsNoSearchResults.
+  ///
+  /// In ru, this message translates to:
+  /// **'ничего не нашли'**
+  String get chatsNoSearchResults;
+
   /// No description provided for @chatsDeleteTitle.
   ///
   /// In ru, this message translates to:
@@ -263,7 +269,7 @@ abstract class AppLocalizations {
   /// No description provided for @noMessages.
   ///
   /// In ru, this message translates to:
-  /// **'Нет сообщений'**
+  /// **'тут пока ничего нет'**
   String get noMessages;
 
   /// No description provided for @permissionDenied.

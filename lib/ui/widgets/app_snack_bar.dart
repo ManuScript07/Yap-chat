@@ -18,7 +18,8 @@ void showAppSnackBar(
   final colorScheme = context.colorScheme;
   final systemPadding = MediaQuery.paddingOf(context);
 
-  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  final scaffoldMessenger = ScaffoldMessenger.of(context);
+  scaffoldMessenger.hideCurrentSnackBar();
 
   final (IconData icon, Color iconColor) = switch (type) {
     SnackBarType.success => (Icons.check_circle_rounded, colorScheme.primary),
@@ -26,7 +27,7 @@ void showAppSnackBar(
     SnackBarType.info => (Icons.info_rounded, colorScheme.primary),
   };
 
-  ScaffoldMessenger.of(context).showSnackBar(
+  scaffoldMessenger.showSnackBar(
     SnackBar(
       duration: duration,
       elevation: 6,
@@ -69,6 +70,10 @@ void showAppSnackBar(
               onPressed: onActionPressed,
             )
           : null,
+    ),
+    snackBarAnimationStyle: const AnimationStyle(
+      duration: Duration(milliseconds: 220),
+      reverseDuration: Duration(milliseconds: 180),
     ),
   );
 }

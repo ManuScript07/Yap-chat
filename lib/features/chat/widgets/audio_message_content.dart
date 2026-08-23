@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chat/widgets/message_status_icon.dart';
 import 'package:yap_chat/features/chat/widgets/audio_waveform.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
@@ -208,12 +209,6 @@ class _StatusIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (status) {
-      MessageStatus.sending => Icons.access_time_rounded,
-      MessageStatus.sent => Icons.done_rounded,
-      MessageStatus.read => Icons.done_all_rounded,
-      MessageStatus.error => Icons.error_outline_rounded,
-    };
-    return Icon(icon, size: 17, color: color);
+    return MessageStatusIcon(status: status, color: color, size: 17);
   }
 }

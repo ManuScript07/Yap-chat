@@ -709,15 +709,17 @@ class _ChatMessagesState extends State<_ChatMessages> {
           }
 
           if (state.messages.isEmpty) {
-            return Center(
-              child: Text(
-                context.l10n.noMessages,
-                style: TextStyle(
-                  color: context.colorScheme.onSurfaceVariant,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuad,
+              padding: EdgeInsets.only(
+                top: widget.headerHeight + 12,
+                bottom:
+                    widget.composerHeight +
+                    MediaQuery.viewInsetsOf(context).bottom +
+                    12,
               ),
+              child: EmptyChatState(message: context.l10n.noMessages),
             );
           }
 

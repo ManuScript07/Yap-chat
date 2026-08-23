@@ -7,6 +7,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
 import 'package:yap_chat/features/chat/widgets/audio_message_content.dart';
 import 'package:yap_chat/features/chat/widgets/message_reply_preview.dart';
+import 'package:yap_chat/features/chat/widgets/message_status_icon.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class MessageBubble extends StatefulWidget {
@@ -418,15 +419,6 @@ class _MessageBubbleState extends State<MessageBubble>
   }
 
   Widget _buildStatusIcon(Color color) {
-    switch (widget.message.status) {
-      case MessageStatus.sending:
-        return Icon(Icons.access_time_rounded, size: 18, color: color);
-      case MessageStatus.sent:
-        return Icon(Icons.done_rounded, size: 18, color: color);
-      case MessageStatus.read:
-        return Icon(Icons.done_all_rounded, size: 18, color: color);
-      case MessageStatus.error:
-        return Icon(Icons.error_outline_rounded, size: 18, color: color);
-    }
+    return MessageStatusIcon(status: widget.message.status, color: color);
   }
 }
