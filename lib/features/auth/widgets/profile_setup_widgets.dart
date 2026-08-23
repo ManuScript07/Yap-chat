@@ -13,11 +13,13 @@ class ProfileSetupStep extends StatefulWidget {
     required this.child,
     this.subtitle,
     this.errorText,
+    this.avoidKeyboardCompression = false,
   });
 
   final String title;
   final String? subtitle;
   final String? errorText;
+  final bool avoidKeyboardCompression;
   final Widget child;
 
   @override
@@ -36,6 +38,13 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final mediaQuery = MediaQuery.of(context);
+        final isKeyboardVisible = mediaQuery.viewInsets.bottom > 0;
+        final isLandscape = mediaQuery.orientation == Orientation.landscape;
+        final useScrollableContent =
+            isKeyboardVisible &&
+            (isLandscape || widget.avoidKeyboardCompression);
+
         if (_layoutSize != constraints.biggest) {
           _layoutSize = constraints.biggest;
           _contentTop = null;
@@ -45,64 +54,84 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
           42.0,
           math.max(30.0, constraints.maxWidth * .1),
         );
+        final contentBody = SizedBox(
+          width: math.min(448, constraints.maxWidth - 72),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: context.textTheme.displaySmall?.copyWith(
+                  color: context.colorScheme.onSurface,
+                  fontSize: titleSize,
+                  fontWeight: FontWeight.w800,
+                  height: 1.24,
+                  letterSpacing: .42,
+                ),
+              ),
+              if (widget.subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  widget.subtitle!,
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    color: context.colorScheme.onSurfaceVariant,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    height: 1,
+                    letterSpacing: .5,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 56),
+              widget.child,
+              if (widget.errorText != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  widget.errorText!,
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: Color.lerp(
+                      context.colorScheme.error,
+                      Colors.red,
+                      .2,
+                    ),
+                    fontWeight: FontWeight.w500,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
         final content = FittedBox(
           key: _contentKey,
           fit: BoxFit.scaleDown,
-          child: SizedBox(
-            width: math.min(448, constraints.maxWidth - 72),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  widget.title,
-                  textAlign: TextAlign.center,
-                  style: context.textTheme.displaySmall?.copyWith(
-                    color: context.colorScheme.onSurface,
-                    fontSize: titleSize,
-                    fontWeight: FontWeight.w800,
-                    height: 1.24,
-                    letterSpacing: .42,
-                  ),
-                ),
-                if (widget.subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.subtitle!,
-                    textAlign: TextAlign.center,
-                    style: context.textTheme.bodyMedium?.copyWith(
-                      color: context.colorScheme.onSurfaceVariant,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      height: 1,
-                      letterSpacing: .5,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 56),
-                widget.child,
-                if (widget.errorText != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.errorText!,
-                    textAlign: TextAlign.center,
-                    style: context.textTheme.bodySmall?.copyWith(
-                      color: context.colorScheme.error,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+          child: contentBody,
         );
-        final isAnchored = _contentTop != null;
+        final isAnchored = !useScrollableContent && _contentTop != null;
 
-        if (!isAnchored) _scheduleContentMeasurement();
+        if (!useScrollableContent && !isAnchored) {
+          _scheduleContentMeasurement();
+        }
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
           child: SizedBox.expand(
             key: _layoutKey,
-            child: isAnchored
+            child: useScrollableContent
+                ? SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: math.max(0, constraints.maxHeight - 48),
+                      ),
+                      child: Center(child: contentBody),
+                    ),
+                  )
+                : isAnchored
                 ? Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -137,10 +166,7 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
       final layoutBox = _layoutKey.currentContext?.findRenderObject();
       if (contentBox is! RenderBox || layoutBox is! RenderBox) return;
 
-      final top = contentBox.localToGlobal(
-        Offset.zero,
-        ancestor: layoutBox,
-      ).dy;
+      final top = contentBox.localToGlobal(Offset.zero, ancestor: layoutBox).dy;
       if (_contentTop == top) return;
       setState(() => _contentTop = top);
     });
@@ -304,7 +330,7 @@ class ProfileAvatarPicker extends StatelessWidget {
                 icon: const Icon(Icons.close_rounded),
               ),
             ),
-          )
+          ),
       ],
     );
   }
@@ -378,42 +404,46 @@ class ProfileSetupNavigation extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       child: SizedBox(
                         height: 56,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            if (effectiveShowSkip)
-                              Transform.translate(
-                                offset: const Offset(0, -2),
-                                child: Text(
-                                  skipLabel,
-                                  style: context.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        color: context.colorScheme.onSurface,
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1,
-                                        letterSpacing: .32,
-                                      ),
+                        child: Transform.translate(
+                          offset: effectiveShowSkip
+                              ? const Offset(4, 0)
+                              : Offset.zero,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              if (effectiveShowSkip)
+                                Transform.translate(
+                                  offset: const Offset(4, -2),
+                                  child: Text(
+                                    skipLabel,
+                                    style: context.textTheme.headlineSmall
+                                        ?.copyWith(
+                                          color: context.colorScheme.onSurface,
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1,
+                                          letterSpacing: .32,
+                                        ),
+                                  ),
                                 ),
-                              ),
-                            if (isLastStep)
-                              Text(
-                                completeLabel,
-                                style: context.textTheme.titleLarge?.copyWith(
-                                  color: context.colorScheme.onSurface,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
+                              if (isLastStep)
+                                Text(
+                                  completeLabel,
+                                  style: context.textTheme.titleLarge?.copyWith(
+                                    color: context.colorScheme.onSurface,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            if (effectiveShowSkip)
-                              const SizedBox(width: 2),
-                            if (!isLastStep)
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                size: 56,
-                              ),
-                          ],
+                              if (effectiveShowSkip) const SizedBox(width: 2),
+                              if (!isLastStep)
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 56,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

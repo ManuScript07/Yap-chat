@@ -295,31 +295,34 @@ class AppLocalizationsRu extends AppLocalizations {
       'Проверьте данные из Яндекс ID и заполните недостающие поля.';
 
   @override
-  String get authOnboardingNameTitle => 'Как тебя зовут?';
+  String get authOnboardingNameTitle => 'как тебя зовут?';
 
   @override
-  String get authOnboardingBirthDateTitle => 'А когда др?';
+  String get authOnboardingBirthDateTitle => 'а когда др?';
 
   @override
-  String get authOnboardingBirthDateHint => 'Покажем только возраст';
+  String get authOnboardingBirthDateHint => 'покажем только возраст';
 
   @override
-  String get authOnboardingGenderTitle => 'Кто ты?';
+  String get authOnboardingGenderTitle => 'кто ты?';
 
   @override
-  String get authOnboardingAvatarTitle => 'Добавим аву?';
+  String get authOnboardingAvatarTitle => 'добавим аву?';
 
   @override
-  String get authOnboardingUsernameTitle => 'Придумай тег.';
+  String get authOnboardingUsernameTitle => 'придумай тег.';
 
   @override
-  String get authOnboardingUsernameHint => 'Это уникальное имя пользователя';
+  String get authOnboardingUsernameHint => 'это уникальное имя пользователя';
 
   @override
-  String get authOnboardingBioTitle => 'Напиши о себе';
+  String get authOnboardingBioTitle => 'напиши о себе';
 
   @override
-  String get authOnboardingBioLabel => 'О себе';
+  String get authOnboardingBioLabel => 'о себе';
+
+  @override
+  String get authOnboardingBioHint => 'напишите немного о себе';
 
   @override
   String get authOnboardingSkip => 'скип';
@@ -343,7 +346,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authBirthDateYear => 'ГГГГ';
 
   @override
-  String get authDisplayNameLabel => 'Имя';
+  String get authDisplayNameLabel => 'имя';
+
+  @override
+  String get authDisplayNameHint => 'как тебя звать?';
+
+  @override
+  String get authInputTooLong => 'слишком длинный';
 
   @override
   String get authUsernameLabel => 'Username';

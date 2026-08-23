@@ -83,6 +83,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
+    final mediaQuery = MediaQuery.of(context);
+    final hideNavigationForKeyboard =
+        mediaQuery.orientation == Orientation.landscape &&
+        mediaQuery.viewInsets.bottom > 0;
 
     return BlocListener<AuthBloc, AuthState>(
       listenWhen: (previous, current) =>
@@ -119,13 +123,17 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                               children: [
                                 ProfileSetupStep(
                                   title: context.l10n.authOnboardingNameTitle,
-                                  errorText: _currentStep == 0
-                                      ? _validationError
-                                      : null,
                                   child: OnboardingTextField(
                                     controller: _nameController,
                                     label: context.l10n.authDisplayNameLabel,
+                                    hint: context.l10n.authDisplayNameHint,
                                     maxLength: 30,
+                                    maxLines: 1,
+                                    tooLongText: context.l10n.authInputTooLong,
+                                    errorText: _currentStep == 0
+                                        ? _validationError
+                                        : null,
+                                    onChanged: (_) => _clearValidationError(),
                                     textCapitalization:
                                         TextCapitalization.words,
                                     textInputAction: TextInputAction.next,
@@ -186,13 +194,18 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                 ),
                                 ProfileSetupStep(
                                   title: context.l10n.authOnboardingBioTitle,
-                                  errorText: _currentStep == _stepCount - 1
-                                      ? _validationError
-                                      : null,
+                                  avoidKeyboardCompression: true,
                                   child: OnboardingTextField(
                                     controller: _bioController,
                                     label: context.l10n.authOnboardingBioLabel,
+                                    hint: context.l10n.authOnboardingBioHint,
                                     maxLength: 130,
+                                    maxLines: 4,
+                                    tooLongText: context.l10n.authInputTooLong,
+                                    errorText: _currentStep == _stepCount - 1
+                                        ? _validationError
+                                        : null,
+                                    onChanged: (_) => _clearValidationError(),
                                     textCapitalization:
                                         TextCapitalization.sentences,
                                   ),
@@ -200,35 +213,36 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                               ],
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                            child: AnimatedBuilder(
-                              animation: Listenable.merge([
-                                _nameController,
-                                _dayController,
-                                _monthController,
-                                _yearController,
-                                _bioController,
-                              ]),
-                              builder: (context, _) => ProfileSetupNavigation(
-                                isFirstStep: _currentStep == 0,
-                                isLastStep: _currentStep == _stepCount - 1,
-                                showSkip:
-                                    _currentStep != _stepCount - 1 &&
-                                    _showSkip(authState),
-                                isSubmitting: authState.isSubmitting,
-                                isNextEnabled:
-                                    _canProceed &&
-                                    (_currentStep != 1 ||
-                                        _birthDateValidationError == null),
-                                skipLabel: context.l10n.authOnboardingSkip,
-                                completeLabel:
-                                    context.l10n.authOnboardingComplete,
-                                onBack: _previous,
-                                onNext: _next,
+                          if (!hideNavigationForKeyboard)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                              child: AnimatedBuilder(
+                                animation: Listenable.merge([
+                                  _nameController,
+                                  _dayController,
+                                  _monthController,
+                                  _yearController,
+                                  _bioController,
+                                ]),
+                                builder: (context, _) => ProfileSetupNavigation(
+                                  isFirstStep: _currentStep == 0,
+                                  isLastStep: _currentStep == _stepCount - 1,
+                                  showSkip:
+                                      _currentStep != _stepCount - 1 &&
+                                      _showSkip(authState),
+                                  isSubmitting: authState.isSubmitting,
+                                  isNextEnabled:
+                                      _canProceed &&
+                                      (_currentStep != 1 ||
+                                          _birthDateValidationError == null),
+                                  skipLabel: context.l10n.authOnboardingSkip,
+                                  completeLabel:
+                                      context.l10n.authOnboardingComplete,
+                                  onBack: _previous,
+                                  onNext: _next,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                       Positioned(
@@ -267,9 +281,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
     if (!_canProceed) {
       setState(
-        () => _validationError = _currentStep == 0
-            ? context.l10n.authNameRequired
-            : context.l10n.authBirthDateInvalid,
+        () => _validationError = switch (_currentStep) {
+          0 => context.l10n.authNameRequired,
+          1 => context.l10n.authBirthDateInvalid,
+          4 => context.l10n.authInputTooLong,
+          _ => null,
+        },
       );
       return;
     }
@@ -294,9 +311,18 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     );
   }
 
+  void _clearValidationError() {
+    if (_validationError != null) {
+      setState(() => _validationError = null);
+    }
+  }
+
   bool get _canProceed => switch (_currentStep) {
-    0 => _nameController.text.trim().isNotEmpty,
+    0 =>
+      _nameController.text.trim().isNotEmpty &&
+          _nameController.text.length <= 30,
     1 => _parseBirthDate() != null,
+    4 => _bioController.text.length <= 130,
     _ => true,
   };
 

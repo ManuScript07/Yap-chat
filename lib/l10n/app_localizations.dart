@@ -527,56 +527,62 @@ abstract class AppLocalizations {
   /// No description provided for @authOnboardingNameTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Как тебя зовут?'**
+  /// **'как тебя зовут?'**
   String get authOnboardingNameTitle;
 
   /// No description provided for @authOnboardingBirthDateTitle.
   ///
   /// In ru, this message translates to:
-  /// **'А когда др?'**
+  /// **'а когда др?'**
   String get authOnboardingBirthDateTitle;
 
   /// No description provided for @authOnboardingBirthDateHint.
   ///
   /// In ru, this message translates to:
-  /// **'Покажем только возраст'**
+  /// **'покажем только возраст'**
   String get authOnboardingBirthDateHint;
 
   /// No description provided for @authOnboardingGenderTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Кто ты?'**
+  /// **'кто ты?'**
   String get authOnboardingGenderTitle;
 
   /// No description provided for @authOnboardingAvatarTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Добавим аву?'**
+  /// **'добавим аву?'**
   String get authOnboardingAvatarTitle;
 
   /// No description provided for @authOnboardingUsernameTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Придумай тег.'**
+  /// **'придумай тег.'**
   String get authOnboardingUsernameTitle;
 
   /// No description provided for @authOnboardingUsernameHint.
   ///
   /// In ru, this message translates to:
-  /// **'Это уникальное имя пользователя'**
+  /// **'это уникальное имя пользователя'**
   String get authOnboardingUsernameHint;
 
   /// No description provided for @authOnboardingBioTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Напиши о себе'**
+  /// **'напиши о себе'**
   String get authOnboardingBioTitle;
 
   /// No description provided for @authOnboardingBioLabel.
   ///
   /// In ru, this message translates to:
-  /// **'О себе'**
+  /// **'о себе'**
   String get authOnboardingBioLabel;
+
+  /// No description provided for @authOnboardingBioHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'напишите немного о себе'**
+  String get authOnboardingBioHint;
 
   /// No description provided for @authOnboardingSkip.
   ///
@@ -623,8 +629,20 @@ abstract class AppLocalizations {
   /// No description provided for @authDisplayNameLabel.
   ///
   /// In ru, this message translates to:
-  /// **'Имя'**
+  /// **'имя'**
   String get authDisplayNameLabel;
+
+  /// No description provided for @authDisplayNameHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'как тебя звать?'**
+  String get authDisplayNameHint;
+
+  /// No description provided for @authInputTooLong.
+  ///
+  /// In ru, this message translates to:
+  /// **'слишком длинный'**
+  String get authInputTooLong;
 
   /// No description provided for @authUsernameLabel.
   ///

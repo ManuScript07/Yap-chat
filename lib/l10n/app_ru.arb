@@ -17,13 +17,17 @@
   "chatsDeleteTitle": "{count, plural, =1{Удалить чат?} other{Удалить чаты?}}",
   "@chatsDeleteTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "chatsDeleteConfirmation": "{count, plural, =1{История удалится только у вас.} other{История выбранных чатов удалится только у вас.}}",
   "@chatsDeleteConfirmation": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "chatInputHint": "Введите сообщение",
@@ -119,15 +123,16 @@
   "authSignInFailed": "Не удалось войти через Яндекс ID. Попробуйте ещё раз.",
   "authProfileSetupTitle": "Завершение регистрации",
   "authProfileSetupDescription": "Проверьте данные из Яндекс ID и заполните недостающие поля.",
-  "authOnboardingNameTitle": "Как тебя зовут?",
-  "authOnboardingBirthDateTitle": "А когда др?",
-  "authOnboardingBirthDateHint": "Покажем только возраст",
-  "authOnboardingGenderTitle": "Кто ты?",
-  "authOnboardingAvatarTitle": "Добавим аву?",
-  "authOnboardingUsernameTitle": "Придумай тег.",
-  "authOnboardingUsernameHint": "Это уникальное имя пользователя",
-  "authOnboardingBioTitle": "Напиши о себе",
-  "authOnboardingBioLabel": "О себе",
+  "authOnboardingNameTitle": "как тебя зовут?",
+  "authOnboardingBirthDateTitle": "а когда др?",
+  "authOnboardingBirthDateHint": "покажем только возраст",
+  "authOnboardingGenderTitle": "кто ты?",
+  "authOnboardingAvatarTitle": "добавим аву?",
+  "authOnboardingUsernameTitle": "придумай тег.",
+  "authOnboardingUsernameHint": "это уникальное имя пользователя",
+  "authOnboardingBioTitle": "напиши о себе",
+  "authOnboardingBioLabel": "о себе",
+  "authOnboardingBioHint": "напишите немного о себе",
   "authOnboardingSkip": "скип",
   "authOnboardingReset": "Сбросить",
   "authAddImage": "Добавить изображение",
@@ -135,7 +140,9 @@
   "authBirthDateDay": "ДД",
   "authBirthDateMonth": "ММ",
   "authBirthDateYear": "ГГГГ",
-  "authDisplayNameLabel": "Имя",
+  "authDisplayNameLabel": "имя",
+  "authDisplayNameHint": "как тебя звать?",
+  "authInputTooLong": "слишком длинный",
   "authUsernameLabel": "Username",
   "authUsernameHelper": "От 3 до 24 латинских букв, цифр или _. Можно оставить автоматически созданный.",
   "authBirthDateLabel": "Дата рождения",

@@ -7,17 +7,27 @@ class OnboardingTextField extends StatefulWidget {
     super.key,
     required this.controller,
     required this.label,
+    required this.hint,
     required this.maxLength,
+    required this.maxLines,
+    required this.tooLongText,
+    this.errorText,
     this.textCapitalization = TextCapitalization.none,
     this.textInputAction,
+    this.onChanged,
     this.onSubmitted,
   });
 
   final TextEditingController controller;
   final String label;
+  final String hint;
   final int maxLength;
+  final int maxLines;
+  final String tooLongText;
+  final String? errorText;
   final TextCapitalization textCapitalization;
   final TextInputAction? textInputAction;
+  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
   @override
@@ -45,58 +55,85 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: _focusNode.requestFocus,
-      child: _OnboardingInputFrame(
-        isFocused: _focusNode.hasFocus,
-        counter: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: widget.controller,
-          builder: (context, value, _) => value.text.isEmpty
-              ? const SizedBox.shrink()
-              : Text('${value.text.length}/${widget.maxLength}'),
-        ),
-        child: TextField(
-          controller: widget.controller,
-          focusNode: _focusNode,
-          maxLength: widget.maxLength,
-          minLines: 1,
-          maxLines: null,
-          autocorrect: true,
-          textCapitalization: widget.textCapitalization,
-          textInputAction: widget.textInputAction,
-          onSubmitted: widget.onSubmitted,
-          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-          textAlignVertical: TextAlignVertical.center,
-          style: context.textTheme.titleMedium?.copyWith(
-            color: context.colorScheme.onSurface,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            height: 1.3,
-            letterSpacing: .5,
-          ),
-          decoration: InputDecoration(
-            hintText: widget.label,
-            hintStyle: context.textTheme.bodyMedium?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              height: 1,
-              letterSpacing: .5,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) {
+        final errorText = value.text.length > widget.maxLength
+            ? widget.tooLongText
+            : widget.errorText;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _focusNode.requestFocus,
+          child: _OnboardingTextInputFrame(
+            isFocused: _focusNode.hasFocus,
+            label: widget.label,
+            errorText: errorText,
+            counter: Text('${value.text.length}/${widget.maxLength}'),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 28),
+              child: Align(
+                alignment: widget.maxLines == 1
+                    ? Alignment.center
+                    : Alignment.topCenter,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: TextField(
+                    controller: widget.controller,
+                    focusNode: _focusNode,
+                    maxLength: widget.maxLength,
+                    maxLengthEnforcement: MaxLengthEnforcement.none,
+                    minLines: 1,
+                    maxLines: widget.maxLines,
+                    autocorrect: true,
+                    textCapitalization: widget.textCapitalization,
+                    textInputAction: widget.textInputAction,
+                    onChanged: widget.onChanged,
+                    onSubmitted: widget.onSubmitted,
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
+                    textAlignVertical: TextAlignVertical.center,
+                    strutStyle: const StrutStyle(
+                      fontSize: 18,
+                      height: 1.15,
+                      forceStrutHeight: true,
+                    ),
+                    style: context.textTheme.titleMedium?.copyWith(
+                      color: context.colorScheme.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      height: 1.15,
+                      letterSpacing: .5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: widget.hint,
+                      hintStyle: context.textTheme.bodyMedium?.copyWith(
+                        color: context.colorScheme.onSurfaceVariant.withValues(
+                          alpha: .72,
+                        ),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        height: 1.15,
+                        letterSpacing: 0,
+                      ),
+                      counterText: '',
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ),
             ),
-            counterText: '',
-            filled: false,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            focusedErrorBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            isDense: true,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -207,50 +244,160 @@ class _OnboardingDateFieldState extends State<_OnboardingDateField> {
 
   @override
   Widget build(BuildContext context) {
-    return _OnboardingInputFrame(
-      height: 61,
-      isFocused: widget.focusNode.hasFocus,
-      child: TextField(
-        controller: widget.controller,
-        focusNode: widget.focusNode,
-        maxLength: widget.maxLength,
-        expands: true,
-        maxLines: null,
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        textAlignVertical: TextAlignVertical.center,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-        onChanged: (value) {
-          widget.onChanged();
-          if (value.length == widget.maxLength) widget.onCompleted?.call();
-        },
-        style: context.textTheme.titleMedium?.copyWith(
-          color: context.colorScheme.onSurface,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          height: 1,
-          letterSpacing: .5,
-        ),
-        decoration: InputDecoration(
-          hintText: widget.placeholder,
-          hintStyle: context.textTheme.bodyMedium?.copyWith(
-            color: context.colorScheme.onSurfaceVariant,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            height: 1,
-            letterSpacing: .5,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.focusNode.requestFocus,
+      child: _OnboardingInputFrame(
+        height: 61,
+        isFocused: widget.focusNode.hasFocus,
+        child: Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: double.infinity,
+            child: TextField(
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              maxLength: widget.maxLength,
+              minLines: 1,
+              maxLines: 1,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              textAlignVertical: TextAlignVertical.center,
+              strutStyle: const StrutStyle(
+                fontSize: 18,
+                height: 1.15,
+                forceStrutHeight: true,
+              ),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onTapOutside: (_) =>
+                  FocusManager.instance.primaryFocus?.unfocus(),
+              onChanged: (value) {
+                widget.onChanged();
+                if (value.length == widget.maxLength) {
+                  widget.onCompleted?.call();
+                }
+              },
+              style: context.textTheme.titleMedium?.copyWith(
+                color: context.colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                height: 1.15,
+                letterSpacing: .5,
+              ),
+              decoration: InputDecoration(
+                hintText: widget.placeholder,
+                hintStyle: context.textTheme.bodyMedium?.copyWith(
+                  color: context.colorScheme.onSurfaceVariant.withValues(
+                    alpha: .78,
+                  ),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  height: 1.15,
+                  letterSpacing: .5,
+                ),
+                counterText: '',
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+            ),
           ),
-          counterText: '',
-          filled: false,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          focusedErrorBorder: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-          isDense: true,
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingTextInputFrame extends StatelessWidget {
+  const _OnboardingTextInputFrame({
+    required this.child,
+    required this.isFocused,
+    required this.label,
+    required this.errorText,
+    required this.counter,
+  });
+
+  final Widget child;
+  final bool isFocused;
+  final String label;
+  final String? errorText;
+  final Widget counter;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.colorScheme;
+    final titleColor = errorText == null
+        ? colorScheme.onSurface
+        : Color.lerp(colorScheme.error, Colors.red, 1)!;
+    final titleStyle = context.textTheme.labelLarge?.copyWith(
+      color: titleColor,
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+      height: 1.15,
+      letterSpacing: .35,
+    );
+    final borderColor = isFocused
+        ? colorScheme.onSurface.withValues(alpha: .8)
+        : colorScheme.outline;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        decoration: BoxDecoration(
+          color: colorScheme.onSurface.withValues(alpha: .2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    errorText ?? label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                ),
+                if (isFocused) ...[
+                  const SizedBox(width: 8),
+                  DefaultTextStyle(
+                    style:
+                        context.textTheme.bodySmall?.copyWith(
+                          color: errorText == null
+                              ? colorScheme.onSurfaceVariant.withValues(
+                                  alpha: .82,
+                                )
+                              : titleColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          height: 1.15,
+                          letterSpacing: .2,
+                        ) ??
+                        const TextStyle(),
+                    child: IgnorePointer(child: counter),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 2),
+            child,
+          ],
         ),
       ),
     );
@@ -261,13 +408,11 @@ class _OnboardingInputFrame extends StatelessWidget {
   const _OnboardingInputFrame({
     required this.child,
     required this.isFocused,
-    this.counter,
     this.height,
   });
 
   final Widget child;
   final bool isFocused;
-  final Widget? counter;
   final double? height;
 
   @override
@@ -287,33 +432,7 @@ class _OnboardingInputFrame extends StatelessWidget {
           width: 2,
         ),
       ),
-      child: counter == null
-          ? child
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                child,
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: IgnorePointer(
-                      child: DefaultTextStyle(
-                        style:
-                            context.textTheme.bodyMedium?.copyWith(
-                              color: context.colorScheme.onSurfaceVariant,
-                              fontSize: 16,
-                              height: 1,
-                              letterSpacing: .5,
-                            ) ??
-                            const TextStyle(),
-                        child: counter!,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      child: child,
     );
 
     return AnimatedSize(

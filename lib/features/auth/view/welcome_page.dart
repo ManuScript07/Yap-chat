@@ -207,45 +207,52 @@ class _WelcomeAuthPanel extends StatelessWidget {
           color: context.scaffoldBackgroundColor,
           borderRadius: panelRadius,
         ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final panelHeight = constraints.maxHeight;
-            final panelWidth = constraints.maxWidth;
-            final buttonWidth = math.min(247.0, panelWidth * 0.72);
+        child: SafeArea(
+          top: false,
+          left: false,
+          right: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final panelHeight = constraints.maxHeight;
+              final panelWidth = constraints.maxWidth;
+              final buttonWidth = math.min(247.0, panelWidth * 0.72);
 
-            return Stack(
-              children: [
-                Positioned(
-                  top: panelHeight * (32 / 288),
-                  left: 16,
-                  right: 16,
-                  child: Text(
-                    context.l10n.authSignInWith,
-                    textAlign: TextAlign.center,
-                    style: context.textTheme.titleLarge?.copyWith(
-                      color: context.colorScheme.onSurface,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      height: 0.91,
-                      letterSpacing: 0.1,
+              return Stack(
+                children: [
+                  Positioned(
+                    top: panelHeight * (32 / 288),
+                    left: 16,
+                    right: 16,
+                    child: Text(
+                      context.l10n.authSignInWith,
+                      textAlign: TextAlign.center,
+                      style: context.textTheme.titleLarge?.copyWith(
+                        color: context.colorScheme.onSurface,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w500,
+                        height: 0.91,
+                        letterSpacing: 0.1,
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: panelHeight * (115 / 288),
-                  left: 0,
-                  right: 0,
-                  child: Center(child: _YandexSignInButton(width: buttonWidth)),
-                ),
-                Positioned(
-                  top: panelHeight * (208 / 288),
-                  left: math.min(31, panelWidth * 0.075),
-                  right: math.min(31, panelWidth * 0.075),
-                  child: const _AuthConsentText(),
-                ),
-              ],
-            );
-          },
+                  Positioned(
+                    top: panelHeight * (115 / 288),
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: _YandexSignInButton(width: buttonWidth),
+                    ),
+                  ),
+                  Positioned(
+                    top: panelHeight * (208 / 288),
+                    left: math.min(31, panelWidth * 0.075),
+                    right: math.min(31, panelWidth * 0.075),
+                    child: const _AuthConsentText(),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

@@ -24,7 +24,8 @@ class _MessageActionsBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPending = message.status == MessageStatus.sending ||
+    final isPending =
+        message.status == MessageStatus.sending ||
         message.status == MessageStatus.error;
     final readAt = message.readAt;
 
@@ -34,61 +35,67 @@ class _MessageActionsBottomSheet extends StatelessWidget {
         color: context.colorScheme.primary,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Align(
-          alignment: Alignment.topCenter,
-          widthFactor: 1,
-          heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 560,
-              maxHeight: MediaQuery.sizeOf(context).height * 0.8,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.onSurface,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (message.isMine && readAt != null) ...[
-                  Text(
-                    TimeFormatter.formatReadReceipt(context, readAt),
-                    style: TextStyle(
-                      color: context.colorScheme.onSurface.withValues(
-                        alpha: 0.8,
+      child: SafeArea(
+        top: false,
+        left: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Align(
+            alignment: Alignment.topCenter,
+            widthFactor: 1,
+            heightFactor: 1,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 560,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.onSurface,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (!isPending && message.type == MessageType.text)
-                  _ActionTile(
-                    icon: Icons.copy_rounded,
-                    label: context.l10n.chatActionCopy,
-                    onTap: () => Navigator.pop(context, MessageAction.copy),
-                  ),
-                if (!isPending)
-                  _ActionTile(
-                    icon: Icons.reply_rounded,
-                    label: context.l10n.chatActionReply,
-                    onTap: () => Navigator.pop(context, MessageAction.reply),
-                  ),
-                _ActionTile(
-                  icon: Icons.delete_outline_rounded,
-                  label: context.l10n.chatActionDelete,
-                  onTap: () => Navigator.pop(context, MessageAction.delete),
+                    const SizedBox(height: 10),
+                    if (message.isMine && readAt != null) ...[
+                      Text(
+                        TimeFormatter.formatReadReceipt(context, readAt),
+                        style: TextStyle(
+                          color: context.colorScheme.onSurface.withValues(
+                            alpha: 0.8,
+                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (!isPending && message.type == MessageType.text)
+                      _ActionTile(
+                        icon: Icons.copy_rounded,
+                        label: context.l10n.chatActionCopy,
+                        onTap: () => Navigator.pop(context, MessageAction.copy),
+                      ),
+                    if (!isPending)
+                      _ActionTile(
+                        icon: Icons.reply_rounded,
+                        label: context.l10n.chatActionReply,
+                        onTap: () =>
+                            Navigator.pop(context, MessageAction.reply),
+                      ),
+                    _ActionTile(
+                      icon: Icons.delete_outline_rounded,
+                      label: context.l10n.chatActionDelete,
+                      onTap: () => Navigator.pop(context, MessageAction.delete),
+                    ),
+                  ],
                 ),
-                ],
               ),
             ),
           ),

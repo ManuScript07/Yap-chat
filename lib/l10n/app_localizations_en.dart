@@ -290,31 +290,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'Review the data from Yandex ID and fill in the missing fields.';
 
   @override
-  String get authOnboardingNameTitle => 'What\'s your name?';
+  String get authOnboardingNameTitle => 'what\'s your name?';
 
   @override
-  String get authOnboardingBirthDateTitle => 'When is your birthday?';
+  String get authOnboardingBirthDateTitle => 'when is your birthday?';
 
   @override
-  String get authOnboardingBirthDateHint => 'We\'ll only show your age';
+  String get authOnboardingBirthDateHint => 'we\'ll only show your age';
 
   @override
-  String get authOnboardingGenderTitle => 'Who are you?';
+  String get authOnboardingGenderTitle => 'who are you?';
 
   @override
-  String get authOnboardingAvatarTitle => 'Add an avatar?';
+  String get authOnboardingAvatarTitle => 'add an avatar?';
 
   @override
-  String get authOnboardingUsernameTitle => 'Choose a username.';
+  String get authOnboardingUsernameTitle => 'choose a username.';
 
   @override
-  String get authOnboardingUsernameHint => 'This is your unique username';
+  String get authOnboardingUsernameHint => 'this is your unique username';
 
   @override
-  String get authOnboardingBioTitle => 'Tell us about yourself';
+  String get authOnboardingBioTitle => 'tell us about yourself';
 
   @override
-  String get authOnboardingBioLabel => 'About me';
+  String get authOnboardingBioLabel => 'about me';
+
+  @override
+  String get authOnboardingBioHint => 'tell us a little about yourself';
 
   @override
   String get authOnboardingSkip => 'Skip';
@@ -329,16 +332,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authOnboardingComplete => 'Finish';
 
   @override
-  String get authBirthDateDay => 'DD';
+  String get authBirthDateDay => 'dd';
 
   @override
-  String get authBirthDateMonth => 'MM';
+  String get authBirthDateMonth => 'mm';
 
   @override
-  String get authBirthDateYear => 'YYYY';
+  String get authBirthDateYear => 'yyyy';
 
   @override
-  String get authDisplayNameLabel => 'Name';
+  String get authDisplayNameLabel => 'name';
+
+  @override
+  String get authDisplayNameHint => 'enter your name';
+
+  @override
+  String get authInputTooLong => 'too long';
 
   @override
   String get authUsernameLabel => 'Username';

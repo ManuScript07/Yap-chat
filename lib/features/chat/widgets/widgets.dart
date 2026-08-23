@@ -9,3 +9,4 @@ export 'audio_waveform.dart';
 export 'chat_media_gallery_page.dart';
 export 'message_media_grid.dart';
 export 'voice_recorder_bar.dart';
+export 'size_reporter.dart';
