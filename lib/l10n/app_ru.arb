@@ -168,5 +168,7 @@
   "notificationYou": "Ты",
   "notificationPhoto": "Фотография",
   "notificationAudio": "Голосовое сообщение",
-  "notificationLocation": "Местоположение"
+  "notificationLocation": "Местоположение",
+  "chatsNotificationsEnabled": "Уведомления включены",
+  "chatsNotificationsDisabled": "Уведомления отключены"
 }

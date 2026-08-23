@@ -432,4 +432,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationLocation => 'Location';
+
+  @override
+  String get chatsNotificationsEnabled => 'Notifications enabled';
+
+  @override
+  String get chatsNotificationsDisabled => 'Notifications disabled';
 }

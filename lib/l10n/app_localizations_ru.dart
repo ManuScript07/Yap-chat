@@ -437,4 +437,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get notificationLocation => 'Местоположение';
+
+  @override
+  String get chatsNotificationsEnabled => 'Уведомления включены';
+
+  @override
+  String get chatsNotificationsDisabled => 'Уведомления отключены';
 }

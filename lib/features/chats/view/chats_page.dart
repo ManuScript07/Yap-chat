@@ -53,49 +53,104 @@ class ChatsPage extends StatelessWidget {
         );
         final firstSelectedMuted = selectedChats.firstOrNull?.isMuted ?? false;
 
-        return Scaffold(
-          resizeToAvoidBottomInset: false,
-          backgroundColor: context.scaffoldBackgroundColor,
-          extendBodyBehindAppBar: true,
-          appBar: hideAppBarForKeyboard
-              ? null
-              : state.isSelectionMode
-              ? SelectionToolbar(
-                  selectedCount: state.selectedChatIds.length,
-                  onClose: () => context.read<ChatsBloc>().add(
-                    const ChatSelectionCleared(),
-                  ),
-                  isMuted: firstSelectedMuted,
-                  onToggleNotifications: () =>
-                      context.read<ChatsBloc>().add(const ChatsMuteToggled()),
-                  onMarkAsRead: () =>
-                      context.read<ChatsBloc>().add(const ChatsMarkedAsRead()),
-                  onDelete: () async {
-                    final count = state.selectedChatIds.length;
-                    final confirmed = await showConfirmationDialog(
-                      context,
-                      title: context.l10n.chatsDeleteTitle(count),
-                      content: context.l10n.chatsDeleteConfirmation(count),
-                      confirmLabel: context.l10n.chatActionDelete,
-                    );
-                    if (confirmed == true && context.mounted) {
-                      context.read<ChatsBloc>().add(const ChatsDeleted());
-                    }
-                  },
-                )
-              : PrimaryAppBar(
-                  title: context.l10n.navChats,
-                  actionIcon: Icons.add_comment_rounded,
-                  onActionPressed: () {
-                    FocusScope.of(context).unfocus();
-                    final authRouter = context.router.root
-                        .innerRouterOf<StackRouter>(AuthGateRoute.name);
-                    if (authRouter != null) {
-                      unawaited(authRouter.push(const NewChatRoute()));
-                    }
-                  },
-                ),
-          body: const _ChatsBody(),
+        return ScaffoldMessenger(
+          child: Builder(
+            builder: (scaffoldContext) => Scaffold(
+              resizeToAvoidBottomInset: false,
+              backgroundColor: context.scaffoldBackgroundColor,
+              extendBodyBehindAppBar: true,
+              appBar: hideAppBarForKeyboard
+                  ? null
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(130),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        reverseDuration: const Duration(milliseconds: 180),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          final slideAnimation = Tween<Offset>(
+                            begin: const Offset(0, -0.06),
+                            end: Offset.zero,
+                          ).animate(animation);
+
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: slideAnimation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: state.isSelectionMode
+                            ? SelectionToolbar(
+                                key: const ValueKey('selection_toolbar'),
+                                selectedCount: state.selectedChatIds.length,
+                                onClose: () => context.read<ChatsBloc>().add(
+                                  const ChatSelectionCleared(),
+                                ),
+                                isMuted: firstSelectedMuted,
+                                onToggleNotifications: () {
+                                  context.read<ChatsBloc>().add(
+                                    const ChatsMuteToggled(),
+                                  );
+                                  showAppSnackBar(
+                                    scaffoldContext,
+                                    message: firstSelectedMuted
+                                        ? context.l10n.chatsNotificationsEnabled
+                                        : context
+                                              .l10n
+                                              .chatsNotificationsDisabled,
+                                    type: SnackBarType.info,
+                                    bottomMargin:
+                                        mediaQuery.viewPadding.bottom + 112,
+                                  );
+                                },
+                                onMarkAsRead: () => context
+                                    .read<ChatsBloc>()
+                                    .add(const ChatsMarkedAsRead()),
+                                onDelete: () async {
+                                  final count = state.selectedChatIds.length;
+                                  final confirmed =
+                                      await showConfirmationDialog(
+                                        context,
+                                        title: context.l10n.chatsDeleteTitle(
+                                          count,
+                                        ),
+                                        content: context.l10n
+                                            .chatsDeleteConfirmation(count),
+                                        confirmLabel:
+                                            context.l10n.chatActionDelete,
+                                      );
+                                  if (confirmed == true && context.mounted) {
+                                    context.read<ChatsBloc>().add(
+                                      const ChatsDeleted(),
+                                    );
+                                  }
+                                },
+                              )
+                            : PrimaryAppBar(
+                                key: const ValueKey('primary_app_bar'),
+                                title: context.l10n.navChats,
+                                actionIcon: Icons.add_comment_rounded,
+                                onActionPressed: () {
+                                  FocusScope.of(context).unfocus();
+                                  final authRouter = context.router.root
+                                      .innerRouterOf<StackRouter>(
+                                        AuthGateRoute.name,
+                                      );
+                                  if (authRouter != null) {
+                                    unawaited(
+                                      authRouter.push(const NewChatRoute()),
+                                    );
+                                  }
+                                },
+                              ),
+                      ),
+                    ),
+              body: const _ChatsBody(),
+            ),
+          ),
         );
       },
     );

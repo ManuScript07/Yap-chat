@@ -11,10 +11,12 @@ void showAppSnackBar(
   required String message,
   SnackBarType type = SnackBarType.info,
   Duration duration = const Duration(seconds: 3),
+  double bottomMargin = 12,
   String? actionLabel,
   VoidCallback? onActionPressed,
 }) {
   final colorScheme = context.colorScheme;
+  final systemPadding = MediaQuery.paddingOf(context);
 
   ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
@@ -29,7 +31,12 @@ void showAppSnackBar(
       duration: duration,
       elevation: 6,
       behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: EdgeInsets.only(
+        left: systemPadding.left + 16,
+        top: 12,
+        right: systemPadding.right + 16,
+        bottom: bottomMargin,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       backgroundColor: AppColors.background,
       shape: RoundedRectangleBorder(

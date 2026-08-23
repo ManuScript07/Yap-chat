@@ -799,6 +799,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Местоположение'**
   String get notificationLocation;
+
+  /// No description provided for @chatsNotificationsEnabled.
+  ///
+  /// In ru, this message translates to:
+  /// **'Уведомления включены'**
+  String get chatsNotificationsEnabled;
+
+  /// No description provided for @chatsNotificationsDisabled.
+  ///
+  /// In ru, this message translates to:
+  /// **'Уведомления отключены'**
+  String get chatsNotificationsDisabled;
 }
 
 class _AppLocalizationsDelegate

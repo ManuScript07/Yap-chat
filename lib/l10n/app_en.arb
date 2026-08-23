@@ -164,5 +164,7 @@
   "notificationYou": "You",
   "notificationPhoto": "Photo",
   "notificationAudio": "Voice message",
-  "notificationLocation": "Location"
+  "notificationLocation": "Location",
+  "chatsNotificationsEnabled": "Notifications enabled",
+  "chatsNotificationsDisabled": "Notifications disabled"
 }
