@@ -9,6 +9,9 @@ abstract interface class IChatsRepository {
 
   Future<Chat?> getChatById(String chatId);
 
+  /// Возвращает существующий direct-чат или создаёт его для пользователя.
+  Future<Chat> openDirectChat(String peerId);
+
   /// Удаляет выбранные чаты по их идентификаторам.
   Future<void> deleteChats(Set<String> ids);
 

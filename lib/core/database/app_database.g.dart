@@ -3719,6 +3719,1261 @@ class PendingChatOperationsCompanion
   }
 }
 
+class $CachedFriendsTable extends CachedFriends
+    with TableInfo<$CachedFriendsTable, CachedFriend> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedFriendsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _avatarStoragePathMeta = const VerificationMeta(
+    'avatarStoragePath',
+  );
+  @override
+  late final GeneratedColumn<String> avatarStoragePath =
+      GeneratedColumn<String>(
+        'avatar_storage_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _friendsSinceMeta = const VerificationMeta(
+    'friendsSince',
+  );
+  @override
+  late final GeneratedColumn<DateTime> friendsSince = GeneratedColumn<DateTime>(
+    'friends_since',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    userId,
+    username,
+    displayName,
+    avatarUrl,
+    avatarStoragePath,
+    friendsSince,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_friends';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedFriend> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_usernameMeta);
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_displayNameMeta);
+    }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
+      );
+    }
+    if (data.containsKey('avatar_storage_path')) {
+      context.handle(
+        _avatarStoragePathMeta,
+        avatarStoragePath.isAcceptableOrUnknown(
+          data['avatar_storage_path']!,
+          _avatarStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('friends_since')) {
+      context.handle(
+        _friendsSinceMeta,
+        friendsSince.isAcceptableOrUnknown(
+          data['friends_since']!,
+          _friendsSinceMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_friendsSinceMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, userId};
+  @override
+  CachedFriend map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedFriend(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      )!,
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      )!,
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
+      avatarStoragePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_storage_path'],
+      ),
+      friendsSince: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}friends_since'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedFriendsTable createAlias(String alias) {
+    return $CachedFriendsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedFriend extends DataClass implements Insertable<CachedFriend> {
+  final String ownerUserId;
+  final String userId;
+  final String username;
+  final String displayName;
+  final String? avatarUrl;
+  final String? avatarStoragePath;
+  final DateTime friendsSince;
+  final DateTime cachedAt;
+  const CachedFriend({
+    required this.ownerUserId,
+    required this.userId,
+    required this.username,
+    required this.displayName,
+    this.avatarUrl,
+    this.avatarStoragePath,
+    required this.friendsSince,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['user_id'] = Variable<String>(userId);
+    map['username'] = Variable<String>(username);
+    map['display_name'] = Variable<String>(displayName);
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
+    }
+    if (!nullToAbsent || avatarStoragePath != null) {
+      map['avatar_storage_path'] = Variable<String>(avatarStoragePath);
+    }
+    map['friends_since'] = Variable<DateTime>(friendsSince);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedFriendsCompanion toCompanion(bool nullToAbsent) {
+    return CachedFriendsCompanion(
+      ownerUserId: Value(ownerUserId),
+      userId: Value(userId),
+      username: Value(username),
+      displayName: Value(displayName),
+      avatarUrl: avatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarUrl),
+      avatarStoragePath: avatarStoragePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarStoragePath),
+      friendsSince: Value(friendsSince),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedFriend.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedFriend(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      username: serializer.fromJson<String>(json['username']),
+      displayName: serializer.fromJson<String>(json['displayName']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
+      avatarStoragePath: serializer.fromJson<String?>(
+        json['avatarStoragePath'],
+      ),
+      friendsSince: serializer.fromJson<DateTime>(json['friendsSince']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'userId': serializer.toJson<String>(userId),
+      'username': serializer.toJson<String>(username),
+      'displayName': serializer.toJson<String>(displayName),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
+      'avatarStoragePath': serializer.toJson<String?>(avatarStoragePath),
+      'friendsSince': serializer.toJson<DateTime>(friendsSince),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedFriend copyWith({
+    String? ownerUserId,
+    String? userId,
+    String? username,
+    String? displayName,
+    Value<String?> avatarUrl = const Value.absent(),
+    Value<String?> avatarStoragePath = const Value.absent(),
+    DateTime? friendsSince,
+    DateTime? cachedAt,
+  }) => CachedFriend(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    userId: userId ?? this.userId,
+    username: username ?? this.username,
+    displayName: displayName ?? this.displayName,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
+    avatarStoragePath: avatarStoragePath.present
+        ? avatarStoragePath.value
+        : this.avatarStoragePath,
+    friendsSince: friendsSince ?? this.friendsSince,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedFriend copyWithCompanion(CachedFriendsCompanion data) {
+    return CachedFriend(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      username: data.username.present ? data.username.value : this.username,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
+      avatarStoragePath: data.avatarStoragePath.present
+          ? data.avatarStoragePath.value
+          : this.avatarStoragePath,
+      friendsSince: data.friendsSince.present
+          ? data.friendsSince.value
+          : this.friendsSince,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriend(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('userId: $userId, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('avatarUrl: $avatarUrl, ')
+          ..write('avatarStoragePath: $avatarStoragePath, ')
+          ..write('friendsSince: $friendsSince, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    userId,
+    username,
+    displayName,
+    avatarUrl,
+    avatarStoragePath,
+    friendsSince,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedFriend &&
+          other.ownerUserId == this.ownerUserId &&
+          other.userId == this.userId &&
+          other.username == this.username &&
+          other.displayName == this.displayName &&
+          other.avatarUrl == this.avatarUrl &&
+          other.avatarStoragePath == this.avatarStoragePath &&
+          other.friendsSince == this.friendsSince &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
+  final Value<String> ownerUserId;
+  final Value<String> userId;
+  final Value<String> username;
+  final Value<String> displayName;
+  final Value<String?> avatarUrl;
+  final Value<String?> avatarStoragePath;
+  final Value<DateTime> friendsSince;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedFriendsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.username = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
+    this.avatarStoragePath = const Value.absent(),
+    this.friendsSince = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedFriendsCompanion.insert({
+    required String ownerUserId,
+    required String userId,
+    required String username,
+    required String displayName,
+    this.avatarUrl = const Value.absent(),
+    this.avatarStoragePath = const Value.absent(),
+    required DateTime friendsSince,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       userId = Value(userId),
+       username = Value(username),
+       displayName = Value(displayName),
+       friendsSince = Value(friendsSince),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedFriend> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? userId,
+    Expression<String>? username,
+    Expression<String>? displayName,
+    Expression<String>? avatarUrl,
+    Expression<String>? avatarStoragePath,
+    Expression<DateTime>? friendsSince,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (userId != null) 'user_id': userId,
+      if (username != null) 'username': username,
+      if (displayName != null) 'display_name': displayName,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (avatarStoragePath != null) 'avatar_storage_path': avatarStoragePath,
+      if (friendsSince != null) 'friends_since': friendsSince,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedFriendsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? userId,
+    Value<String>? username,
+    Value<String>? displayName,
+    Value<String?>? avatarUrl,
+    Value<String?>? avatarStoragePath,
+    Value<DateTime>? friendsSince,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedFriendsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      userId: userId ?? this.userId,
+      username: username ?? this.username,
+      displayName: displayName ?? this.displayName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
+      friendsSince: friendsSince ?? this.friendsSince,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
+    }
+    if (avatarStoragePath.present) {
+      map['avatar_storage_path'] = Variable<String>(avatarStoragePath.value);
+    }
+    if (friendsSince.present) {
+      map['friends_since'] = Variable<DateTime>(friendsSince.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('userId: $userId, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('avatarUrl: $avatarUrl, ')
+          ..write('avatarStoragePath: $avatarStoragePath, ')
+          ..write('friendsSince: $friendsSince, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedFriendRequestsTable extends CachedFriendRequests
+    with TableInfo<$CachedFriendRequestsTable, CachedFriendRequest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedFriendRequestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _requestIdMeta = const VerificationMeta(
+    'requestId',
+  );
+  @override
+  late final GeneratedColumn<String> requestId = GeneratedColumn<String>(
+    'request_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerIdMeta = const VerificationMeta('peerId');
+  @override
+  late final GeneratedColumn<String> peerId = GeneratedColumn<String>(
+    'peer_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerUsernameMeta = const VerificationMeta(
+    'peerUsername',
+  );
+  @override
+  late final GeneratedColumn<String> peerUsername = GeneratedColumn<String>(
+    'peer_username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerDisplayNameMeta = const VerificationMeta(
+    'peerDisplayName',
+  );
+  @override
+  late final GeneratedColumn<String> peerDisplayName = GeneratedColumn<String>(
+    'peer_display_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerAvatarUrlMeta = const VerificationMeta(
+    'peerAvatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> peerAvatarUrl = GeneratedColumn<String>(
+    'peer_avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _peerAvatarStoragePathMeta =
+      const VerificationMeta('peerAvatarStoragePath');
+  @override
+  late final GeneratedColumn<String> peerAvatarStoragePath =
+      GeneratedColumn<String>(
+        'peer_avatar_storage_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _peerFriendCountMeta = const VerificationMeta(
+    'peerFriendCount',
+  );
+  @override
+  late final GeneratedColumn<int> peerFriendCount = GeneratedColumn<int>(
+    'peer_friend_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _directionMeta = const VerificationMeta(
+    'direction',
+  );
+  @override
+  late final GeneratedColumn<String> direction = GeneratedColumn<String>(
+    'direction',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _requestedAtMeta = const VerificationMeta(
+    'requestedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> requestedAt = GeneratedColumn<DateTime>(
+    'requested_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    requestId,
+    peerId,
+    peerUsername,
+    peerDisplayName,
+    peerAvatarUrl,
+    peerAvatarStoragePath,
+    peerFriendCount,
+    direction,
+    requestedAt,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_friend_requests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedFriendRequest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('request_id')) {
+      context.handle(
+        _requestIdMeta,
+        requestId.isAcceptableOrUnknown(data['request_id']!, _requestIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_requestIdMeta);
+    }
+    if (data.containsKey('peer_id')) {
+      context.handle(
+        _peerIdMeta,
+        peerId.isAcceptableOrUnknown(data['peer_id']!, _peerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_peerIdMeta);
+    }
+    if (data.containsKey('peer_username')) {
+      context.handle(
+        _peerUsernameMeta,
+        peerUsername.isAcceptableOrUnknown(
+          data['peer_username']!,
+          _peerUsernameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_peerUsernameMeta);
+    }
+    if (data.containsKey('peer_display_name')) {
+      context.handle(
+        _peerDisplayNameMeta,
+        peerDisplayName.isAcceptableOrUnknown(
+          data['peer_display_name']!,
+          _peerDisplayNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_peerDisplayNameMeta);
+    }
+    if (data.containsKey('peer_avatar_url')) {
+      context.handle(
+        _peerAvatarUrlMeta,
+        peerAvatarUrl.isAcceptableOrUnknown(
+          data['peer_avatar_url']!,
+          _peerAvatarUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('peer_avatar_storage_path')) {
+      context.handle(
+        _peerAvatarStoragePathMeta,
+        peerAvatarStoragePath.isAcceptableOrUnknown(
+          data['peer_avatar_storage_path']!,
+          _peerAvatarStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('peer_friend_count')) {
+      context.handle(
+        _peerFriendCountMeta,
+        peerFriendCount.isAcceptableOrUnknown(
+          data['peer_friend_count']!,
+          _peerFriendCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('direction')) {
+      context.handle(
+        _directionMeta,
+        direction.isAcceptableOrUnknown(data['direction']!, _directionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_directionMeta);
+    }
+    if (data.containsKey('requested_at')) {
+      context.handle(
+        _requestedAtMeta,
+        requestedAt.isAcceptableOrUnknown(
+          data['requested_at']!,
+          _requestedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_requestedAtMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, requestId};
+  @override
+  CachedFriendRequest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedFriendRequest(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      requestId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}request_id'],
+      )!,
+      peerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_id'],
+      )!,
+      peerUsername: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_username'],
+      )!,
+      peerDisplayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_display_name'],
+      )!,
+      peerAvatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_avatar_url'],
+      ),
+      peerAvatarStoragePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_avatar_storage_path'],
+      ),
+      peerFriendCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}peer_friend_count'],
+      ),
+      direction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}direction'],
+      )!,
+      requestedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}requested_at'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedFriendRequestsTable createAlias(String alias) {
+    return $CachedFriendRequestsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedFriendRequest extends DataClass
+    implements Insertable<CachedFriendRequest> {
+  final String ownerUserId;
+  final String requestId;
+  final String peerId;
+  final String peerUsername;
+  final String peerDisplayName;
+  final String? peerAvatarUrl;
+  final String? peerAvatarStoragePath;
+  final int? peerFriendCount;
+  final String direction;
+  final DateTime requestedAt;
+  final DateTime cachedAt;
+  const CachedFriendRequest({
+    required this.ownerUserId,
+    required this.requestId,
+    required this.peerId,
+    required this.peerUsername,
+    required this.peerDisplayName,
+    this.peerAvatarUrl,
+    this.peerAvatarStoragePath,
+    this.peerFriendCount,
+    required this.direction,
+    required this.requestedAt,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['request_id'] = Variable<String>(requestId);
+    map['peer_id'] = Variable<String>(peerId);
+    map['peer_username'] = Variable<String>(peerUsername);
+    map['peer_display_name'] = Variable<String>(peerDisplayName);
+    if (!nullToAbsent || peerAvatarUrl != null) {
+      map['peer_avatar_url'] = Variable<String>(peerAvatarUrl);
+    }
+    if (!nullToAbsent || peerAvatarStoragePath != null) {
+      map['peer_avatar_storage_path'] = Variable<String>(peerAvatarStoragePath);
+    }
+    if (!nullToAbsent || peerFriendCount != null) {
+      map['peer_friend_count'] = Variable<int>(peerFriendCount);
+    }
+    map['direction'] = Variable<String>(direction);
+    map['requested_at'] = Variable<DateTime>(requestedAt);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedFriendRequestsCompanion toCompanion(bool nullToAbsent) {
+    return CachedFriendRequestsCompanion(
+      ownerUserId: Value(ownerUserId),
+      requestId: Value(requestId),
+      peerId: Value(peerId),
+      peerUsername: Value(peerUsername),
+      peerDisplayName: Value(peerDisplayName),
+      peerAvatarUrl: peerAvatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(peerAvatarUrl),
+      peerAvatarStoragePath: peerAvatarStoragePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(peerAvatarStoragePath),
+      peerFriendCount: peerFriendCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(peerFriendCount),
+      direction: Value(direction),
+      requestedAt: Value(requestedAt),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedFriendRequest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedFriendRequest(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      requestId: serializer.fromJson<String>(json['requestId']),
+      peerId: serializer.fromJson<String>(json['peerId']),
+      peerUsername: serializer.fromJson<String>(json['peerUsername']),
+      peerDisplayName: serializer.fromJson<String>(json['peerDisplayName']),
+      peerAvatarUrl: serializer.fromJson<String?>(json['peerAvatarUrl']),
+      peerAvatarStoragePath: serializer.fromJson<String?>(
+        json['peerAvatarStoragePath'],
+      ),
+      peerFriendCount: serializer.fromJson<int?>(json['peerFriendCount']),
+      direction: serializer.fromJson<String>(json['direction']),
+      requestedAt: serializer.fromJson<DateTime>(json['requestedAt']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'requestId': serializer.toJson<String>(requestId),
+      'peerId': serializer.toJson<String>(peerId),
+      'peerUsername': serializer.toJson<String>(peerUsername),
+      'peerDisplayName': serializer.toJson<String>(peerDisplayName),
+      'peerAvatarUrl': serializer.toJson<String?>(peerAvatarUrl),
+      'peerAvatarStoragePath': serializer.toJson<String?>(
+        peerAvatarStoragePath,
+      ),
+      'peerFriendCount': serializer.toJson<int?>(peerFriendCount),
+      'direction': serializer.toJson<String>(direction),
+      'requestedAt': serializer.toJson<DateTime>(requestedAt),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedFriendRequest copyWith({
+    String? ownerUserId,
+    String? requestId,
+    String? peerId,
+    String? peerUsername,
+    String? peerDisplayName,
+    Value<String?> peerAvatarUrl = const Value.absent(),
+    Value<String?> peerAvatarStoragePath = const Value.absent(),
+    Value<int?> peerFriendCount = const Value.absent(),
+    String? direction,
+    DateTime? requestedAt,
+    DateTime? cachedAt,
+  }) => CachedFriendRequest(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    requestId: requestId ?? this.requestId,
+    peerId: peerId ?? this.peerId,
+    peerUsername: peerUsername ?? this.peerUsername,
+    peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+    peerAvatarUrl: peerAvatarUrl.present
+        ? peerAvatarUrl.value
+        : this.peerAvatarUrl,
+    peerAvatarStoragePath: peerAvatarStoragePath.present
+        ? peerAvatarStoragePath.value
+        : this.peerAvatarStoragePath,
+    peerFriendCount: peerFriendCount.present
+        ? peerFriendCount.value
+        : this.peerFriendCount,
+    direction: direction ?? this.direction,
+    requestedAt: requestedAt ?? this.requestedAt,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedFriendRequest copyWithCompanion(CachedFriendRequestsCompanion data) {
+    return CachedFriendRequest(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      requestId: data.requestId.present ? data.requestId.value : this.requestId,
+      peerId: data.peerId.present ? data.peerId.value : this.peerId,
+      peerUsername: data.peerUsername.present
+          ? data.peerUsername.value
+          : this.peerUsername,
+      peerDisplayName: data.peerDisplayName.present
+          ? data.peerDisplayName.value
+          : this.peerDisplayName,
+      peerAvatarUrl: data.peerAvatarUrl.present
+          ? data.peerAvatarUrl.value
+          : this.peerAvatarUrl,
+      peerAvatarStoragePath: data.peerAvatarStoragePath.present
+          ? data.peerAvatarStoragePath.value
+          : this.peerAvatarStoragePath,
+      peerFriendCount: data.peerFriendCount.present
+          ? data.peerFriendCount.value
+          : this.peerFriendCount,
+      direction: data.direction.present ? data.direction.value : this.direction,
+      requestedAt: data.requestedAt.present
+          ? data.requestedAt.value
+          : this.requestedAt,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendRequest(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('requestId: $requestId, ')
+          ..write('peerId: $peerId, ')
+          ..write('peerUsername: $peerUsername, ')
+          ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('peerAvatarUrl: $peerAvatarUrl, ')
+          ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
+          ..write('peerFriendCount: $peerFriendCount, ')
+          ..write('direction: $direction, ')
+          ..write('requestedAt: $requestedAt, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    requestId,
+    peerId,
+    peerUsername,
+    peerDisplayName,
+    peerAvatarUrl,
+    peerAvatarStoragePath,
+    peerFriendCount,
+    direction,
+    requestedAt,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedFriendRequest &&
+          other.ownerUserId == this.ownerUserId &&
+          other.requestId == this.requestId &&
+          other.peerId == this.peerId &&
+          other.peerUsername == this.peerUsername &&
+          other.peerDisplayName == this.peerDisplayName &&
+          other.peerAvatarUrl == this.peerAvatarUrl &&
+          other.peerAvatarStoragePath == this.peerAvatarStoragePath &&
+          other.peerFriendCount == this.peerFriendCount &&
+          other.direction == this.direction &&
+          other.requestedAt == this.requestedAt &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedFriendRequestsCompanion
+    extends UpdateCompanion<CachedFriendRequest> {
+  final Value<String> ownerUserId;
+  final Value<String> requestId;
+  final Value<String> peerId;
+  final Value<String> peerUsername;
+  final Value<String> peerDisplayName;
+  final Value<String?> peerAvatarUrl;
+  final Value<String?> peerAvatarStoragePath;
+  final Value<int?> peerFriendCount;
+  final Value<String> direction;
+  final Value<DateTime> requestedAt;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedFriendRequestsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.requestId = const Value.absent(),
+    this.peerId = const Value.absent(),
+    this.peerUsername = const Value.absent(),
+    this.peerDisplayName = const Value.absent(),
+    this.peerAvatarUrl = const Value.absent(),
+    this.peerAvatarStoragePath = const Value.absent(),
+    this.peerFriendCount = const Value.absent(),
+    this.direction = const Value.absent(),
+    this.requestedAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedFriendRequestsCompanion.insert({
+    required String ownerUserId,
+    required String requestId,
+    required String peerId,
+    required String peerUsername,
+    required String peerDisplayName,
+    this.peerAvatarUrl = const Value.absent(),
+    this.peerAvatarStoragePath = const Value.absent(),
+    this.peerFriendCount = const Value.absent(),
+    required String direction,
+    required DateTime requestedAt,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       requestId = Value(requestId),
+       peerId = Value(peerId),
+       peerUsername = Value(peerUsername),
+       peerDisplayName = Value(peerDisplayName),
+       direction = Value(direction),
+       requestedAt = Value(requestedAt),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedFriendRequest> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? requestId,
+    Expression<String>? peerId,
+    Expression<String>? peerUsername,
+    Expression<String>? peerDisplayName,
+    Expression<String>? peerAvatarUrl,
+    Expression<String>? peerAvatarStoragePath,
+    Expression<int>? peerFriendCount,
+    Expression<String>? direction,
+    Expression<DateTime>? requestedAt,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (requestId != null) 'request_id': requestId,
+      if (peerId != null) 'peer_id': peerId,
+      if (peerUsername != null) 'peer_username': peerUsername,
+      if (peerDisplayName != null) 'peer_display_name': peerDisplayName,
+      if (peerAvatarUrl != null) 'peer_avatar_url': peerAvatarUrl,
+      if (peerAvatarStoragePath != null)
+        'peer_avatar_storage_path': peerAvatarStoragePath,
+      if (peerFriendCount != null) 'peer_friend_count': peerFriendCount,
+      if (direction != null) 'direction': direction,
+      if (requestedAt != null) 'requested_at': requestedAt,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedFriendRequestsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? requestId,
+    Value<String>? peerId,
+    Value<String>? peerUsername,
+    Value<String>? peerDisplayName,
+    Value<String?>? peerAvatarUrl,
+    Value<String?>? peerAvatarStoragePath,
+    Value<int?>? peerFriendCount,
+    Value<String>? direction,
+    Value<DateTime>? requestedAt,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedFriendRequestsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      requestId: requestId ?? this.requestId,
+      peerId: peerId ?? this.peerId,
+      peerUsername: peerUsername ?? this.peerUsername,
+      peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+      peerAvatarUrl: peerAvatarUrl ?? this.peerAvatarUrl,
+      peerAvatarStoragePath:
+          peerAvatarStoragePath ?? this.peerAvatarStoragePath,
+      peerFriendCount: peerFriendCount ?? this.peerFriendCount,
+      direction: direction ?? this.direction,
+      requestedAt: requestedAt ?? this.requestedAt,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (requestId.present) {
+      map['request_id'] = Variable<String>(requestId.value);
+    }
+    if (peerId.present) {
+      map['peer_id'] = Variable<String>(peerId.value);
+    }
+    if (peerUsername.present) {
+      map['peer_username'] = Variable<String>(peerUsername.value);
+    }
+    if (peerDisplayName.present) {
+      map['peer_display_name'] = Variable<String>(peerDisplayName.value);
+    }
+    if (peerAvatarUrl.present) {
+      map['peer_avatar_url'] = Variable<String>(peerAvatarUrl.value);
+    }
+    if (peerAvatarStoragePath.present) {
+      map['peer_avatar_storage_path'] = Variable<String>(
+        peerAvatarStoragePath.value,
+      );
+    }
+    if (peerFriendCount.present) {
+      map['peer_friend_count'] = Variable<int>(peerFriendCount.value);
+    }
+    if (direction.present) {
+      map['direction'] = Variable<String>(direction.value);
+    }
+    if (requestedAt.present) {
+      map['requested_at'] = Variable<DateTime>(requestedAt.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendRequestsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('requestId: $requestId, ')
+          ..write('peerId: $peerId, ')
+          ..write('peerUsername: $peerUsername, ')
+          ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('peerAvatarUrl: $peerAvatarUrl, ')
+          ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
+          ..write('peerFriendCount: $peerFriendCount, ')
+          ..write('direction: $direction, ')
+          ..write('requestedAt: $requestedAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3727,6 +4982,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedMessagesTable cachedMessages = $CachedMessagesTable(this);
   late final $PendingChatOperationsTable pendingChatOperations =
       $PendingChatOperationsTable(this);
+  late final $CachedFriendsTable cachedFriends = $CachedFriendsTable(this);
+  late final $CachedFriendRequestsTable cachedFriendRequests =
+      $CachedFriendRequestsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3736,6 +4994,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedChats,
     cachedMessages,
     pendingChatOperations,
+    cachedFriends,
+    cachedFriendRequests,
   ];
 }
 
@@ -5422,6 +6682,615 @@ typedef $$PendingChatOperationsTableProcessedTableManager =
       PendingChatOperation,
       PrefetchHooks Function()
     >;
+typedef $$CachedFriendsTableCreateCompanionBuilder =
+    CachedFriendsCompanion Function({
+      required String ownerUserId,
+      required String userId,
+      required String username,
+      required String displayName,
+      Value<String?> avatarUrl,
+      Value<String?> avatarStoragePath,
+      required DateTime friendsSince,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedFriendsTableUpdateCompanionBuilder =
+    CachedFriendsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> userId,
+      Value<String> username,
+      Value<String> displayName,
+      Value<String?> avatarUrl,
+      Value<String?> avatarStoragePath,
+      Value<DateTime> friendsSince,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedFriendsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedFriendsTable> {
+  $$CachedFriendsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarStoragePath => $composableBuilder(
+    column: $table.avatarStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get friendsSince => $composableBuilder(
+    column: $table.friendsSince,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedFriendsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedFriendsTable> {
+  $$CachedFriendsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarStoragePath => $composableBuilder(
+    column: $table.avatarStoragePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get friendsSince => $composableBuilder(
+    column: $table.friendsSince,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedFriendsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedFriendsTable> {
+  $$CachedFriendsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get avatarStoragePath => $composableBuilder(
+    column: $table.avatarStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get friendsSince => $composableBuilder(
+    column: $table.friendsSince,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedFriendsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedFriendsTable,
+          CachedFriend,
+          $$CachedFriendsTableFilterComposer,
+          $$CachedFriendsTableOrderingComposer,
+          $$CachedFriendsTableAnnotationComposer,
+          $$CachedFriendsTableCreateCompanionBuilder,
+          $$CachedFriendsTableUpdateCompanionBuilder,
+          (
+            CachedFriend,
+            BaseReferences<_$AppDatabase, $CachedFriendsTable, CachedFriend>,
+          ),
+          CachedFriend,
+          PrefetchHooks Function()
+        > {
+  $$CachedFriendsTableTableManager(_$AppDatabase db, $CachedFriendsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedFriendsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedFriendsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedFriendsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> username = const Value.absent(),
+                Value<String> displayName = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
+                Value<String?> avatarStoragePath = const Value.absent(),
+                Value<DateTime> friendsSince = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendsCompanion(
+                ownerUserId: ownerUserId,
+                userId: userId,
+                username: username,
+                displayName: displayName,
+                avatarUrl: avatarUrl,
+                avatarStoragePath: avatarStoragePath,
+                friendsSince: friendsSince,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String userId,
+                required String username,
+                required String displayName,
+                Value<String?> avatarUrl = const Value.absent(),
+                Value<String?> avatarStoragePath = const Value.absent(),
+                required DateTime friendsSince,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendsCompanion.insert(
+                ownerUserId: ownerUserId,
+                userId: userId,
+                username: username,
+                displayName: displayName,
+                avatarUrl: avatarUrl,
+                avatarStoragePath: avatarStoragePath,
+                friendsSince: friendsSince,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedFriendsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedFriendsTable,
+      CachedFriend,
+      $$CachedFriendsTableFilterComposer,
+      $$CachedFriendsTableOrderingComposer,
+      $$CachedFriendsTableAnnotationComposer,
+      $$CachedFriendsTableCreateCompanionBuilder,
+      $$CachedFriendsTableUpdateCompanionBuilder,
+      (
+        CachedFriend,
+        BaseReferences<_$AppDatabase, $CachedFriendsTable, CachedFriend>,
+      ),
+      CachedFriend,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedFriendRequestsTableCreateCompanionBuilder =
+    CachedFriendRequestsCompanion Function({
+      required String ownerUserId,
+      required String requestId,
+      required String peerId,
+      required String peerUsername,
+      required String peerDisplayName,
+      Value<String?> peerAvatarUrl,
+      Value<String?> peerAvatarStoragePath,
+      Value<int?> peerFriendCount,
+      required String direction,
+      required DateTime requestedAt,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedFriendRequestsTableUpdateCompanionBuilder =
+    CachedFriendRequestsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> requestId,
+      Value<String> peerId,
+      Value<String> peerUsername,
+      Value<String> peerDisplayName,
+      Value<String?> peerAvatarUrl,
+      Value<String?> peerAvatarStoragePath,
+      Value<int?> peerFriendCount,
+      Value<String> direction,
+      Value<DateTime> requestedAt,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedFriendRequestsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedFriendRequestsTable> {
+  $$CachedFriendRequestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get requestId => $composableBuilder(
+    column: $table.requestId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerId => $composableBuilder(
+    column: $table.peerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerUsername => $composableBuilder(
+    column: $table.peerUsername,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerAvatarUrl => $composableBuilder(
+    column: $table.peerAvatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerAvatarStoragePath => $composableBuilder(
+    column: $table.peerAvatarStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get peerFriendCount => $composableBuilder(
+    column: $table.peerFriendCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get requestedAt => $composableBuilder(
+    column: $table.requestedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedFriendRequestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedFriendRequestsTable> {
+  $$CachedFriendRequestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get requestId => $composableBuilder(
+    column: $table.requestId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerId => $composableBuilder(
+    column: $table.peerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerUsername => $composableBuilder(
+    column: $table.peerUsername,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerAvatarUrl => $composableBuilder(
+    column: $table.peerAvatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerAvatarStoragePath => $composableBuilder(
+    column: $table.peerAvatarStoragePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get peerFriendCount => $composableBuilder(
+    column: $table.peerFriendCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get requestedAt => $composableBuilder(
+    column: $table.requestedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedFriendRequestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedFriendRequestsTable> {
+  $$CachedFriendRequestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get requestId =>
+      $composableBuilder(column: $table.requestId, builder: (column) => column);
+
+  GeneratedColumn<String> get peerId =>
+      $composableBuilder(column: $table.peerId, builder: (column) => column);
+
+  GeneratedColumn<String> get peerUsername => $composableBuilder(
+    column: $table.peerUsername,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerDisplayName => $composableBuilder(
+    column: $table.peerDisplayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerAvatarUrl => $composableBuilder(
+    column: $table.peerAvatarUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerAvatarStoragePath => $composableBuilder(
+    column: $table.peerAvatarStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get peerFriendCount => $composableBuilder(
+    column: $table.peerFriendCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get direction =>
+      $composableBuilder(column: $table.direction, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get requestedAt => $composableBuilder(
+    column: $table.requestedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedFriendRequestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedFriendRequestsTable,
+          CachedFriendRequest,
+          $$CachedFriendRequestsTableFilterComposer,
+          $$CachedFriendRequestsTableOrderingComposer,
+          $$CachedFriendRequestsTableAnnotationComposer,
+          $$CachedFriendRequestsTableCreateCompanionBuilder,
+          $$CachedFriendRequestsTableUpdateCompanionBuilder,
+          (
+            CachedFriendRequest,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedFriendRequestsTable,
+              CachedFriendRequest
+            >,
+          ),
+          CachedFriendRequest,
+          PrefetchHooks Function()
+        > {
+  $$CachedFriendRequestsTableTableManager(
+    _$AppDatabase db,
+    $CachedFriendRequestsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedFriendRequestsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedFriendRequestsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedFriendRequestsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> requestId = const Value.absent(),
+                Value<String> peerId = const Value.absent(),
+                Value<String> peerUsername = const Value.absent(),
+                Value<String> peerDisplayName = const Value.absent(),
+                Value<String?> peerAvatarUrl = const Value.absent(),
+                Value<String?> peerAvatarStoragePath = const Value.absent(),
+                Value<int?> peerFriendCount = const Value.absent(),
+                Value<String> direction = const Value.absent(),
+                Value<DateTime> requestedAt = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendRequestsCompanion(
+                ownerUserId: ownerUserId,
+                requestId: requestId,
+                peerId: peerId,
+                peerUsername: peerUsername,
+                peerDisplayName: peerDisplayName,
+                peerAvatarUrl: peerAvatarUrl,
+                peerAvatarStoragePath: peerAvatarStoragePath,
+                peerFriendCount: peerFriendCount,
+                direction: direction,
+                requestedAt: requestedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String requestId,
+                required String peerId,
+                required String peerUsername,
+                required String peerDisplayName,
+                Value<String?> peerAvatarUrl = const Value.absent(),
+                Value<String?> peerAvatarStoragePath = const Value.absent(),
+                Value<int?> peerFriendCount = const Value.absent(),
+                required String direction,
+                required DateTime requestedAt,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendRequestsCompanion.insert(
+                ownerUserId: ownerUserId,
+                requestId: requestId,
+                peerId: peerId,
+                peerUsername: peerUsername,
+                peerDisplayName: peerDisplayName,
+                peerAvatarUrl: peerAvatarUrl,
+                peerAvatarStoragePath: peerAvatarStoragePath,
+                peerFriendCount: peerFriendCount,
+                direction: direction,
+                requestedAt: requestedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedFriendRequestsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedFriendRequestsTable,
+      CachedFriendRequest,
+      $$CachedFriendRequestsTableFilterComposer,
+      $$CachedFriendRequestsTableOrderingComposer,
+      $$CachedFriendRequestsTableAnnotationComposer,
+      $$CachedFriendRequestsTableCreateCompanionBuilder,
+      $$CachedFriendRequestsTableUpdateCompanionBuilder,
+      (
+        CachedFriendRequest,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedFriendRequestsTable,
+          CachedFriendRequest
+        >,
+      ),
+      CachedFriendRequest,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5434,4 +7303,8 @@ class $AppDatabaseManager {
       $$CachedMessagesTableTableManager(_db, _db.cachedMessages);
   $$PendingChatOperationsTableTableManager get pendingChatOperations =>
       $$PendingChatOperationsTableTableManager(_db, _db.pendingChatOperations);
+  $$CachedFriendsTableTableManager get cachedFriends =>
+      $$CachedFriendsTableTableManager(_db, _db.cachedFriends);
+  $$CachedFriendRequestsTableTableManager get cachedFriendRequests =>
+      $$CachedFriendRequestsTableTableManager(_db, _db.cachedFriendRequests);
 }

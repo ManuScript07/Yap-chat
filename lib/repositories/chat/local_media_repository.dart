@@ -6,9 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 
 class LocalMediaRepository implements ILocalMediaRepository {
-  LocalMediaRepository({
-    required SharedPreferences preferences,
-  }) : _prefs = preferences;
+  LocalMediaRepository({required SharedPreferences preferences})
+    : _prefs = preferences;
 
   final SharedPreferences _prefs;
   static const _storageKey = 'recent_chat_media_paths';

@@ -49,11 +49,7 @@ class GlassIconButton extends StatelessWidget {
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(innerRadius),
                 child: Center(
-                  child: Icon(
-                    icon,
-                    color: mainColor,
-                    size: iconSize,
-                  ),
+                  child: Icon(icon, color: mainColor, size: iconSize),
                 ),
               ),
             ),

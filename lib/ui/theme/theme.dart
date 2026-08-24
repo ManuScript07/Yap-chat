@@ -30,7 +30,7 @@ abstract class AppColors {
 final ThemeData theme = ThemeData(
   useMaterial3: true,
   brightness: Brightness.dark,
-  scaffoldBackgroundColor: AppColors.background,
+  scaffoldBackgroundColor: AppColors.onBrandPrimary,
 
   // Цветовая схема
   colorScheme: ColorScheme.dark(

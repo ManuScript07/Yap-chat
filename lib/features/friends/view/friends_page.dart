@@ -1,5 +1,15 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:yap_chat/app/app.dart';
+import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/friends/friends.dart';
+import 'package:yap_chat/repositories/repositories.dart';
+import 'package:yap_chat/router/router.gr.dart';
+import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
 class FriendsPage extends StatelessWidget {
@@ -7,13 +17,362 @@ class FriendsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Друзья'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+    return BlocBuilder<FriendsBloc, FriendsState>(
+      buildWhen: (previous, current) => previous.activeTab != current.activeTab,
+      builder: (context, state) {
+        final mediaQuery = MediaQuery.of(context);
+        final isLandscapeKeyboard =
+            mediaQuery.orientation == Orientation.landscape &&
+            mediaQuery.viewInsets.bottom > 0;
+        const appBarHeight = 130.0;
+        const searchBarHeight = 50.0;
+        const searchBarSpacing = 16.0;
+        final searchBarTop =
+            mediaQuery.size.height -
+            mediaQuery.viewInsets.bottom -
+            searchBarSpacing -
+            searchBarHeight;
+        final hideAppBar = isLandscapeKeyboard && searchBarTop < appBarHeight;
+
+        return ScaffoldMessenger(
+          child: Builder(
+            builder: (scaffoldContext) =>
+                BlocListener<FriendsBloc, FriendsState>(
+                  listenWhen: (previous, current) =>
+                      previous.actionError != current.actionError &&
+                      current.actionError != null,
+                  listener: (context, state) {
+                    showAppSnackBar(
+                      scaffoldContext,
+                      message: context.l10n.friendsActionFailed,
+                      type: SnackBarType.error,
+                      bottomMargin: 156,
+                    );
+                    context.read<FriendsBloc>().add(
+                      const FriendsActionFailureCleared(),
+                    );
+                  },
+                  child: Scaffold(
+                    resizeToAvoidBottomInset: false,
+                    extendBodyBehindAppBar: true,
+                    backgroundColor: context.scaffoldBackgroundColor,
+                    appBar: hideAppBar
+                        ? null
+                        : PrimaryAppBar(
+                            title: context.l10n.navFriends,
+                            actionIcon: Icons.person_add_alt_1_rounded,
+                            onActionPressed: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              final authRouter = context.router.root
+                                  .innerRouterOf<StackRouter>(
+                                    AuthGateRoute.name,
+                                  );
+                              if (authRouter != null) {
+                                unawaited(
+                                  authRouter.push(const AddFriendRoute()),
+                                );
+                              }
+                            },
+                          ),
+                    body: const _FriendsBody(),
+                  ),
+                ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FriendsBody extends StatefulWidget {
+  const _FriendsBody();
+
+  @override
+  State<_FriendsBody> createState() => _FriendsBodyState();
+}
+
+class _FriendsBodyState extends State<_FriendsBody> {
+  final _friendsSearchController = TextEditingController();
+  final _requestsSearchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _friendsSearchController.dispose();
+    _requestsSearchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final isKeyboardOpen = keyboardHeight > 0;
+    const navBarHeight = 70.0;
+    const navBarBottomOffset = 16.0;
+    const searchBarSpacing = 16.0;
+    const searchBarHeight = 50.0;
+    const contentExtraPadding = 16.0;
+    final navigationSpace =
+        mediaQuery.viewPadding.bottom + navBarBottomOffset + navBarHeight;
+    final searchBarBottomOffset = isKeyboardOpen
+        ? keyboardHeight + searchBarSpacing
+        : navigationSpace + searchBarSpacing;
+    final contentBottomPadding =
+        searchBarBottomOffset + searchBarHeight + contentExtraPadding;
+    final glowBottomOffset = isKeyboardOpen ? keyboardHeight : 0.0;
+
+    return BlocBuilder<FriendsBloc, FriendsState>(
+      builder: (context, state) {
+        final activeIndex = state.activeTab.index;
+        return Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned.fill(
+              top: 130,
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  PrimarySegmentedControl(
+                    items: [
+                      PrimarySegmentItem(label: context.l10n.friendsTabFriends),
+                      PrimarySegmentItem(
+                        label: context.l10n.friendsTabRequests,
+                        count: state.incomingRequestCount,
+                      ),
+                    ],
+                    selectedIndex: activeIndex,
+                    onChanged: (index) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      context.read<FriendsBloc>().add(
+                        FriendsTabChanged(FriendsTab.values[index]),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: IndexedStack(
+                      index: activeIndex,
+                      children: [
+                        _FriendsList(bottomPadding: contentBottomPadding),
+                        _RequestsList(bottomPadding: contentBottomPadding),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedPositioned(
+              duration: Duration.zero,
+              left: 0,
+              right: 0,
+              bottom: glowBottomOffset,
+              child: const BottomAmbientGlow(),
+            ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuad,
+              left: 0,
+              right: 0,
+              bottom: searchBarBottomOffset,
+              child: GlassSearchBar(
+                key: ValueKey(state.activeTab),
+                controller: state.activeTab == FriendsTab.friends
+                    ? _friendsSearchController
+                    : _requestsSearchController,
+                hintText: context.l10n.friendsSearchHint,
+                onChanged: (value) => context.read<FriendsBloc>().add(
+                  FriendsSearchChanged(value),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FriendsList extends StatelessWidget {
+  const _FriendsList({required this.bottomPadding});
+
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<FriendsBloc, FriendsState>(
+      buildWhen: (previous, current) =>
+          previous.status != current.status ||
+          previous.friends != current.friends ||
+          previous.friendsQuery != current.friendsQuery,
+      builder: (context, state) {
+        if (state.status == FriendsStatus.initial ||
+            state.status == FriendsStatus.loading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (state.status == FriendsStatus.failure) {
+          return Center(child: Text(context.l10n.friendsLoadFailed));
+        }
+        final friends = state.filteredFriends;
+        if (friends.isEmpty) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            child: EmptyChatState(
+              showImage: state.friendsQuery.trim().isEmpty,
+              message: state.friendsQuery.trim().isEmpty
+                  ? context.l10n.friendsEmpty
+                  : context.l10n.friendsNoSearchResults,
+            ),
+          );
+        }
+        return ListView.builder(
+          key: const PageStorageKey('friends-list'),
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          itemCount: friends.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return FriendsSectionTitle(
+                title: context.l10n.friendsAll,
+                count: friends.length,
+              );
+            }
+            final friend = friends[index - 1];
+            return FriendListItem(
+              key: ValueKey(friend.id),
+              friend: friend,
+              onChat: () => _openChat(context, friend),
+              onLocation: () => _openLocation(context, friend),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openChat(BuildContext context, Friend friend) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      final chat = await context.read<IChatsRepository>().openDirectChat(
+        friend.id,
+      );
+      if (context.mounted) {
+        await context.read<ChatNavigationCoordinator>().open(chat);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.friendsChatOpenFailed,
+          type: SnackBarType.error,
+          bottomMargin: 156,
+        );
+      }
+    }
+  }
+
+  Future<void> _openLocation(BuildContext context, Friend friend) async {
+    try {
+      final location = await context
+          .read<IFriendsRepository>()
+          .getFriendLocation(friend.id);
+      if (!context.mounted) return;
+      if (location == null) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.friendsLocationUnavailable,
+          bottomMargin: 156,
+        );
+        return;
+      }
+      final uri = Uri.parse(
+        'geo:${location.latitude},${location.longitude}?q=${location.latitude},${location.longitude}',
+      );
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (opened || !context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.locationOpenError,
+        type: SnackBarType.error,
+        bottomMargin: 156,
+      );
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.locationOpenError,
+          type: SnackBarType.error,
+          bottomMargin: 156,
+        );
+      }
+    }
+  }
+}
+
+class _RequestsList extends StatelessWidget {
+  const _RequestsList({required this.bottomPadding});
+
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<FriendsBloc, FriendsState>(
+      buildWhen: (previous, current) =>
+          previous.status != current.status ||
+          previous.requests != current.requests ||
+          previous.requestsQuery != current.requestsQuery,
+      builder: (context, state) {
+        if (state.status == FriendsStatus.initial ||
+            state.status == FriendsStatus.loading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (state.status == FriendsStatus.failure) {
+          return Center(child: Text(context.l10n.friendsLoadFailed));
+        }
+        final incoming = state.incomingRequests;
+        final outgoing = state.outgoingRequests;
+        if (incoming.isEmpty && outgoing.isEmpty) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            child: EmptyChatState(
+              showImage: state.requestsQuery.trim().isEmpty,
+              message: state.requestsQuery.trim().isEmpty
+                  ? context.l10n.friendsRequestsEmpty
+                  : context.l10n.friendsNoSearchResults,
+            ),
+          );
+        }
+        return ListView(
+          key: const PageStorageKey('friend-requests-list'),
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          children: [
+            FriendsSectionTitle(
+              title: context.l10n.friendsOutgoing,
+              count: outgoing.length,
+            ),
+            ...outgoing.map((request) => _item(context, request)),
+            FriendsSectionTitle(
+              title: context.l10n.friendsIncoming,
+              count: incoming.length,
+            ),
+            ...incoming.map((request) => _item(context, request)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _item(BuildContext context, FriendRequest request) {
+    return FriendRequestItem(
+      key: ValueKey(request.id),
+      request: request,
+      cancelLabel: context.l10n.friendsCancelRequest,
+      friendsLabel: context.l10n.friendsCount,
+      onCancel: () =>
+          context.read<FriendsBloc>().add(FriendRequestCancelled(request.id)),
+      onAccept: () => context.read<FriendsBloc>().add(
+        FriendRequestResponded(request.id, accept: true),
       ),
-      body: const Center(
-        child: Text('Список друзей'),
+      onReject: () => context.read<FriendsBloc>().add(
+        FriendRequestResponded(request.id, accept: false),
       ),
     );
   }

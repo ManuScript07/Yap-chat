@@ -221,6 +221,7 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     if (_disposed || !_belongsToCurrentUser(payload) || !payload.isValid) {
       return;
     }
+    if (!payload.isChatMessage) return;
     _openedConversationController.add(payload.conversationId);
   }
 

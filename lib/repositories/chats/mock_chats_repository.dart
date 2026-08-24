@@ -102,6 +102,31 @@ class MockChatsRepository implements IChatsRepository {
   }
 
   @override
+  Future<Chat> openDirectChat(String peerId) async {
+    for (final chat in _chats) {
+      if (chat.peerId == peerId) return chat;
+    }
+    final peer = switch (peerId) {
+      'friend-1' => ('masha', 'Маша'),
+      'friend-2' => ('sasha', 'Саша'),
+      _ => (peerId, peerId),
+    };
+    final chat = Chat(
+      id: 'mock-$peerId',
+      peerId: peerId,
+      peerUsername: peer.$1,
+      userName: peer.$2,
+      lastMessage: '',
+      lastMessageTime: DateTime.now(),
+      unreadCount: 0,
+      isOnline: false,
+      isLastMessageFromMe: false,
+    );
+    _chats.insert(0, chat);
+    return chat;
+  }
+
+  @override
   Future<void> deleteChats(Set<String> ids) async {
     await Future<void>.delayed(_networkDelay);
     _chats.removeWhere((chat) => ids.contains(chat.id));

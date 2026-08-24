@@ -89,8 +89,46 @@ class PendingChatOperations extends Table {
   Set<Column> get primaryKey => {ownerUserId, id};
 }
 
+class CachedFriends extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get userId => text()();
+  TextColumn get username => text()();
+  TextColumn get displayName => text()();
+  TextColumn get avatarUrl => text().nullable()();
+  TextColumn get avatarStoragePath => text().nullable()();
+  DateTimeColumn get friendsSince => dateTime()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, userId};
+}
+
+class CachedFriendRequests extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get requestId => text()();
+  TextColumn get peerId => text()();
+  TextColumn get peerUsername => text()();
+  TextColumn get peerDisplayName => text()();
+  TextColumn get peerAvatarUrl => text().nullable()();
+  TextColumn get peerAvatarStoragePath => text().nullable()();
+  IntColumn get peerFriendCount => integer().nullable()();
+  TextColumn get direction => text()();
+  DateTimeColumn get requestedAt => dateTime()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, requestId};
+}
+
 @DriftDatabase(
-  tables: [CachedProfiles, CachedChats, CachedMessages, PendingChatOperations],
+  tables: [
+    CachedProfiles,
+    CachedChats,
+    CachedMessages,
+    PendingChatOperations,
+    CachedFriends,
+    CachedFriendRequests,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase()
@@ -108,7 +146,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -127,6 +165,10 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5) {
         await migrator.addColumn(cachedChats, cachedChats.showsLastSeen);
+      }
+      if (from < 6) {
+        await migrator.createTable(cachedFriends);
+        await migrator.createTable(cachedFriendRequests);
       }
     },
   );

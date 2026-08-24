@@ -86,6 +86,5 @@ class ChatNavigationCoordinator {
     }
   }
 
-  static Future<void> _waitForNextFrame() =>
-      WidgetsBinding.instance.endOfFrame;
+  static Future<void> _waitForNextFrame() => WidgetsBinding.instance.endOfFrame;
 }

@@ -5,6 +5,8 @@ import 'package:yap_chat/l10n/app_localizations.dart';
 
 enum PushMessageType { text, image, audio, location }
 
+enum PushNotificationKind { chatMessage, friendRequest }
+
 class PushNotificationPayload extends Equatable {
   const PushNotificationPayload({
     required this.conversationId,
@@ -15,6 +17,8 @@ class PushNotificationPayload extends Equatable {
     required this.messageType,
     required this.messageText,
     required this.sentAt,
+    this.kind = PushNotificationKind.chatMessage,
+    this.friendRequestId = '',
   });
 
   factory PushNotificationPayload.fromData(Map<String, dynamic> data) {
@@ -22,6 +26,7 @@ class PushNotificationPayload extends Equatable {
     final contentType = _stringValue(
       data['content_type'] ?? data['message_type'],
     );
+    final notificationType = _stringValue(data['notification_type']);
     return PushNotificationPayload(
       conversationId: _stringValue(data['conversation_id']),
       messageId: _stringValue(data['message_id']),
@@ -34,6 +39,10 @@ class PushNotificationPayload extends Equatable {
       ),
       messageText: _stringValue(data['message_text']),
       sentAt: sentAt?.toLocal() ?? DateTime.now(),
+      kind: notificationType == 'friend_request'
+          ? PushNotificationKind.friendRequest
+          : PushNotificationKind.chatMessage,
+      friendRequestId: _stringValue(data['friend_request_id']),
     );
   }
 
@@ -53,19 +62,29 @@ class PushNotificationPayload extends Equatable {
   final PushMessageType messageType;
   final String messageText;
   final DateTime sentAt;
+  final PushNotificationKind kind;
+  final String friendRequestId;
+
+  bool get isChatMessage => kind == PushNotificationKind.chatMessage;
 
   bool get isValid =>
-      conversationId.isNotEmpty &&
-      messageId.isNotEmpty &&
       recipientId.isNotEmpty &&
-      senderId.isNotEmpty;
+      senderId.isNotEmpty &&
+      (isChatMessage
+          ? conversationId.isNotEmpty && messageId.isNotEmpty
+          : friendRequestId.isNotEmpty);
 
-  String localizedBody(AppLocalizations l10n) => switch (messageType) {
-    PushMessageType.text => messageText,
-    PushMessageType.image => l10n.notificationPhoto,
-    PushMessageType.audio => l10n.notificationAudio,
-    PushMessageType.location => l10n.notificationLocation,
-  };
+  String localizedBody(AppLocalizations l10n) {
+    if (kind == PushNotificationKind.friendRequest) {
+      return l10n.notificationFriendRequest;
+    }
+    return switch (messageType) {
+      PushMessageType.text => messageText,
+      PushMessageType.image => l10n.notificationPhoto,
+      PushMessageType.audio => l10n.notificationAudio,
+      PushMessageType.location => l10n.notificationLocation,
+    };
+  }
 
   String toJson() => jsonEncode({
     'conversation_id': conversationId,
@@ -76,6 +95,10 @@ class PushNotificationPayload extends Equatable {
     'message_type': messageType.name,
     'message_text': messageText,
     'sent_at': sentAt.toUtc().toIso8601String(),
+    'notification_type': kind == PushNotificationKind.friendRequest
+        ? 'friend_request'
+        : 'chat_message',
+    'friend_request_id': friendRequestId,
   });
 
   static String _stringValue(Object? value) => value?.toString().trim() ?? '';
@@ -90,5 +113,7 @@ class PushNotificationPayload extends Equatable {
     messageType,
     messageText,
     sentAt,
+    kind,
+    friendRequestId,
   ];
 }

@@ -446,4 +446,83 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get chatsNotificationsDisabled => 'Уведомления отключены';
+
+  @override
+  String get friendsTabFriends => 'друны';
+
+  @override
+  String get friendsTabRequests => 'заявки';
+
+  @override
+  String get friendsAll => 'все друны';
+
+  @override
+  String get friendsOutgoing => 'исходящие';
+
+  @override
+  String get friendsIncoming => 'входящие';
+
+  @override
+  String get friendsSearchHint => 'поиск';
+
+  @override
+  String get friendsEmpty => 'у вас пока нет друнов';
+
+  @override
+  String get friendsRequestsEmpty => 'заявок пока нет';
+
+  @override
+  String get friendsNoSearchResults => 'ничего не нашли';
+
+  @override
+  String get friendsLoadFailed => 'Не удалось загрузить друнов';
+
+  @override
+  String get friendsActionFailed => 'Не удалось выполнить действие';
+
+  @override
+  String get friendsCancelRequest => 'отменить';
+
+  @override
+  String friendsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count друзей',
+      many: '$count друзей',
+      few: '$count друга',
+      one: '$count друг',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get friendsAddTitle => 'Добавить друна';
+
+  @override
+  String get friendsUserSearchHint => 'поиск по username';
+
+  @override
+  String get friendsSearchPrompt => 'найдите друна по username или имени';
+
+  @override
+  String get friendsUserSearchFailed => 'Не удалось выполнить поиск';
+
+  @override
+  String get friendsAlreadyAdded => 'уже в друнах';
+
+  @override
+  String get friendsRequestSent => 'заявка отправлена';
+
+  @override
+  String get friendsRequestIncoming => 'ответьте в заявках';
+
+  @override
+  String get friendsLocationUnavailable => 'Друг ещё не делился геопозицией';
+
+  @override
+  String get friendsChatOpenFailed => 'Не удалось открыть чат';
+
+  @override
+  String get notificationFriendRequest => 'отправил(а) вам заявку в друны';
 }

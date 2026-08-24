@@ -37,6 +37,7 @@ class _AppInitializerState extends State<AppInitializer> {
       chatsRepository: _repositories.chatsRepository,
       chatRepository: _repositories.chatRepository,
       presenceRepository: _repositories.presenceRepository,
+      friendsRepository: _repositories.friendsRepository,
       talker: widget.config.talker,
     );
   }
@@ -88,6 +89,9 @@ class _AppInitializerState extends State<AppInitializer> {
         RepositoryProvider<IPushNotificationsRepository>.value(
           value: _repositories.pushNotificationsRepository,
         ),
+        RepositoryProvider<IFriendsRepository>.value(
+          value: _repositories.friendsRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -96,9 +100,9 @@ class _AppInitializerState extends State<AppInitializer> {
               authRepository: context.read<IAuthRepository>(),
               profileRepository: context.read<IProfileRepository>(),
               clearUserCache: _repositories.mediaCache.clearUser,
-              beforeSignOut:
-                  _repositories.pushNotificationsRepository
-                      .unregisterCurrentDevice,
+              beforeSignOut: _repositories
+                  .pushNotificationsRepository
+                  .unregisterCurrentDevice,
             )..add(const AuthStarted()),
           ),
           BlocProvider<PresenceCubit>(

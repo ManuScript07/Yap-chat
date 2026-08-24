@@ -66,6 +66,13 @@ class AppRouter extends RootStackRouter {
           duration: const Duration(milliseconds: 200),
           reverseDuration: const Duration(milliseconds: 150),
         ),
+        CustomRoute(
+          path: 'add-friend',
+          page: AddFriendRoute.page,
+          transitionsBuilder: _slideRightWithFade,
+          duration: const Duration(milliseconds: 200),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
       ],
     ),
   ];

@@ -57,11 +57,7 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
                   child: IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    icon: Icon(
-                      actionIcon,
-                      color: iconColor,
-                      size: 42,
-                    ),
+                    icon: Icon(actionIcon, color: iconColor, size: 42),
                     onPressed: onActionPressed,
                   ),
                 ),

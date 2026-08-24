@@ -67,7 +67,9 @@ class AndroidNotificationService {
     await initialize();
 
     final l10n = _localizations();
-    final notificationId = notificationIdFor(payload.conversationId);
+    final notificationId = notificationIdFor(
+      payload.isChatMessage ? payload.conversationId : payload.friendRequestId,
+    );
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin

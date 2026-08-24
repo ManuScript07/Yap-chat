@@ -21,6 +21,7 @@ class RepositoryContainer {
     required this.profileRepository,
     required this.presenceRepository,
     required this.pushNotificationsRepository,
+    required this.friendsRepository,
   });
 
   factory RepositoryContainer.prod({required AppConfig config}) {
@@ -40,6 +41,14 @@ class RepositoryContainer {
     final chatsRemote = ChatsRemoteDataSource(
       client: client,
       talker: config.talker,
+    );
+    final friendsRemote = FriendsRemoteDataSource(
+      client: client,
+      talker: config.talker,
+    );
+    final friendsCache = FriendsCacheDataSource(
+      database: config.database,
+      userIdProvider: () => client.auth.currentUser!.id,
     );
     final chatRemote = ChatRemoteDataSource(client: client);
     final messageHydrator = ChatMessageHydrator(
@@ -104,6 +113,12 @@ class RepositoryContainer {
               preferences: config.preferences,
               talker: config.talker,
             ),
+      friendsRepository: FriendsRepository(
+        config: config,
+        cache: friendsCache,
+        remote: friendsRemote,
+        mediaCache: mediaCache,
+      ),
     );
   }
 
@@ -126,6 +141,7 @@ class RepositoryContainer {
       profileRepository: MockProfileRepository(preferences: config.preferences),
       presenceRepository: MockPresenceRepository(),
       pushNotificationsRepository: const MockPushNotificationsRepository(),
+      friendsRepository: MockFriendsRepository(),
     );
   }
 
@@ -140,6 +156,7 @@ class RepositoryContainer {
   final IProfileRepository profileRepository;
   final IPresenceRepository presenceRepository;
   final IPushNotificationsRepository pushNotificationsRepository;
+  final IFriendsRepository friendsRepository;
 
   Future<void> dispose() async {
     mediaCache.dispose();
@@ -148,6 +165,7 @@ class RepositoryContainer {
       chatRepository.pauseNetwork(),
       presenceRepository.disconnect(),
       pushNotificationsRepository.dispose(),
+      friendsRepository.pauseRealtime(),
     ]);
   }
 }

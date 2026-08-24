@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chats/chats.dart';
+import 'package:yap_chat/features/friends/friends.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -13,10 +14,19 @@ class MainPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<ChatsBloc>(
-      create: (context) =>
-          ChatsBloc(chatsRepository: context.read<IChatsRepository>())
-            ..add(const ChatsLoadStarted()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<ChatsBloc>(
+          create: (context) =>
+              ChatsBloc(chatsRepository: context.read<IChatsRepository>())
+                ..add(const ChatsLoadStarted()),
+        ),
+        BlocProvider<FriendsBloc>(
+          create: (context) =>
+              FriendsBloc(repository: context.read<IFriendsRepository>())
+                ..add(const FriendsLoadStarted()),
+        ),
+      ],
       child: const _MainView(),
     );
   }

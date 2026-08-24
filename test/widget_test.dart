@@ -7,7 +7,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-
 void main() {
   testWidgets('Smoke test', (WidgetTester tester) async {
     // This test is currently a stub because the App requires configuration.

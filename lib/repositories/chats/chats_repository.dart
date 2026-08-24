@@ -113,6 +113,17 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
+  Future<Chat> openDirectChat(String peerId) async {
+    final chatId = await _remote.createDirectConversation(peerId);
+    await _synchronize();
+    final chat = await getChatById(chatId);
+    if (chat == null) {
+      throw StateError('Created conversation is missing from summaries');
+    }
+    return chat;
+  }
+
+  @override
   Future<void> deleteChats(Set<String> ids) async {
     if (ids.isEmpty) return;
     final clearedAt = DateTime.now().toUtc();

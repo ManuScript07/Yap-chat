@@ -135,11 +135,7 @@ class _AudioPlayerSession implements IAudioPlayerSession {
       await _player.pause();
       await _player.seek(Duration.zero);
       _hasCompleted = true;
-      _emit(
-        position: Duration.zero,
-        isPlaying: false,
-        isCompleted: true,
-      );
+      _emit(position: Duration.zero, isPlaying: false, isCompleted: true);
     } finally {
       _isResettingAfterCompletion = false;
     }

@@ -441,4 +441,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatsNotificationsDisabled => 'Notifications disabled';
+
+  @override
+  String get friendsTabFriends => 'friends';
+
+  @override
+  String get friendsTabRequests => 'requests';
+
+  @override
+  String get friendsAll => 'all friends';
+
+  @override
+  String get friendsOutgoing => 'outgoing';
+
+  @override
+  String get friendsIncoming => 'incoming';
+
+  @override
+  String get friendsSearchHint => 'search';
+
+  @override
+  String get friendsEmpty => 'you don\'t have any friends yet';
+
+  @override
+  String get friendsRequestsEmpty => 'no requests yet';
+
+  @override
+  String get friendsNoSearchResults => 'nothing found';
+
+  @override
+  String get friendsLoadFailed => 'Unable to load friends';
+
+  @override
+  String get friendsActionFailed => 'Unable to complete the action';
+
+  @override
+  String get friendsCancelRequest => 'cancel';
+
+  @override
+  String friendsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count friends',
+      one: '$count friend',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get friendsAddTitle => 'Add friend';
+
+  @override
+  String get friendsUserSearchHint => 'search by username';
+
+  @override
+  String get friendsSearchPrompt => 'find a friend by username or name';
+
+  @override
+  String get friendsUserSearchFailed => 'Unable to search';
+
+  @override
+  String get friendsAlreadyAdded => 'already a friend';
+
+  @override
+  String get friendsRequestSent => 'request sent';
+
+  @override
+  String get friendsRequestIncoming => 'respond in requests';
+
+  @override
+  String get friendsLocationUnavailable =>
+      'This friend hasn\'t shared a location yet';
+
+  @override
+  String get friendsChatOpenFailed => 'Unable to open chat';
+
+  @override
+  String get notificationFriendRequest => 'sent you a friend request';
 }

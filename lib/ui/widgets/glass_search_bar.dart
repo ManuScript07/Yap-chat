@@ -104,9 +104,7 @@ class _GlassSearchBarState extends State<GlassSearchBar>
 
     // Some Android versions update MediaQuery one frame after the platform
     // metrics callback. Keep the same transition guard here as a fallback.
-    if (_hasKeyboardInset &&
-        _lastKeyboardInset > 0 &&
-        keyboardInset <= 0) {
+    if (_hasKeyboardInset && _lastKeyboardInset > 0 && keyboardInset <= 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _clearFocus();
       });

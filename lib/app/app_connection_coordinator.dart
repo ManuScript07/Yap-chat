@@ -8,15 +8,18 @@ class AppConnectionCoordinator {
     required IChatsRepository chatsRepository,
     required IChatRepository chatRepository,
     required IPresenceRepository presenceRepository,
+    required IFriendsRepository friendsRepository,
     required Talker talker,
   }) : _chatsRepository = chatsRepository,
        _chatRepository = chatRepository,
        _presenceRepository = presenceRepository,
+       _friendsRepository = friendsRepository,
        _talker = talker;
 
   final IChatsRepository _chatsRepository;
   final IChatRepository _chatRepository;
   final IPresenceRepository _presenceRepository;
+  final IFriendsRepository _friendsRepository;
   final Talker _talker;
 
   Future<void> _operation = Future<void>.value();
@@ -67,6 +70,10 @@ class AppConnectionCoordinator {
         _guard('Chats realtime pause failed', _chatsRepository.pauseRealtime),
         _guard('Chat network pause failed', _chatRepository.pauseNetwork),
         _guard('Presence disconnect failed', _presenceRepository.disconnect),
+        _guard(
+          'Friends realtime pause failed',
+          _friendsRepository.pauseRealtime,
+        ),
       ]);
       return;
     }
@@ -79,6 +86,10 @@ class AppConnectionCoordinator {
         _guard('Chats realtime pause failed', _chatsRepository.pauseRealtime),
         _guard('Chat network pause failed', _chatRepository.pauseNetwork),
         _guard('Presence disconnect failed', _presenceRepository.disconnect),
+        _guard(
+          'Friends realtime pause failed',
+          _friendsRepository.pauseRealtime,
+        ),
       ]);
     }
 
@@ -93,6 +104,10 @@ class AppConnectionCoordinator {
       _guard(
         'Presence connect failed',
         () => _presenceRepository.connect(desiredUserId),
+      ),
+      _guard(
+        'Friends realtime resume failed',
+        _friendsRepository.resumeRealtime,
       ),
     ]);
   }

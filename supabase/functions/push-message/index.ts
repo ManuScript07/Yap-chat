@@ -3,8 +3,10 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 type OutboxRecord = {
   id: string;
-  message_id: string;
-  conversation_id: string;
+  message_id: string | null;
+  conversation_id: string | null;
+  friend_request_id: string | null;
+  notification_type: 'chat_message' | 'friend_request';
   recipient_user_id: string;
   sender_id: string;
   sender_name: string;
@@ -105,17 +107,19 @@ Deno.serve(async (request) => {
     return Response.json({ status: 'already_processed' });
   }
 
-  const { data: isMessageDeliverable, error: messageError } = await admin.rpc(
-    'is_push_message_deliverable',
-    { target_message_id: job.message_id },
-  );
-  if (messageError) {
-    await markFailed(admin, job.id, messageError.message);
-    return Response.json({ error: 'message_lookup_failed' }, { status: 500 });
-  }
-  if (!isMessageDeliverable) {
-    await markCompleted(admin, job.id, 'message_deleted', 0);
-    return Response.json({ status: 'message_deleted' });
+  if (job.notification_type === 'chat_message') {
+    const { data: isMessageDeliverable, error: messageError } = await admin.rpc(
+      'is_push_message_deliverable',
+      { target_message_id: job.message_id },
+    );
+    if (messageError) {
+      await markFailed(admin, job.id, messageError.message);
+      return Response.json({ error: 'message_lookup_failed' }, { status: 500 });
+    }
+    if (!isMessageDeliverable) {
+      await markCompleted(admin, job.id, 'message_deleted', 0);
+      return Response.json({ status: 'message_deleted' });
+    }
   }
 
   const { data: devices, error: devicesError } = await admin
@@ -255,8 +259,10 @@ async function deliver(
             body,
           },
           data: {
-            conversation_id: job.conversation_id,
-            message_id: job.message_id,
+            conversation_id: job.conversation_id ?? '',
+            message_id: job.message_id ?? '',
+            friend_request_id: job.friend_request_id ?? '',
+            notification_type: job.notification_type,
             recipient_id: job.recipient_user_id,
             sender_id: job.sender_id,
             sender_name: job.sender_name,
@@ -298,6 +304,11 @@ function notificationBody(
   job: OutboxRecord,
   locale: PushDevice['locale'],
 ): string {
+  if (job.notification_type === 'friend_request') {
+    return locale === 'en'
+      ? 'sent you a friend request'
+      : 'отправил(а) вам заявку в друны';
+  }
   if (job.message_type === 'text') {
     return job.message_text.trim() || (locale === 'en' ? 'New message' : 'Новое сообщение');
   }

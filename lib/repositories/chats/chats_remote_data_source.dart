@@ -240,6 +240,11 @@ class ChatsRemoteDataSource {
     params: {'conversation_ids': ids.toList(growable: false)},
   );
 
+  Future<String> createDirectConversation(String peerId) => _client.rpc<String>(
+    'create_direct_conversation',
+    params: {'peer_user_id': peerId},
+  );
+
   ChatPreviewType _previewType(String? value) {
     return switch (value) {
       'image' => ChatPreviewType.image,

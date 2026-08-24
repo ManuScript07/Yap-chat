@@ -817,6 +817,144 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Уведомления отключены'**
   String get chatsNotificationsDisabled;
+
+  /// No description provided for @friendsTabFriends.
+  ///
+  /// In ru, this message translates to:
+  /// **'друны'**
+  String get friendsTabFriends;
+
+  /// No description provided for @friendsTabRequests.
+  ///
+  /// In ru, this message translates to:
+  /// **'заявки'**
+  String get friendsTabRequests;
+
+  /// No description provided for @friendsAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'все друны'**
+  String get friendsAll;
+
+  /// No description provided for @friendsOutgoing.
+  ///
+  /// In ru, this message translates to:
+  /// **'исходящие'**
+  String get friendsOutgoing;
+
+  /// No description provided for @friendsIncoming.
+  ///
+  /// In ru, this message translates to:
+  /// **'входящие'**
+  String get friendsIncoming;
+
+  /// No description provided for @friendsSearchHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'поиск'**
+  String get friendsSearchHint;
+
+  /// No description provided for @friendsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'у вас пока нет друнов'**
+  String get friendsEmpty;
+
+  /// No description provided for @friendsRequestsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'заявок пока нет'**
+  String get friendsRequestsEmpty;
+
+  /// No description provided for @friendsNoSearchResults.
+  ///
+  /// In ru, this message translates to:
+  /// **'ничего не нашли'**
+  String get friendsNoSearchResults;
+
+  /// No description provided for @friendsLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить друнов'**
+  String get friendsLoadFailed;
+
+  /// No description provided for @friendsActionFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось выполнить действие'**
+  String get friendsActionFailed;
+
+  /// No description provided for @friendsCancelRequest.
+  ///
+  /// In ru, this message translates to:
+  /// **'отменить'**
+  String get friendsCancelRequest;
+
+  /// No description provided for @friendsCount.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, one{{count} друг} few{{count} друга} many{{count} друзей} other{{count} друзей}}'**
+  String friendsCount(int count);
+
+  /// No description provided for @friendsAddTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить друна'**
+  String get friendsAddTitle;
+
+  /// No description provided for @friendsUserSearchHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'поиск по username'**
+  String get friendsUserSearchHint;
+
+  /// No description provided for @friendsSearchPrompt.
+  ///
+  /// In ru, this message translates to:
+  /// **'найдите друна по username или имени'**
+  String get friendsSearchPrompt;
+
+  /// No description provided for @friendsUserSearchFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось выполнить поиск'**
+  String get friendsUserSearchFailed;
+
+  /// No description provided for @friendsAlreadyAdded.
+  ///
+  /// In ru, this message translates to:
+  /// **'уже в друнах'**
+  String get friendsAlreadyAdded;
+
+  /// No description provided for @friendsRequestSent.
+  ///
+  /// In ru, this message translates to:
+  /// **'заявка отправлена'**
+  String get friendsRequestSent;
+
+  /// No description provided for @friendsRequestIncoming.
+  ///
+  /// In ru, this message translates to:
+  /// **'ответьте в заявках'**
+  String get friendsRequestIncoming;
+
+  /// No description provided for @friendsLocationUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Друг ещё не делился геопозицией'**
+  String get friendsLocationUnavailable;
+
+  /// No description provided for @friendsChatOpenFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось открыть чат'**
+  String get friendsChatOpenFailed;
+
+  /// No description provided for @notificationFriendRequest.
+  ///
+  /// In ru, this message translates to:
+  /// **'отправил(а) вам заявку в друны'**
+  String get notificationFriendRequest;
 }
 
 class _AppLocalizationsDelegate
