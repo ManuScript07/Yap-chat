@@ -9,6 +9,9 @@ class ContactDiscoveryItem extends StatelessWidget {
     required this.entry,
     required this.friendsLabel,
     required this.notRegisteredLabel,
+    required this.checkingLabel,
+    required this.unknownLabel,
+    required this.isRefreshing,
     required this.hiddenFriendCountLabel,
     required this.inviteLabel,
     required this.relationshipLabel,
@@ -22,6 +25,9 @@ class ContactDiscoveryItem extends StatelessWidget {
   final ContactDiscoveryEntry entry;
   final String Function(int count) friendsLabel;
   final String notRegisteredLabel;
+  final String checkingLabel;
+  final String unknownLabel;
+  final bool isRefreshing;
   final String hiddenFriendCountLabel;
   final String inviteLabel;
   final String Function(FriendRelationship relationship) relationshipLabel;
@@ -76,7 +82,14 @@ class ContactDiscoveryItem extends StatelessWidget {
                 ),
                 Text(
                   candidate == null
-                      ? notRegisteredLabel
+                      ? switch (entry.matchStatus) {
+                          ContactMatchStatus.notRegistered =>
+                            notRegisteredLabel,
+                          ContactMatchStatus.unknown => isRefreshing
+                              ? checkingLabel
+                              : unknownLabel,
+                          ContactMatchStatus.matched => unknownLabel,
+                        }
                       : candidate.friendCount == null
                       ? hiddenFriendCountLabel
                       : friendsLabel(candidate.friendCount!),
@@ -90,16 +103,18 @@ class ContactDiscoveryItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          if (candidate == null)
+          if (entry.matchStatus == ContactMatchStatus.notRegistered)
             _InviteButton(label: inviteLabel, onTap: onInvite)
-          else
+          else if (candidate != null)
             _CandidateAction(
               candidate: candidate,
               relationshipLabel: relationshipLabel,
               onAdd: onAdd,
               onAccept: onAccept,
               onReject: onReject,
-            ),
+            )
+          else
+            const SizedBox(width: 8),
         ],
       ),
     );

@@ -111,6 +111,27 @@ class _ContactDiscoverySheet extends StatelessWidget {
                   ],
                 ),
               ),
+              BlocSelector<
+                ContactDiscoveryCubit,
+                ContactDiscoveryState,
+                bool
+              >(
+                selector: (state) => state.isRefreshing,
+                builder: (context, isRefreshing) => AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: isRefreshing
+                      ? LinearProgressIndicator(
+                          key: const ValueKey('contacts-refreshing'),
+                          minHeight: 2,
+                          color: context.colorScheme.primary,
+                          backgroundColor: Colors.transparent,
+                        )
+                      : const SizedBox(
+                          key: ValueKey('contacts-idle'),
+                          height: 2,
+                        ),
+                ),
+              ),
               Expanded(
                 child: _ContactDiscoveryBody(
                   username: username,
@@ -204,6 +225,9 @@ class _ContactDiscoveryBody extends StatelessWidget {
                 entry: entry,
                 friendsLabel: context.l10n.friendsCount,
                 notRegisteredLabel: context.l10n.friendsContactsNotRegistered,
+                checkingLabel: context.l10n.friendsContactsChecking,
+                unknownLabel: context.l10n.friendsContactsUnableToCheck,
+                isRefreshing: state.isRefreshing,
                 hiddenFriendCountLabel:
                     context.l10n.friendsContactsFriendCountHidden,
                 inviteLabel: context.l10n.friendsContactsInvite,

@@ -212,6 +212,15 @@ class MediaCacheService {
       await (_database.delete(
         _database.cachedProfiles,
       )..where((table) => table.userId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedFriends,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedFriendRequests,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedContactMatches,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
     });
   }
 

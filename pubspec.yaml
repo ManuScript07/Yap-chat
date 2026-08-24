@@ -48,6 +48,8 @@ dependencies:
   flutter_contacts: 2.3.1
   share_plus: 13.3.0
   phone_numbers_parser: 9.0.25
+  crypto: ^3.0.7
+  flutter_secure_storage: ^11.0.0
 
 dev_dependencies:
   flutter_test:

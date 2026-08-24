@@ -196,6 +196,8 @@
   "friendsContactsEmpty": "в адресной книге нет контактов с номерами",
   "friendsContactsLoadFailed": "Не удалось загрузить контакты",
   "friendsContactsNotRegistered": "ещё не в Пуньк",
+  "friendsContactsChecking": "проверяем…",
+  "friendsContactsUnableToCheck": "не удалось проверить",
   "friendsContactsFriendCountHidden": "количество друзей скрыто",
   "friendsContactsInvite": "пригласить",
   "friendsContactsPermissionTitle": "Нет доступа к контактам",

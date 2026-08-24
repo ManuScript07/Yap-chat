@@ -5,6 +5,7 @@ import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/friends/abstract_friends_repository.dart';
+import 'package:yap_chat/repositories/friends/contact_match_cache_data_source.dart';
 import 'package:yap_chat/repositories/friends/friends_cache_data_source.dart';
 import 'package:yap_chat/repositories/friends/friends_remote_data_source.dart';
 
@@ -12,23 +13,34 @@ class FriendsRepository implements IFriendsRepository {
   FriendsRepository({
     required AppConfig config,
     required FriendsCacheDataSource cache,
+    required ContactMatchCacheDataSource contactMatchCache,
     required FriendsRemoteDataSource remote,
     required MediaCacheService mediaCache,
+    ContactMatchCachePolicy contactMatchCachePolicy =
+        const ContactMatchCachePolicy(),
+    DateTime Function()? clock,
   }) : _config = config,
        _cache = cache,
+       _contactMatchCache = contactMatchCache,
+       _contactMatchCachePolicy = contactMatchCachePolicy,
        _remote = remote,
-       _mediaCache = mediaCache;
+       _mediaCache = mediaCache,
+       _clock = clock ?? DateTime.now;
 
   final AppConfig _config;
   final FriendsCacheDataSource _cache;
+  final ContactMatchCacheDataSource _contactMatchCache;
+  final ContactMatchCachePolicy _contactMatchCachePolicy;
   final FriendsRemoteDataSource _remote;
   final MediaCacheService _mediaCache;
+  final DateTime Function() _clock;
   final Uuid _uuid = const Uuid();
   StreamSubscription<void>? _changesSubscription;
   Future<void>? _activeSync;
   final Map<String, ({DateTime cachedAt, List<FriendCandidate> results})>
   _searchCache = {};
   final Map<String, Future<List<FriendCandidate>>> _activeSearches = {};
+  final Map<String, Future<ContactMatchSnapshot>> _activeContactRefreshes = {};
 
   @override
   Stream<List<Friend>> watchFriends() {
@@ -77,19 +89,103 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
-  Future<Map<String, FriendCandidate>> matchContactPhones(
+  Future<ContactMatchSnapshot> readCachedContactMatches(
+    List<String> phoneNumbers,
+  ) async {
+    final unique = phoneNumbers.toSet().toList(growable: false);
+    final records = await _contactMatchCache.read(unique);
+    return _buildContactSnapshot(records);
+  }
+
+  @override
+  Future<ContactMatchSnapshot> refreshContactMatches(
+    List<String> phoneNumbers,
+  ) {
+    final unique = phoneNumbers.toSet().toList(growable: false)..sort();
+    final operationKey = unique.join('\u0000');
+    final active = _activeContactRefreshes[operationKey];
+    if (active != null) return active;
+    final future = _refreshContactMatches(unique);
+    _activeContactRefreshes[operationKey] = future;
+    return future.whenComplete(
+      () => _activeContactRefreshes.remove(operationKey),
+    );
+  }
+
+  Future<ContactMatchSnapshot> _refreshContactMatches(
     List<String> phoneNumbers,
   ) async {
     const batchSize = 500;
-    final unique = phoneNumbers.toSet().toList(growable: false);
-    final matches = <String, FriendCandidate>{};
-    for (var offset = 0; offset < unique.length; offset += batchSize) {
-      final end = (offset + batchSize).clamp(0, unique.length);
-      matches.addAll(
-        await _remote.matchContactPhones(unique.sublist(offset, end)),
+    await _contactMatchCache.retainOnly(phoneNumbers);
+    final cached = await _contactMatchCache.read(phoneNumbers);
+    final now = _clock().toUtc();
+    final stalePhoneNumbers = phoneNumbers
+        .where(
+          (phone) =>
+              _contactMatchCachePolicy.shouldRefresh(cached[phone], now),
+        )
+        .toList(growable: false);
+
+    final freshMatches = <String, FriendCandidate>{};
+    for (var offset = 0; offset < stalePhoneNumbers.length; offset += batchSize) {
+      final end = (offset + batchSize).clamp(0, stalePhoneNumbers.length);
+      freshMatches.addAll(
+        await _remote.matchContactPhones(
+          stalePhoneNumbers.sublist(offset, end),
+        ),
       );
     }
-    return Map.unmodifiable(matches);
+    if (stalePhoneNumbers.isNotEmpty) {
+      await _contactMatchCache.writeResults(
+        checkedPhoneNumbers: stalePhoneNumbers,
+        matches: freshMatches,
+        checkedAt: now,
+      );
+    }
+    final updated = await _contactMatchCache.read(phoneNumbers);
+    return _buildContactSnapshot(updated, freshMatches: freshMatches);
+  }
+
+  Future<ContactMatchSnapshot> _buildContactSnapshot(
+    Map<String, ContactMatchCacheRecord> records, {
+    Map<String, FriendCandidate> freshMatches = const {},
+  }) async {
+    final friends = await _cache.readFriends();
+    final requests = await _cache.readRequests();
+    final friendsById = {for (final friend in friends) friend.id: friend};
+    final requestsByPeerId = {
+      for (final request in requests) request.peerId: request,
+    };
+    final matches = <String, FriendCandidate>{};
+    for (final entry in records.entries) {
+      final cachedCandidate = entry.value.candidate;
+      if (!entry.value.isRegistered || cachedCandidate == null) continue;
+      final freshCandidate = freshMatches[entry.key];
+      final candidate = freshCandidate ?? cachedCandidate;
+      final friend = friendsById[candidate.id];
+      final request = requestsByPeerId[candidate.id];
+      final relationship = friend != null
+          ? FriendRelationship.friend
+          : request != null
+          ? request.direction == FriendRequestDirection.incoming
+                ? FriendRelationship.incoming
+                : FriendRelationship.outgoing
+          : freshCandidate?.relationship ?? FriendRelationship.none;
+      matches[entry.key] = FriendCandidate(
+        id: candidate.id,
+        requestId: request?.id ?? freshCandidate?.requestId,
+        username: candidate.username,
+        displayName: candidate.displayName,
+        avatarUrl: candidate.avatarUrl,
+        avatarStoragePath: candidate.avatarStoragePath,
+        friendCount: candidate.friendCount,
+        relationship: relationship,
+      );
+    }
+    return ContactMatchSnapshot(
+      matches: Map.unmodifiable(matches),
+      checkedPhoneNumbers: Set.unmodifiable(records.keys),
+    );
   }
 
   @override

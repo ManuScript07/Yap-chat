@@ -528,6 +528,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get friendsContactsNotRegistered => 'ещё не в Пуньк';
 
   @override
+  String get friendsContactsChecking => 'проверяем…';
+
+  @override
+  String get friendsContactsUnableToCheck => 'не удалось проверить';
+
+  @override
   String get friendsContactsFriendCountHidden => 'количество друзей скрыто';
 
   @override

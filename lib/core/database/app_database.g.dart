@@ -4974,6 +4974,665 @@ class CachedFriendRequestsCompanion
   }
 }
 
+class $CachedContactMatchesTable extends CachedContactMatches
+    with TableInfo<$CachedContactMatchesTable, CachedContactMatch> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedContactMatchesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phoneKeyMeta = const VerificationMeta(
+    'phoneKey',
+  );
+  @override
+  late final GeneratedColumn<String> phoneKey = GeneratedColumn<String>(
+    'phone_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isRegisteredMeta = const VerificationMeta(
+    'isRegistered',
+  );
+  @override
+  late final GeneratedColumn<bool> isRegistered = GeneratedColumn<bool>(
+    'is_registered',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_registered" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _candidateIdMeta = const VerificationMeta(
+    'candidateId',
+  );
+  @override
+  late final GeneratedColumn<String> candidateId = GeneratedColumn<String>(
+    'candidate_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _avatarStoragePathMeta = const VerificationMeta(
+    'avatarStoragePath',
+  );
+  @override
+  late final GeneratedColumn<String> avatarStoragePath =
+      GeneratedColumn<String>(
+        'avatar_storage_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _friendCountMeta = const VerificationMeta(
+    'friendCount',
+  );
+  @override
+  late final GeneratedColumn<int> friendCount = GeneratedColumn<int>(
+    'friend_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _checkedAtMeta = const VerificationMeta(
+    'checkedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> checkedAt = GeneratedColumn<DateTime>(
+    'checked_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    phoneKey,
+    isRegistered,
+    candidateId,
+    username,
+    displayName,
+    avatarUrl,
+    avatarStoragePath,
+    friendCount,
+    checkedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_contact_matches';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedContactMatch> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('phone_key')) {
+      context.handle(
+        _phoneKeyMeta,
+        phoneKey.isAcceptableOrUnknown(data['phone_key']!, _phoneKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_phoneKeyMeta);
+    }
+    if (data.containsKey('is_registered')) {
+      context.handle(
+        _isRegisteredMeta,
+        isRegistered.isAcceptableOrUnknown(
+          data['is_registered']!,
+          _isRegisteredMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_isRegisteredMeta);
+    }
+    if (data.containsKey('candidate_id')) {
+      context.handle(
+        _candidateIdMeta,
+        candidateId.isAcceptableOrUnknown(
+          data['candidate_id']!,
+          _candidateIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
+      );
+    }
+    if (data.containsKey('avatar_storage_path')) {
+      context.handle(
+        _avatarStoragePathMeta,
+        avatarStoragePath.isAcceptableOrUnknown(
+          data['avatar_storage_path']!,
+          _avatarStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('friend_count')) {
+      context.handle(
+        _friendCountMeta,
+        friendCount.isAcceptableOrUnknown(
+          data['friend_count']!,
+          _friendCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('checked_at')) {
+      context.handle(
+        _checkedAtMeta,
+        checkedAt.isAcceptableOrUnknown(data['checked_at']!, _checkedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_checkedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, phoneKey};
+  @override
+  CachedContactMatch map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedContactMatch(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      phoneKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phone_key'],
+      )!,
+      isRegistered: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_registered'],
+      )!,
+      candidateId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}candidate_id'],
+      ),
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      ),
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      ),
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
+      avatarStoragePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_storage_path'],
+      ),
+      friendCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}friend_count'],
+      ),
+      checkedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}checked_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedContactMatchesTable createAlias(String alias) {
+    return $CachedContactMatchesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedContactMatch extends DataClass
+    implements Insertable<CachedContactMatch> {
+  final String ownerUserId;
+  final String phoneKey;
+  final bool isRegistered;
+  final String? candidateId;
+  final String? username;
+  final String? displayName;
+  final String? avatarUrl;
+  final String? avatarStoragePath;
+  final int? friendCount;
+  final DateTime checkedAt;
+  const CachedContactMatch({
+    required this.ownerUserId,
+    required this.phoneKey,
+    required this.isRegistered,
+    this.candidateId,
+    this.username,
+    this.displayName,
+    this.avatarUrl,
+    this.avatarStoragePath,
+    this.friendCount,
+    required this.checkedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['phone_key'] = Variable<String>(phoneKey);
+    map['is_registered'] = Variable<bool>(isRegistered);
+    if (!nullToAbsent || candidateId != null) {
+      map['candidate_id'] = Variable<String>(candidateId);
+    }
+    if (!nullToAbsent || username != null) {
+      map['username'] = Variable<String>(username);
+    }
+    if (!nullToAbsent || displayName != null) {
+      map['display_name'] = Variable<String>(displayName);
+    }
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
+    }
+    if (!nullToAbsent || avatarStoragePath != null) {
+      map['avatar_storage_path'] = Variable<String>(avatarStoragePath);
+    }
+    if (!nullToAbsent || friendCount != null) {
+      map['friend_count'] = Variable<int>(friendCount);
+    }
+    map['checked_at'] = Variable<DateTime>(checkedAt);
+    return map;
+  }
+
+  CachedContactMatchesCompanion toCompanion(bool nullToAbsent) {
+    return CachedContactMatchesCompanion(
+      ownerUserId: Value(ownerUserId),
+      phoneKey: Value(phoneKey),
+      isRegistered: Value(isRegistered),
+      candidateId: candidateId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(candidateId),
+      username: username == null && nullToAbsent
+          ? const Value.absent()
+          : Value(username),
+      displayName: displayName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(displayName),
+      avatarUrl: avatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarUrl),
+      avatarStoragePath: avatarStoragePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarStoragePath),
+      friendCount: friendCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(friendCount),
+      checkedAt: Value(checkedAt),
+    );
+  }
+
+  factory CachedContactMatch.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedContactMatch(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      phoneKey: serializer.fromJson<String>(json['phoneKey']),
+      isRegistered: serializer.fromJson<bool>(json['isRegistered']),
+      candidateId: serializer.fromJson<String?>(json['candidateId']),
+      username: serializer.fromJson<String?>(json['username']),
+      displayName: serializer.fromJson<String?>(json['displayName']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
+      avatarStoragePath: serializer.fromJson<String?>(
+        json['avatarStoragePath'],
+      ),
+      friendCount: serializer.fromJson<int?>(json['friendCount']),
+      checkedAt: serializer.fromJson<DateTime>(json['checkedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'phoneKey': serializer.toJson<String>(phoneKey),
+      'isRegistered': serializer.toJson<bool>(isRegistered),
+      'candidateId': serializer.toJson<String?>(candidateId),
+      'username': serializer.toJson<String?>(username),
+      'displayName': serializer.toJson<String?>(displayName),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
+      'avatarStoragePath': serializer.toJson<String?>(avatarStoragePath),
+      'friendCount': serializer.toJson<int?>(friendCount),
+      'checkedAt': serializer.toJson<DateTime>(checkedAt),
+    };
+  }
+
+  CachedContactMatch copyWith({
+    String? ownerUserId,
+    String? phoneKey,
+    bool? isRegistered,
+    Value<String?> candidateId = const Value.absent(),
+    Value<String?> username = const Value.absent(),
+    Value<String?> displayName = const Value.absent(),
+    Value<String?> avatarUrl = const Value.absent(),
+    Value<String?> avatarStoragePath = const Value.absent(),
+    Value<int?> friendCount = const Value.absent(),
+    DateTime? checkedAt,
+  }) => CachedContactMatch(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    phoneKey: phoneKey ?? this.phoneKey,
+    isRegistered: isRegistered ?? this.isRegistered,
+    candidateId: candidateId.present ? candidateId.value : this.candidateId,
+    username: username.present ? username.value : this.username,
+    displayName: displayName.present ? displayName.value : this.displayName,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
+    avatarStoragePath: avatarStoragePath.present
+        ? avatarStoragePath.value
+        : this.avatarStoragePath,
+    friendCount: friendCount.present ? friendCount.value : this.friendCount,
+    checkedAt: checkedAt ?? this.checkedAt,
+  );
+  CachedContactMatch copyWithCompanion(CachedContactMatchesCompanion data) {
+    return CachedContactMatch(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      phoneKey: data.phoneKey.present ? data.phoneKey.value : this.phoneKey,
+      isRegistered: data.isRegistered.present
+          ? data.isRegistered.value
+          : this.isRegistered,
+      candidateId: data.candidateId.present
+          ? data.candidateId.value
+          : this.candidateId,
+      username: data.username.present ? data.username.value : this.username,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
+      avatarStoragePath: data.avatarStoragePath.present
+          ? data.avatarStoragePath.value
+          : this.avatarStoragePath,
+      friendCount: data.friendCount.present
+          ? data.friendCount.value
+          : this.friendCount,
+      checkedAt: data.checkedAt.present ? data.checkedAt.value : this.checkedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedContactMatch(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('phoneKey: $phoneKey, ')
+          ..write('isRegistered: $isRegistered, ')
+          ..write('candidateId: $candidateId, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('avatarUrl: $avatarUrl, ')
+          ..write('avatarStoragePath: $avatarStoragePath, ')
+          ..write('friendCount: $friendCount, ')
+          ..write('checkedAt: $checkedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    phoneKey,
+    isRegistered,
+    candidateId,
+    username,
+    displayName,
+    avatarUrl,
+    avatarStoragePath,
+    friendCount,
+    checkedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedContactMatch &&
+          other.ownerUserId == this.ownerUserId &&
+          other.phoneKey == this.phoneKey &&
+          other.isRegistered == this.isRegistered &&
+          other.candidateId == this.candidateId &&
+          other.username == this.username &&
+          other.displayName == this.displayName &&
+          other.avatarUrl == this.avatarUrl &&
+          other.avatarStoragePath == this.avatarStoragePath &&
+          other.friendCount == this.friendCount &&
+          other.checkedAt == this.checkedAt);
+}
+
+class CachedContactMatchesCompanion
+    extends UpdateCompanion<CachedContactMatch> {
+  final Value<String> ownerUserId;
+  final Value<String> phoneKey;
+  final Value<bool> isRegistered;
+  final Value<String?> candidateId;
+  final Value<String?> username;
+  final Value<String?> displayName;
+  final Value<String?> avatarUrl;
+  final Value<String?> avatarStoragePath;
+  final Value<int?> friendCount;
+  final Value<DateTime> checkedAt;
+  final Value<int> rowid;
+  const CachedContactMatchesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.phoneKey = const Value.absent(),
+    this.isRegistered = const Value.absent(),
+    this.candidateId = const Value.absent(),
+    this.username = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
+    this.avatarStoragePath = const Value.absent(),
+    this.friendCount = const Value.absent(),
+    this.checkedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedContactMatchesCompanion.insert({
+    required String ownerUserId,
+    required String phoneKey,
+    required bool isRegistered,
+    this.candidateId = const Value.absent(),
+    this.username = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
+    this.avatarStoragePath = const Value.absent(),
+    this.friendCount = const Value.absent(),
+    required DateTime checkedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       phoneKey = Value(phoneKey),
+       isRegistered = Value(isRegistered),
+       checkedAt = Value(checkedAt);
+  static Insertable<CachedContactMatch> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? phoneKey,
+    Expression<bool>? isRegistered,
+    Expression<String>? candidateId,
+    Expression<String>? username,
+    Expression<String>? displayName,
+    Expression<String>? avatarUrl,
+    Expression<String>? avatarStoragePath,
+    Expression<int>? friendCount,
+    Expression<DateTime>? checkedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (phoneKey != null) 'phone_key': phoneKey,
+      if (isRegistered != null) 'is_registered': isRegistered,
+      if (candidateId != null) 'candidate_id': candidateId,
+      if (username != null) 'username': username,
+      if (displayName != null) 'display_name': displayName,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (avatarStoragePath != null) 'avatar_storage_path': avatarStoragePath,
+      if (friendCount != null) 'friend_count': friendCount,
+      if (checkedAt != null) 'checked_at': checkedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedContactMatchesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? phoneKey,
+    Value<bool>? isRegistered,
+    Value<String?>? candidateId,
+    Value<String?>? username,
+    Value<String?>? displayName,
+    Value<String?>? avatarUrl,
+    Value<String?>? avatarStoragePath,
+    Value<int?>? friendCount,
+    Value<DateTime>? checkedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedContactMatchesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      phoneKey: phoneKey ?? this.phoneKey,
+      isRegistered: isRegistered ?? this.isRegistered,
+      candidateId: candidateId ?? this.candidateId,
+      username: username ?? this.username,
+      displayName: displayName ?? this.displayName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
+      friendCount: friendCount ?? this.friendCount,
+      checkedAt: checkedAt ?? this.checkedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (phoneKey.present) {
+      map['phone_key'] = Variable<String>(phoneKey.value);
+    }
+    if (isRegistered.present) {
+      map['is_registered'] = Variable<bool>(isRegistered.value);
+    }
+    if (candidateId.present) {
+      map['candidate_id'] = Variable<String>(candidateId.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
+    }
+    if (avatarStoragePath.present) {
+      map['avatar_storage_path'] = Variable<String>(avatarStoragePath.value);
+    }
+    if (friendCount.present) {
+      map['friend_count'] = Variable<int>(friendCount.value);
+    }
+    if (checkedAt.present) {
+      map['checked_at'] = Variable<DateTime>(checkedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedContactMatchesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('phoneKey: $phoneKey, ')
+          ..write('isRegistered: $isRegistered, ')
+          ..write('candidateId: $candidateId, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('avatarUrl: $avatarUrl, ')
+          ..write('avatarStoragePath: $avatarStoragePath, ')
+          ..write('friendCount: $friendCount, ')
+          ..write('checkedAt: $checkedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4985,6 +5644,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedFriendsTable cachedFriends = $CachedFriendsTable(this);
   late final $CachedFriendRequestsTable cachedFriendRequests =
       $CachedFriendRequestsTable(this);
+  late final $CachedContactMatchesTable cachedContactMatches =
+      $CachedContactMatchesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4996,6 +5657,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     pendingChatOperations,
     cachedFriends,
     cachedFriendRequests,
+    cachedContactMatches,
   ];
 }
 
@@ -7291,6 +7953,329 @@ typedef $$CachedFriendRequestsTableProcessedTableManager =
       CachedFriendRequest,
       PrefetchHooks Function()
     >;
+typedef $$CachedContactMatchesTableCreateCompanionBuilder =
+    CachedContactMatchesCompanion Function({
+      required String ownerUserId,
+      required String phoneKey,
+      required bool isRegistered,
+      Value<String?> candidateId,
+      Value<String?> username,
+      Value<String?> displayName,
+      Value<String?> avatarUrl,
+      Value<String?> avatarStoragePath,
+      Value<int?> friendCount,
+      required DateTime checkedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedContactMatchesTableUpdateCompanionBuilder =
+    CachedContactMatchesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> phoneKey,
+      Value<bool> isRegistered,
+      Value<String?> candidateId,
+      Value<String?> username,
+      Value<String?> displayName,
+      Value<String?> avatarUrl,
+      Value<String?> avatarStoragePath,
+      Value<int?> friendCount,
+      Value<DateTime> checkedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedContactMatchesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedContactMatchesTable> {
+  $$CachedContactMatchesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phoneKey => $composableBuilder(
+    column: $table.phoneKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRegistered => $composableBuilder(
+    column: $table.isRegistered,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get candidateId => $composableBuilder(
+    column: $table.candidateId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarStoragePath => $composableBuilder(
+    column: $table.avatarStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get friendCount => $composableBuilder(
+    column: $table.friendCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get checkedAt => $composableBuilder(
+    column: $table.checkedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedContactMatchesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedContactMatchesTable> {
+  $$CachedContactMatchesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phoneKey => $composableBuilder(
+    column: $table.phoneKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isRegistered => $composableBuilder(
+    column: $table.isRegistered,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get candidateId => $composableBuilder(
+    column: $table.candidateId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarStoragePath => $composableBuilder(
+    column: $table.avatarStoragePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get friendCount => $composableBuilder(
+    column: $table.friendCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get checkedAt => $composableBuilder(
+    column: $table.checkedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedContactMatchesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedContactMatchesTable> {
+  $$CachedContactMatchesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get phoneKey =>
+      $composableBuilder(column: $table.phoneKey, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRegistered => $composableBuilder(
+    column: $table.isRegistered,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get candidateId => $composableBuilder(
+    column: $table.candidateId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get avatarStoragePath => $composableBuilder(
+    column: $table.avatarStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get friendCount => $composableBuilder(
+    column: $table.friendCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get checkedAt =>
+      $composableBuilder(column: $table.checkedAt, builder: (column) => column);
+}
+
+class $$CachedContactMatchesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedContactMatchesTable,
+          CachedContactMatch,
+          $$CachedContactMatchesTableFilterComposer,
+          $$CachedContactMatchesTableOrderingComposer,
+          $$CachedContactMatchesTableAnnotationComposer,
+          $$CachedContactMatchesTableCreateCompanionBuilder,
+          $$CachedContactMatchesTableUpdateCompanionBuilder,
+          (
+            CachedContactMatch,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedContactMatchesTable,
+              CachedContactMatch
+            >,
+          ),
+          CachedContactMatch,
+          PrefetchHooks Function()
+        > {
+  $$CachedContactMatchesTableTableManager(
+    _$AppDatabase db,
+    $CachedContactMatchesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedContactMatchesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedContactMatchesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedContactMatchesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> phoneKey = const Value.absent(),
+                Value<bool> isRegistered = const Value.absent(),
+                Value<String?> candidateId = const Value.absent(),
+                Value<String?> username = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
+                Value<String?> avatarStoragePath = const Value.absent(),
+                Value<int?> friendCount = const Value.absent(),
+                Value<DateTime> checkedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedContactMatchesCompanion(
+                ownerUserId: ownerUserId,
+                phoneKey: phoneKey,
+                isRegistered: isRegistered,
+                candidateId: candidateId,
+                username: username,
+                displayName: displayName,
+                avatarUrl: avatarUrl,
+                avatarStoragePath: avatarStoragePath,
+                friendCount: friendCount,
+                checkedAt: checkedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String phoneKey,
+                required bool isRegistered,
+                Value<String?> candidateId = const Value.absent(),
+                Value<String?> username = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
+                Value<String?> avatarStoragePath = const Value.absent(),
+                Value<int?> friendCount = const Value.absent(),
+                required DateTime checkedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedContactMatchesCompanion.insert(
+                ownerUserId: ownerUserId,
+                phoneKey: phoneKey,
+                isRegistered: isRegistered,
+                candidateId: candidateId,
+                username: username,
+                displayName: displayName,
+                avatarUrl: avatarUrl,
+                avatarStoragePath: avatarStoragePath,
+                friendCount: friendCount,
+                checkedAt: checkedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedContactMatchesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedContactMatchesTable,
+      CachedContactMatch,
+      $$CachedContactMatchesTableFilterComposer,
+      $$CachedContactMatchesTableOrderingComposer,
+      $$CachedContactMatchesTableAnnotationComposer,
+      $$CachedContactMatchesTableCreateCompanionBuilder,
+      $$CachedContactMatchesTableUpdateCompanionBuilder,
+      (
+        CachedContactMatch,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedContactMatchesTable,
+          CachedContactMatch
+        >,
+      ),
+      CachedContactMatch,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7307,4 +8292,6 @@ class $AppDatabaseManager {
       $$CachedFriendsTableTableManager(_db, _db.cachedFriends);
   $$CachedFriendRequestsTableTableManager get cachedFriendRequests =>
       $$CachedFriendRequestsTableTableManager(_db, _db.cachedFriendRequests);
+  $$CachedContactMatchesTableTableManager get cachedContactMatches =>
+      $$CachedContactMatchesTableTableManager(_db, _db.cachedContactMatches);
 }

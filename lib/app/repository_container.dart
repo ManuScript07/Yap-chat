@@ -1,6 +1,7 @@
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/avatar_image_processor.dart';
 import 'package:yap_chat/core/services/chat_media_processor.dart';
+import 'package:yap_chat/core/services/contact_cache_key_service.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
@@ -50,6 +51,11 @@ class RepositoryContainer {
     final friendsCache = FriendsCacheDataSource(
       database: config.database,
       userIdProvider: () => client.auth.currentUser!.id,
+    );
+    final contactMatchCache = ContactMatchCacheDataSource(
+      database: config.database,
+      userIdProvider: () => client.auth.currentUser!.id,
+      keyService: ContactCacheKeyService(),
     );
     final chatRemote = ChatRemoteDataSource(client: client);
     final messageHydrator = ChatMessageHydrator(
@@ -120,6 +126,7 @@ class RepositoryContainer {
       friendsRepository: FriendsRepository(
         config: config,
         cache: friendsCache,
+        contactMatchCache: contactMatchCache,
         remote: friendsRemote,
         mediaCache: mediaCache,
       ),

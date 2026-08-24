@@ -520,6 +520,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get friendsContactsNotRegistered => 'not yet in Yapchat';
 
   @override
+  String get friendsContactsChecking => 'checking…';
+
+  @override
+  String get friendsContactsUnableToCheck => 'unable to check';
+
+  @override
   String get friendsContactsFriendCountHidden => 'friend count is hidden';
 
   @override

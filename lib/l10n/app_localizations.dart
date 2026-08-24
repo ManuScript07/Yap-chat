@@ -956,6 +956,18 @@ abstract class AppLocalizations {
   /// **'ещё не в Пуньк'**
   String get friendsContactsNotRegistered;
 
+  /// No description provided for @friendsContactsChecking.
+  ///
+  /// In ru, this message translates to:
+  /// **'проверяем…'**
+  String get friendsContactsChecking;
+
+  /// No description provided for @friendsContactsUnableToCheck.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось проверить'**
+  String get friendsContactsUnableToCheck;
+
   /// No description provided for @friendsContactsFriendCountHidden.
   ///
   /// In ru, this message translates to:

@@ -120,6 +120,23 @@ class CachedFriendRequests extends Table {
   Set<Column> get primaryKey => {ownerUserId, requestId};
 }
 
+@DataClassName('CachedContactMatch')
+class CachedContactMatches extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get phoneKey => text()();
+  BoolColumn get isRegistered => boolean()();
+  TextColumn get candidateId => text().nullable()();
+  TextColumn get username => text().nullable()();
+  TextColumn get displayName => text().nullable()();
+  TextColumn get avatarUrl => text().nullable()();
+  TextColumn get avatarStoragePath => text().nullable()();
+  IntColumn get friendCount => integer().nullable()();
+  DateTimeColumn get checkedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, phoneKey};
+}
+
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -128,6 +145,7 @@ class CachedFriendRequests extends Table {
     PendingChatOperations,
     CachedFriends,
     CachedFriendRequests,
+    CachedContactMatches,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -146,7 +164,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -169,6 +187,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         await migrator.createTable(cachedFriends);
         await migrator.createTable(cachedFriendRequests);
+      }
+      if (from < 7) {
+        await migrator.createTable(cachedContactMatches);
       }
     },
   );

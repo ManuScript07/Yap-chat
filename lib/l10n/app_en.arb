@@ -192,6 +192,8 @@
   "friendsContactsEmpty": "there are no contacts with phone numbers",
   "friendsContactsLoadFailed": "Unable to load contacts",
   "friendsContactsNotRegistered": "not yet in Yapchat",
+  "friendsContactsChecking": "checking…",
+  "friendsContactsUnableToCheck": "unable to check",
   "friendsContactsFriendCountHidden": "friend count is hidden",
   "friendsContactsInvite": "invite",
   "friendsContactsPermissionTitle": "Contacts access denied",

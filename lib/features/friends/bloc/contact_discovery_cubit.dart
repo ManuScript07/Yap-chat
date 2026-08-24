@@ -10,12 +10,16 @@ class ContactDiscoveryState extends Equatable {
     this.status = ContactDiscoveryStatus.initial,
     this.entries = const [],
     this.query = '',
+    this.isRefreshing = false,
+    this.refreshFailed = false,
     this.actionError,
   });
 
   final ContactDiscoveryStatus status;
   final List<ContactDiscoveryEntry> entries;
   final String query;
+  final bool isRefreshing;
+  final bool refreshFailed;
   final Object? actionError;
 
   List<ContactDiscoveryEntry> get visibleEntries {
@@ -35,17 +39,28 @@ class ContactDiscoveryState extends Equatable {
     ContactDiscoveryStatus? status,
     List<ContactDiscoveryEntry>? entries,
     String? query,
+    bool? isRefreshing,
+    bool? refreshFailed,
     Object? actionError,
     bool clearActionError = false,
   }) => ContactDiscoveryState(
     status: status ?? this.status,
     entries: entries ?? this.entries,
     query: query ?? this.query,
+    isRefreshing: isRefreshing ?? this.isRefreshing,
+    refreshFailed: refreshFailed ?? this.refreshFailed,
     actionError: clearActionError ? null : actionError ?? this.actionError,
   );
 
   @override
-  List<Object?> get props => [status, entries, query, actionError];
+  List<Object?> get props => [
+    status,
+    entries,
+    query,
+    isRefreshing,
+    refreshFailed,
+    actionError,
+  ];
 }
 
 class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
@@ -63,23 +78,43 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
     emit(const ContactDiscoveryState(status: ContactDiscoveryStatus.loading));
     try {
       final contacts = await _contactsRepository.readPhoneContacts();
-      final matches = await _friendsRepository.matchContactPhones(
-        contacts.map((contact) => contact.normalizedPhone).toList(),
-      );
+      final phoneNumbers = contacts
+          .map((contact) => contact.normalizedPhone)
+          .toList(growable: false);
+      ContactMatchSnapshot cached;
+      try {
+        cached = await _friendsRepository.readCachedContactMatches(
+          phoneNumbers,
+        );
+      } catch (_) {
+        cached = const ContactMatchSnapshot();
+      }
       if (isClosed) return;
       emit(
         ContactDiscoveryState(
           status: ContactDiscoveryStatus.success,
-          entries: _sortEntries(
-            contacts.map(
-              (contact) => ContactDiscoveryEntry(
-                contact: contact,
-                candidate: matches[contact.normalizedPhone],
-              ),
-            ),
-          ),
+          entries: _entriesFromSnapshot(contacts, cached),
+          isRefreshing: phoneNumbers.isNotEmpty,
         ),
       );
+      if (phoneNumbers.isEmpty) return;
+      try {
+        final refreshed = await _friendsRepository.refreshContactMatches(
+          phoneNumbers,
+        );
+        if (isClosed) return;
+        emit(
+          state.copyWith(
+            entries: _entriesFromSnapshot(contacts, refreshed),
+            isRefreshing: false,
+            refreshFailed: false,
+          ),
+        );
+      } catch (_) {
+        if (!isClosed) {
+          emit(state.copyWith(isRefreshing: false, refreshFailed: true));
+        }
+      }
     } catch (_) {
       if (!isClosed) {
         emit(
@@ -178,12 +213,32 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
   static int _sortGroup(ContactDiscoveryEntry entry) {
     final candidate = entry.candidate;
     if (candidate?.relationship == FriendRelationship.none) return 0;
-    if (candidate == null) return 1;
+    if (entry.matchStatus == ContactMatchStatus.notRegistered) return 1;
+    if (entry.matchStatus == ContactMatchStatus.unknown) return 2;
+    if (candidate == null) return 2;
     return switch (candidate.relationship) {
-      FriendRelationship.incoming => 2,
-      FriendRelationship.outgoing => 3,
-      FriendRelationship.friend => 4,
+      FriendRelationship.incoming => 3,
+      FriendRelationship.outgoing => 4,
+      FriendRelationship.friend => 5,
       FriendRelationship.none => 0,
     };
   }
+
+  static List<ContactDiscoveryEntry> _entriesFromSnapshot(
+    List<DeviceContactPhone> contacts,
+    ContactMatchSnapshot snapshot,
+  ) => _sortEntries(
+    contacts.map((contact) {
+      final candidate = snapshot.matches[contact.normalizedPhone];
+      return ContactDiscoveryEntry(
+        contact: contact,
+        matchStatus: candidate != null
+            ? ContactMatchStatus.matched
+            : snapshot.checkedPhoneNumbers.contains(contact.normalizedPhone)
+            ? ContactMatchStatus.notRegistered
+            : ContactMatchStatus.unknown,
+        candidate: candidate,
+      );
+    }),
+  );
 }
