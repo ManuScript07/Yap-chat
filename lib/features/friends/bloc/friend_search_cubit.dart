@@ -45,15 +45,16 @@ class FriendSearchCubit extends Cubit<FriendSearchState> {
   final IFriendsRepository _repository;
   Timer? _debounce;
   int _searchGeneration = 0;
+  bool _searchInProgress = false;
+  ({String query, int generation})? _pendingSearch;
 
   void queryChanged(String value) {
     _debounce?.cancel();
     final query = value.trim();
     final generation = ++_searchGeneration;
-    if (query.isEmpty) {
-      emit(
-        const FriendSearchState(status: FriendSearchStatus.initial, query: ''),
-      );
+    if (!_isGlobalQuery(query)) {
+      _pendingSearch = null;
+      emit(FriendSearchState(status: FriendSearchStatus.initial, query: value));
       return;
     }
     emit(
@@ -63,23 +64,48 @@ class FriendSearchCubit extends Cubit<FriendSearchState> {
         clearActionError: true,
       ),
     );
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
-      try {
-        final results = await _repository.searchUsers(query);
-        if (!isClosed && generation == _searchGeneration) {
-          emit(
-            state.copyWith(
-              status: FriendSearchStatus.success,
-              results: results,
-            ),
-          );
-        }
-      } catch (error) {
-        if (!isClosed && generation == _searchGeneration) {
-          emit(state.copyWith(status: FriendSearchStatus.failure));
-        }
+    _debounce = Timer(
+      const Duration(milliseconds: 375),
+      () => _scheduleSearch(query, generation),
+    );
+  }
+
+  bool _isGlobalQuery(String query) {
+    if (query.startsWith('@')) return query.substring(1).length >= 3;
+    return query.length >= 3;
+  }
+
+  void _scheduleSearch(String query, int generation) {
+    if (_searchInProgress) {
+      _pendingSearch = (query: query, generation: generation);
+      return;
+    }
+    unawaited(_runSearch(query, generation));
+  }
+
+  Future<void> _runSearch(String query, int generation) async {
+    _searchInProgress = true;
+    try {
+      final results = await _repository.searchUsers(query);
+      if (!isClosed && generation == _searchGeneration) {
+        emit(
+          state.copyWith(status: FriendSearchStatus.success, results: results),
+        );
       }
-    });
+    } catch (_) {
+      if (!isClosed && generation == _searchGeneration) {
+        emit(state.copyWith(status: FriendSearchStatus.failure));
+      }
+    } finally {
+      _searchInProgress = false;
+      final pending = _pendingSearch;
+      _pendingSearch = null;
+      if (!isClosed &&
+          pending != null &&
+          pending.generation == _searchGeneration) {
+        await _runSearch(pending.query, pending.generation);
+      }
+    }
   }
 
   Future<void> sendRequest(FriendCandidate candidate) async {
@@ -93,6 +119,37 @@ class FriendSearchCubit extends Cubit<FriendSearchState> {
     emit(state.copyWith(results: optimistic, clearActionError: true));
     try {
       await _repository.sendRequest(candidate);
+    } catch (error) {
+      if (!isClosed) {
+        emit(state.copyWith(results: previous, actionError: error));
+      }
+    }
+  }
+
+  Future<void> respondToIncoming(
+    FriendCandidate candidate, {
+    required bool accept,
+  }) async {
+    final requestId = candidate.requestId;
+    final index = state.results.indexWhere((item) => item.id == candidate.id);
+    if (requestId == null ||
+        index < 0 ||
+        candidate.relationship != FriendRelationship.incoming) {
+      return;
+    }
+    final previous = state.results;
+    final optimistic = [...previous];
+    if (accept) {
+      optimistic.removeAt(index);
+    } else {
+      optimistic[index] = candidate.copyWith(
+        relationship: FriendRelationship.none,
+        clearRequestId: true,
+      );
+    }
+    emit(state.copyWith(results: optimistic, clearActionError: true));
+    try {
+      await _repository.respondToRequest(requestId, accept: accept);
     } catch (error) {
       if (!isClosed) {
         emit(state.copyWith(results: previous, actionError: error));

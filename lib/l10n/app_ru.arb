@@ -154,6 +154,7 @@
   "authPrivacyPolicy": "Политику конфиденциальности",
   "authCompleteRegistration": "Завершить регистрацию",
   "authNameRequired": "Укажите имя",
+  "authNameInvalid": "Имя должно содержать от 2 до 30 символов",
   "authBirthDateRequired": "Укажите дату рождения",
   "authBirthDateInvalid": "Введите корректную дату рождения. Вам должно быть не менее 14 лет.",
   "authDocumentsRequired": "Необходимо принять соглашение и политику конфиденциальности",
@@ -193,6 +194,8 @@
   "friendsAlreadyAdded": "уже в друнах",
   "friendsRequestSent": "заявка отправлена",
   "friendsRequestIncoming": "ответьте в заявках",
+  "friendsGlobalSearch": "глобальный поиск",
+  "friendsAddTemporarilyUnavailable": "Поиск на этой странице временно недоступен",
   "friendsLocationUnavailable": "Друг ещё не делился геопозицией",
   "friendsChatOpenFailed": "Не удалось открыть чат"
   ,"notificationFriendRequest": "отправил(а) вам заявку в друны"

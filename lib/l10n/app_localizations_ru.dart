@@ -389,6 +389,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authNameRequired => 'Укажите имя';
 
   @override
+  String get authNameInvalid => 'Имя должно содержать от 2 до 30 символов';
+
+  @override
   String get authBirthDateRequired => 'Укажите дату рождения';
 
   @override
@@ -516,6 +519,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get friendsRequestIncoming => 'ответьте в заявках';
+
+  @override
+  String get friendsGlobalSearch => 'глобальный поиск';
+
+  @override
+  String get friendsAddTemporarilyUnavailable =>
+      'Поиск на этой странице временно недоступен';
 
   @override
   String get friendsLocationUnavailable => 'Друг ещё не делился геопозицией';

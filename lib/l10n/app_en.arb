@@ -150,6 +150,7 @@
   "authPrivacyPolicy": "Privacy Policy",
   "authCompleteRegistration": "Complete registration",
   "authNameRequired": "Enter your name",
+  "authNameInvalid": "Name must contain 2–30 characters",
   "authBirthDateRequired": "Enter your date of birth",
   "authBirthDateInvalid": "Enter a valid date of birth. You must be at least 14 years old.",
   "authDocumentsRequired": "You must accept the Terms of Service and Privacy Policy",
@@ -189,6 +190,8 @@
   "friendsAlreadyAdded": "already a friend",
   "friendsRequestSent": "request sent",
   "friendsRequestIncoming": "respond in requests",
+  "friendsGlobalSearch": "global search",
+  "friendsAddTemporarilyUnavailable": "Search on this page is temporarily unavailable",
   "friendsLocationUnavailable": "This friend hasn't shared a location yet",
   "friendsChatOpenFailed": "Unable to open chat"
   ,"notificationFriendRequest": "sent you a friend request"

@@ -18,6 +18,7 @@ enum AuthFailure {
   profileSave,
   usernameTaken,
   invalidUsername,
+  invalidDisplayName,
   signOut,
 }
 

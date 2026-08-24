@@ -9,12 +9,14 @@ class GlassSearchBar extends StatefulWidget {
     this.onChanged,
     this.controller,
     this.focusNode,
+    this.enabled = true,
   });
 
   final String hintText;
   final ValueChanged<String>? onChanged;
   final TextEditingController? controller;
   final FocusNode? focusNode;
+  final bool enabled;
 
   @override
   State<GlassSearchBar> createState() => _GlassSearchBarState();
@@ -135,6 +137,7 @@ class _GlassSearchBarState extends State<GlassSearchBar>
               child: Container(
                 color: mainColor.withValues(alpha: 0.15),
                 child: TextField(
+                  enabled: widget.enabled,
                   controller: _controller,
                   focusNode: _focusNode,
                   onChanged: widget.onChanged,

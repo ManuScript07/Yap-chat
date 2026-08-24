@@ -30,11 +30,13 @@ class FriendsState extends Equatable {
   List<Friend> get filteredFriends {
     final query = friendsQuery.trim().toLowerCase();
     if (query.isEmpty) return friends;
+    final usernameQuery = query.startsWith('@') ? query.substring(1) : query;
     return friends
         .where(
-          (friend) =>
-              friend.displayName.toLowerCase().contains(query) ||
-              friend.username.toLowerCase().contains(query),
+          (friend) => query.startsWith('@')
+              ? friend.username.toLowerCase().contains(usernameQuery)
+              : friend.displayName.toLowerCase().contains(query) ||
+                    friend.username.toLowerCase().contains(usernameQuery),
         )
         .toList(growable: false);
   }
@@ -42,11 +44,13 @@ class FriendsState extends Equatable {
   List<FriendRequest> get filteredRequests {
     final query = requestsQuery.trim().toLowerCase();
     if (query.isEmpty) return requests;
+    final usernameQuery = query.startsWith('@') ? query.substring(1) : query;
     return requests
         .where(
-          (request) =>
-              request.peerDisplayName.toLowerCase().contains(query) ||
-              request.peerUsername.toLowerCase().contains(query),
+          (request) => query.startsWith('@')
+              ? request.peerUsername.toLowerCase().contains(usernameQuery)
+              : request.peerDisplayName.toLowerCase().contains(query) ||
+                    request.peerUsername.toLowerCase().contains(usernameQuery),
         )
         .toList(growable: false);
   }

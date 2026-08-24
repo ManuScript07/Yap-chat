@@ -17,6 +17,24 @@ class FriendsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) =>
+          FriendSearchCubit(repository: context.read<IFriendsRepository>()),
+      child: const _FriendsPageView(),
+    );
+  }
+}
+
+bool _isGlobalFriendQuery(String query) {
+  if (query.startsWith('@')) return query.substring(1).length >= 3;
+  return query.length >= 3;
+}
+
+class _FriendsPageView extends StatelessWidget {
+  const _FriendsPageView();
+
+  @override
+  Widget build(BuildContext context) {
     return BlocBuilder<FriendsBloc, FriendsState>(
       buildWhen: (previous, current) => previous.activeTab != current.activeTab,
       builder: (context, state) {
@@ -52,29 +70,43 @@ class FriendsPage extends StatelessWidget {
                       const FriendsActionFailureCleared(),
                     );
                   },
-                  child: Scaffold(
-                    resizeToAvoidBottomInset: false,
-                    extendBodyBehindAppBar: true,
-                    backgroundColor: context.scaffoldBackgroundColor,
-                    appBar: hideAppBar
-                        ? null
-                        : PrimaryAppBar(
-                            title: context.l10n.navFriends,
-                            actionIcon: Icons.person_add_alt_1_rounded,
-                            onActionPressed: () {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              final authRouter = context.router.root
-                                  .innerRouterOf<StackRouter>(
-                                    AuthGateRoute.name,
+                  child: BlocListener<FriendSearchCubit, FriendSearchState>(
+                    listenWhen: (previous, current) =>
+                        previous.actionError != current.actionError &&
+                        current.actionError != null,
+                    listener: (context, state) {
+                      showAppSnackBar(
+                        scaffoldContext,
+                        message: context.l10n.friendsActionFailed,
+                        type: SnackBarType.error,
+                        bottomMargin: 156,
+                      );
+                      context.read<FriendSearchCubit>().clearActionError();
+                    },
+                    child: Scaffold(
+                      resizeToAvoidBottomInset: false,
+                      extendBodyBehindAppBar: true,
+                      backgroundColor: context.scaffoldBackgroundColor,
+                      appBar: hideAppBar
+                          ? null
+                          : PrimaryAppBar(
+                              title: context.l10n.navFriends,
+                              actionIcon: Icons.person_add_alt_1_rounded,
+                              onActionPressed: () {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                final authRouter = context.router.root
+                                    .innerRouterOf<StackRouter>(
+                                      AuthGateRoute.name,
+                                    );
+                                if (authRouter != null) {
+                                  unawaited(
+                                    authRouter.push(const AddFriendRoute()),
                                   );
-                              if (authRouter != null) {
-                                unawaited(
-                                  authRouter.push(const AddFriendRoute()),
-                                );
-                              }
-                            },
-                          ),
-                    body: const _FriendsBody(),
+                                }
+                              },
+                            ),
+                      body: const _FriendsBody(),
+                    ),
                   ),
                 ),
           ),
@@ -180,9 +212,12 @@ class _FriendsBodyState extends State<_FriendsBody> {
                     ? _friendsSearchController
                     : _requestsSearchController,
                 hintText: context.l10n.friendsSearchHint,
-                onChanged: (value) => context.read<FriendsBloc>().add(
-                  FriendsSearchChanged(value),
-                ),
+                onChanged: (value) {
+                  context.read<FriendsBloc>().add(FriendsSearchChanged(value));
+                  if (state.activeTab == FriendsTab.friends) {
+                    context.read<FriendSearchCubit>().queryChanged(value);
+                  }
+                },
               ),
             ),
           ],
@@ -204,49 +239,124 @@ class _FriendsList extends StatelessWidget {
           previous.status != current.status ||
           previous.friends != current.friends ||
           previous.friendsQuery != current.friendsQuery,
-      builder: (context, state) {
-        if (state.status == FriendsStatus.initial ||
-            state.status == FriendsStatus.loading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (state.status == FriendsStatus.failure) {
-          return Center(child: Text(context.l10n.friendsLoadFailed));
-        }
-        final friends = state.filteredFriends;
-        if (friends.isEmpty) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: bottomPadding),
-            child: EmptyChatState(
-              showImage: state.friendsQuery.trim().isEmpty,
-              message: state.friendsQuery.trim().isEmpty
-                  ? context.l10n.friendsEmpty
-                  : context.l10n.friendsNoSearchResults,
-            ),
-          );
-        }
-        return ListView.builder(
-          key: const PageStorageKey('friends-list'),
-          padding: EdgeInsets.only(bottom: bottomPadding),
-          itemCount: friends.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return FriendsSectionTitle(
-                title: context.l10n.friendsAll,
-                count: friends.length,
+      builder: (context, state) =>
+          BlocBuilder<FriendSearchCubit, FriendSearchState>(
+            builder: (context, searchState) {
+              if (state.status == FriendsStatus.initial ||
+                  state.status == FriendsStatus.loading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (state.status == FriendsStatus.failure) {
+                return Center(child: Text(context.l10n.friendsLoadFailed));
+              }
+              final friends = state.filteredFriends;
+              final query = state.friendsQuery.trim();
+              final showGlobal = _isGlobalFriendQuery(query);
+              if (friends.isEmpty && !showGlobal) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  child: EmptyChatState(
+                    showImage: query.isEmpty,
+                    message: query.isEmpty
+                        ? context.l10n.friendsEmpty
+                        : context.l10n.friendsNoSearchResults,
+                  ),
+                );
+              }
+              return ListView(
+                key: const PageStorageKey('friends-list'),
+                padding: EdgeInsets.only(bottom: bottomPadding),
+                children: [
+                  if (friends.isNotEmpty) ...[
+                    FriendsSectionTitle(
+                      title: query.isEmpty
+                          ? context.l10n.friendsAll
+                          : context.l10n.friendsTabFriends,
+                      count: friends.length,
+                    ),
+                    ...friends.map(
+                      (friend) => FriendListItem(
+                        key: ValueKey(friend.id),
+                        friend: friend,
+                        onChat: () => _openChat(context, friend),
+                        onLocation: () => _openLocation(context, friend),
+                      ),
+                    ),
+                  ],
+                  if (showGlobal) ...[
+                    FriendsSectionTitle(
+                      title: context.l10n.friendsGlobalSearch,
+                    ),
+                    ..._globalSearchChildren(context, searchState),
+                  ],
+                ],
               );
-            }
-            final friend = friends[index - 1];
-            return FriendListItem(
-              key: ValueKey(friend.id),
-              friend: friend,
-              onChat: () => _openChat(context, friend),
-              onLocation: () => _openLocation(context, friend),
-            );
-          },
-        );
-      },
+            },
+          ),
     );
   }
+
+  List<Widget> _globalSearchChildren(
+    BuildContext context,
+    FriendSearchState state,
+  ) {
+    final widgets = <Widget>[];
+    if (state.status == FriendSearchStatus.loading) {
+      widgets.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Center(
+            child: SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ),
+        ),
+      );
+    }
+    if (state.status == FriendSearchStatus.failure) {
+      widgets.add(
+        _globalMessage(context, context.l10n.friendsUserSearchFailed),
+      );
+      return widgets;
+    }
+    if (state.status == FriendSearchStatus.success && state.results.isEmpty) {
+      widgets.add(_globalMessage(context, context.l10n.friendsNoSearchResults));
+      return widgets;
+    }
+    final repository = context.read<IFriendsRepository>();
+    final cubit = context.read<FriendSearchCubit>();
+    widgets.addAll(
+      state.results.map(
+        (candidate) => FriendCandidateItem(
+          key: ValueKey('global:${candidate.id}'),
+          candidate: candidate,
+          friendsLabel: context.l10n.friendsCount,
+          relationshipLabel: (relationship) => switch (relationship) {
+            FriendRelationship.friend => context.l10n.friendsAlreadyAdded,
+            FriendRelationship.outgoing => context.l10n.friendsRequestSent,
+            FriendRelationship.incoming => context.l10n.friendsRequestIncoming,
+            FriendRelationship.none => '',
+          },
+          avatarLoader: () => repository.resolveCandidateAvatar(candidate),
+          onAdd: () => cubit.sendRequest(candidate),
+          onAccept: () => cubit.respondToIncoming(candidate, accept: true),
+          onReject: () => cubit.respondToIncoming(candidate, accept: false),
+        ),
+      ),
+    );
+    return widgets;
+  }
+
+  Widget _globalMessage(BuildContext context, String message) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+    child: Text(
+      message,
+      style: context.textTheme.bodyLarge?.copyWith(
+        color: context.colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
 
   Future<void> _openChat(BuildContext context, Friend friend) async {
     FocusManager.instance.primaryFocus?.unfocus();

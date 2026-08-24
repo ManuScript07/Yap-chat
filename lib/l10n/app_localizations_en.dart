@@ -384,6 +384,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authNameRequired => 'Enter your name';
 
   @override
+  String get authNameInvalid => 'Name must contain 2–30 characters';
+
+  @override
   String get authBirthDateRequired => 'Enter your date of birth';
 
   @override
@@ -509,6 +512,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get friendsRequestIncoming => 'respond in requests';
+
+  @override
+  String get friendsGlobalSearch => 'global search';
+
+  @override
+  String get friendsAddTemporarilyUnavailable =>
+      'Search on this page is temporarily unavailable';
 
   @override
   String get friendsLocationUnavailable =>

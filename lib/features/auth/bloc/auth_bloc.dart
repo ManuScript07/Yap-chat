@@ -147,7 +147,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     final session = state.session;
-    if (session == null || event.displayName.trim().isEmpty) return;
+    if (session == null) return;
+
+    final displayName = event.displayName.trim();
+    if (displayName.length < 2 || displayName.length > 30) {
+      emit(state.copyWith(failure: AuthFailure.invalidDisplayName));
+      return;
+    }
 
     final username = event.username?.trim().toLowerCase();
     if (username != null &&
@@ -161,7 +167,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final profile = await _profileRepository.completeProfile(
         userId: session.userId,
-        displayName: event.displayName,
+        displayName: displayName,
         birthDate: event.birthDate,
         gender: event.gender,
         username: username,

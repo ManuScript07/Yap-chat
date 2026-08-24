@@ -1,9 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/features/friends/friends.dart';
-import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -11,13 +8,7 @@ class AddFriendPage extends StatelessWidget {
   const AddFriendPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) =>
-          FriendSearchCubit(repository: context.read<IFriendsRepository>()),
-      child: const _AddFriendView(),
-    );
-  }
+  Widget build(BuildContext context) => const _AddFriendView();
 }
 
 class _AddFriendView extends StatelessWidget {
@@ -25,31 +16,12 @@ class _AddFriendView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScaffoldMessenger(
-      child: Builder(
-        builder: (scaffoldContext) =>
-            BlocListener<FriendSearchCubit, FriendSearchState>(
-              listenWhen: (previous, current) =>
-                  previous.actionError != current.actionError &&
-                  current.actionError != null,
-              listener: (context, state) {
-                showAppSnackBar(
-                  scaffoldContext,
-                  message: context.l10n.friendsActionFailed,
-                  type: SnackBarType.error,
-                  bottomMargin: 82,
-                );
-                context.read<FriendSearchCubit>().clearActionError();
-              },
-              child: Scaffold(
-                resizeToAvoidBottomInset: false,
-                extendBodyBehindAppBar: true,
-                backgroundColor: context.scaffoldBackgroundColor,
-                appBar: PrimaryAppBar(title: context.l10n.friendsAddTitle),
-                body: const _AddFriendBody(),
-              ),
-            ),
-      ),
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      extendBodyBehindAppBar: true,
+      backgroundColor: context.scaffoldBackgroundColor,
+      appBar: PrimaryAppBar(title: context.l10n.friendsAddTitle),
+      body: const _AddFriendBody(),
     );
   }
 }
@@ -89,7 +61,7 @@ class _AddFriendBody extends StatelessWidget {
           bottom: searchBottom,
           child: GlassSearchBar(
             hintText: context.l10n.friendsUserSearchHint,
-            onChanged: context.read<FriendSearchCubit>().queryChanged,
+            enabled: false,
           ),
         ),
       ],
@@ -104,56 +76,12 @@ class _SearchResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<FriendSearchCubit, FriendSearchState>(
-      builder: (context, state) {
-        switch (state.status) {
-          case FriendSearchStatus.initial:
-            return Padding(
-              padding: EdgeInsets.only(bottom: bottomPadding),
-              child: EmptyChatState(
-                showImage: false,
-                message: context.l10n.friendsSearchPrompt,
-              ),
-            );
-          case FriendSearchStatus.loading:
-            return const Center(child: CircularProgressIndicator());
-          case FriendSearchStatus.failure:
-            return Center(child: Text(context.l10n.friendsUserSearchFailed));
-          case FriendSearchStatus.success:
-            if (state.results.isEmpty) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: bottomPadding),
-                child: EmptyChatState(
-                  showImage: false,
-                  message: context.l10n.friendsNoSearchResults,
-                ),
-              );
-            }
-            return ListView.builder(
-              padding: EdgeInsets.only(top: 16, bottom: bottomPadding),
-              itemCount: state.results.length,
-              itemBuilder: (context, index) {
-                final candidate = state.results[index];
-                return FriendCandidateItem(
-                  key: ValueKey(candidate.id),
-                  candidate: candidate,
-                  friendsLabel: context.l10n.friendsCount,
-                  relationshipLabel: (relationship) => switch (relationship) {
-                    FriendRelationship.friend =>
-                      context.l10n.friendsAlreadyAdded,
-                    FriendRelationship.outgoing =>
-                      context.l10n.friendsRequestSent,
-                    FriendRelationship.incoming =>
-                      context.l10n.friendsRequestIncoming,
-                    FriendRelationship.none => '',
-                  },
-                  onAdd: () =>
-                      context.read<FriendSearchCubit>().sendRequest(candidate),
-                );
-              },
-            );
-        }
-      },
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: EmptyChatState(
+        showImage: false,
+        message: context.l10n.friendsAddTemporarilyUnavailable,
+      ),
     );
   }
 }

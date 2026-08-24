@@ -82,7 +82,7 @@ class FriendsRemoteDataSource {
   Future<List<FriendCandidate>> searchUsers(String query) async {
     final response = await _client.rpc<List<dynamic>>(
       'search_friend_candidates',
-      params: {'search_query': query, 'result_limit': 50},
+      params: {'search_query': query, 'result_limit': 10},
     );
     return response
         .map((item) {
@@ -90,6 +90,7 @@ class FriendsRemoteDataSource {
           final storagePath = row['avatar_storage_path'] as String?;
           return FriendCandidate(
             id: row['id'] as String,
+            requestId: row['request_id'] as String?,
             username: row['username'] as String? ?? '',
             displayName: row['display_name'] as String? ?? '',
             avatarUrl: storagePath == null

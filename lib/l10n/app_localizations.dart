@@ -710,6 +710,12 @@ abstract class AppLocalizations {
   /// **'Укажите имя'**
   String get authNameRequired;
 
+  /// No description provided for @authNameInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Имя должно содержать от 2 до 30 символов'**
+  String get authNameInvalid;
+
   /// No description provided for @authBirthDateRequired.
   ///
   /// In ru, this message translates to:
@@ -937,6 +943,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'ответьте в заявках'**
   String get friendsRequestIncoming;
+
+  /// No description provided for @friendsGlobalSearch.
+  ///
+  /// In ru, this message translates to:
+  /// **'глобальный поиск'**
+  String get friendsGlobalSearch;
+
+  /// No description provided for @friendsAddTemporarilyUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поиск на этой странице временно недоступен'**
+  String get friendsAddTemporarilyUnavailable;
 
   /// No description provided for @friendsLocationUnavailable.
   ///

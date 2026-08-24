@@ -26,6 +26,9 @@ class FriendsRepository implements IFriendsRepository {
   final Uuid _uuid = const Uuid();
   StreamSubscription<void>? _changesSubscription;
   Future<void>? _activeSync;
+  final Map<String, ({DateTime cachedAt, List<FriendCandidate> results})>
+  _searchCache = {};
+  final Map<String, Future<List<FriendCandidate>>> _activeSearches = {};
 
   @override
   Stream<List<Friend>> watchFriends() {
@@ -53,9 +56,29 @@ class FriendsRepository implements IFriendsRepository {
 
   @override
   Future<List<FriendCandidate>> searchUsers(String query) async {
-    final candidates = await _remote.searchUsers(query.trim());
-    return Future.wait(candidates.map(_hydrateCandidate));
+    final normalized = query.trim().toLowerCase();
+    final cached = _searchCache[normalized];
+    if (cached != null &&
+        DateTime.now().difference(cached.cachedAt) <
+            const Duration(seconds: 45)) {
+      return cached.results;
+    }
+    final active = _activeSearches[normalized];
+    if (active != null) return active;
+    final future = _remote.searchUsers(normalized).then((results) {
+      _searchCache[normalized] = (cachedAt: DateTime.now(), results: results);
+      while (_searchCache.length > 20) {
+        _searchCache.remove(_searchCache.keys.first);
+      }
+      return results;
+    });
+    _activeSearches[normalized] = future;
+    return future.whenComplete(() => _activeSearches.remove(normalized));
   }
+
+  @override
+  Future<String?> resolveCandidateAvatar(FriendCandidate candidate) =>
+      _hydrateAvatar(candidate.avatarStoragePath, candidate.avatarUrl);
 
   @override
   Future<void> sendRequest(FriendCandidate candidate) async {
@@ -75,6 +98,7 @@ class FriendsRepository implements IFriendsRepository {
     );
     try {
       await _remote.sendRequest(candidate.id);
+      _invalidateSearchCache();
       await _synchronize();
     } catch (_) {
       await _cache.removeRequest(localId);
@@ -90,6 +114,7 @@ class FriendsRepository implements IFriendsRepository {
     await _cache.removeRequest(requestId);
     try {
       await _remote.cancelRequest(requestId);
+      _invalidateSearchCache();
     } catch (_) {
       if (request != null) await _cache.addRequest(request);
       await _synchronizeSafely();
@@ -111,6 +136,7 @@ class FriendsRepository implements IFriendsRepository {
     }
     try {
       await _remote.respond(requestId, accept: accept);
+      _invalidateSearchCache();
       await _synchronize();
     } catch (_) {
       if (request != null) await _cache.addRequest(request);
@@ -182,14 +208,6 @@ class FriendsRepository implements IFriendsRepository {
     return local == null ? request : request.copyWith(peerAvatarUrl: local);
   }
 
-  Future<FriendCandidate> _hydrateCandidate(FriendCandidate candidate) async {
-    final local = await _hydrateAvatar(
-      candidate.avatarStoragePath,
-      candidate.avatarUrl,
-    );
-    return local == null ? candidate : candidate.copyWith(avatarUrl: local);
-  }
-
   Future<String?> _hydrateAvatar(String? storagePath, String? remoteUrl) async {
     try {
       if (storagePath != null && storagePath.isNotEmpty) {
@@ -212,4 +230,6 @@ class FriendsRepository implements IFriendsRepository {
     }
     return null;
   }
+
+  void _invalidateSearchCache() => _searchCache.clear();
 }

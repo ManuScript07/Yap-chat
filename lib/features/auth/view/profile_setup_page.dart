@@ -282,7 +282,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     if (!_canProceed) {
       setState(
         () => _validationError = switch (_currentStep) {
-          0 => context.l10n.authNameRequired,
+          0 => context.l10n.authNameInvalid,
           1 => context.l10n.authBirthDateInvalid,
           4 => context.l10n.authInputTooLong,
           _ => null,
@@ -319,8 +319,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   bool get _canProceed => switch (_currentStep) {
     0 =>
-      _nameController.text.trim().isNotEmpty &&
-          _nameController.text.length <= 30,
+      _nameController.text.trim().length >= 2 &&
+          _nameController.text.trim().length <= 30,
     1 => _parseBirthDate() != null,
     4 => _bioController.text.length <= 130,
     _ => true,
@@ -434,6 +434,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     return switch (failure) {
       AuthFailure.usernameTaken => context.l10n.authUsernameTaken,
       AuthFailure.invalidUsername => context.l10n.authUsernameInvalid,
+      AuthFailure.invalidDisplayName => context.l10n.authNameInvalid,
       _ => context.l10n.authProfileSaveFailed,
     };
   }

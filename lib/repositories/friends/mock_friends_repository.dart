@@ -50,6 +50,7 @@ class MockFriendsRepository implements IFriendsRepository {
       StreamController.broadcast(sync: true);
 
   List<Friend> get _friendsSnapshot => List.unmodifiable(_friends);
+
   List<FriendRequest> get _requestsSnapshot => List.unmodifiable(_requests);
 
   @override
@@ -73,8 +74,10 @@ class MockFriendsRepository implements IFriendsRepository {
   @override
   Future<List<FriendCandidate>> searchUsers(String query) async {
     final normalized = query.trim().toLowerCase();
-    if (normalized.isEmpty) return const [];
-    final candidates = [
+    final usernameSearch = normalized.startsWith('@');
+    final searchValue = usernameSearch ? normalized.substring(1) : normalized;
+    if (searchValue.length < 3) return const [];
+    final candidates = <FriendCandidate>[
       const FriendCandidate(
         id: 'candidate-3',
         username: 'max',
@@ -82,6 +85,7 @@ class MockFriendsRepository implements IFriendsRepository {
         friendCount: 21,
         relationship: FriendRelationship.none,
       ),
+
       const FriendCandidate(
         id: 'candidate-4',
         username: 'katya',
@@ -89,15 +93,38 @@ class MockFriendsRepository implements IFriendsRepository {
         friendCount: 8,
         relationship: FriendRelationship.none,
       ),
+      ..._requests.map(
+        (request) => FriendCandidate(
+          id: request.peerId,
+          requestId: request.id,
+          username: request.peerUsername,
+          displayName: request.peerDisplayName,
+          avatarUrl: request.peerAvatarUrl,
+          avatarStoragePath: request.peerAvatarStoragePath,
+          friendCount: request.peerFriendCount,
+          relationship:
+              request.direction == FriendRequestDirection.incoming
+              ? FriendRelationship.incoming
+              : FriendRelationship.outgoing,
+        ),
+      ),
     ];
     return candidates
         .where(
-          (item) =>
-              item.username.toLowerCase().contains(normalized) ||
-              item.displayName.toLowerCase().contains(normalized),
+          (item) => usernameSearch
+              ? item.username.toLowerCase() == searchValue
+              : item.displayName
+                    .toLowerCase()
+                    .split(RegExp(r'[^a-zа-яё0-9_]+'))
+                    .any((word) => word.startsWith(searchValue)),
         )
+        .take(10)
         .toList(growable: false);
   }
+
+  @override
+  Future<String?> resolveCandidateAvatar(FriendCandidate candidate) async =>
+      candidate.avatarUrl;
 
   @override
   Future<void> sendRequest(FriendCandidate candidate) async {

@@ -8,12 +8,14 @@ class FriendCandidate extends Equatable {
     required this.username,
     required this.displayName,
     required this.relationship,
+    this.requestId,
     this.avatarUrl,
     this.avatarStoragePath,
     this.friendCount,
   });
 
   final String id;
+  final String? requestId;
   final String username;
   final String displayName;
   final String? avatarUrl;
@@ -24,8 +26,11 @@ class FriendCandidate extends Equatable {
   FriendCandidate copyWith({
     FriendRelationship? relationship,
     String? avatarUrl,
+    String? requestId,
+    bool clearRequestId = false,
   }) => FriendCandidate(
     id: id,
+    requestId: clearRequestId ? null : requestId ?? this.requestId,
     username: username,
     displayName: displayName,
     avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -37,6 +42,7 @@ class FriendCandidate extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    requestId,
     username,
     displayName,
     avatarUrl,

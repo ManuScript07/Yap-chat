@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 
 class FriendsSectionTitle extends StatelessWidget {
-  const FriendsSectionTitle({
-    super.key,
-    required this.title,
-    required this.count,
-  });
+  const FriendsSectionTitle({super.key, required this.title, this.count});
 
   final String title;
-  final int count;
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +21,11 @@ class FriendsSectionTitle extends StatelessWidget {
         TextSpan(
           children: [
             TextSpan(text: title),
-            TextSpan(
-              text: ' $count',
-              style: TextStyle(color: context.colorScheme.onSurfaceVariant),
-            ),
+            if (count != null)
+              TextSpan(
+                text: ' $count',
+                style: TextStyle(color: context.colorScheme.onSurfaceVariant),
+              ),
           ],
         ),
         style: context.textTheme.headlineSmall?.copyWith(
