@@ -1,6 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/friends/widgets/widgets.dart';
+import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -17,7 +23,6 @@ class _AddFriendView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       backgroundColor: context.scaffoldBackgroundColor,
       appBar: PrimaryAppBar(title: context.l10n.friendsAddTitle),
@@ -31,57 +36,87 @@ class _AddFriendBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final keyboard = mediaQuery.viewInsets.bottom;
-    const searchSpacing = 16.0;
-    const searchHeight = 50.0;
-    final searchBottom = keyboard > 0
-        ? keyboard + searchSpacing
-        : mediaQuery.viewPadding.bottom + searchSpacing;
-    final contentBottom = searchBottom + searchHeight + 16;
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        Positioned.fill(
-          top: 130,
-          child: _SearchResults(bottomPadding: contentBottom),
-        ),
-        AnimatedPositioned(
-          duration: Duration.zero,
-          left: 0,
-          right: 0,
-          bottom: keyboard > 0 ? keyboard : 0,
-          child: const BottomAmbientGlow(),
-        ),
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutQuad,
-          left: 0,
-          right: 0,
-          bottom: searchBottom,
-          child: GlassSearchBar(
-            hintText: context.l10n.friendsUserSearchHint,
-            enabled: false,
+    final systemPadding = MediaQuery.paddingOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = math.max(16.0, (constraints.maxWidth - 720) / 2);
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            horizontal + systemPadding.left,
+            130,
+            horizontal + systemPadding.right,
+            systemPadding.bottom + 24,
           ),
-        ),
-      ],
+          children: [
+            AddFriendMethodTile(
+              icon: Icons.contacts_rounded,
+              title: context.l10n.friendsAddContacts,
+              onTap: () => _openContacts(context),
+            ),
+            AddFriendMethodTile(
+              icon: Icons.alternate_email_rounded,
+              title: context.l10n.friendsAddByUsername,
+              trailing: context.l10n.friendsAddComingSoon,
+            ),
+            const SizedBox(height: 22),
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 5),
+              child: Text(
+                context.l10n.friendsAddSocialNetworks,
+                style: context.textTheme.headlineSmall?.copyWith(
+                  color: context.colorScheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            AddFriendMethodTile(
+              icon: Icons.send_rounded,
+              title: context.l10n.friendsSocialTelegram,
+              trailing: context.l10n.friendsAddComingSoon,
+            ),
+            AddFriendMethodTile(
+              icon: Icons.people_alt_rounded,
+              title: context.l10n.friendsSocialVk,
+              trailing: context.l10n.friendsAddComingSoon,
+            ),
+            AddFriendMethodTile(
+              icon: Icons.chat_rounded,
+              title: context.l10n.friendsSocialWhatsapp,
+              trailing: context.l10n.friendsAddComingSoon,
+            ),
+          ],
+        );
+      },
     );
   }
-}
 
-class _SearchResults extends StatelessWidget {
-  const _SearchResults({required this.bottomPadding});
+  Future<void> _openContacts(BuildContext context) async {
+    final repository = context.read<IContactsRepository>();
+    try {
+      final status = await repository.requestPermission();
+      if (!context.mounted) return;
+      if (status == ContactsPermissionStatus.permanentlyDenied) {
+        await showPermissionDeniedDialog(
+          context,
+          title: context.l10n.friendsContactsPermissionTitle,
+          content: context.l10n.friendsContactsPermissionDescription,
+          onOpenSettings: repository.openAppSettings,
+        );
+        return;
+      }
+      if (status != ContactsPermissionStatus.granted) return;
 
-  final double bottomPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      child: EmptyChatState(
-        showImage: false,
-        message: context.l10n.friendsAddTemporarilyUnavailable,
-      ),
-    );
+      await showContactDiscoverySheet(
+        context,
+        username: context.read<AuthBloc>().state.profile?.username,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.friendsContactsLoadFailed,
+        type: SnackBarType.error,
+      );
+    }
   }
 }

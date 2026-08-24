@@ -118,7 +118,15 @@ class ChatsRepository implements IChatsRepository {
 
   @override
   Future<Chat> openDirectChat(String peerId) async {
-    final chatId = await _remote.createDirectConversation(peerId);
+    final normalizedPeerId = peerId.trim();
+    if (normalizedPeerId.isEmpty) {
+      throw ArgumentError.value(peerId, 'peerId', 'Peer ID must not be empty');
+    }
+
+    final cachedChat = await _cache.readByPeerId(normalizedPeerId);
+    if (cachedChat != null) return cachedChat;
+
+    final chatId = await _remote.createDirectConversation(normalizedPeerId);
     await _synchronize();
     final chat = await getChatById(chatId);
     if (chat == null) {

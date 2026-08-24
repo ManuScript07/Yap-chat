@@ -8,6 +8,10 @@ type YandexUser = {
   birthday?: string | null;
   default_avatar_id?: string;
   is_avatar_empty?: boolean;
+  default_phone?: {
+    id?: number;
+    number?: string;
+  };
 };
 
 Deno.serve(async (request) => {
@@ -39,6 +43,7 @@ Deno.serve(async (request) => {
       ? `https://avatars.yandex.net/get-yapic/${user.default_avatar_id}/islands-200`
       : null;
   const email = user.default_email ?? user.emails?.[0] ?? null;
+  const phoneNumber = user.default_phone?.number?.trim() || null;
 
   return Response.json({
     sub: user.id,
@@ -48,6 +53,13 @@ Deno.serve(async (request) => {
     name: user.real_name ?? user.display_name ?? user.login ?? null,
     preferred_username: user.login ?? null,
     picture: avatarUrl,
+    birthdate: user.birthday ?? null,
     birthday: user.birthday ?? null,
+    // Supabase Custom OAuth2 currently parses `phone`/`phone_verified`.
+    // Keep the standard OIDC aliases too, so this endpoint remains portable.
+    phone: phoneNumber,
+    phone_verified: phoneNumber !== null,
+    phone_number: phoneNumber,
+    phone_number_verified: phoneNumber !== null,
   });
 });

@@ -500,7 +500,63 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get friendsAddTitle => 'Добавить друна';
+  String get friendsAddTitle => 'добавить';
+
+  @override
+  String get friendsAddContacts => 'из контактов';
+
+  @override
+  String get friendsAddByUsername => 'по username';
+
+  @override
+  String get friendsAddSocialNetworks => 'социальные сети';
+
+  @override
+  String get friendsAddComingSoon => 'скоро';
+
+  @override
+  String get friendsContactsTitle => 'контакты';
+
+  @override
+  String get friendsContactsEmpty =>
+      'в адресной книге нет контактов с номерами';
+
+  @override
+  String get friendsContactsLoadFailed => 'Не удалось загрузить контакты';
+
+  @override
+  String get friendsContactsNotRegistered => 'ещё не в Пуньк';
+
+  @override
+  String get friendsContactsFriendCountHidden => 'количество друзей скрыто';
+
+  @override
+  String get friendsContactsInvite => 'пригласить';
+
+  @override
+  String get friendsContactsPermissionTitle => 'Нет доступа к контактам';
+
+  @override
+  String get friendsContactsPermissionDescription =>
+      'Разрешите доступ к контактам в настройках приложения.';
+
+  @override
+  String friendsContactsInviteText(String username) {
+    return 'Я в Пуньк как @$username. Присоединяйся!';
+  }
+
+  @override
+  String get friendsContactsInviteTextWithoutUsername =>
+      'Присоединяйся ко мне в Пуньк!';
+
+  @override
+  String get friendsSocialTelegram => 'Telegram';
+
+  @override
+  String get friendsSocialVk => 'VK';
+
+  @override
+  String get friendsSocialWhatsapp => 'WhatsApp';
 
   @override
   String get friendsUserSearchHint => 'поиск по username';

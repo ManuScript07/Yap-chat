@@ -905,8 +905,110 @@ abstract class AppLocalizations {
   /// No description provided for @friendsAddTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Добавить друна'**
+  /// **'добавить'**
   String get friendsAddTitle;
+
+  /// No description provided for @friendsAddContacts.
+  ///
+  /// In ru, this message translates to:
+  /// **'из контактов'**
+  String get friendsAddContacts;
+
+  /// No description provided for @friendsAddByUsername.
+  ///
+  /// In ru, this message translates to:
+  /// **'по username'**
+  String get friendsAddByUsername;
+
+  /// No description provided for @friendsAddSocialNetworks.
+  ///
+  /// In ru, this message translates to:
+  /// **'социальные сети'**
+  String get friendsAddSocialNetworks;
+
+  /// No description provided for @friendsAddComingSoon.
+  ///
+  /// In ru, this message translates to:
+  /// **'скоро'**
+  String get friendsAddComingSoon;
+
+  /// No description provided for @friendsContactsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'контакты'**
+  String get friendsContactsTitle;
+
+  /// No description provided for @friendsContactsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'в адресной книге нет контактов с номерами'**
+  String get friendsContactsEmpty;
+
+  /// No description provided for @friendsContactsLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить контакты'**
+  String get friendsContactsLoadFailed;
+
+  /// No description provided for @friendsContactsNotRegistered.
+  ///
+  /// In ru, this message translates to:
+  /// **'ещё не в Пуньк'**
+  String get friendsContactsNotRegistered;
+
+  /// No description provided for @friendsContactsFriendCountHidden.
+  ///
+  /// In ru, this message translates to:
+  /// **'количество друзей скрыто'**
+  String get friendsContactsFriendCountHidden;
+
+  /// No description provided for @friendsContactsInvite.
+  ///
+  /// In ru, this message translates to:
+  /// **'пригласить'**
+  String get friendsContactsInvite;
+
+  /// No description provided for @friendsContactsPermissionTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет доступа к контактам'**
+  String get friendsContactsPermissionTitle;
+
+  /// No description provided for @friendsContactsPermissionDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешите доступ к контактам в настройках приложения.'**
+  String get friendsContactsPermissionDescription;
+
+  /// No description provided for @friendsContactsInviteText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Я в Пуньк как @{username}. Присоединяйся!'**
+  String friendsContactsInviteText(String username);
+
+  /// No description provided for @friendsContactsInviteTextWithoutUsername.
+  ///
+  /// In ru, this message translates to:
+  /// **'Присоединяйся ко мне в Пуньк!'**
+  String get friendsContactsInviteTextWithoutUsername;
+
+  /// No description provided for @friendsSocialTelegram.
+  ///
+  /// In ru, this message translates to:
+  /// **'Telegram'**
+  String get friendsSocialTelegram;
+
+  /// No description provided for @friendsSocialVk.
+  ///
+  /// In ru, this message translates to:
+  /// **'VK'**
+  String get friendsSocialVk;
+
+  /// No description provided for @friendsSocialWhatsapp.
+  ///
+  /// In ru, this message translates to:
+  /// **'WhatsApp'**
+  String get friendsSocialWhatsapp;
 
   /// No description provided for @friendsUserSearchHint.
   ///

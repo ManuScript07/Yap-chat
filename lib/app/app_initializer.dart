@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
+import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/app/repository_container.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/presence/presence.dart';
@@ -26,6 +27,7 @@ class AppInitializer extends StatefulWidget {
 class _AppInitializerState extends State<AppInitializer> {
   late final RepositoryContainer _repositories;
   late final AppConnectionCoordinator _connectionCoordinator;
+  late final LocationTrackingCoordinator _locationTrackingCoordinator;
 
   @override
   void initState() {
@@ -40,12 +42,17 @@ class _AppInitializerState extends State<AppInitializer> {
       friendsRepository: _repositories.friendsRepository,
       talker: widget.config.talker,
     );
+    _locationTrackingCoordinator = LocationTrackingCoordinator(
+      locationRepository: _repositories.locationRepository,
+      talker: widget.config.talker,
+    );
   }
 
   @override
   void dispose() {
     unawaited(() async {
       await _connectionCoordinator.dispose();
+      await _locationTrackingCoordinator.dispose();
       await _repositories.dispose();
     }());
     super.dispose();
@@ -58,6 +65,9 @@ class _AppInitializerState extends State<AppInitializer> {
         RepositoryProvider<AppConfig>.value(value: widget.config),
         RepositoryProvider<AppConnectionCoordinator>.value(
           value: _connectionCoordinator,
+        ),
+        RepositoryProvider<LocationTrackingCoordinator>.value(
+          value: _locationTrackingCoordinator,
         ),
         RepositoryProvider<IChatsRepository>.value(
           value: _repositories.chatsRepository,
@@ -91,6 +101,9 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
         RepositoryProvider<IFriendsRepository>.value(
           value: _repositories.friendsRepository,
+        ),
+        RepositoryProvider<IContactsRepository>.value(
+          value: _repositories.contactsRepository,
         ),
       ],
       child: MultiBlocProvider(

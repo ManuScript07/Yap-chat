@@ -122,6 +122,20 @@ class MockFriendsRepository implements IFriendsRepository {
   }
 
   @override
+  Future<Map<String, FriendCandidate>> matchContactPhones(
+    List<String> phoneNumbers,
+  ) async => {
+    if (phoneNumbers.contains('+79990000001'))
+      '+79990000001': const FriendCandidate(
+        id: 'candidate-3',
+        username: 'max',
+        displayName: 'Максим',
+        friendCount: 21,
+        relationship: FriendRelationship.none,
+      ),
+  };
+
+  @override
   Future<String?> resolveFriendAvatar(Friend friend) async => friend.avatarUrl;
 
   @override

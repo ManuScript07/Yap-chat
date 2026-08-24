@@ -106,6 +106,38 @@ class FriendsRemoteDataSource {
         .toList(growable: false);
   }
 
+  Future<Map<String, FriendCandidate>> matchContactPhones(
+    List<String> phoneNumbers,
+  ) async {
+    if (phoneNumbers.isEmpty) return const {};
+    final response = await _client.rpc<List<dynamic>>(
+      'match_contact_phones',
+      params: {'phone_numbers': phoneNumbers},
+    );
+    return {
+      for (final item in response)
+        (item as Map)['phone_number'] as String: _mapCandidate(
+          Map<String, dynamic>.from(item),
+        ),
+    };
+  }
+
+  FriendCandidate _mapCandidate(Map<String, dynamic> row) {
+    final storagePath = row['avatar_storage_path'] as String?;
+    return FriendCandidate(
+      id: row['id'] as String,
+      requestId: row['request_id'] as String?,
+      username: row['username'] as String? ?? '',
+      displayName: row['display_name'] as String? ?? '',
+      avatarUrl: storagePath == null ? row['avatar_url'] as String? : null,
+      avatarStoragePath: storagePath,
+      friendCount: (row['friend_count'] as num?)?.toInt(),
+      relationship: FriendRelationship.values.byName(
+        row['relationship'] as String,
+      ),
+    );
+  }
+
   Future<String> sendRequest(String peerId) => _client.rpc<String>(
     'send_friend_request',
     params: {'peer_user_id': peerId},

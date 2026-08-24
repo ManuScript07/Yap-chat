@@ -27,6 +27,18 @@ class ChatsCacheDataSource {
     return (await query.get()).map(_mapRow).toList(growable: false);
   }
 
+  Future<Chat?> readByPeerId(String peerId) async {
+    final query = _database.select(_database.cachedChats)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(_userIdProvider()) &
+            table.peerId.equals(peerId),
+      )
+      ..limit(1);
+    final row = await query.getSingleOrNull();
+    return row == null ? null : _mapRow(row);
+  }
+
   Future<void> replaceAll(List<Chat> chats) async {
     await _database.transaction(() async {
       final ownerUserId = _userIdProvider();

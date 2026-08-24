@@ -76,7 +76,6 @@ class _UserAvatarState extends State<UserAvatar> {
                     targetWidth: targetWidth,
                     iconColor: iconColor,
                   )
-                : Icon(Icons.person, color: iconColor, size: size * 0.65),
                 : FutureBuilder<String?>(
                     future: _avatarFuture,
                     builder: (context, snapshot) {
@@ -92,6 +91,7 @@ class _UserAvatarState extends State<UserAvatar> {
                         _provider(value),
                         targetWidth: targetWidth,
                         iconColor: iconColor,
+                      );
                     },
                   ),
           ),

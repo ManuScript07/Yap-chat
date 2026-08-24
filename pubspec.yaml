@@ -45,6 +45,9 @@ dependencies:
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
   flutter_local_notifications: ^22.3.0
+  flutter_contacts: 2.3.1
+  share_plus: 13.3.0
+  phone_numbers_parser: 9.0.25
 
 dev_dependencies:
   flutter_test:

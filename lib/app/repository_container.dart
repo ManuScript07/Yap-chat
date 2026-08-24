@@ -22,6 +22,7 @@ class RepositoryContainer {
     required this.presenceRepository,
     required this.pushNotificationsRepository,
     required this.friendsRepository,
+    required this.contactsRepository,
   });
 
   factory RepositoryContainer.prod({required AppConfig config}) {
@@ -84,7 +85,10 @@ class RepositoryContainer {
       localMediaRepository: LocalMediaRepository(
         preferences: config.preferences,
       ),
-      locationRepository: LocationRepository(),
+      locationRepository: LocationRepository(
+        preferences: config.preferences,
+        client: client,
+      ),
       audioRecorderRepository: AudioRecorderRepository(),
       audioPlayerRepository: AudioPlayerRepository(),
       authRepository: AuthRepository(
@@ -119,6 +123,7 @@ class RepositoryContainer {
         remote: friendsRemote,
         mediaCache: mediaCache,
       ),
+      contactsRepository: ContactsRepository(),
     );
   }
 
@@ -134,7 +139,10 @@ class RepositoryContainer {
       localMediaRepository: LocalMediaRepository(
         preferences: config.preferences,
       ),
-      locationRepository: LocationRepository(),
+      locationRepository: LocationRepository(
+        preferences: config.preferences,
+        client: config.supabaseClient,
+      ),
       audioRecorderRepository: AudioRecorderRepository(),
       audioPlayerRepository: AudioPlayerRepository(),
       authRepository: MockAuthRepository(preferences: config.preferences),
@@ -142,6 +150,7 @@ class RepositoryContainer {
       presenceRepository: MockPresenceRepository(),
       pushNotificationsRepository: const MockPushNotificationsRepository(),
       friendsRepository: MockFriendsRepository(),
+      contactsRepository: const MockContactsRepository(),
     );
   }
 
@@ -157,6 +166,7 @@ class RepositoryContainer {
   final IPresenceRepository presenceRepository;
   final IPushNotificationsRepository pushNotificationsRepository;
   final IFriendsRepository friendsRepository;
+  final IContactsRepository contactsRepository;
 
   Future<void> dispose() async {
     mediaCache.dispose();

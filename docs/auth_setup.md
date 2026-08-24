@@ -53,7 +53,8 @@ Client Secret нельзя добавлять в Flutter или коммитит
    - `login:info` — имя пользователя;
    - `login:email` — email;
    - `login:avatar` — портрет;
-   - `login:birthday` — дата рождения.
+   - `login:birthday` — дата рождения;
+   - `login:default_phone` — подтверждённый номер телефона.
 
 7. Сохраните Client ID и Client Secret. Secret понадобится только в настройках
    Supabase custom provider.
@@ -70,13 +71,13 @@ Client Secret нельзя добавлять в Flutter или коммитит
 | UserInfo URL | `https://<project-ref>.supabase.co/functions/v1/yandex-userinfo` |
 | Client ID | Client ID приложения Yandex OAuth |
 | Client Secret | Client Secret приложения Yandex OAuth |
-| Scopes | `login:info login:email login:avatar login:birthday` |
+| Scopes | `login:info login:email login:avatar login:birthday login:default_phone` |
 | PKCE | включён |
 | Email optional | выключен |
 
 Функция `yandex-userinfo` преобразует Yandex-заголовок `OAuth` и поля
-`id/default_email/real_name/default_avatar_id` в стандартный UserInfo-ответ,
-который ожидает Supabase Auth.
+`id/default_email/real_name/default_avatar_id/default_phone` в UserInfo-ответ,
+который ожидает Supabase Custom OAuth2.
 
 ## 4. Юридические документы
 

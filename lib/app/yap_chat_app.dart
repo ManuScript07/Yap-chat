@@ -8,6 +8,7 @@ import 'package:yap_chat/app/chat_navigation_coordinator.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/app_initializer.dart';
+import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
@@ -105,9 +106,11 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final connections = context.read<AppConnectionCoordinator>();
+    final locationTracking = context.read<LocationTrackingCoordinator>();
     final notifications = context.read<NotificationsCubit>();
     if (state == AppLifecycleState.resumed) {
       unawaited(connections.setForeground(true));
+      unawaited(locationTracking.setForeground(true));
       unawaited(notifications.setAppForeground(true));
       return;
     }
@@ -119,6 +122,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       unawaited(connections.setForeground(false));
+      unawaited(locationTracking.setForeground(false));
       unawaited(notifications.setAppForeground(false));
     }
   }
@@ -195,6 +199,11 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
                 ),
               );
               unawaited(
+                context
+                    .read<LocationTrackingCoordinator>()
+                    .setAuthenticatedUser(userId),
+              );
+              unawaited(
                 context.read<NotificationsCubit>().setAuthenticatedUser(userId),
               );
             } else if (state.status == AuthStatus.unauthenticated ||
@@ -204,6 +213,11 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
                   null,
                 ),
+              );
+              unawaited(
+                context
+                    .read<LocationTrackingCoordinator>()
+                    .setAuthenticatedUser(null),
               );
               unawaited(
                 context.read<NotificationsCubit>().setAuthenticatedUser(null),

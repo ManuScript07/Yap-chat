@@ -77,6 +77,22 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
+  Future<Map<String, FriendCandidate>> matchContactPhones(
+    List<String> phoneNumbers,
+  ) async {
+    const batchSize = 500;
+    final unique = phoneNumbers.toSet().toList(growable: false);
+    final matches = <String, FriendCandidate>{};
+    for (var offset = 0; offset < unique.length; offset += batchSize) {
+      final end = (offset + batchSize).clamp(0, unique.length);
+      matches.addAll(
+        await _remote.matchContactPhones(unique.sublist(offset, end)),
+      );
+    }
+    return Map.unmodifiable(matches);
+  }
+
+  @override
   Future<String?> resolveFriendAvatar(Friend friend) =>
       _hydrateAvatar(friend.avatarStoragePath, friend.avatarUrl);
 

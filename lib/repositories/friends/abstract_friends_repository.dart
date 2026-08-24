@@ -7,6 +7,9 @@ abstract interface class IFriendsRepository {
   Future<List<Friend>> getFriends();
   Future<List<FriendRequest>> getRequests();
   Future<List<FriendCandidate>> searchUsers(String query);
+  Future<Map<String, FriendCandidate>> matchContactPhones(
+    List<String> phoneNumbers,
+  );
   Future<String?> resolveFriendAvatar(Friend friend);
   Future<String?> resolveRequestAvatar(FriendRequest request);
   Future<String?> resolveCandidateAvatar(FriendCandidate candidate);

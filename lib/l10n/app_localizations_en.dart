@@ -493,7 +493,61 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get friendsAddTitle => 'Add friend';
+  String get friendsAddTitle => 'add friends';
+
+  @override
+  String get friendsAddContacts => 'from contacts';
+
+  @override
+  String get friendsAddByUsername => 'by username';
+
+  @override
+  String get friendsAddSocialNetworks => 'social networks';
+
+  @override
+  String get friendsAddComingSoon => 'coming soon';
+
+  @override
+  String get friendsContactsTitle => 'contacts';
+
+  @override
+  String get friendsContactsEmpty => 'there are no contacts with phone numbers';
+
+  @override
+  String get friendsContactsLoadFailed => 'Unable to load contacts';
+
+  @override
+  String get friendsContactsNotRegistered => 'not yet in Yapchat';
+
+  @override
+  String get friendsContactsFriendCountHidden => 'friend count is hidden';
+
+  @override
+  String get friendsContactsInvite => 'invite';
+
+  @override
+  String get friendsContactsPermissionTitle => 'Contacts access denied';
+
+  @override
+  String get friendsContactsPermissionDescription =>
+      'Allow contacts access in the app settings.';
+
+  @override
+  String friendsContactsInviteText(String username) {
+    return 'I\'m on Yapchat as @$username. Join me!';
+  }
+
+  @override
+  String get friendsContactsInviteTextWithoutUsername => 'Join me on Yapchat!';
+
+  @override
+  String get friendsSocialTelegram => 'Telegram';
+
+  @override
+  String get friendsSocialVk => 'VK';
+
+  @override
+  String get friendsSocialWhatsapp => 'WhatsApp';
 
   @override
   String get friendsUserSearchHint => 'search by username';
