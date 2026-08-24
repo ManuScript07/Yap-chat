@@ -25,6 +25,7 @@ class MediaCacheService {
   final int maxCacheBytes;
   final Uuid _uuid = const Uuid();
   final Map<String, Future<String>> _activeWrites = {};
+  final LinkedHashMap<String, String> _resolvedPaths = LinkedHashMap();
   final Queue<Completer<void>> _downloadQueue = Queue();
   final Map<String, Timer> _trimTimers = {};
   int _activeDownloadCount = 0;
@@ -35,6 +36,9 @@ class MediaCacheService {
     required String storagePath,
     String? mimeType,
   }) {
+    final key = _operationKey(ownerUserId, bucket, storagePath);
+    final resolved = _takeResolvedPath(key);
+    if (resolved != null) return Future.value(resolved);
     return _runOnce(ownerUserId, bucket, storagePath, () async {
       final cached = await _readExisting(
         ownerUserId,
@@ -58,7 +62,7 @@ class MediaCacheService {
         bytes: bytes,
         mimeType: mimeType,
       );
-    });
+    }).then((localPath) => _rememberResolvedPath(key, localPath));
   }
 
   Future<String?> findStorageFile({
@@ -75,6 +79,9 @@ class MediaCacheService {
     required String url,
     String bucket = externalAvatarsBucket,
   }) {
+    final key = _operationKey(ownerUserId, bucket, url);
+    final resolved = _takeResolvedPath(key);
+    if (resolved != null) return Future.value(resolved);
     return _runOnce(ownerUserId, bucket, url, () async {
       final cached = await _readExisting(ownerUserId, bucket, url, null);
       if (cached != null) return cached;
@@ -103,7 +110,7 @@ class MediaCacheService {
           client.close(force: true);
         }
       });
-    });
+    }).then((localPath) => _rememberResolvedPath(key, localPath));
   }
 
   Future<String> storeBytes({
@@ -157,6 +164,7 @@ class MediaCacheService {
         mimeType,
       );
       if (await file.exists()) await file.delete();
+      _forgetResolvedPath(file.path);
     }
   }
 
@@ -187,6 +195,9 @@ class MediaCacheService {
 
     final directory = await _userDirectory(ownerUserId);
     if (await directory.exists()) await directory.delete(recursive: true);
+    _resolvedPaths.removeWhere(
+      (key, _) => key.startsWith('$ownerUserId\u0000'),
+    );
 
     await _database.transaction(() async {
       await (_database.delete(
@@ -210,7 +221,7 @@ class MediaCacheService {
     String storagePath,
     Future<String> Function() operation,
   ) {
-    final key = '$ownerUserId\u0000$bucket\u0000$storagePath';
+    final key = _operationKey(ownerUserId, bucket, storagePath);
     final active = _activeWrites[key];
     if (active != null) return active;
     final future = operation();
@@ -218,6 +229,28 @@ class MediaCacheService {
     return future.whenComplete(() {
       if (identical(_activeWrites[key], future)) _activeWrites.remove(key);
     });
+  }
+
+  String _operationKey(String ownerUserId, String bucket, String storagePath) =>
+      '$ownerUserId\u0000$bucket\u0000$storagePath';
+
+  String? _takeResolvedPath(String key) {
+    final path = _resolvedPaths.remove(key);
+    if (path != null) _resolvedPaths[key] = path;
+    return path;
+  }
+
+  String _rememberResolvedPath(String key, String localPath) {
+    _resolvedPaths.remove(key);
+    _resolvedPaths[key] = localPath;
+    while (_resolvedPaths.length > 512) {
+      _resolvedPaths.remove(_resolvedPaths.keys.first);
+    }
+    return localPath;
+  }
+
+  void _forgetResolvedPath(String localPath) {
+    _resolvedPaths.removeWhere((_, path) => path == localPath);
   }
 
   Future<T> _withDownloadSlot<T>(Future<T> Function() operation) async {
@@ -302,6 +335,7 @@ class MediaCacheService {
     for (final item in files) {
       if (totalBytes <= maxCacheBytes) break;
       if (await item.file.exists()) await item.file.delete();
+      _forgetResolvedPath(item.file.path);
       totalBytes -= item.size;
     }
   }
@@ -352,5 +386,6 @@ class MediaCacheService {
       timer.cancel();
     }
     _trimTimers.clear();
+    _resolvedPaths.clear();
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chats/chats.dart';
+import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -291,6 +292,8 @@ class _ChatsContent extends StatelessWidget {
                 return ChatListItem(
                   key: ValueKey(chat.id),
                   chat: chat,
+                  avatarLoader: () =>
+                      context.read<IChatsRepository>().resolveAvatar(chat),
                   isSelected: isSelected,
                   onTap: () {
                     FocusManager.instance.primaryFocus?.unfocus();

@@ -77,6 +77,14 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
+  Future<String?> resolveFriendAvatar(Friend friend) =>
+      _hydrateAvatar(friend.avatarStoragePath, friend.avatarUrl);
+
+  @override
+  Future<String?> resolveRequestAvatar(FriendRequest request) =>
+      _hydrateAvatar(request.peerAvatarStoragePath, request.peerAvatarUrl);
+
+  @override
   Future<String?> resolveCandidateAvatar(FriendCandidate candidate) =>
       _hydrateAvatar(candidate.avatarStoragePath, candidate.avatarUrl);
 
@@ -175,13 +183,10 @@ class FriendsRepository implements IFriendsRepository {
       _remote.fetchFriends(),
       _remote.fetchRequests(),
     ]);
-    final friends = await Future.wait(
-      (results[0] as List<Friend>).map(_hydrateFriend),
+    await _cache.replaceAll(
+      friends: results[0] as List<Friend>,
+      requests: results[1] as List<FriendRequest>,
     );
-    final requests = await Future.wait(
-      (results[1] as List<FriendRequest>).map(_hydrateRequest),
-    );
-    await _cache.replaceAll(friends: friends, requests: requests);
   }
 
   Future<void> _synchronizeSafely() async {
@@ -190,22 +195,6 @@ class FriendsRepository implements IFriendsRepository {
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Friends sync failed');
     }
-  }
-
-  Future<Friend> _hydrateFriend(Friend friend) async {
-    final local = await _hydrateAvatar(
-      friend.avatarStoragePath,
-      friend.avatarUrl,
-    );
-    return local == null ? friend : friend.copyWith(avatarUrl: local);
-  }
-
-  Future<FriendRequest> _hydrateRequest(FriendRequest request) async {
-    final local = await _hydrateAvatar(
-      request.peerAvatarStoragePath,
-      request.peerAvatarUrl,
-    );
-    return local == null ? request : request.copyWith(peerAvatarUrl: local);
   }
 
   Future<String?> _hydrateAvatar(String? storagePath, String? remoteUrl) async {

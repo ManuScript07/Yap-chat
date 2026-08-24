@@ -13,12 +13,14 @@ class ChatListItem extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.isSelected = false,
+    this.avatarLoader,
   });
 
   final Chat chat;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isSelected;
+  final Future<String?> Function()? avatarLoader;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +48,8 @@ class ChatListItem extends StatelessWidget {
             children: [
               UserAvatar(
                 avatarUrl: chat.avatarUrl,
+                avatarLoader: avatarLoader,
+                avatarRevision: chat.avatarStoragePath ?? chat.avatarUrl,
                 size: 56,
                 borderRadius: 10,
                 isOnline: isOnline,

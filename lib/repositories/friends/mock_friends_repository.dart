@@ -102,8 +102,7 @@ class MockFriendsRepository implements IFriendsRepository {
           avatarUrl: request.peerAvatarUrl,
           avatarStoragePath: request.peerAvatarStoragePath,
           friendCount: request.peerFriendCount,
-          relationship:
-              request.direction == FriendRequestDirection.incoming
+          relationship: request.direction == FriendRequestDirection.incoming
               ? FriendRelationship.incoming
               : FriendRelationship.outgoing,
         ),
@@ -121,6 +120,13 @@ class MockFriendsRepository implements IFriendsRepository {
         .take(10)
         .toList(growable: false);
   }
+
+  @override
+  Future<String?> resolveFriendAvatar(Friend friend) async => friend.avatarUrl;
+
+  @override
+  Future<String?> resolveRequestAvatar(FriendRequest request) async =>
+      request.peerAvatarUrl;
 
   @override
   Future<String?> resolveCandidateAvatar(FriendCandidate candidate) async =>

@@ -13,6 +13,7 @@ class FriendRequestItem extends StatelessWidget {
     required this.onAccept,
     required this.onReject,
     this.onTap,
+    this.avatarLoader,
   });
 
   final FriendRequest request;
@@ -22,6 +23,7 @@ class FriendRequestItem extends StatelessWidget {
   final VoidCallback onAccept;
   final VoidCallback onReject;
   final VoidCallback? onTap;
+  final Future<String?> Function()? avatarLoader;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +41,9 @@ class FriendRequestItem extends StatelessWidget {
           children: [
             UserAvatar(
               avatarUrl: request.peerAvatarUrl,
+              avatarLoader: avatarLoader,
+              avatarRevision:
+                  request.peerAvatarStoragePath ?? request.peerAvatarUrl,
               size: 54,
               borderRadius: 12,
             ),

@@ -81,6 +81,10 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
+  Stream<Chat?> watchChat(String chatId) =>
+      _cache.watch().map((chats) => _findChat(chats, chatId));
+
+  @override
   Future<List<Chat>> getChats() async {
     try {
       await _retryPendingDeletions();
@@ -329,9 +333,8 @@ class ChatsRepository implements IChatsRepository {
     final visibleChats = chats
         .where((chat) => !pendingChatIds.contains(chat.id))
         .toList(growable: false);
-    final hydrated = await Future.wait(visibleChats.map(_hydrateAvatar));
     if (ensureLatestMessages) {
-      for (final chat in hydrated) {
+      for (final chat in visibleChats) {
         final lastMessageId = chat.lastMessageId;
         if (lastMessageId == null) continue;
         final cached = await _chatCache.readMessage(
@@ -351,7 +354,7 @@ class ChatsRepository implements IChatsRepository {
         }
       }
     }
-    final reconciled = await Future.wait(hydrated.map(_mergeLocalPreview));
+    final reconciled = await Future.wait(visibleChats.map(_mergeLocalPreview));
     await _cache.replaceAll(reconciled);
   }
 
@@ -404,7 +407,8 @@ class ChatsRepository implements IChatsRepository {
     );
   }
 
-  Future<Chat> _hydrateAvatar(Chat chat) async {
+  @override
+  Future<String?> resolveAvatar(Chat chat) async {
     final storagePath = chat.avatarStoragePath;
     final remoteUrl = chat.avatarUrl;
     try {
@@ -421,10 +425,10 @@ class ChatsRepository implements IChatsRepository {
               url: remoteUrl,
             )
           : null;
-      return localPath == null ? chat : chat.copyWith(avatarUrl: localPath);
+      return localPath;
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Avatar caching failed');
-      return chat;
+      return null;
     }
   }
 

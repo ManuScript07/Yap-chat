@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
 
-class UserAvatar extends StatelessWidget {
+class UserAvatar extends StatefulWidget {
   const UserAvatar({
     super.key,
     this.avatarUrl,
     this.avatarImage,
+    this.avatarLoader,
+    this.avatarRevision,
     this.size = 48,
     this.borderRadius = 10,
     this.isOnline = false,
@@ -17,10 +19,38 @@ class UserAvatar extends StatelessWidget {
 
   final String? avatarUrl;
   final ImageProvider? avatarImage;
+  final Future<String?> Function()? avatarLoader;
+  final Object? avatarRevision;
   final double size;
   final double borderRadius;
   final bool isOnline;
   final bool showOnlineBadge;
+
+  @override
+  State<UserAvatar> createState() => _UserAvatarState();
+}
+
+class _UserAvatarState extends State<UserAvatar> {
+  Future<String?>? _avatarFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvatar();
+  }
+
+  @override
+  void didUpdateWidget(covariant UserAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.avatarRevision != widget.avatarRevision ||
+        oldWidget.avatarUrl != widget.avatarUrl) {
+      _loadAvatar();
+    }
+  }
+
+  void _loadAvatar() {
+    _avatarFuture = widget.avatarLoader?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,37 +59,52 @@ class UserAvatar extends StatelessWidget {
     final primaryBrandColor = context.colorScheme.primary;
     final backgroundColor = context.scaffoldBackgroundColor;
 
+    final targetWidth = (widget.size * MediaQuery.devicePixelRatioOf(context))
+        .ceil();
     return Stack(
       clipBehavior: Clip.none,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(borderRadius),
+          borderRadius: BorderRadius.circular(widget.borderRadius),
           child: Container(
-            width: size,
-            height: size,
+            width: widget.size,
+            height: widget.size,
             color: surfaceColor,
-            child: avatarImage != null
-                ? Image(image: avatarImage!, fit: BoxFit.cover)
-                : avatarUrl != null && avatarUrl!.isNotEmpty
-                ? Image(
-                    image: _provider(avatarUrl!),
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                    errorBuilder: (_, _, _) =>
-                        Icon(Icons.person, color: iconColor, size: size * 0.65),
+            child: widget.avatarImage != null
+                ? _image(
+                    widget.avatarImage!,
+                    targetWidth: targetWidth,
+                    iconColor: iconColor,
                   )
                 : Icon(Icons.person, color: iconColor, size: size * 0.65),
+                : FutureBuilder<String?>(
+                    future: _avatarFuture,
+                    builder: (context, snapshot) {
+                      final value = snapshot.data ?? widget.avatarUrl;
+                      if (value == null || value.isEmpty) {
+                        return Icon(
+                          Icons.person,
+                          color: iconColor,
+                          size: widget.size * 0.65,
+                        );
+                      }
+                      return _image(
+                        _provider(value),
+                        targetWidth: targetWidth,
+                        iconColor: iconColor,
+                    },
+                  ),
           ),
         ),
         Positioned(
           right: -2,
           bottom: -2,
           child: AnimatedStatusSwitcher(
-            child: showOnlineBadge && isOnline
+            child: widget.showOnlineBadge && widget.isOnline
                 ? Container(
                     key: const ValueKey('online-badge'),
-                    width: size * 0.32,
-                    height: size * 0.32,
+                    width: widget.size * 0.32,
+                    height: widget.size * 0.32,
                     decoration: BoxDecoration(
                       color: primaryBrandColor,
                       shape: BoxShape.circle,
@@ -72,6 +117,18 @@ class UserAvatar extends StatelessWidget {
       ],
     );
   }
+
+  Widget _image(
+    ImageProvider provider, {
+    required int targetWidth,
+    required Color iconColor,
+  }) => Image(
+    image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
+    fit: BoxFit.cover,
+    gaplessPlayback: true,
+    errorBuilder: (_, _, _) =>
+        Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
+  );
 
   ImageProvider _provider(String value) {
     final uri = Uri.tryParse(value);

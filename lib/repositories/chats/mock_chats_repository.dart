@@ -87,6 +87,11 @@ class MockChatsRepository implements IChatsRepository {
   }
 
   @override
+  Stream<Chat?> watchChat(String chatId) async* {
+    yield await getChatById(chatId);
+  }
+
+  @override
   Future<List<Chat>> getChats() async {
     await Future<void>.delayed(_networkDelay);
     return List.unmodifiable(_chats);
@@ -100,6 +105,9 @@ class MockChatsRepository implements IChatsRepository {
     }
     return null;
   }
+
+  @override
+  Future<String?> resolveAvatar(Chat chat) async => chat.avatarUrl;
 
   @override
   Future<Chat> openDirectChat(String peerId) async {

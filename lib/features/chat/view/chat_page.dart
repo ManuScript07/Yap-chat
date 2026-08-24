@@ -36,7 +36,11 @@ class ChatPage extends StatelessWidget {
           ),
         ),
       ],
-      child: _ChatView(chat: chat),
+      child: StreamBuilder<Chat?>(
+        stream: context.read<IChatsRepository>().watchChat(chat.id),
+        initialData: chat,
+        builder: (context, snapshot) => _ChatView(chat: snapshot.data ?? chat),
+      ),
     );
   }
 }
@@ -79,6 +83,14 @@ class _ChatViewState extends State<_ChatView>
     }
     _notificationsCubit ??= context.read<NotificationsCubit>();
     unawaited(_notificationsCubit!.setActiveConversation(widget.chat.id));
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chat.lastSeenAt != widget.chat.lastSeenAt) {
+      _lastSeenAt = widget.chat.lastSeenAt;
+    }
   }
 
   @override
@@ -271,6 +283,12 @@ class _ChatViewState extends State<_ChatView>
                         lastSeenAt: _lastSeenAt,
                         showsLastSeen: widget.chat.showsLastSeen,
                         avatarUrl: widget.chat.avatarUrl,
+                        avatarLoader: () => context
+                            .read<IChatsRepository>()
+                            .resolveAvatar(widget.chat),
+                        avatarRevision:
+                            widget.chat.avatarStoragePath ??
+                            widget.chat.avatarUrl,
                         onBack: () {
                           Navigator.of(context).maybePop();
                         },

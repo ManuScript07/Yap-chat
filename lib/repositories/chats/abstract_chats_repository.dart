@@ -4,10 +4,16 @@ abstract interface class IChatsRepository {
   /// Cache-first поток, который автоматически синхронизируется с сервером.
   Stream<List<Chat>> watchChats();
 
+  /// Cache-only поток одного чата без создания дополнительного Realtime-канала.
+  Stream<Chat?> watchChat(String chatId);
+
   /// Загружает полный список чатов из источника данных.
   Future<List<Chat>> getChats();
 
   Future<Chat?> getChatById(String chatId);
+
+  /// Возвращает локальный путь к аватару, скачивая его только при cache miss.
+  Future<String?> resolveAvatar(Chat chat);
 
   /// Возвращает существующий direct-чат или создаёт его для пользователя.
   Future<Chat> openDirectChat(String peerId);

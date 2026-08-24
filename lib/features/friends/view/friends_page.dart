@@ -278,6 +278,9 @@ class _FriendsList extends StatelessWidget {
                       (friend) => FriendListItem(
                         key: ValueKey(friend.id),
                         friend: friend,
+                        avatarLoader: () => context
+                            .read<IFriendsRepository>()
+                            .resolveFriendAvatar(friend),
                         onChat: () => _openChat(context, friend),
                         onLocation: () => _openLocation(context, friend),
                       ),
@@ -474,6 +477,8 @@ class _RequestsList extends StatelessWidget {
     return FriendRequestItem(
       key: ValueKey(request.id),
       request: request,
+      avatarLoader: () =>
+          context.read<IFriendsRepository>().resolveRequestAvatar(request),
       cancelLabel: context.l10n.friendsCancelRequest,
       friendsLabel: context.l10n.friendsCount,
       onCancel: () =>

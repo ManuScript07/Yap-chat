@@ -3,7 +3,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/ui/ui.dart';
 
-class FriendCandidateItem extends StatefulWidget {
+class FriendCandidateItem extends StatelessWidget {
   const FriendCandidateItem({
     super.key,
     required this.candidate,
@@ -24,36 +24,6 @@ class FriendCandidateItem extends StatefulWidget {
   final Future<String?> Function()? avatarLoader;
 
   @override
-  State<FriendCandidateItem> createState() => _FriendCandidateItemState();
-}
-
-class _FriendCandidateItemState extends State<FriendCandidateItem> {
-  Future<String?>? _avatarFuture;
-
-  FriendCandidate get candidate => widget.candidate;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAvatar();
-  }
-
-  @override
-  void didUpdateWidget(covariant FriendCandidateItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.candidate.avatarStoragePath != candidate.avatarStoragePath ||
-        oldWidget.candidate.avatarUrl != candidate.avatarUrl) {
-      _loadAvatar();
-    }
-  }
-
-  void _loadAvatar() {
-    _avatarFuture = candidate.avatarStoragePath?.isNotEmpty == true
-        ? widget.avatarLoader?.call()
-        : null;
-  }
-
-  @override
   Widget build(BuildContext context) {
     final systemPadding = MediaQuery.paddingOf(context);
     final canAdd = candidate.relationship == FriendRelationship.none;
@@ -66,13 +36,12 @@ class _FriendCandidateItemState extends State<FriendCandidateItem> {
       ),
       child: Row(
         children: [
-          FutureBuilder<String?>(
-            future: _avatarFuture,
-            builder: (context, snapshot) => UserAvatar(
-              avatarUrl: snapshot.data ?? candidate.avatarUrl,
-              size: 54,
-              borderRadius: 12,
-            ),
+          UserAvatar(
+            avatarUrl: candidate.avatarUrl,
+            avatarLoader: avatarLoader,
+            avatarRevision: candidate.avatarStoragePath ?? candidate.avatarUrl,
+            size: 54,
+            borderRadius: 12,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -90,7 +59,7 @@ class _FriendCandidateItemState extends State<FriendCandidateItem> {
                 Text(
                   candidate.friendCount == null
                       ? '@${candidate.username}'
-                      : '${widget.friendsLabel(candidate.friendCount!)} · @${candidate.username}',
+                      : '${friendsLabel(candidate.friendCount!)} · @${candidate.username}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.messagePreview.copyWith(
@@ -104,18 +73,18 @@ class _FriendCandidateItemState extends State<FriendCandidateItem> {
           if (canAdd)
             PrimaryIconButton(
               icon: Icons.person_add_alt_1_rounded,
-              onTap: widget.onAdd,
+              onTap: onAdd,
             )
           else if (candidate.relationship == FriendRelationship.incoming) ...[
             PrimaryIconButton(
               icon: Icons.check_rounded,
-              onTap: widget.onAccept,
+              onTap: onAccept,
               width: 54,
             ),
             const SizedBox(width: 8),
             GlassIconButton(
               icon: Icons.close_rounded,
-              onTap: widget.onReject,
+              onTap: onReject,
               width: 46,
               height: 42,
               borderRadius: 21,
@@ -125,7 +94,7 @@ class _FriendCandidateItemState extends State<FriendCandidateItem> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 108),
               child: Text(
-                widget.relationshipLabel(candidate.relationship),
+                relationshipLabel(candidate.relationship),
                 textAlign: TextAlign.end,
                 style: context.textTheme.labelLarge?.copyWith(
                   color: context.colorScheme.onSurfaceVariant,

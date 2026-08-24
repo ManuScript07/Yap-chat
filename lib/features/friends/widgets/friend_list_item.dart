@@ -12,12 +12,14 @@ class FriendListItem extends StatelessWidget {
     required this.onChat,
     required this.onLocation,
     this.onTap,
+    this.avatarLoader,
   });
 
   final Friend friend;
   final VoidCallback onChat;
   final VoidCallback onLocation;
   final VoidCallback? onTap;
+  final Future<String?> Function()? avatarLoader;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +40,8 @@ class FriendListItem extends StatelessWidget {
           children: [
             UserAvatar(
               avatarUrl: friend.avatarUrl,
+              avatarLoader: avatarLoader,
+              avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
               size: 54,
               borderRadius: 12,
               isOnline: isOnline,

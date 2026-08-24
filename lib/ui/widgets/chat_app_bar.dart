@@ -13,6 +13,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.lastSeenAt,
     this.showsLastSeen = true,
     this.avatarUrl,
+    this.avatarLoader,
+    this.avatarRevision,
     this.onBack,
   });
 
@@ -21,6 +23,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final DateTime? lastSeenAt;
   final bool showsLastSeen;
   final String? avatarUrl;
+  final Future<String?> Function()? avatarLoader;
+  final Object? avatarRevision;
   final VoidCallback? onBack;
 
   @override
@@ -44,7 +48,13 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             onTap: onBack ?? () => Navigator.of(context).pop(),
           ),
           const SizedBox(width: 16),
-          UserAvatar(avatarUrl: avatarUrl, size: 48, borderRadius: 10),
+          UserAvatar(
+            avatarUrl: avatarUrl,
+            avatarLoader: avatarLoader,
+            avatarRevision: avatarRevision,
+            size: 48,
+            borderRadius: 10,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
