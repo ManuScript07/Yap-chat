@@ -106,18 +106,34 @@ class FriendsRepository implements IFriendsRepository {
     final operationKey = unique.join('\u0000');
     final active = _activeContactRefreshes[operationKey];
     if (active != null) return active;
-    final future = _refreshContactMatches(unique);
+    final future = _refreshContactMatches(unique, retainOnlyInput: true);
     _activeContactRefreshes[operationKey] = future;
     return future.whenComplete(
       () => _activeContactRefreshes.remove(operationKey),
     );
   }
 
+  @override
+  Future<ContactMatchSnapshot> refreshPhoneMatch(String phoneNumber) {
+    final normalized = phoneNumber.trim();
+    if (normalized.isEmpty) return Future.value(const ContactMatchSnapshot());
+    final active = _activeContactRefreshes[normalized];
+    if (active != null) return active;
+    final future = _refreshContactMatches([normalized], retainOnlyInput: false);
+    _activeContactRefreshes[normalized] = future;
+    return future.whenComplete(
+      () => _activeContactRefreshes.remove(normalized),
+    );
+  }
+
   Future<ContactMatchSnapshot> _refreshContactMatches(
-    List<String> phoneNumbers,
-  ) async {
+    List<String> phoneNumbers, {
+    required bool retainOnlyInput,
+  }) async {
     const batchSize = 500;
-    await _contactMatchCache.retainOnly(phoneNumbers);
+    if (retainOnlyInput) {
+      await _contactMatchCache.retainOnly(phoneNumbers);
+    }
     final cached = await _contactMatchCache.read(phoneNumbers);
     final now = _clock().toUtc();
     final stalePhoneNumbers = phoneNumbers

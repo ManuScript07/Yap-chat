@@ -14,6 +14,12 @@ class OnboardingTextField extends StatefulWidget {
     this.errorText,
     this.textCapitalization = TextCapitalization.none,
     this.textInputAction,
+    this.keyboardType,
+    this.textAlign = TextAlign.start,
+    this.autocorrect = true,
+    this.prefixText,
+    this.inputFormatters,
+    this.lengthResolver,
     this.onChanged,
     this.onSubmitted,
   });
@@ -27,6 +33,12 @@ class OnboardingTextField extends StatefulWidget {
   final String? errorText;
   final TextCapitalization textCapitalization;
   final TextInputAction? textInputAction;
+  final TextInputType? keyboardType;
+  final TextAlign textAlign;
+  final bool autocorrect;
+  final String? prefixText;
+  final List<TextInputFormatter>? inputFormatters;
+  final int Function(String value)? lengthResolver;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -58,7 +70,9 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: widget.controller,
       builder: (context, value, _) {
-        final errorText = value.text.length > widget.maxLength
+        final inputLength =
+            widget.lengthResolver?.call(value.text) ?? value.text.length;
+        final errorText = inputLength > widget.maxLength
             ? widget.tooLongText
             : widget.errorText;
 
@@ -69,65 +83,83 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
             isFocused: _focusNode.hasFocus,
             label: widget.label,
             errorText: errorText,
-            counter: Text('${value.text.length}/${widget.maxLength}'),
+            counter: Text('$inputLength/${widget.maxLength}'),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 28),
               child: Align(
                 alignment: widget.maxLines == 1
                     ? Alignment.center
                     : Alignment.topCenter,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: TextField(
-                    controller: widget.controller,
-                    focusNode: _focusNode,
-                    maxLength: widget.maxLength,
-                    maxLengthEnforcement: MaxLengthEnforcement.none,
-                    minLines: 1,
-                    maxLines: widget.maxLines,
-                    autocorrect: true,
-                    textCapitalization: widget.textCapitalization,
-                    textInputAction: widget.textInputAction,
-                    onChanged: widget.onChanged,
-                    onSubmitted: widget.onSubmitted,
-                    onTapOutside: (_) =>
-                        FocusManager.instance.primaryFocus?.unfocus(),
-                    textAlignVertical: TextAlignVertical.center,
-                    strutStyle: const StrutStyle(
-                      fontSize: 18,
-                      height: 1.15,
-                      forceStrutHeight: true,
-                    ),
-                    style: context.textTheme.titleMedium?.copyWith(
-                      color: context.colorScheme.onSurface,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      height: 1.15,
-                      letterSpacing: .5,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: widget.hint,
-                      hintStyle: context.textTheme.bodyMedium?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant.withValues(
-                          alpha: .72,
+                child: Row(
+                  children: [
+                    if (widget.prefixText != null) ...[
+                      Text(
+                        widget.prefixText!,
+                        style: context.textTheme.titleMedium?.copyWith(
+                          color: context.colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          height: 1.15,
+                          letterSpacing: .5,
                         ),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        height: 1.15,
-                        letterSpacing: 0,
                       ),
-                      counterText: '',
-                      filled: false,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      focusedErrorBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      isDense: true,
+                      const SizedBox(width: 6),
+                    ],
+                    Expanded(
+                      child: TextField(
+                        controller: widget.controller,
+                        focusNode: _focusNode,
+                        maxLength: widget.maxLength,
+                        maxLengthEnforcement: MaxLengthEnforcement.none,
+                        minLines: 1,
+                        maxLines: widget.maxLines,
+                        autocorrect: widget.autocorrect,
+                        textCapitalization: widget.textCapitalization,
+                        textInputAction: widget.textInputAction,
+                        keyboardType: widget.keyboardType,
+                        inputFormatters: widget.inputFormatters,
+                        onChanged: widget.onChanged,
+                        onSubmitted: widget.onSubmitted,
+                        onTapOutside: (_) =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
+                        textAlign: widget.textAlign,
+                        textAlignVertical: TextAlignVertical.center,
+                        strutStyle: const StrutStyle(
+                          fontSize: 18,
+                          height: 1.15,
+                          forceStrutHeight: true,
+                        ),
+                        style: context.textTheme.titleMedium?.copyWith(
+                          color: context.colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          height: 1.15,
+                          letterSpacing: .5,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: widget.hint,
+                          hintStyle: context.textTheme.bodyMedium?.copyWith(
+                            color: context.colorScheme.onSurfaceVariant
+                                .withValues(alpha: .72),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            height: 1.15,
+                            letterSpacing: 0,
+                          ),
+                          counterText: '',
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          isDense: true,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),

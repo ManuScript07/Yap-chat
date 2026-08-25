@@ -518,10 +518,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get friendsAddContacts => 'from contacts';
 
   @override
-  String get friendsAddByUsername => 'by username';
+  String get friendsAddByUsername => 'search by username';
+
+  @override
+  String get friendsAddByUsernameTitle => 'add by username';
+
+  @override
+  String get friendsUsernameLabel => 'username';
+
+  @override
+  String get friendsUsernameHint => 'enter a username';
+
+  @override
+  String get friendsUsernameSearch => 'search';
+
+  @override
+  String get friendsUsernameNotFound => 'couldn\'t find a user';
+
+  @override
+  String get friendsUsernameTooLong => 'username is too long';
+
+  @override
+  String get friendsUsernameCharactersOnly => 'only a-z, 0-9, and _';
 
   @override
   String get friendsAddByPhone => 'by phone number';
+
+  @override
+  String get friendsAddByPhoneTitle => 'add by phone number';
+
+  @override
+  String get friendsPhoneLabel => 'phone number';
+
+  @override
+  String get friendsPhoneHint => 'enter a phone number';
+
+  @override
+  String get friendsPhoneTooLong => 'phone number is too long';
+
+  @override
+  String get friendsPhoneInvalid => 'enter a valid phone number';
 
   @override
   String get friendsAddInviteMore => 'invite even more friends';

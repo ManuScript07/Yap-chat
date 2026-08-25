@@ -947,14 +947,86 @@ abstract class AppLocalizations {
   /// No description provided for @friendsAddByUsername.
   ///
   /// In ru, this message translates to:
-  /// **'по username'**
+  /// **'поиск по никнейму'**
   String get friendsAddByUsername;
+
+  /// No description provided for @friendsAddByUsernameTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'добавить по никнейму'**
+  String get friendsAddByUsernameTitle;
+
+  /// No description provided for @friendsUsernameLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'никнейм'**
+  String get friendsUsernameLabel;
+
+  /// No description provided for @friendsUsernameHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'введи никнейм'**
+  String get friendsUsernameHint;
+
+  /// No description provided for @friendsUsernameSearch.
+  ///
+  /// In ru, this message translates to:
+  /// **'искать'**
+  String get friendsUsernameSearch;
+
+  /// No description provided for @friendsUsernameNotFound.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось найти'**
+  String get friendsUsernameNotFound;
+
+  /// No description provided for @friendsUsernameTooLong.
+  ///
+  /// In ru, this message translates to:
+  /// **'никнейм слишком длинный'**
+  String get friendsUsernameTooLong;
+
+  /// No description provided for @friendsUsernameCharactersOnly.
+  ///
+  /// In ru, this message translates to:
+  /// **'только a-z, 0-9 и _'**
+  String get friendsUsernameCharactersOnly;
 
   /// No description provided for @friendsAddByPhone.
   ///
   /// In ru, this message translates to:
   /// **'по номеру телефона'**
   String get friendsAddByPhone;
+
+  /// No description provided for @friendsAddByPhoneTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'добавить по номеру телефона'**
+  String get friendsAddByPhoneTitle;
+
+  /// No description provided for @friendsPhoneLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'номер телефона'**
+  String get friendsPhoneLabel;
+
+  /// No description provided for @friendsPhoneHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'введи номер телефона'**
+  String get friendsPhoneHint;
+
+  /// No description provided for @friendsPhoneTooLong.
+  ///
+  /// In ru, this message translates to:
+  /// **'номер слишком длинный'**
+  String get friendsPhoneTooLong;
+
+  /// No description provided for @friendsPhoneInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'введите корректный номер'**
+  String get friendsPhoneInvalid;
 
   /// No description provided for @friendsAddInviteMore.
   ///

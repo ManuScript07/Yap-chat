@@ -1,8 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter_contacts/flutter_contacts.dart' as native_contacts;
-import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/contacts/abstract_contacts_repository.dart';
 
@@ -33,14 +33,13 @@ class ContactsRepository implements IContactsRepository {
            ((text) async {
              await SharePlus.instance.share(ShareParams(text: text));
            }),
-       _localeProvider =
-           localeProvider ?? (() => PlatformDispatcher.instance.locale);
+       _phoneNormalizer = PhoneNumberNormalizer(localeProvider: localeProvider);
 
   final Future<native_contacts.PermissionStatus> Function() _requestPermission;
   final NativeContactsLoader _loadContacts;
   final Future<void> Function() _openSettings;
   final Future<void> Function(String text) _shareText;
-  final Locale Function() _localeProvider;
+  final PhoneNumberNormalizer _phoneNormalizer;
 
   @override
   Future<ContactsPermissionStatus> requestPermission() async {
@@ -61,17 +60,15 @@ class ContactsRepository implements IContactsRepository {
   @override
   Future<List<DeviceContactPhone>> readPhoneContacts() async {
     final contacts = await _loadContacts();
-    final callerCountry = _callerCountry();
     final entries = <DeviceContactPhone>[];
     for (final contact in contacts) {
       for (var index = 0; index < contact.phones.length; index++) {
         final phone = contact.phones[index];
         final platformNormalized = phone.normalizedNumber?.trim();
-        final normalized = _normalize(
+        final normalized = _phoneNormalizer.normalize(
           platformNormalized == null || platformNormalized.isEmpty
               ? phone.number
               : platformNormalized,
-          callerCountry,
         );
         if (normalized == null) continue;
         final contactId = contact.id ?? contact.displayName ?? 'contact';
@@ -92,33 +89,6 @@ class ContactsRepository implements IContactsRepository {
       return byName != 0 ? byName : left.id.compareTo(right.id);
     });
     return List.unmodifiable(entries);
-  }
-
-  IsoCode? _callerCountry() {
-    final countryCode = _localeProvider().countryCode?.toUpperCase();
-    if (countryCode == null || countryCode.isEmpty) return null;
-    try {
-      return IsoCode.fromJson(countryCode);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  String? _normalize(String rawPhone, IsoCode? callerCountry) {
-    final trimmed = rawPhone.trim();
-    if (trimmed.isEmpty ||
-        (!trimmed.startsWith('+') && callerCountry == null)) {
-      return null;
-    }
-    try {
-      final parsed = PhoneNumber.parse(
-        trimmed,
-        callerCountry: trimmed.startsWith('+') ? null : callerCountry,
-      );
-      return parsed.isValid() ? parsed.international : null;
-    } catch (_) {
-      return null;
-    }
   }
 
   @override

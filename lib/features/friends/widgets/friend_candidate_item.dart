@@ -14,6 +14,7 @@ class FriendCandidateItem extends StatelessWidget {
     required this.onAccept,
     required this.onReject,
     this.avatarLoader,
+    this.respectSystemPadding = true,
   });
 
   final FriendCandidate candidate;
@@ -23,10 +24,13 @@ class FriendCandidateItem extends StatelessWidget {
   final VoidCallback onReject;
   final String Function(FriendRelationship relationship) relationshipLabel;
   final Future<String?> Function()? avatarLoader;
+  final bool respectSystemPadding;
 
   @override
   Widget build(BuildContext context) {
-    final systemPadding = MediaQuery.paddingOf(context);
+    final systemPadding = respectSystemPadding
+        ? MediaQuery.paddingOf(context)
+        : EdgeInsets.zero;
     final canAdd = candidate.relationship == FriendRelationship.none;
     return Padding(
       padding: EdgeInsets.only(

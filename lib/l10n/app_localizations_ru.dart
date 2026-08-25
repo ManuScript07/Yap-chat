@@ -525,10 +525,46 @@ class AppLocalizationsRu extends AppLocalizations {
   String get friendsAddContacts => 'из контактов';
 
   @override
-  String get friendsAddByUsername => 'по username';
+  String get friendsAddByUsername => 'поиск по никнейму';
+
+  @override
+  String get friendsAddByUsernameTitle => 'добавить по никнейму';
+
+  @override
+  String get friendsUsernameLabel => 'никнейм';
+
+  @override
+  String get friendsUsernameHint => 'введи никнейм';
+
+  @override
+  String get friendsUsernameSearch => 'искать';
+
+  @override
+  String get friendsUsernameNotFound => 'не удалось найти';
+
+  @override
+  String get friendsUsernameTooLong => 'никнейм слишком длинный';
+
+  @override
+  String get friendsUsernameCharactersOnly => 'только a-z, 0-9 и _';
 
   @override
   String get friendsAddByPhone => 'по номеру телефона';
+
+  @override
+  String get friendsAddByPhoneTitle => 'добавить по номеру телефона';
+
+  @override
+  String get friendsPhoneLabel => 'номер телефона';
+
+  @override
+  String get friendsPhoneHint => 'введи номер телефона';
+
+  @override
+  String get friendsPhoneTooLong => 'номер слишком длинный';
+
+  @override
+  String get friendsPhoneInvalid => 'введите корректный номер';
 
   @override
   String get friendsAddInviteMore => 'позови ещё больше друзей';

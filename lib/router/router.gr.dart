@@ -19,6 +19,10 @@ import 'package:yap_chat/features/auth/view/welcome_page.dart' as _i12;
 import 'package:yap_chat/features/chat/view/chat_page.dart' as _i4;
 import 'package:yap_chat/features/chats/data/data.dart' as _i15;
 import 'package:yap_chat/features/chats/view/chats_page.dart' as _i5;
+import 'package:yap_chat/features/friends/view/add_friend_by_username_page.dart'
+    as _i16;
+import 'package:yap_chat/features/friends/view/add_friend_by_phone_page.dart'
+    as _i17;
 import 'package:yap_chat/features/friends/view/add_friend_page.dart' as _i1;
 import 'package:yap_chat/features/friends/view/friends_page.dart' as _i6;
 import 'package:yap_chat/features/main/view/main_page.dart' as _i7;
@@ -37,6 +41,38 @@ class AddFriendRoute extends _i13.PageRouteInfo<void> {
     name,
     builder: (data) {
       return const _i1.AddFriendPage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i16.AddFriendByUsernamePage]
+class AddFriendByUsernameRoute extends _i13.PageRouteInfo<void> {
+  const AddFriendByUsernameRoute({List<_i13.PageRouteInfo>? children})
+    : super(AddFriendByUsernameRoute.name, initialChildren: children);
+
+  static const String name = 'AddFriendByUsernameRoute';
+
+  static _i13.PageInfo page = _i13.PageInfo(
+    name,
+    builder: (data) {
+      return const _i16.AddFriendByUsernamePage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i17.AddFriendByPhonePage]
+class AddFriendByPhoneRoute extends _i13.PageRouteInfo<void> {
+  const AddFriendByPhoneRoute({List<_i13.PageRouteInfo>? children})
+    : super(AddFriendByPhoneRoute.name, initialChildren: children);
+
+  static const String name = 'AddFriendByPhoneRoute';
+
+  static _i13.PageInfo page = _i13.PageInfo(
+    name,
+    builder: (data) {
+      return const _i17.AddFriendByPhonePage();
     },
   );
 }

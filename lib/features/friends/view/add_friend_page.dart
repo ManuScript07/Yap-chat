@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:auto_route/auto_route.dart';
@@ -8,6 +9,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/friends/widgets/widgets.dart';
 import 'package:yap_chat/repositories/repositories.dart';
+import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -68,12 +70,12 @@ class _AddFriendBodyState extends State<_AddFriendBody> {
             AddFriendMethodTile(
               icon: Icons.alternate_email_rounded,
               title: context.l10n.friendsAddByUsername,
-              trailing: context.l10n.friendsAddComingSoon,
+              onTap: () => _openUsernameSearch(context),
             ),
             AddFriendMethodTile(
               icon: Icons.phone_rounded,
               title: context.l10n.friendsAddByPhone,
-              trailing: context.l10n.friendsAddComingSoon,
+              onTap: () => _openPhoneSearch(context),
             ),
             const SizedBox(height: 8),
             Padding(
@@ -147,6 +149,26 @@ class _AddFriendBodyState extends State<_AddFriendBody> {
         message: context.l10n.friendsContactsLoadFailed,
         type: SnackBarType.error,
       );
+    }
+  }
+
+  void _openUsernameSearch(BuildContext context) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final authRouter = context.router.root.innerRouterOf<StackRouter>(
+      AuthGateRoute.name,
+    );
+    if (authRouter != null) {
+      unawaited(authRouter.push(const AddFriendByUsernameRoute()));
+    }
+  }
+
+  void _openPhoneSearch(BuildContext context) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final authRouter = context.router.root.innerRouterOf<StackRouter>(
+      AuthGateRoute.name,
+    );
+    if (authRouter != null) {
+      unawaited(authRouter.push(const AddFriendByPhoneRoute()));
     }
   }
 }
