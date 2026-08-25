@@ -178,6 +178,8 @@
   "notificationLocation": "Местоположение",
   "chatsNotificationsEnabled": "Уведомления включены",
   "chatsNotificationsDisabled": "Уведомления отключены",
+  "newChatTitle": "написать",
+  "newChatFindUser": "найти пользователя",
   "friendsTabFriends": "друны",
   "friendsTabRequests": "заявки",
   "friendsAll": "все друны",

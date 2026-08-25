@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chats/data/data.dart';
 
 enum ChatStatus { initial, loading, success, failure }
 
@@ -12,6 +13,7 @@ class ChatState extends Equatable {
   final ChatMessage? replyToMessage;
   final bool isLoadingMore;
   final bool hasMoreMessages;
+  final Chat? resolvedChat;
 
   const ChatState({
     this.status = ChatStatus.initial,
@@ -22,6 +24,7 @@ class ChatState extends Equatable {
     this.replyToMessage,
     this.isLoadingMore = false,
     this.hasMoreMessages = true,
+    this.resolvedChat,
   });
 
   ChatState copyWith({
@@ -34,6 +37,7 @@ class ChatState extends Equatable {
     bool clearReplyToMessage = false,
     bool? isLoadingMore,
     bool? hasMoreMessages,
+    Chat? resolvedChat,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -46,6 +50,7 @@ class ChatState extends Equatable {
           : replyToMessage ?? this.replyToMessage,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
+      resolvedChat: resolvedChat ?? this.resolvedChat,
     );
   }
 
@@ -59,5 +64,6 @@ class ChatState extends Equatable {
     replyToMessage,
     isLoadingMore,
     hasMoreMessages,
+    resolvedChat,
   ];
 }

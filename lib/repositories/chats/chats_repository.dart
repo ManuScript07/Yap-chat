@@ -117,7 +117,44 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
-  Future<Chat> openDirectChat(String peerId) async {
+  Future<Chat> prepareDirectChat({
+    required String peerId,
+    required String peerUsername,
+    required String peerDisplayName,
+    String? peerAvatarUrl,
+    String? peerAvatarStoragePath,
+  }) async {
+    final normalizedPeerId = peerId.trim();
+    if (normalizedPeerId.isEmpty) {
+      throw ArgumentError.value(peerId, 'peerId', 'Peer ID must not be empty');
+    }
+
+    final cachedChat = await _cache.readByPeerId(normalizedPeerId);
+    if (cachedChat != null) return cachedChat;
+
+    try {
+      await _synchronize();
+      final synchronizedChat = await _cache.readByPeerId(normalizedPeerId);
+      if (synchronizedChat != null) return synchronizedChat;
+    } catch (error, stackTrace) {
+      _config.talker.handle(
+        error,
+        stackTrace,
+        'Direct chat lookup failed; opening a local draft',
+      );
+    }
+
+    return Chat.directDraft(
+      peerId: normalizedPeerId,
+      peerUsername: peerUsername,
+      peerDisplayName: peerDisplayName,
+      peerAvatarUrl: peerAvatarUrl,
+      peerAvatarStoragePath: peerAvatarStoragePath,
+    );
+  }
+
+  @override
+  Future<Chat> ensureDirectChat(String peerId) async {
     final normalizedPeerId = peerId.trim();
     if (normalizedPeerId.isEmpty) {
       throw ArgumentError.value(peerId, 'peerId', 'Peer ID must not be empty');

@@ -15,8 +15,17 @@ abstract interface class IChatsRepository {
   /// Возвращает локальный путь к аватару, скачивая его только при cache miss.
   Future<String?> resolveAvatar(Chat chat);
 
-  /// Возвращает существующий direct-чат или создаёт его для пользователя.
-  Future<Chat> openDirectChat(String peerId);
+  /// Возвращает существующий direct-чат или локальный черновик без записи в БД.
+  Future<Chat> prepareDirectChat({
+    required String peerId,
+    required String peerUsername,
+    required String peerDisplayName,
+    String? peerAvatarUrl,
+    String? peerAvatarStoragePath,
+  });
+
+  /// Возвращает существующий direct-чат или создаёт его при первой отправке.
+  Future<Chat> ensureDirectChat(String peerId);
 
   /// Удаляет выбранные чаты по их идентификаторам.
   Future<void> deleteChats(Set<String> ids);

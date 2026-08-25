@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 enum ChatPreviewType { text, image, audio, location }
 
 class Chat extends Equatable {
+  static const _draftIdPrefix = 'direct-draft:';
+
   final String id;
   final String peerId;
   final String peerUsername;
@@ -38,6 +40,28 @@ class Chat extends Equatable {
     required this.isLastMessageFromMe,
     this.isMuted = false,
   });
+
+  factory Chat.directDraft({
+    required String peerId,
+    required String peerUsername,
+    required String peerDisplayName,
+    String? peerAvatarUrl,
+    String? peerAvatarStoragePath,
+  }) => Chat(
+    id: '$_draftIdPrefix$peerId',
+    peerId: peerId,
+    peerUsername: peerUsername,
+    userName: peerDisplayName,
+    avatarUrl: peerAvatarUrl,
+    avatarStoragePath: peerAvatarStoragePath,
+    lastMessage: '',
+    lastMessageTime: DateTime.fromMillisecondsSinceEpoch(0),
+    unreadCount: 0,
+    isOnline: false,
+    isLastMessageFromMe: false,
+  );
+
+  bool get isDraft => id.startsWith(_draftIdPrefix);
 
   Chat copyWith({
     String? id,
@@ -95,5 +119,6 @@ class Chat extends Equatable {
     showsLastSeen,
     isLastMessageFromMe,
     isMuted,
+    isDraft,
   ];
 }

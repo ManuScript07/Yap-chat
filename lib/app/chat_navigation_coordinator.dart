@@ -6,6 +6,7 @@ class ChatNavigationCoordinator {
     required Future<Chat?> Function(String chatId) loadChat,
     required Future<void> Function(Chat chat) navigateToChat,
     required bool Function(String chatId) isConversationVisible,
+    bool Function(String peerId)? isPeerVisible,
     required bool Function() isActive,
     required void Function(Object error, StackTrace stackTrace, String message)
     onError,
@@ -13,6 +14,7 @@ class ChatNavigationCoordinator {
   }) : _loadChat = loadChat,
        _navigateToChat = navigateToChat,
        _isConversationVisible = isConversationVisible,
+       _isPeerVisible = isPeerVisible ?? ((_) => false),
        _isActive = isActive,
        _onError = onError,
        _waitForFrame = waitForFrame ?? _waitForNextFrame;
@@ -20,6 +22,7 @@ class ChatNavigationCoordinator {
   final Future<Chat?> Function(String chatId) _loadChat;
   final Future<void> Function(Chat chat) _navigateToChat;
   final bool Function(String chatId) _isConversationVisible;
+  final bool Function(String peerId) _isPeerVisible;
   final bool Function() _isActive;
   final void Function(Object error, StackTrace stackTrace, String message)
   _onError;
@@ -32,6 +35,7 @@ class ChatNavigationCoordinator {
     final normalizedChatId = chat.id.trim();
     if (normalizedChatId.isEmpty ||
         _isConversationVisible(normalizedChatId) ||
+        _isPeerVisible(chat.peerId) ||
         !_queuedChatIds.add(normalizedChatId)) {
       return _queue;
     }
@@ -56,7 +60,11 @@ class ChatNavigationCoordinator {
     final chatId = chat.id.trim();
     try {
       await _waitForFrame();
-      if (!_isActive() || _isConversationVisible(chatId)) return;
+      if (!_isActive() ||
+          _isConversationVisible(chatId) ||
+          _isPeerVisible(chat.peerId)) {
+        return;
+      }
 
       await _navigateToChat(chat);
     } catch (error, stackTrace) {
@@ -74,9 +82,14 @@ class ChatNavigationCoordinator {
       final chat = await _loadChat(chatId);
       if (!_isActive() || _isConversationVisible(chatId)) return;
       if (chat == null) return;
+      if (_isPeerVisible(chat.peerId)) return;
 
       await _waitForFrame();
-      if (!_isActive() || _isConversationVisible(chatId)) return;
+      if (!_isActive() ||
+          _isConversationVisible(chatId) ||
+          _isPeerVisible(chat.peerId)) {
+        return;
+      }
 
       await _navigateToChat(chat);
     } catch (error, stackTrace) {

@@ -96,6 +96,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
         await WidgetsBinding.instance.endOfFrame;
       },
       isConversationVisible: _isConversationVisible,
+      isPeerVisible: _isPeerVisible,
       isActive: () => mounted,
       onError: talker.handle,
     );
@@ -166,6 +167,19 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     if (route.name != ChatRoute.name) return false;
 
     return route.argsAs<ChatRouteArgs>().chat.id == conversationId;
+  }
+
+  bool _isPeerVisible(String peerId) {
+    final normalizedPeerId = peerId.trim();
+    if (normalizedPeerId.isEmpty) return false;
+
+    final authRouter = _authRouter;
+    if (authRouter == null || authRouter.stackData.isEmpty) return false;
+
+    final route = authRouter.stackData.last;
+    if (route.name != ChatRoute.name) return false;
+
+    return route.argsAs<ChatRouteArgs>().chat.peerId == normalizedPeerId;
   }
 
   StackRouter? get _authRouter =>

@@ -464,6 +464,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsNotificationsDisabled => 'Notifications disabled';
 
   @override
+  String get newChatTitle => 'write';
+
+  @override
+  String get newChatFindUser => 'find a user';
+
+  @override
   String get friendsTabFriends => 'friends';
 
   @override

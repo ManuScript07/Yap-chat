@@ -110,7 +110,27 @@ class MockChatsRepository implements IChatsRepository {
   Future<String?> resolveAvatar(Chat chat) async => chat.avatarUrl;
 
   @override
-  Future<Chat> openDirectChat(String peerId) async {
+  Future<Chat> prepareDirectChat({
+    required String peerId,
+    required String peerUsername,
+    required String peerDisplayName,
+    String? peerAvatarUrl,
+    String? peerAvatarStoragePath,
+  }) async {
+    for (final chat in _chats) {
+      if (chat.peerId == peerId) return chat;
+    }
+    return Chat.directDraft(
+      peerId: peerId,
+      peerUsername: peerUsername,
+      peerDisplayName: peerDisplayName,
+      peerAvatarUrl: peerAvatarUrl,
+      peerAvatarStoragePath: peerAvatarStoragePath,
+    );
+  }
+
+  @override
+  Future<Chat> ensureDirectChat(String peerId) async {
     for (final chat in _chats) {
       if (chat.peerId == peerId) return chat;
     }

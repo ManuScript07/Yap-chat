@@ -475,8 +475,12 @@ class _FriendsListState extends State<_FriendsList> {
   Future<void> _openChat(BuildContext context, Friend friend) async {
     FocusManager.instance.primaryFocus?.unfocus();
     try {
-      final chat = await context.read<IChatsRepository>().openDirectChat(
-        friend.id,
+      final chat = await context.read<IChatsRepository>().prepareDirectChat(
+        peerId: friend.id,
+        peerUsername: friend.username,
+        peerDisplayName: friend.displayName,
+        peerAvatarUrl: friend.avatarUrl,
+        peerAvatarStoragePath: friend.avatarStoragePath,
       );
       if (context.mounted) {
         await context.read<ChatNavigationCoordinator>().open(chat);

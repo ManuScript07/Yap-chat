@@ -469,6 +469,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatsNotificationsDisabled => 'Уведомления отключены';
 
   @override
+  String get newChatTitle => 'написать';
+
+  @override
+  String get newChatFindUser => 'найти пользователя';
+
+  @override
   String get friendsTabFriends => 'друны';
 
   @override

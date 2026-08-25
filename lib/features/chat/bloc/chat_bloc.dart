@@ -4,13 +4,33 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/chat_event.dart';
 import 'package:yap_chat/features/chat/bloc/chat_state.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chat/chat.dart';
+import 'package:yap_chat/repositories/chats/chats.dart';
 
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final IChatRepository _chatRepository;
+  final IChatsRepository _chatsRepository;
+  String? _draftPeerId;
+  Future<Chat>? _directChatFuture;
   StreamSubscription? _messagesSubscription;
 
-  ChatBloc({required this._chatRepository}) : super(const ChatState()) {
+  ChatBloc({
+    required IChatRepository chatRepository,
+    required IChatsRepository chatsRepository,
+    required Chat initialChat,
+  }) : _chatRepository = chatRepository,
+       _chatsRepository = chatsRepository,
+       _draftPeerId = initialChat.isDraft ? initialChat.peerId : null,
+       super(
+         ChatState(
+           status: initialChat.isDraft
+               ? ChatStatus.success
+               : ChatStatus.initial,
+           chatId: initialChat.id,
+           hasMoreMessages: !initialChat.isDraft,
+         ),
+       ) {
     on<ChatStarted>(_onStarted);
     on<ChatMessageSent>(_onMessageSent);
     on<ChatMessageImagesSent>(_onImagesSent);
@@ -28,12 +48,55 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   }
 
   Future<void> _onStarted(ChatStarted event, Emitter<ChatState> emit) async {
-    emit(state.copyWith(status: ChatStatus.loading, chatId: event.chatId));
+    if (_draftPeerId != null) {
+      emit(
+        state.copyWith(
+          status: ChatStatus.success,
+          chatId: event.chatId,
+          hasMoreMessages: false,
+        ),
+      );
+      return;
+    }
 
+    emit(state.copyWith(status: ChatStatus.loading, chatId: event.chatId));
+    await _subscribeToMessages(event.chatId);
+  }
+
+  Future<void> _subscribeToMessages(String chatId) async {
     await _messagesSubscription?.cancel();
     _messagesSubscription = _chatRepository
-        .getMessagesStream(event.chatId)
+        .getMessagesStream(chatId)
         .listen((messages) => add(ChatMessagesReceived(messages)));
+  }
+
+  Future<String> _ensureChat(Emitter<ChatState> emit) async {
+    final peerId = _draftPeerId;
+    if (peerId == null) return state.chatId;
+
+    final pending = _directChatFuture ??= _chatsRepository.ensureDirectChat(
+      peerId,
+    );
+    try {
+      final chat = await pending;
+      if (_draftPeerId != null) {
+        _draftPeerId = null;
+        emit(
+          state.copyWith(
+            status: ChatStatus.loading,
+            chatId: chat.id,
+            hasMoreMessages: true,
+            resolvedChat: chat,
+          ),
+        );
+        await _subscribeToMessages(chat.id);
+      }
+      return chat.id;
+    } finally {
+      if (identical(_directChatFuture, pending)) {
+        _directChatFuture = null;
+      }
+    }
   }
 
   Future<void> _onMessageSent(
@@ -45,8 +108,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final replyToMessageId = state.replyToMessage?.id;
     emit(state.copyWith(clearReplyToMessage: true));
     try {
+      final chatId = await _ensureChat(emit);
       await _chatRepository.sendMessage(
-        state.chatId,
+        chatId,
         event.text,
         replyToMessageId: replyToMessageId,
       );
@@ -64,8 +128,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final replyToMessageId = state.replyToMessage?.id;
     emit(state.copyWith(clearReplyToMessage: true));
     try {
+      final chatId = await _ensureChat(emit);
       await _chatRepository.sendImages(
-        state.chatId,
+        chatId,
         event.imagePaths,
         replyToMessageId: replyToMessageId,
       );
@@ -97,8 +162,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final replyToMessageId = state.replyToMessage?.id;
     emit(state.copyWith(clearReplyToMessage: true));
     try {
+      final chatId = await _ensureChat(emit);
       await _chatRepository.sendAudio(
-        state.chatId,
+        chatId,
         event.audioPath,
         event.duration,
         event.waveform,
@@ -116,8 +182,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final replyToMessageId = state.replyToMessage?.id;
     emit(state.copyWith(clearReplyToMessage: true));
     try {
+      final chatId = await _ensureChat(emit);
       await _chatRepository.sendLocation(
-        state.chatId,
+        chatId,
         event.latitude,
         event.longitude,
         replyToMessageId: replyToMessageId,

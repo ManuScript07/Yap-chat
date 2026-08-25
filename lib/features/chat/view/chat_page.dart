@@ -25,9 +25,11 @@ class ChatPage extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (context) =>
-              ChatBloc(chatRepository: context.read<IChatRepository>())
-                ..add(ChatStarted(chat.id)),
+          create: (context) => ChatBloc(
+            chatRepository: context.read<IChatRepository>(),
+            chatsRepository: context.read<IChatsRepository>(),
+            initialChat: chat,
+          )..add(ChatStarted(chat.id)),
         ),
         BlocProvider(
           create: (context) => VoiceRecorderCubit(
@@ -36,10 +38,21 @@ class ChatPage extends StatelessWidget {
           ),
         ),
       ],
-      child: StreamBuilder<Chat?>(
-        stream: context.read<IChatsRepository>().watchChat(chat.id),
-        initialData: chat,
-        builder: (context, snapshot) => _ChatView(chat: snapshot.data ?? chat),
+      child: BlocBuilder<ChatBloc, ChatState>(
+        buildWhen: (previous, current) =>
+            previous.resolvedChat != current.resolvedChat,
+        builder: (context, state) {
+          final activeChat = state.resolvedChat ?? chat;
+          if (activeChat.isDraft) return _ChatView(chat: activeChat);
+
+          return StreamBuilder<Chat?>(
+            key: ValueKey(activeChat.id),
+            stream: context.read<IChatsRepository>().watchChat(activeChat.id),
+            initialData: activeChat,
+            builder: (context, snapshot) =>
+                _ChatView(chat: snapshot.data ?? activeChat),
+          );
+        },
       ),
     );
   }
@@ -82,12 +95,24 @@ class _ChatViewState extends State<_ChatView>
       _hasKeyboardInset = true;
     }
     _notificationsCubit ??= context.read<NotificationsCubit>();
-    unawaited(_notificationsCubit!.setActiveConversation(widget.chat.id));
+    if (!widget.chat.isDraft) {
+      unawaited(_notificationsCubit!.setActiveConversation(widget.chat.id));
+    }
   }
 
   @override
   void didUpdateWidget(covariant _ChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.chat.id != widget.chat.id) {
+      if (!oldWidget.chat.isDraft) {
+        unawaited(
+          _notificationsCubit?.clearActiveConversation(oldWidget.chat.id),
+        );
+      }
+      if (!widget.chat.isDraft) {
+        unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+      }
+    }
     if (oldWidget.chat.lastSeenAt != widget.chat.lastSeenAt) {
       _lastSeenAt = widget.chat.lastSeenAt;
     }
@@ -111,23 +136,31 @@ class _ChatViewState extends State<_ChatView>
 
   @override
   void didPush() {
-    unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+    if (!widget.chat.isDraft) {
+      unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+    }
   }
 
   @override
   void didPopNext() {
-    unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+    if (!widget.chat.isDraft) {
+      unawaited(_notificationsCubit?.setActiveConversation(widget.chat.id));
+    }
   }
 
   @override
   void didPushNext() {
-    unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
+    if (!widget.chat.isDraft) {
+      unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
+    if (!widget.chat.isDraft) {
+      unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
+    }
     _scrollController.dispose();
     super.dispose();
   }

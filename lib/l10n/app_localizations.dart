@@ -854,6 +854,18 @@ abstract class AppLocalizations {
   /// **'Уведомления отключены'**
   String get chatsNotificationsDisabled;
 
+  /// No description provided for @newChatTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'написать'**
+  String get newChatTitle;
+
+  /// No description provided for @newChatFindUser.
+  ///
+  /// In ru, this message translates to:
+  /// **'найти пользователя'**
+  String get newChatFindUser;
+
   /// No description provided for @friendsTabFriends.
   ///
   /// In ru, this message translates to:
