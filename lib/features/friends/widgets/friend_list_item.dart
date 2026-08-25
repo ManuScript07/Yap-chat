@@ -11,6 +11,7 @@ class FriendListItem extends StatelessWidget {
     required this.friend,
     required this.onChat,
     required this.onLocation,
+    this.isLocationEnabled = true,
     this.onTap,
     this.avatarLoader,
   });
@@ -18,6 +19,7 @@ class FriendListItem extends StatelessWidget {
   final Friend friend;
   final VoidCallback onChat;
   final VoidCallback onLocation;
+  final bool isLocationEnabled;
   final VoidCallback? onTap;
   final Future<String?> Function()? avatarLoader;
 
@@ -74,13 +76,16 @@ class FriendListItem extends StatelessWidget {
             const SizedBox(width: 8),
             PrimaryIconButton(icon: Icons.chat_rounded, onTap: onChat),
             const SizedBox(width: 8),
-            GlassIconButton(
-              icon: Icons.near_me_rounded,
-              onTap: onLocation,
+            SizedBox(
               width: 46,
               height: 42,
-              borderRadius: 21,
-              iconSize: 25,
+              child: IconButton(
+                onPressed: isLocationEnabled ? onLocation : null,
+                padding: EdgeInsets.zero,
+                iconSize: 25,
+                color: context.colorScheme.onSurface,
+                icon: const Icon(Icons.near_me_rounded),
+              ),
             ),
           ],
         ),

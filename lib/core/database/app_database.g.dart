@@ -4974,6 +4974,446 @@ class CachedFriendRequestsCompanion
   }
 }
 
+class $CachedFriendLocationsTable extends CachedFriendLocations
+    with TableInfo<$CachedFriendLocationsTable, CachedFriendLocation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedFriendLocationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _friendUserIdMeta = const VerificationMeta(
+    'friendUserId',
+  );
+  @override
+  late final GeneratedColumn<String> friendUserId = GeneratedColumn<String>(
+    'friend_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _latitudeMeta = const VerificationMeta(
+    'latitude',
+  );
+  @override
+  late final GeneratedColumn<double> latitude = GeneratedColumn<double>(
+    'latitude',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _longitudeMeta = const VerificationMeta(
+    'longitude',
+  );
+  @override
+  late final GeneratedColumn<double> longitude = GeneratedColumn<double>(
+    'longitude',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _locationUpdatedAtMsMeta =
+      const VerificationMeta('locationUpdatedAtMs');
+  @override
+  late final GeneratedColumn<int> locationUpdatedAtMs = GeneratedColumn<int>(
+    'location_updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    friendUserId,
+    latitude,
+    longitude,
+    locationUpdatedAtMs,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_friend_locations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedFriendLocation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('friend_user_id')) {
+      context.handle(
+        _friendUserIdMeta,
+        friendUserId.isAcceptableOrUnknown(
+          data['friend_user_id']!,
+          _friendUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_friendUserIdMeta);
+    }
+    if (data.containsKey('latitude')) {
+      context.handle(
+        _latitudeMeta,
+        latitude.isAcceptableOrUnknown(data['latitude']!, _latitudeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_latitudeMeta);
+    }
+    if (data.containsKey('longitude')) {
+      context.handle(
+        _longitudeMeta,
+        longitude.isAcceptableOrUnknown(data['longitude']!, _longitudeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_longitudeMeta);
+    }
+    if (data.containsKey('location_updated_at_ms')) {
+      context.handle(
+        _locationUpdatedAtMsMeta,
+        locationUpdatedAtMs.isAcceptableOrUnknown(
+          data['location_updated_at_ms']!,
+          _locationUpdatedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_locationUpdatedAtMsMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, friendUserId};
+  @override
+  CachedFriendLocation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedFriendLocation(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      friendUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}friend_user_id'],
+      )!,
+      latitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}latitude'],
+      )!,
+      longitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}longitude'],
+      )!,
+      locationUpdatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}location_updated_at_ms'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedFriendLocationsTable createAlias(String alias) {
+    return $CachedFriendLocationsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedFriendLocation extends DataClass
+    implements Insertable<CachedFriendLocation> {
+  final String ownerUserId;
+  final String friendUserId;
+  final double latitude;
+  final double longitude;
+  final int locationUpdatedAtMs;
+  final DateTime cachedAt;
+  const CachedFriendLocation({
+    required this.ownerUserId,
+    required this.friendUserId,
+    required this.latitude,
+    required this.longitude,
+    required this.locationUpdatedAtMs,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['friend_user_id'] = Variable<String>(friendUserId);
+    map['latitude'] = Variable<double>(latitude);
+    map['longitude'] = Variable<double>(longitude);
+    map['location_updated_at_ms'] = Variable<int>(locationUpdatedAtMs);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedFriendLocationsCompanion toCompanion(bool nullToAbsent) {
+    return CachedFriendLocationsCompanion(
+      ownerUserId: Value(ownerUserId),
+      friendUserId: Value(friendUserId),
+      latitude: Value(latitude),
+      longitude: Value(longitude),
+      locationUpdatedAtMs: Value(locationUpdatedAtMs),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedFriendLocation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedFriendLocation(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      friendUserId: serializer.fromJson<String>(json['friendUserId']),
+      latitude: serializer.fromJson<double>(json['latitude']),
+      longitude: serializer.fromJson<double>(json['longitude']),
+      locationUpdatedAtMs: serializer.fromJson<int>(
+        json['locationUpdatedAtMs'],
+      ),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'friendUserId': serializer.toJson<String>(friendUserId),
+      'latitude': serializer.toJson<double>(latitude),
+      'longitude': serializer.toJson<double>(longitude),
+      'locationUpdatedAtMs': serializer.toJson<int>(locationUpdatedAtMs),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedFriendLocation copyWith({
+    String? ownerUserId,
+    String? friendUserId,
+    double? latitude,
+    double? longitude,
+    int? locationUpdatedAtMs,
+    DateTime? cachedAt,
+  }) => CachedFriendLocation(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    friendUserId: friendUserId ?? this.friendUserId,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    locationUpdatedAtMs: locationUpdatedAtMs ?? this.locationUpdatedAtMs,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedFriendLocation copyWithCompanion(CachedFriendLocationsCompanion data) {
+    return CachedFriendLocation(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      friendUserId: data.friendUserId.present
+          ? data.friendUserId.value
+          : this.friendUserId,
+      latitude: data.latitude.present ? data.latitude.value : this.latitude,
+      longitude: data.longitude.present ? data.longitude.value : this.longitude,
+      locationUpdatedAtMs: data.locationUpdatedAtMs.present
+          ? data.locationUpdatedAtMs.value
+          : this.locationUpdatedAtMs,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendLocation(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('friendUserId: $friendUserId, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('locationUpdatedAtMs: $locationUpdatedAtMs, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    friendUserId,
+    latitude,
+    longitude,
+    locationUpdatedAtMs,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedFriendLocation &&
+          other.ownerUserId == this.ownerUserId &&
+          other.friendUserId == this.friendUserId &&
+          other.latitude == this.latitude &&
+          other.longitude == this.longitude &&
+          other.locationUpdatedAtMs == this.locationUpdatedAtMs &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedFriendLocationsCompanion
+    extends UpdateCompanion<CachedFriendLocation> {
+  final Value<String> ownerUserId;
+  final Value<String> friendUserId;
+  final Value<double> latitude;
+  final Value<double> longitude;
+  final Value<int> locationUpdatedAtMs;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedFriendLocationsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.friendUserId = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.locationUpdatedAtMs = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedFriendLocationsCompanion.insert({
+    required String ownerUserId,
+    required String friendUserId,
+    required double latitude,
+    required double longitude,
+    required int locationUpdatedAtMs,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       friendUserId = Value(friendUserId),
+       latitude = Value(latitude),
+       longitude = Value(longitude),
+       locationUpdatedAtMs = Value(locationUpdatedAtMs),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedFriendLocation> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? friendUserId,
+    Expression<double>? latitude,
+    Expression<double>? longitude,
+    Expression<int>? locationUpdatedAtMs,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (friendUserId != null) 'friend_user_id': friendUserId,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (locationUpdatedAtMs != null)
+        'location_updated_at_ms': locationUpdatedAtMs,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedFriendLocationsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? friendUserId,
+    Value<double>? latitude,
+    Value<double>? longitude,
+    Value<int>? locationUpdatedAtMs,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedFriendLocationsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      friendUserId: friendUserId ?? this.friendUserId,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      locationUpdatedAtMs: locationUpdatedAtMs ?? this.locationUpdatedAtMs,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (friendUserId.present) {
+      map['friend_user_id'] = Variable<String>(friendUserId.value);
+    }
+    if (latitude.present) {
+      map['latitude'] = Variable<double>(latitude.value);
+    }
+    if (longitude.present) {
+      map['longitude'] = Variable<double>(longitude.value);
+    }
+    if (locationUpdatedAtMs.present) {
+      map['location_updated_at_ms'] = Variable<int>(locationUpdatedAtMs.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendLocationsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('friendUserId: $friendUserId, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('locationUpdatedAtMs: $locationUpdatedAtMs, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedContactMatchesTable extends CachedContactMatches
     with TableInfo<$CachedContactMatchesTable, CachedContactMatch> {
   @override
@@ -5644,6 +6084,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedFriendsTable cachedFriends = $CachedFriendsTable(this);
   late final $CachedFriendRequestsTable cachedFriendRequests =
       $CachedFriendRequestsTable(this);
+  late final $CachedFriendLocationsTable cachedFriendLocations =
+      $CachedFriendLocationsTable(this);
   late final $CachedContactMatchesTable cachedContactMatches =
       $CachedContactMatchesTable(this);
   @override
@@ -5657,6 +6099,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     pendingChatOperations,
     cachedFriends,
     cachedFriendRequests,
+    cachedFriendLocations,
     cachedContactMatches,
   ];
 }
@@ -7953,6 +8396,250 @@ typedef $$CachedFriendRequestsTableProcessedTableManager =
       CachedFriendRequest,
       PrefetchHooks Function()
     >;
+typedef $$CachedFriendLocationsTableCreateCompanionBuilder =
+    CachedFriendLocationsCompanion Function({
+      required String ownerUserId,
+      required String friendUserId,
+      required double latitude,
+      required double longitude,
+      required int locationUpdatedAtMs,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedFriendLocationsTableUpdateCompanionBuilder =
+    CachedFriendLocationsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> friendUserId,
+      Value<double> latitude,
+      Value<double> longitude,
+      Value<int> locationUpdatedAtMs,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedFriendLocationsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedFriendLocationsTable> {
+  $$CachedFriendLocationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get friendUserId => $composableBuilder(
+    column: $table.friendUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get locationUpdatedAtMs => $composableBuilder(
+    column: $table.locationUpdatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedFriendLocationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedFriendLocationsTable> {
+  $$CachedFriendLocationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get friendUserId => $composableBuilder(
+    column: $table.friendUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get locationUpdatedAtMs => $composableBuilder(
+    column: $table.locationUpdatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedFriendLocationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedFriendLocationsTable> {
+  $$CachedFriendLocationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get friendUserId => $composableBuilder(
+    column: $table.friendUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get latitude =>
+      $composableBuilder(column: $table.latitude, builder: (column) => column);
+
+  GeneratedColumn<double> get longitude =>
+      $composableBuilder(column: $table.longitude, builder: (column) => column);
+
+  GeneratedColumn<int> get locationUpdatedAtMs => $composableBuilder(
+    column: $table.locationUpdatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedFriendLocationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedFriendLocationsTable,
+          CachedFriendLocation,
+          $$CachedFriendLocationsTableFilterComposer,
+          $$CachedFriendLocationsTableOrderingComposer,
+          $$CachedFriendLocationsTableAnnotationComposer,
+          $$CachedFriendLocationsTableCreateCompanionBuilder,
+          $$CachedFriendLocationsTableUpdateCompanionBuilder,
+          (
+            CachedFriendLocation,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedFriendLocationsTable,
+              CachedFriendLocation
+            >,
+          ),
+          CachedFriendLocation,
+          PrefetchHooks Function()
+        > {
+  $$CachedFriendLocationsTableTableManager(
+    _$AppDatabase db,
+    $CachedFriendLocationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedFriendLocationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedFriendLocationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedFriendLocationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> friendUserId = const Value.absent(),
+                Value<double> latitude = const Value.absent(),
+                Value<double> longitude = const Value.absent(),
+                Value<int> locationUpdatedAtMs = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendLocationsCompanion(
+                ownerUserId: ownerUserId,
+                friendUserId: friendUserId,
+                latitude: latitude,
+                longitude: longitude,
+                locationUpdatedAtMs: locationUpdatedAtMs,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String friendUserId,
+                required double latitude,
+                required double longitude,
+                required int locationUpdatedAtMs,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendLocationsCompanion.insert(
+                ownerUserId: ownerUserId,
+                friendUserId: friendUserId,
+                latitude: latitude,
+                longitude: longitude,
+                locationUpdatedAtMs: locationUpdatedAtMs,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedFriendLocationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedFriendLocationsTable,
+      CachedFriendLocation,
+      $$CachedFriendLocationsTableFilterComposer,
+      $$CachedFriendLocationsTableOrderingComposer,
+      $$CachedFriendLocationsTableAnnotationComposer,
+      $$CachedFriendLocationsTableCreateCompanionBuilder,
+      $$CachedFriendLocationsTableUpdateCompanionBuilder,
+      (
+        CachedFriendLocation,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedFriendLocationsTable,
+          CachedFriendLocation
+        >,
+      ),
+      CachedFriendLocation,
+      PrefetchHooks Function()
+    >;
 typedef $$CachedContactMatchesTableCreateCompanionBuilder =
     CachedContactMatchesCompanion Function({
       required String ownerUserId,
@@ -8292,6 +8979,8 @@ class $AppDatabaseManager {
       $$CachedFriendsTableTableManager(_db, _db.cachedFriends);
   $$CachedFriendRequestsTableTableManager get cachedFriendRequests =>
       $$CachedFriendRequestsTableTableManager(_db, _db.cachedFriendRequests);
+  $$CachedFriendLocationsTableTableManager get cachedFriendLocations =>
+      $$CachedFriendLocationsTableTableManager(_db, _db.cachedFriendLocations);
   $$CachedContactMatchesTableTableManager get cachedContactMatches =>
       $$CachedContactMatchesTableTableManager(_db, _db.cachedContactMatches);
 }

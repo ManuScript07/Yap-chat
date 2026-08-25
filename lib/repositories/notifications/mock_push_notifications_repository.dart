@@ -18,6 +18,13 @@ class MockPushNotificationsRepository implements IPushNotificationsRepository {
   Future<void> setAppForeground(bool isForeground) async {}
 
   @override
+  Future<PushPermissionStatus> getPermissionStatus() async =>
+      PushPermissionStatus.authorized;
+
+  @override
+  Future<void> openAppSettings() async {}
+
+  @override
   Future<void> unregisterCurrentDevice() async {}
 
   @override

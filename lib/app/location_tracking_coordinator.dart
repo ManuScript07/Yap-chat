@@ -30,7 +30,9 @@ class LocationTrackingCoordinator {
     if (_isDisposed || _userId == userId) return;
     _userId = userId;
     _restartTimer();
-    if (userId != null && _isForeground) await _refresh();
+    if (userId != null && _isForeground) {
+      await _refresh(forcePublish: true);
+    }
   }
 
   Future<void> setForeground(bool isForeground) async {
@@ -55,7 +57,7 @@ class LocationTrackingCoordinator {
     _timer = Timer.periodic(refreshInterval, (_) => unawaited(_refresh()));
   }
 
-  Future<void> _refresh() {
+  Future<void> _refresh({bool forcePublish = false}) {
     final activeRefresh = _activeRefresh;
     final userId = _userId;
     if (_isDisposed || !_isForeground || userId == null) {
@@ -63,10 +65,12 @@ class LocationTrackingCoordinator {
     }
     if (activeRefresh != null) {
       if (_activeRefreshUserId == userId) return activeRefresh;
-      return activeRefresh.then((_) => _refresh());
+      return activeRefresh.then(
+        (_) => _refresh(forcePublish: forcePublish),
+      );
     }
 
-    final refresh = _performRefresh(userId);
+    final refresh = _performRefresh(userId, forcePublish: forcePublish);
     _activeRefresh = refresh;
     _activeRefreshUserId = userId;
     return refresh.whenComplete(() {
@@ -77,9 +81,19 @@ class LocationTrackingCoordinator {
     });
   }
 
-  Future<void> _performRefresh(String userId) async {
+  Future<void> _performRefresh(
+    String userId, {
+    required bool forcePublish,
+  }) async {
     try {
-      await _locationRepository.refreshTrackedLocation(userId);
+      final result = await _locationRepository.refreshTrackedLocation(
+        userId,
+        forcePublish: forcePublish,
+      );
+      _talker.info(
+        'Location refresh completed: ${result.name}; '
+        'forcePublish=$forcePublish',
+      );
     } catch (error, stackTrace) {
       _talker.handle(error, stackTrace, 'Location refresh failed');
     }

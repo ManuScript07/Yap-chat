@@ -356,6 +356,36 @@ abstract class AppLocalizations {
   /// **'Разрешите доступ к геолокации в настройках приложения.'**
   String get locationPermissionSettingsDescription;
 
+  /// No description provided for @notificationsPermissionReminderTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Включите уведомления'**
+  String get notificationsPermissionReminderTitle;
+
+  /// No description provided for @notificationsPermissionReminderContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешите уведомления в настройках, чтобы не пропускать сообщения и заявки в друны.'**
+  String get notificationsPermissionReminderContent;
+
+  /// No description provided for @locationPermissionReminderTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешите геолокацию'**
+  String get locationPermissionReminderTitle;
+
+  /// No description provided for @locationPermissionReminderContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешите доступ к геолокации, чтобы друны могли видеть ваше последнее местоположение.'**
+  String get locationPermissionReminderContent;
+
+  /// No description provided for @locationServiceReminderContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Включите геолокацию на устройстве, чтобы друны могли видеть ваше последнее местоположение.'**
+  String get locationServiceReminderContent;
+
   /// No description provided for @locationMessageYou.
   ///
   /// In ru, this message translates to:

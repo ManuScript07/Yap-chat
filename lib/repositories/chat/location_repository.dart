@@ -74,9 +74,30 @@ class LocationRepository implements ILocationRepository {
   }
 
   @override
+  Future<LocationAccessStatus> getLocationAccessStatus() async {
+    if (!await _isLocationServiceEnabled()) {
+      return LocationAccessStatus.serviceDisabled;
+    }
+    return _mapPermission(await _checkPermission());
+  }
+
+  @override
+  Future<LocationAccessStatus> requestLocationAccess() async {
+    if (!await _isLocationServiceEnabled()) {
+      return LocationAccessStatus.serviceDisabled;
+    }
+    var permission = await _checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await _requestPermission();
+    }
+    return _mapPermission(permission);
+  }
+
+  @override
   Future<TrackedLocationRefreshResult> refreshTrackedLocation(
-    String userId,
-  ) async {
+    String userId, {
+    bool forcePublish = false,
+  }) async {
     final normalizedUserId = userId.trim();
     if (normalizedUserId.isEmpty) {
       return TrackedLocationRefreshResult.unavailable;
@@ -109,7 +130,7 @@ class LocationRepository implements ILocationRepository {
       return TrackedLocationRefreshResult.unavailable;
     }
 
-    if (!_shouldPublish(normalizedUserId, position)) {
+    if (!forcePublish && !_shouldPublish(normalizedUserId, position)) {
       return TrackedLocationRefreshResult.unchanged;
     }
 
@@ -170,6 +191,16 @@ class LocationRepository implements ILocationRepository {
 
   String _publishedAtKey(String userId) =>
       'tracked_location.$userId.published_at';
+
+  LocationAccessStatus _mapPermission(LocationPermission permission) =>
+      switch (permission) {
+        LocationPermission.whileInUse ||
+        LocationPermission.always => LocationAccessStatus.granted,
+        LocationPermission.deniedForever =>
+          LocationAccessStatus.permanentlyDenied,
+        LocationPermission.denied ||
+        LocationPermission.unableToDetermine => LocationAccessStatus.denied,
+      };
 
   @override
   Future<bool> openLocationSettings() => Geolocator.openLocationSettings();

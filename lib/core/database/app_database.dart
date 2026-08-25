@@ -120,6 +120,19 @@ class CachedFriendRequests extends Table {
   Set<Column> get primaryKey => {ownerUserId, requestId};
 }
 
+@DataClassName('CachedFriendLocation')
+class CachedFriendLocations extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get friendUserId => text()();
+  RealColumn get latitude => real()();
+  RealColumn get longitude => real()();
+  IntColumn get locationUpdatedAtMs => integer()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, friendUserId};
+}
+
 @DataClassName('CachedContactMatch')
 class CachedContactMatches extends Table {
   TextColumn get ownerUserId => text()();
@@ -145,6 +158,7 @@ class CachedContactMatches extends Table {
     PendingChatOperations,
     CachedFriends,
     CachedFriendRequests,
+    CachedFriendLocations,
     CachedContactMatches,
   ],
 )
@@ -164,7 +178,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -190,6 +204,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 7) {
         await migrator.createTable(cachedContactMatches);
+      }
+      if (from < 8) {
+        await migrator.createTable(cachedFriendLocations);
       }
     },
   );

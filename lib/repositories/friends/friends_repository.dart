@@ -41,6 +41,7 @@ class FriendsRepository implements IFriendsRepository {
   _searchCache = {};
   final Map<String, Future<List<FriendCandidate>>> _activeSearches = {};
   final Map<String, Future<ContactMatchSnapshot>> _activeContactRefreshes = {};
+  final Map<String, Future<FriendLocation?>> _activeLocationRequests = {};
 
   @override
   Stream<List<Friend>> watchFriends() {
@@ -266,8 +267,41 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
-  Future<FriendLocation?> getFriendLocation(String friendId) =>
-      _remote.getFriendLocation(friendId);
+  Future<FriendLocation?> getFriendLocation(String friendId) async {
+    final cached = await _cache.readLocation(friendId);
+    if (cached != null) {
+      unawaited(_refreshFriendLocationSafely(friendId));
+      return cached;
+    }
+    return _refreshFriendLocation(friendId);
+  }
+
+  Future<FriendLocation?> _refreshFriendLocation(String friendId) {
+    final active = _activeLocationRequests[friendId];
+    if (active != null) return active;
+    final future = _remote.getFriendLocation(friendId).then((location) async {
+      if (location == null) {
+        await _cache.removeLocation(friendId);
+      } else {
+        await _cache.writeLocation(friendId, location);
+      }
+      return location;
+    });
+    _activeLocationRequests[friendId] = future;
+    return future.whenComplete(() => _activeLocationRequests.remove(friendId));
+  }
+
+  Future<void> _refreshFriendLocationSafely(String friendId) async {
+    try {
+      await _refreshFriendLocation(friendId);
+    } catch (error, stackTrace) {
+      _config.talker.handle(
+        error,
+        stackTrace,
+        'Friend location refresh failed',
+      );
+    }
+  }
 
   @override
   Future<void> pauseRealtime() => _remote.pauseChanges();

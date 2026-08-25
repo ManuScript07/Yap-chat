@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/location_tracking_coordinator.dart';
+import 'package:yap_chat/app/permission_reminder_coordinator.dart';
 import 'package:yap_chat/app/repository_container.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/presence/presence.dart';
@@ -28,6 +29,7 @@ class _AppInitializerState extends State<AppInitializer> {
   late final RepositoryContainer _repositories;
   late final AppConnectionCoordinator _connectionCoordinator;
   late final LocationTrackingCoordinator _locationTrackingCoordinator;
+  late final PermissionReminderCoordinator _permissionReminderCoordinator;
 
   @override
   void initState() {
@@ -43,6 +45,12 @@ class _AppInitializerState extends State<AppInitializer> {
       talker: widget.config.talker,
     );
     _locationTrackingCoordinator = LocationTrackingCoordinator(
+      locationRepository: _repositories.locationRepository,
+      talker: widget.config.talker,
+    );
+    _permissionReminderCoordinator = PermissionReminderCoordinator(
+      preferences: widget.config.preferences,
+      notificationsRepository: _repositories.pushNotificationsRepository,
       locationRepository: _repositories.locationRepository,
       talker: widget.config.talker,
     );
@@ -68,6 +76,9 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
         RepositoryProvider<LocationTrackingCoordinator>.value(
           value: _locationTrackingCoordinator,
+        ),
+        RepositoryProvider<PermissionReminderCoordinator>.value(
+          value: _permissionReminderCoordinator,
         ),
         RepositoryProvider<IChatsRepository>.value(
           value: _repositories.chatsRepository,

@@ -191,6 +191,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Allow location access in the app settings.';
 
   @override
+  String get notificationsPermissionReminderTitle => 'Enable notifications';
+
+  @override
+  String get notificationsPermissionReminderContent =>
+      'Allow notifications in Settings so you don\'t miss messages and friend requests.';
+
+  @override
+  String get locationPermissionReminderTitle => 'Allow location access';
+
+  @override
+  String get locationPermissionReminderContent =>
+      'Allow location access so friends can see your latest location.';
+
+  @override
+  String get locationServiceReminderContent =>
+      'Enable location services so friends can see your latest location.';
+
+  @override
   String get locationMessageYou => 'You shared your location';
 
   @override

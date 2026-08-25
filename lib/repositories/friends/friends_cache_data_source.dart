@@ -42,6 +42,47 @@ class FriendsCacheDataSource {
     return (await query.get()).map(_mapRequest).toList(growable: false);
   }
 
+  Future<FriendLocation?> readLocation(String friendId) async {
+    final query = _database.select(_database.cachedFriendLocations)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(_userIdProvider()) &
+            table.friendUserId.equals(friendId),
+      );
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    return FriendLocation(
+      latitude: row.latitude,
+      longitude: row.longitude,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        row.locationUpdatedAtMs,
+        isUtc: true,
+      ),
+    );
+  }
+
+  Future<void> writeLocation(String friendId, FriendLocation location) =>
+      _database
+          .into(_database.cachedFriendLocations)
+          .insertOnConflictUpdate(
+            CachedFriendLocationsCompanion.insert(
+              ownerUserId: _userIdProvider(),
+              friendUserId: friendId,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              locationUpdatedAtMs: location.updatedAt.millisecondsSinceEpoch,
+              cachedAt: DateTime.now().toUtc(),
+            ),
+          );
+
+  Future<void> removeLocation(String friendId) =>
+      (_database.delete(_database.cachedFriendLocations)..where(
+            (table) =>
+                table.ownerUserId.equals(_userIdProvider()) &
+                table.friendUserId.equals(friendId),
+          ))
+          .go();
+
   Future<void> replaceAll({
     required List<Friend> friends,
     required List<FriendRequest> requests,
@@ -60,6 +101,33 @@ class FriendsCacheDataSource {
       await _database
           .into(_database.cachedFriendRequests)
           .insert(_requestRow(request));
+    }
+    final friendIds = friends.map((friend) => friend.id).toSet();
+    final cachedLocations = await (_database.select(
+      _database.cachedFriendLocations,
+    )..where((table) => table.ownerUserId.equals(owner))).get();
+    final obsoleteLocationIds = cachedLocations
+        .map((row) => row.friendUserId)
+        .where((friendId) => !friendIds.contains(friendId))
+        .toList(growable: false);
+    const deleteBatchSize = 500;
+    for (
+      var offset = 0;
+      offset < obsoleteLocationIds.length;
+      offset += deleteBatchSize
+    ) {
+      final end = (offset + deleteBatchSize).clamp(
+        0,
+        obsoleteLocationIds.length,
+      );
+      await (_database.delete(_database.cachedFriendLocations)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                table.friendUserId.isIn(
+                  obsoleteLocationIds.sublist(offset, end),
+                ),
+          ))
+          .go();
     }
   });
 

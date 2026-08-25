@@ -197,6 +197,24 @@ class AppLocalizationsRu extends AppLocalizations {
       'Разрешите доступ к геолокации в настройках приложения.';
 
   @override
+  String get notificationsPermissionReminderTitle => 'Включите уведомления';
+
+  @override
+  String get notificationsPermissionReminderContent =>
+      'Разрешите уведомления в настройках, чтобы не пропускать сообщения и заявки в друны.';
+
+  @override
+  String get locationPermissionReminderTitle => 'Разрешите геолокацию';
+
+  @override
+  String get locationPermissionReminderContent =>
+      'Разрешите доступ к геолокации, чтобы друны могли видеть ваше последнее местоположение.';
+
+  @override
+  String get locationServiceReminderContent =>
+      'Включите геолокацию на устройстве, чтобы друны могли видеть ваше последнее местоположение.';
+
+  @override
   String get locationMessageYou => 'Вы поделились местоположением';
 
   @override

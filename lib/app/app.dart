@@ -4,3 +4,4 @@ export 'app_connection_coordinator.dart';
 export 'app_config.dart';
 export 'app_initializer.dart';
 export 'repository_container.dart';
+export 'permission_reminder_coordinator.dart';

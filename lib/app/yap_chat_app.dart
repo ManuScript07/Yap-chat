@@ -9,6 +9,8 @@ import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/app_initializer.dart';
 import 'package:yap_chat/app/location_tracking_coordinator.dart';
+import 'package:yap_chat/app/permission_reminder_coordinator.dart';
+import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
@@ -56,6 +58,8 @@ class _AppContent extends StatefulWidget {
 
 class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _pendingChatRestored = false;
+  bool _permissionReminderScheduled = false;
+  bool _isForeground = true;
   late final ChatNavigationCoordinator _chatNavigator;
   bool _dependenciesInitialized = false;
 
@@ -109,18 +113,21 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     final locationTracking = context.read<LocationTrackingCoordinator>();
     final notifications = context.read<NotificationsCubit>();
     if (state == AppLifecycleState.resumed) {
+      _isForeground = true;
       unawaited(connections.setForeground(true));
       unawaited(locationTracking.setForeground(true));
       unawaited(notifications.setAppForeground(true));
       return;
     }
     if (state == AppLifecycleState.inactive) {
+      _isForeground = false;
       unawaited(notifications.setAppForeground(false));
       return;
     }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
+      _isForeground = false;
       unawaited(connections.setForeground(false));
       unawaited(locationTracking.setForeground(false));
       unawaited(notifications.setAppForeground(false));
@@ -182,6 +189,73 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     return stack.isNotEmpty && stack.last.name == ChatRoute.name;
   }
 
+  Future<void> _initializeNotificationsAndReminder(String userId) async {
+    try {
+      await context.read<NotificationsCubit>().setAuthenticatedUser(userId);
+    } catch (error, stackTrace) {
+      if (mounted) context.read<AppConfig>().talker.handle(error, stackTrace);
+    }
+    if (!mounted || _permissionReminderScheduled) return;
+    _permissionReminderScheduled = true;
+
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted || !_isForeground) return;
+    final authState = context.read<AuthBloc>().state;
+    if (authState.status != AuthStatus.authenticated ||
+        authState.session?.userId != userId) {
+      return;
+    }
+
+    final authRouter = await _authenticatedRouter;
+    if (!mounted || authRouter == null) return;
+    final reminderCoordinator = context.read<PermissionReminderCoordinator>();
+    final reminder = await reminderCoordinator.reminderForLaunch(userId);
+    if (!mounted ||
+        !_isForeground ||
+        reminder == null ||
+        authRouter.stackData.length != 1) {
+      return;
+    }
+    final dialogContext = authRouter.navigatorKey.currentContext;
+    if (dialogContext == null || !dialogContext.mounted) return;
+
+    switch (reminder) {
+      case PermissionReminderKind.notificationsBlocked:
+        await showPermissionDeniedDialog(
+          dialogContext,
+          title: dialogContext.l10n.notificationsPermissionReminderTitle,
+          content: dialogContext.l10n.notificationsPermissionReminderContent,
+          onOpenSettings: context
+              .read<IPushNotificationsRepository>()
+              .openAppSettings,
+        );
+        break;
+      case PermissionReminderKind.locationServiceDisabled:
+        await showPermissionDeniedDialog(
+          dialogContext,
+          title: dialogContext.l10n.locationDisabled,
+          content: dialogContext.l10n.locationServiceReminderContent,
+          onOpenSettings: context
+              .read<ILocationRepository>()
+              .openLocationSettings,
+        );
+        break;
+      case PermissionReminderKind.locationPermissionPermanentlyDenied:
+        await showPermissionDeniedDialog(
+          dialogContext,
+          title: dialogContext.l10n.locationPermissionReminderTitle,
+          content: dialogContext.l10n.locationPermissionReminderContent,
+          onOpenSettings: context.read<ILocationRepository>().openAppSettings,
+        );
+        break;
+      case PermissionReminderKind.locationPermission:
+        await context.read<ILocationRepository>().requestLocationAccess();
+        break;
+    }
+    await reminderCoordinator.markPresented(userId, reminder);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
@@ -203,9 +277,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
                     .read<LocationTrackingCoordinator>()
                     .setAuthenticatedUser(userId),
               );
-              unawaited(
-                context.read<NotificationsCubit>().setAuthenticatedUser(userId),
-              );
+              unawaited(_initializeNotificationsAndReminder(userId));
             } else if (state.status == AuthStatus.unauthenticated ||
                 state.status == AuthStatus.profileIncomplete ||
                 state.status == AuthStatus.failure) {

@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:permission_handler/permission_handler.dart' as permissions;
 import 'package:yap_chat/features/notifications/data/data.dart';
 import 'package:yap_chat/repositories/notifications/abstract_push_notifications_repository.dart';
 import 'package:yap_chat/repositories/notifications/android_notification_service.dart';
@@ -83,7 +84,22 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
 
   @override
   Future<void> setAppForeground(bool isForeground) async {
+    final wasForeground = _isAppForeground;
     _isAppForeground = isForeground;
+    if (!wasForeground && isForeground && _currentUserId != null) {
+      await _enqueue(_requestPermissionAndRegisterToken);
+    }
+  }
+
+  @override
+  Future<PushPermissionStatus> getPermissionStatus() async =>
+      _mapPermissionStatus(
+        (await _messaging.getNotificationSettings()).authorizationStatus,
+      );
+
+  @override
+  Future<void> openAppSettings() async {
+    await permissions.openAppSettings();
   }
 
   @override
@@ -145,11 +161,14 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
 
   Future<void> _requestPermissionAndRegisterToken() async {
     try {
-      final settings = await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      var settings = await _messaging.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        settings = await _messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
       final isAllowed =
           settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional;
@@ -162,6 +181,14 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
       _talker.handle(error, stackTrace, 'Push permission setup failed');
     }
   }
+
+  PushPermissionStatus _mapPermissionStatus(AuthorizationStatus status) =>
+      switch (status) {
+        AuthorizationStatus.authorized => PushPermissionStatus.authorized,
+        AuthorizationStatus.provisional => PushPermissionStatus.provisional,
+        AuthorizationStatus.denied => PushPermissionStatus.denied,
+        AuthorizationStatus.notDetermined => PushPermissionStatus.notDetermined,
+      };
 
   Future<void> _resetTokenAfterSenderChange() async {
     final senderId = Firebase.app().options.messagingSenderId.trim();

@@ -1,3 +1,5 @@
+enum PushPermissionStatus { authorized, provisional, denied, notDetermined }
+
 abstract interface class IPushNotificationsRepository {
   Stream<String> get openedConversationIds;
 
@@ -6,6 +8,10 @@ abstract interface class IPushNotificationsRepository {
   Future<void> setActiveConversation(String? conversationId);
 
   Future<void> setAppForeground(bool isForeground);
+
+  Future<PushPermissionStatus> getPermissionStatus();
+
+  Future<void> openAppSettings();
 
   Future<void> unregisterCurrentDevice();
 

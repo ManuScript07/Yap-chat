@@ -227,10 +227,18 @@ class _FriendsBodyState extends State<_FriendsBody> {
   }
 }
 
-class _FriendsList extends StatelessWidget {
+class _FriendsList extends StatefulWidget {
   const _FriendsList({required this.bottomPadding});
 
   final double bottomPadding;
+
+  @override
+  State<_FriendsList> createState() => _FriendsListState();
+}
+
+class _FriendsListState extends State<_FriendsList> {
+  static const _locationLaunchCooldown = Duration(seconds: 2);
+  final _openingLocations = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +262,7 @@ class _FriendsList extends StatelessWidget {
               final showGlobal = _isGlobalFriendQuery(query);
               if (friends.isEmpty && !showGlobal) {
                 return Padding(
-                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  padding: EdgeInsets.only(bottom: widget.bottomPadding),
                   child: EmptyChatState(
                     showImage: query.isEmpty,
                     message: query.isEmpty
@@ -265,7 +273,7 @@ class _FriendsList extends StatelessWidget {
               }
               return ListView(
                 key: const PageStorageKey('friends-list'),
-                padding: EdgeInsets.only(bottom: bottomPadding),
+                padding: EdgeInsets.only(bottom: widget.bottomPadding),
                 children: [
                   if (friends.isNotEmpty) ...[
                     FriendsSectionTitle(
@@ -283,6 +291,9 @@ class _FriendsList extends StatelessWidget {
                             .resolveFriendAvatar(friend),
                         onChat: () => _openChat(context, friend),
                         onLocation: () => _openLocation(context, friend),
+                        isLocationEnabled: !_openingLocations.contains(
+                          friend.id,
+                        ),
                       ),
                     ),
                   ],
@@ -383,6 +394,9 @@ class _FriendsList extends StatelessWidget {
   }
 
   Future<void> _openLocation(BuildContext context, Friend friend) async {
+    if (!_openingLocations.add(friend.id)) return;
+    final startedAt = DateTime.now();
+    if (mounted) setState(() {});
     try {
       final location = await context
           .read<IFriendsRepository>()
@@ -416,6 +430,14 @@ class _FriendsList extends StatelessWidget {
           bottomMargin: 156,
         );
       }
+    } finally {
+      final elapsed = DateTime.now().difference(startedAt);
+      final cooldownLeft = _locationLaunchCooldown - elapsed;
+      if (cooldownLeft > Duration.zero) {
+        await Future<void>.delayed(cooldownLeft);
+      }
+      _openingLocations.remove(friend.id);
+      if (mounted) setState(() {});
     }
   }
 }

@@ -219,6 +219,9 @@ class MediaCacheService {
         _database.cachedFriendRequests,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
       await (_database.delete(
+        _database.cachedFriendLocations,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
         _database.cachedContactMatches,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
     });
