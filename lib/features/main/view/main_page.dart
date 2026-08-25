@@ -59,6 +59,9 @@ class _MainView extends StatelessWidget {
               .where((chat) => !chat.isMuted)
               .fold(0, (total, chat) => total + chat.unreadCount),
         );
+        final incomingFriendRequestsCount = context.select<FriendsBloc, int>(
+          (bloc) => bloc.state.incomingRequestCount,
+        );
 
         return PopScope(
           canPop:
@@ -106,6 +109,7 @@ class _MainView extends StatelessWidget {
                   icon: Icons.mood_outlined,
                   activeIcon: Icons.emoji_emotions,
                   label: context.l10n.navFriends,
+                  unreadCount: incomingFriendRequestsCount,
                 ),
                 FloatingNavigationBarItem(
                   icon: Icons.person_outline_rounded,

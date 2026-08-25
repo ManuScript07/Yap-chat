@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
+import 'package:yap_chat/features/friends/widgets/friend_request_reject_button.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class FriendRequestItem extends StatelessWidget {
@@ -83,14 +84,7 @@ class FriendRequestItem extends StatelessWidget {
                 width: 54,
               ),
               const SizedBox(width: 8),
-              GlassIconButton(
-                icon: Icons.close_rounded,
-                onTap: onReject,
-                width: 46,
-                height: 42,
-                borderRadius: 21,
-                iconSize: 26,
-              ),
+              FriendRequestRejectButton(onTap: onReject),
             ],
           ],
         ),

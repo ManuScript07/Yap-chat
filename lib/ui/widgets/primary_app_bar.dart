@@ -6,11 +6,13 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
   const PrimaryAppBar({
     super.key,
     required this.title,
+    this.titleWidget,
     this.actionIcon,
     this.onActionPressed,
   });
 
   final String title;
+  final Widget? titleWidget;
   final IconData? actionIcon;
   final VoidCallback? onActionPressed;
 
@@ -43,12 +45,14 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: AppTextStyles.titleLargeFlex,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                child:
+                    titleWidget ??
+                    Text(
+                      title,
+                      style: AppTextStyles.titleLargeFlex,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
               ),
               if (actionIcon != null)
                 SizedBox(

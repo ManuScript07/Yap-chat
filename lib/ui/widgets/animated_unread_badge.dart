@@ -10,6 +10,7 @@ class AnimatedUnreadBadge extends StatelessWidget {
     this.size = 25,
     this.borderColor,
     this.borderWidth = 0,
+    this.maintainSize = true,
   });
 
   final int count;
@@ -18,6 +19,7 @@ class AnimatedUnreadBadge extends StatelessWidget {
   final double size;
   final Color? borderColor;
   final double borderWidth;
+  final bool maintainSize;
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +52,13 @@ class AnimatedUnreadBadge extends StatelessWidget {
                 ),
               ),
             )
-          : SizedBox(
+          : maintainSize
+          ? SizedBox(
               key: const ValueKey('unread-badge-hidden'),
               width: size,
               height: size,
-            ),
+            )
+          : const SizedBox.shrink(key: ValueKey('unread-badge-hidden')),
     );
   }
 }

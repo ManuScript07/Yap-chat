@@ -7,18 +7,18 @@ import 'package:yap_chat/repositories/friends/abstract_friends_repository.dart';
 class MockFriendsRepository implements IFriendsRepository {
   MockFriendsRepository()
     : _friends = [
-        // Friend(
-        //   id: 'friend-1',
-        //   username: 'masha',
-        //   displayName: 'Маша',
-        //   friendsSince: DateTime.now().subtract(const Duration(days: 2)),
-        // ),
-        // Friend(
-        //   id: 'friend-2',
-        //   username: 'sasha',
-        //   displayName: 'Саша',
-        //   friendsSince: DateTime.now().subtract(const Duration(days: 7)),
-        // ),
+        Friend(
+          id: 'friend-1',
+          username: 'masha',
+          displayName: 'Маша',
+          friendsSince: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+        Friend(
+          id: 'friend-2',
+          username: 'sasha',
+          displayName: 'Саша',
+          friendsSince: DateTime.now().subtract(const Duration(days: 7)),
+        ),
       ],
       _requests = [
         FriendRequest(

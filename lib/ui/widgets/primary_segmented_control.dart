@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/widgets/animated_unread_badge.dart';
 
 class PrimarySegmentItem {
   const PrimarySegmentItem({required this.label, this.count});
@@ -14,11 +15,13 @@ class PrimarySegmentedControl extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onChanged,
+    this.horizontalPadding = 16,
   });
 
   final List<PrimarySegmentItem> items;
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+  final double horizontalPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +29,8 @@ class PrimarySegmentedControl extends StatelessWidget {
     final systemPadding = MediaQuery.paddingOf(context);
     return Padding(
       padding: EdgeInsets.only(
-        left: 16 + systemPadding.left,
-        right: 16 + systemPadding.right,
+        left: horizontalPadding + systemPadding.left,
+        right: horizontalPadding + systemPadding.right,
       ),
       child: Container(
         height: 50,
@@ -40,6 +43,9 @@ class PrimarySegmentedControl extends StatelessWidget {
           children: List.generate(items.length, (index) {
             final item = items[index];
             final selected = index == selectedIndex;
+            final textColor = selected
+                ? color
+                : context.colorScheme.onSurfaceVariant;
             return Expanded(
               child: Material(
                 color: selected
@@ -55,18 +61,29 @@ class PrimarySegmentedControl extends StatelessWidget {
                       style:
                           (context.textTheme.titleMedium ?? const TextStyle())
                               .copyWith(
-                                color: selected
-                                    ? color
-                                    : context.colorScheme.onSurfaceVariant,
+                                color: textColor,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.5,
                               ),
-                      child: Text(
-                        item.count == null || item.count == 0
-                            ? item.label
-                            : '${item.label} ${item.count}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (item.count != null) ...[
+                            const SizedBox(width: 6),
+                            AnimatedUnreadBadge(
+                              count: item.count!,
+                              color: textColor,
+                              textColor: context.scaffoldBackgroundColor,
+                              size: 22,
+                              maintainSize: false,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),

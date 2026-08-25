@@ -36,7 +36,9 @@ class _FriendsPageView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<FriendsBloc, FriendsState>(
-      buildWhen: (previous, current) => previous.activeTab != current.activeTab,
+      buildWhen: (previous, current) =>
+          previous.activeTab != current.activeTab ||
+          previous.incomingRequestCount != current.incomingRequestCount,
       builder: (context, state) {
         final mediaQuery = MediaQuery.of(context);
         final isLandscapeKeyboard =
@@ -91,6 +93,17 @@ class _FriendsPageView extends StatelessWidget {
                           ? null
                           : PrimaryAppBar(
                               title: context.l10n.navFriends,
+                              titleWidget:
+                                  mediaQuery.orientation ==
+                                      Orientation.landscape
+                                  ? Padding(
+                                      padding: const EdgeInsets.only(right: 12),
+                                      child: _FriendsTabs(
+                                        state: state,
+                                        horizontalPadding: 0,
+                                      ),
+                                    )
+                                  : null,
                               actionIcon: Icons.person_add_alt_1_rounded,
                               onActionPressed: () {
                                 FocusManager.instance.primaryFocus?.unfocus();
@@ -105,7 +118,11 @@ class _FriendsPageView extends StatelessWidget {
                                 }
                               },
                             ),
-                      body: const _FriendsBody(),
+                      body: _FriendsBody(
+                        isLandscape:
+                            mediaQuery.orientation == Orientation.landscape,
+                        contentTop: hideAppBar ? 0 : appBarHeight,
+                      ),
                     ),
                   ),
                 ),
@@ -117,7 +134,10 @@ class _FriendsPageView extends StatelessWidget {
 }
 
 class _FriendsBody extends StatefulWidget {
-  const _FriendsBody();
+  const _FriendsBody({required this.isLandscape, required this.contentTop});
+
+  final bool isLandscape;
+  final double contentTop;
 
   @override
   State<_FriendsBody> createState() => _FriendsBodyState();
@@ -152,6 +172,9 @@ class _FriendsBodyState extends State<_FriendsBody> {
     final contentBottomPadding =
         searchBarBottomOffset + searchBarHeight + contentExtraPadding;
     final glowBottomOffset = isKeyboardOpen ? keyboardHeight : 0.0;
+    final listTopPadding = widget.isLandscape && widget.contentTop > 0
+        ? 104.0
+        : widget.contentTop;
 
     return BlocBuilder<FriendsBloc, FriendsState>(
       builder: (context, state) {
@@ -159,40 +182,56 @@ class _FriendsBodyState extends State<_FriendsBody> {
         return Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            Positioned.fill(
-              top: 130,
-              child: Column(
-                children: [
-                  const SizedBox(height: 16),
-                  PrimarySegmentedControl(
-                    items: [
-                      PrimarySegmentItem(label: context.l10n.friendsTabFriends),
-                      PrimarySegmentItem(
-                        label: context.l10n.friendsTabRequests,
-                        count: state.incomingRequestCount,
-                      ),
-                    ],
-                    selectedIndex: activeIndex,
-                    onChanged: (index) {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      context.read<FriendsBloc>().add(
-                        FriendsTabChanged(FriendsTab.values[index]),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: IndexedStack(
-                      index: activeIndex,
-                      children: [
-                        _FriendsList(bottomPadding: contentBottomPadding),
-                        _RequestsList(bottomPadding: contentBottomPadding),
-                      ],
+            if (widget.isLandscape) ...[
+              Positioned.fill(
+                child: IndexedStack(
+                  index: activeIndex,
+                  children: [
+                    _FriendsList(
+                      isLandscape: widget.isLandscape,
+                      topPadding: listTopPadding,
+                      bottomPadding: contentBottomPadding,
                     ),
-                  ),
-                ],
+                    _RequestsList(
+                      isLandscape: widget.isLandscape,
+                      topPadding: listTopPadding,
+                      bottomPadding: contentBottomPadding,
+                    ),
+                  ],
+                ),
               ),
-            ),
+              GradientOverlay(
+                height: listTopPadding + (widget.contentTop == 0 ? 90 : 20),
+                isTop: true,
+                backgroundColor: context.scaffoldBackgroundColor,
+              ),
+              if (widget.contentTop == 0)
+                Positioned(
+                  top: 16,
+                  left: 0,
+                  right: 0,
+                  child: _FriendsTabs(state: state),
+                ),
+            ] else
+              Positioned.fill(
+                top: widget.contentTop,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _FriendsTabs(state: state),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: IndexedStack(
+                        index: activeIndex,
+                        children: [
+                          _FriendsList(bottomPadding: contentBottomPadding),
+                          _RequestsList(bottomPadding: contentBottomPadding),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             AnimatedPositioned(
               duration: Duration.zero,
               left: 0,
@@ -227,10 +266,44 @@ class _FriendsBodyState extends State<_FriendsBody> {
   }
 }
 
-class _FriendsList extends StatefulWidget {
-  const _FriendsList({required this.bottomPadding});
+class _FriendsTabs extends StatelessWidget {
+  const _FriendsTabs({required this.state, this.horizontalPadding = 16});
 
+  final FriendsState state;
+  final double horizontalPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimarySegmentedControl(
+      horizontalPadding: horizontalPadding,
+      items: [
+        PrimarySegmentItem(label: context.l10n.friendsTabFriends),
+        PrimarySegmentItem(
+          label: context.l10n.friendsTabRequests,
+          count: state.incomingRequestCount,
+        ),
+      ],
+      selectedIndex: state.activeTab.index,
+      onChanged: (index) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        context.read<FriendsBloc>().add(
+          FriendsTabChanged(FriendsTab.values[index]),
+        );
+      },
+    );
+  }
+}
+
+class _FriendsList extends StatefulWidget {
+  const _FriendsList({
+    required this.bottomPadding,
+    this.topPadding = 0,
+    this.isLandscape = false,
+  });
+
+  final double topPadding;
   final double bottomPadding;
+  final bool isLandscape;
 
   @override
   State<_FriendsList> createState() => _FriendsListState();
@@ -261,21 +334,38 @@ class _FriendsListState extends State<_FriendsList> {
               final query = state.friendsQuery.trim();
               final showGlobal = _isGlobalFriendQuery(query);
               if (friends.isEmpty && !showGlobal) {
+                final emptyState = EmptyChatState(
+                  showImage: query.isEmpty,
+                  message: query.isEmpty
+                      ? context.l10n.friendsEmpty
+                      : context.l10n.friendsNoSearchResults,
+                );
+                if (widget.isLandscape) {
+                  return ListView(
+                    key: const PageStorageKey('friends-empty-state'),
+                    padding: EdgeInsets.only(
+                      top: widget.topPadding,
+                      bottom: widget.bottomPadding,
+                    ),
+                    children: [emptyState],
+                  );
+                }
                 return AnimatedPadding(
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeOutQuad,
-                  padding: EdgeInsets.only(bottom: widget.bottomPadding),
-                  child: EmptyChatState(
-                    showImage: query.isEmpty,
-                    message: query.isEmpty
-                        ? context.l10n.friendsEmpty
-                        : context.l10n.friendsNoSearchResults,
+                  padding: EdgeInsets.only(
+                    top: widget.topPadding,
+                    bottom: widget.bottomPadding,
                   ),
+                  child: emptyState,
                 );
               }
               return ListView(
                 key: const PageStorageKey('friends-list'),
-                padding: EdgeInsets.only(bottom: widget.bottomPadding),
+                padding: EdgeInsets.only(
+                  top: widget.topPadding,
+                  bottom: widget.bottomPadding,
+                ),
                 children: [
                   if (friends.isNotEmpty) ...[
                     FriendsSectionTitle(
@@ -364,15 +454,23 @@ class _FriendsListState extends State<_FriendsList> {
     return widgets;
   }
 
-  Widget _globalMessage(BuildContext context, String message) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-    child: Text(
-      message,
-      style: context.textTheme.bodyLarge?.copyWith(
-        color: context.colorScheme.onSurfaceVariant,
+  Widget _globalMessage(BuildContext context, String message) {
+    final systemPadding = MediaQuery.paddingOf(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16 + systemPadding.left,
+        12,
+        16 + systemPadding.right,
+        20,
       ),
-    ),
-  );
+      child: Text(
+        message,
+        style: context.textTheme.bodyLarge?.copyWith(
+          color: context.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 
   Future<void> _openChat(BuildContext context, Friend friend) async {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -445,9 +543,15 @@ class _FriendsListState extends State<_FriendsList> {
 }
 
 class _RequestsList extends StatelessWidget {
-  const _RequestsList({required this.bottomPadding});
+  const _RequestsList({
+    required this.bottomPadding,
+    this.topPadding = 0,
+    this.isLandscape = false,
+  });
 
+  final double topPadding;
   final double bottomPadding;
+  final bool isLandscape;
 
   @override
   Widget build(BuildContext context) {
@@ -467,32 +571,44 @@ class _RequestsList extends StatelessWidget {
         final incoming = state.incomingRequests;
         final outgoing = state.outgoingRequests;
         if (incoming.isEmpty && outgoing.isEmpty) {
+          final emptyState = EmptyChatState(
+            showImage: state.requestsQuery.trim().isEmpty,
+            message: state.requestsQuery.trim().isEmpty
+                ? context.l10n.friendsRequestsEmpty
+                : context.l10n.friendsNoSearchResults,
+          );
+          if (isLandscape) {
+            return ListView(
+              key: const PageStorageKey('friend-requests-empty-state'),
+              padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
+              children: [emptyState],
+            );
+          }
           return AnimatedPadding(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutQuad,
-            padding: EdgeInsets.only(bottom: bottomPadding),
-            child: EmptyChatState(
-              showImage: state.requestsQuery.trim().isEmpty,
-              message: state.requestsQuery.trim().isEmpty
-                  ? context.l10n.friendsRequestsEmpty
-                  : context.l10n.friendsNoSearchResults,
-            ),
+            padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
+            child: emptyState,
           );
         }
         return ListView(
           key: const PageStorageKey('friend-requests-list'),
-          padding: EdgeInsets.only(bottom: bottomPadding),
+          padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
           children: [
-            FriendsSectionTitle(
-              title: context.l10n.friendsOutgoing,
-              count: outgoing.length,
-            ),
-            ...outgoing.map((request) => _item(context, request)),
-            FriendsSectionTitle(
-              title: context.l10n.friendsIncoming,
-              count: incoming.length,
-            ),
-            ...incoming.map((request) => _item(context, request)),
+            if (outgoing.isNotEmpty) ...[
+              FriendsSectionTitle(
+                title: context.l10n.friendsOutgoing,
+                count: outgoing.length,
+              ),
+              ...outgoing.map((request) => _item(context, request)),
+            ],
+            if (incoming.isNotEmpty) ...[
+              FriendsSectionTitle(
+                title: context.l10n.friendsIncoming,
+                count: incoming.length,
+              ),
+              ...incoming.map((request) => _item(context, request)),
+            ],
           ],
         );
       },

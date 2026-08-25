@@ -263,12 +263,12 @@ class _ChatViewState extends State<_ChatView>
                           voiceState.status != VoiceRecorderStatus.recording,
                       onMessageLongPress: _showMessageActions,
                     ),
-                    _GradientOverlay(
+                    GradientOverlay(
                       height: headerHeight + 20,
                       isTop: true,
                       backgroundColor: backgroundColor,
                     ),
-                    _GradientOverlay(
+                    GradientOverlay(
                       height: composerHeight + 20,
                       isTop: false,
                       backgroundColor: backgroundColor,
@@ -1019,41 +1019,6 @@ class _ScrollToBottomButton extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Переиспользуемый виджет для градиентных оверлеев
-class _GradientOverlay extends StatelessWidget {
-  final double height;
-  final bool isTop;
-  final Color backgroundColor;
-
-  const _GradientOverlay({
-    required this.height,
-    required this.isTop,
-    required this.backgroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: isTop ? 0 : null,
-      bottom: isTop ? null : 0,
-      left: 0,
-      right: 0,
-      height: height,
-      child: IgnorePointer(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: isTop ? Alignment.topCenter : Alignment.bottomCenter,
-              end: isTop ? Alignment.bottomCenter : Alignment.topCenter,
-              colors: [backgroundColor, backgroundColor.withValues(alpha: 0.0)],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
