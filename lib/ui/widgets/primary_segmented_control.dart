@@ -33,8 +33,8 @@ class PrimarySegmentedControl extends StatelessWidget {
         height: 50,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.6), width: 2),
         ),
         child: Row(
           children: List.generate(items.length, (index) {
@@ -43,12 +43,12 @@ class PrimarySegmentedControl extends StatelessWidget {
             return Expanded(
               child: Material(
                 color: selected
-                    ? color.withValues(alpha: 0.18)
+                    ? color.withValues(alpha: 0.2)
                     : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 child: InkWell(
                   onTap: () => onChanged(index),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   child: Center(
                     child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 180),
@@ -59,6 +59,7 @@ class PrimarySegmentedControl extends StatelessWidget {
                                     ? color
                                     : context.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
                               ),
                       child: Text(
                         item.count == null || item.count == 0

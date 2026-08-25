@@ -482,7 +482,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get friendsSearchHint => 'search';
 
   @override
-  String get friendsEmpty => 'you don\'t have any friends yet';
+  String get friendsEmpty =>
+      'you don\'t have any friends yet. use search or the button above';
 
   @override
   String get friendsRequestsEmpty => 'no requests yet';

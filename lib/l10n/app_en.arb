@@ -180,7 +180,7 @@
   "friendsOutgoing": "outgoing",
   "friendsIncoming": "incoming",
   "friendsSearchHint": "search",
-  "friendsEmpty": "you don't have any friends yet",
+  "friendsEmpty": "you don't have any friends yet. use search or the button above",
   "friendsRequestsEmpty": "no requests yet",
   "friendsNoSearchResults": "nothing found",
   "friendsLoadFailed": "Unable to load friends",

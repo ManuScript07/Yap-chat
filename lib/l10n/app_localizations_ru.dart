@@ -487,7 +487,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get friendsSearchHint => 'поиск';
 
   @override
-  String get friendsEmpty => 'у вас пока нет друнов';
+  String get friendsEmpty =>
+      'друзей пока нет. воспользуйтесь поиском или кнопкой сверху';
 
   @override
   String get friendsRequestsEmpty => 'заявок пока нет';

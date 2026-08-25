@@ -50,7 +50,11 @@ class AnimatedUnreadBadge extends StatelessWidget {
                 ),
               ),
             )
-          : SizedBox(key: const ValueKey('unread-badge-hidden')),
+          : SizedBox(
+              key: const ValueKey('unread-badge-hidden'),
+              width: size,
+              height: size,
+            ),
     );
   }
 }

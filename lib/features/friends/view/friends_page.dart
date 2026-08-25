@@ -261,7 +261,9 @@ class _FriendsListState extends State<_FriendsList> {
               final query = state.friendsQuery.trim();
               final showGlobal = _isGlobalFriendQuery(query);
               if (friends.isEmpty && !showGlobal) {
-                return Padding(
+                return AnimatedPadding(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutQuad,
                   padding: EdgeInsets.only(bottom: widget.bottomPadding),
                   child: EmptyChatState(
                     showImage: query.isEmpty,
@@ -465,7 +467,9 @@ class _RequestsList extends StatelessWidget {
         final incoming = state.incomingRequests;
         final outgoing = state.outgoingRequests;
         if (incoming.isEmpty && outgoing.isEmpty) {
-          return Padding(
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutQuad,
             padding: EdgeInsets.only(bottom: bottomPadding),
             child: EmptyChatState(
               showImage: state.requestsQuery.trim().isEmpty,
