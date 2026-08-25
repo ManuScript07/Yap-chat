@@ -15,41 +15,35 @@ Future<void> showContactDiscoverySheet(
 }) {
   final contactsRepository = context.read<IContactsRepository>();
   final friendsRepository = context.read<IFriendsRepository>();
-  final screen = MediaQuery.sizeOf(context);
-  final parentTheme = Theme.of(context);
-  final parentScheme = parentTheme.colorScheme;
-  final sheetTheme = parentTheme.copyWith(
-    colorScheme: parentScheme.copyWith(
-      primary: parentScheme.onPrimary,
-      onPrimary: parentScheme.primary,
-      onSurface: parentScheme.onPrimary,
-      onSurfaceVariant: parentScheme.onPrimary.withValues(alpha: 0.65),
-    ),
-  );
-  final heightFactor = screen.width > screen.height ? 0.96 : 0.9;
+  final parentScheme = context.colorScheme;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: parentScheme.primary,
-    barrierColor: Colors.black.withValues(alpha: 0.65),
-    constraints: BoxConstraints(
-      maxWidth: math.min(screen.width, 720),
-      maxHeight: screen.height * heightFactor,
-    ),
+    backgroundColor: context.scaffoldBackgroundColor,
+    barrierColor: parentScheme.scrim.withValues(alpha: 0.65),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (_) => Theme(
-      data: sheetTheme,
-      child: BlocProvider(
-        create: (_) => ContactDiscoveryCubit(
-          contactsRepository: contactsRepository,
-          friendsRepository: friendsRepository,
-        )..load(),
-        child: _ContactDiscoverySheet(username: username),
-      ),
+    builder: (_) => LayoutBuilder(
+      builder: (sheetContext, _) {
+        final screen = MediaQuery.sizeOf(sheetContext);
+        final heightFactor = screen.width > screen.height ? 0.96 : 0.9;
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(screen.width, 720),
+            maxHeight: screen.height * heightFactor,
+          ),
+          child: BlocProvider(
+            create: (_) => ContactDiscoveryCubit(
+              contactsRepository: contactsRepository,
+              friendsRepository: friendsRepository,
+            )..load(),
+            child: _ContactDiscoverySheet(username: username),
+          ),
+        );
+      },
     ),
   );
 }
@@ -95,27 +89,18 @@ class _ContactDiscoverySheet extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        context.l10n.friendsContactsTitle,
-                        style: AppTextStyles.titleLargeFlex,
-                      ),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    context.l10n.friendsContactsTitle,
+                    style: AppTextStyles.titleLargeFlex.copyWith(
+                      color: context.colorScheme.onSurface,
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded, size: 30),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              BlocSelector<
-                ContactDiscoveryCubit,
-                ContactDiscoveryState,
-                bool
-              >(
+              BlocSelector<ContactDiscoveryCubit, ContactDiscoveryState, bool>(
                 selector: (state) => state.isRefreshing,
                 builder: (context, isRefreshing) => AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
@@ -210,6 +195,12 @@ class _ContactDiscoveryBody extends StatelessWidget {
               child: Text(
                 context.l10n.friendsNoSearchResults,
                 textAlign: TextAlign.center,
+                style: context.textTheme.titleLarge?.copyWith(
+                  color: context.colorScheme.onSurface,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
               ),
             ),
           ),

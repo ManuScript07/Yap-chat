@@ -528,7 +528,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get friendsAddByUsername => 'по username';
 
   @override
-  String get friendsAddSocialNetworks => 'социальные сети';
+  String get friendsAddByPhone => 'по номеру телефона';
+
+  @override
+  String get friendsAddInviteMore => 'позови ещё больше друзей';
+
+  @override
+  String get friendsAddSocialNetworks => 'из соцсетей';
 
   @override
   String get friendsAddComingSoon => 'скоро';

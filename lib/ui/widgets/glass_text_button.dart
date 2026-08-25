@@ -7,17 +7,23 @@ class GlassTextButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.height = 42,
+    this.horizontalPadding = 18,
+    this.backgroundColor,
+    this.foregroundColor,
   });
 
   final String label;
   final VoidCallback? onTap;
   final double height;
+  final double horizontalPadding;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
-    final color = context.colorScheme.onSurface;
+    final foreground = foregroundColor ?? context.colorScheme.onSurface;
     return Material(
-      color: color.withValues(alpha: 0.2),
+      color: backgroundColor ?? foreground.withValues(alpha: 0.2),
       borderRadius: BorderRadius.circular(height / 2),
       child: InkWell(
         onTap: onTap,
@@ -25,12 +31,12 @@ class GlassTextButton extends StatelessWidget {
         child: SizedBox(
           height: height,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Center(
               child: Text(
                 label,
                 style: context.textTheme.labelLarge?.copyWith(
-                  color: color,
+                  color: foreground,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 ),

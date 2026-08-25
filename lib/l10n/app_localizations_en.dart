@@ -521,7 +521,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get friendsAddByUsername => 'by username';
 
   @override
-  String get friendsAddSocialNetworks => 'social networks';
+  String get friendsAddByPhone => 'by phone number';
+
+  @override
+  String get friendsAddInviteMore => 'invite even more friends';
+
+  @override
+  String get friendsAddSocialNetworks => 'from social networks';
 
   @override
   String get friendsAddComingSoon => 'coming soon';

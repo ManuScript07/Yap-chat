@@ -47,17 +47,17 @@ class ContactDiscoveryItem extends StatelessWidget {
         children: [
           if (candidate == null)
             Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: context.colorScheme.onSurface.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.person_rounded,
-                color: context.colorScheme.onSurfaceVariant,
-                size: 30,
-              ),
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: context.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: context.colorScheme.onPrimary,
+                  size: 30,
+                ),
             )
           else
             UserAvatar(
@@ -105,7 +105,15 @@ class ContactDiscoveryItem extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           if (entry.matchStatus == ContactMatchStatus.notRegistered)
-            _InviteButton(label: inviteLabel, onTap: onInvite)
+            GlassTextButton(
+              label: inviteLabel,
+              onTap: onInvite,
+              horizontalPadding: 15,
+              backgroundColor: context.colorScheme.onSurface.withValues(
+                alpha: 0.14,
+              ),
+              foregroundColor: context.colorScheme.onSurface,
+            )
           else if (candidate != null)
             _CandidateAction(
               candidate: candidate,
@@ -117,35 +125,6 @@ class ContactDiscoveryItem extends StatelessWidget {
           else
             const SizedBox(width: 8),
         ],
-      ),
-    );
-  }
-}
-
-class _InviteButton extends StatelessWidget {
-  const _InviteButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.colorScheme.onSurface.withValues(alpha: 0.14),
-      borderRadius: BorderRadius.circular(21),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(21),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-          child: Text(
-            label,
-            style: context.textTheme.labelLarge?.copyWith(
-              color: context.colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
       ),
     );
   }

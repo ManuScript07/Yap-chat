@@ -950,10 +950,22 @@ abstract class AppLocalizations {
   /// **'по username'**
   String get friendsAddByUsername;
 
+  /// No description provided for @friendsAddByPhone.
+  ///
+  /// In ru, this message translates to:
+  /// **'по номеру телефона'**
+  String get friendsAddByPhone;
+
+  /// No description provided for @friendsAddInviteMore.
+  ///
+  /// In ru, this message translates to:
+  /// **'позови ещё больше друзей'**
+  String get friendsAddInviteMore;
+
   /// No description provided for @friendsAddSocialNetworks.
   ///
   /// In ru, this message translates to:
-  /// **'социальные сети'**
+  /// **'из соцсетей'**
   String get friendsAddSocialNetworks;
 
   /// No description provided for @friendsAddComingSoon.
