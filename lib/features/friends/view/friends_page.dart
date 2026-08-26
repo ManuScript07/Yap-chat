@@ -427,7 +427,15 @@ class _FriendsListState extends State<_FriendsList> {
       return widgets;
     }
     if (state.status == FriendSearchStatus.success && state.results.isEmpty) {
-      widgets.add(_globalMessage(context, context.l10n.friendsNoSearchResults));
+      widgets.add(
+        SizedBox(
+          height: 150,
+          child: EmptyChatState(
+            showImage: false,
+            message: context.l10n.friendsNoSearchResults,
+          ),
+        ),
+      );
       return widgets;
     }
     final repository = context.read<IFriendsRepository>();

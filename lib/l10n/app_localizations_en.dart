@@ -489,7 +489,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get friendsEmpty =>
-      'you don\'t have any friends yet. use search or the button above';
+      'you don\'t have any friends yet, use the button above';
 
   @override
   String get friendsRequestsEmpty => 'no requests yet';

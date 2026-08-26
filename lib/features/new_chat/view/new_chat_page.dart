@@ -90,51 +90,82 @@ class _NewChatPageState extends State<NewChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final systemPadding = MediaQuery.paddingOf(context);
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardInset = mediaQuery.viewInsets.bottom;
+    final isKeyboardOpen = keyboardInset > 0;
+    final searchBottom = isKeyboardOpen
+        ? keyboardInset + 16
+        : mediaQuery.viewPadding.bottom + 16;
+    final searchTop = mediaQuery.size.height - searchBottom - 50;
+    final hideAppBar =
+        mediaQuery.orientation == Orientation.landscape &&
+        isKeyboardOpen &&
+        searchTop < 130;
+    const listTop = 146.0;
+    final listBottom = searchBottom + 66;
 
-    return Scaffold(
-      backgroundColor: context.scaffoldBackgroundColor,
-      resizeToAvoidBottomInset: false,
-      appBar: PrimaryAppBar(title: context.l10n.newChatTitle),
-      body: Stack(
-        children: [
-          StreamBuilder<List<Friend>>(
-            stream: _friendsStream,
-            builder: (context, snapshot) {
-              final friends = _filterFriends(snapshot.data ?? const []);
-              return ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.only(
-                  top: 16,
-                  bottom: systemPadding.bottom + 98,
-                ),
-                children: [
-                  _FindUserRow(onPressed: _openAddFriendPage),
-                  FriendsSectionTitle(
-                    title: context.l10n.friendsAll,
-                    count: friends.length,
-                  ),
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 24),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: context.colorScheme.primary,
-                        ),
-                      ),
-                    )
-                  else if (snapshot.hasError)
-                    _StatusText(message: context.l10n.friendsLoadFailed)
-                  else if (friends.isEmpty)
-                    _StatusText(
-                      message: _query.trim().isEmpty
-                          ? context.l10n.friendsEmpty
-                          : context.l10n.friendsNoSearchResults,
-                    )
-                  else
+    return KeyboardDismissPopScope(
+      child: Scaffold(
+        backgroundColor: context.scaffoldBackgroundColor,
+        resizeToAvoidBottomInset: false,
+        extendBodyBehindAppBar: true,
+        appBar: hideAppBar
+            ? null
+            : PrimaryAppBar(title: context.l10n.newChatTitle),
+        body: Stack(
+          children: [
+            StreamBuilder<List<Friend>>(
+              stream: _friendsStream,
+              builder: (context, snapshot) {
+                final allFriends = snapshot.data ?? const <Friend>[];
+                final friends = _filterFriends(allFriends);
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: context.colorScheme.primary,
+                    ),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return _StatusText(
+                    message: context.l10n.friendsLoadFailed,
+                    topPadding: 130,
+                  );
+                }
+                if (allFriends.isEmpty) {
+                  return _StaticNewChatContent(
+                    showFindUser: true,
+                    findUserTop: listTop,
+                    onFindUser: _openAddFriendPage,
+                    child: _StableEmptyFriendsState(
+                      topPadding: 130,
+                      bottomPadding: mediaQuery.viewPadding.bottom + 82,
+                    ),
+                  );
+                }
+                if (friends.isEmpty) {
+                  return _StaticNewChatContent(
+                    showFindUser: true,
+                    findUserTop: listTop,
+                    onFindUser: _openAddFriendPage,
+                    child: _NoSearchResults(
+                      topPadding: 130,
+                      bottomPadding: mediaQuery.viewPadding.bottom + 82,
+                    ),
+                  );
+                }
+
+                return ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.only(top: listTop, bottom: listBottom),
+                  children: [
+                    _FindUserRow(onPressed: _openAddFriendPage),
+                    FriendsSectionTitle(
+                      title: context.l10n.friendsAll,
+                      count: friends.length,
+                    ),
                     for (final friend in friends)
                       _NewChatFriendItem(
                         friend: friend,
@@ -143,28 +174,30 @@ class _NewChatPageState extends State<NewChatPage> {
                             .resolveFriendAvatar(friend),
                         onTap: () => _openChat(friend),
                       ),
-                ],
-              );
-            },
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: keyboardInset,
-            child: const BottomAmbientGlow(),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom:
-                16 + (keyboardInset > 0 ? keyboardInset : systemPadding.bottom),
-            child: GlassSearchBar(
-              controller: _searchController,
-              hintText: context.l10n.friendsSearchHint,
-              onChanged: (value) => setState(() => _query = value),
+                  ],
+                );
+              },
             ),
-          ),
-        ],
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: keyboardInset,
+              child: const BottomAmbientGlow(),
+            ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuad,
+              left: 0,
+              right: 0,
+              bottom: searchBottom,
+              child: GlassSearchBar(
+                controller: _searchController,
+                hintText: context.l10n.friendsSearchHint,
+                onChanged: (value) => setState(() => _query = value),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -201,6 +234,36 @@ class _FindUserRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _StaticNewChatContent extends StatelessWidget {
+  const _StaticNewChatContent({
+    required this.showFindUser,
+    required this.findUserTop,
+    required this.onFindUser,
+    required this.child,
+  });
+
+  final bool showFindUser;
+  final double findUserTop;
+  final VoidCallback onFindUser;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(child: child),
+        if (showFindUser)
+          Positioned(
+            top: findUserTop,
+            left: 0,
+            right: 0,
+            child: _FindUserRow(onPressed: onFindUser),
+          ),
+      ],
     );
   }
 }
@@ -273,10 +336,50 @@ class _NewChatFriendItem extends StatelessWidget {
   }
 }
 
+class _StableEmptyFriendsState extends StatelessWidget {
+  const _StableEmptyFriendsState({
+    required this.topPadding,
+    required this.bottomPadding,
+  });
+
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
+      child: EmptyChatState(message: context.l10n.friendsEmpty),
+    );
+  }
+}
+
+class _NoSearchResults extends StatelessWidget {
+  const _NoSearchResults({
+    required this.topPadding,
+    required this.bottomPadding,
+  });
+
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
+      child: EmptyChatState(
+        showImage: false,
+        message: context.l10n.friendsNoSearchResults,
+      ),
+    );
+  }
+}
+
 class _StatusText extends StatelessWidget {
-  const _StatusText({required this.message});
+  const _StatusText({required this.message, required this.topPadding});
 
   final String message;
+  final double topPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +387,7 @@ class _StatusText extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         16 + systemPadding.left,
-        24,
+        topPadding + 24,
         16 + systemPadding.right,
         16,
       ),

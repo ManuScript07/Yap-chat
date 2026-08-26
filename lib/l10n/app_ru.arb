@@ -186,7 +186,7 @@
   "friendsOutgoing": "исходящие",
   "friendsIncoming": "входящие",
   "friendsSearchHint": "поиск",
-  "friendsEmpty": "друзей пока нет. воспользуйтесь поиском или кнопкой сверху",
+  "friendsEmpty": "друзей пока нет, воспользуйтесь кнопкой сверху",
   "friendsRequestsEmpty": "заявок пока нет",
   "friendsNoSearchResults": "ничего не нашли",
   "friendsLoadFailed": "Не удалось загрузить друнов",

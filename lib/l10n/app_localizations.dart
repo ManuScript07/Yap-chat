@@ -905,7 +905,7 @@ abstract class AppLocalizations {
   /// No description provided for @friendsEmpty.
   ///
   /// In ru, this message translates to:
-  /// **'друзей пока нет. воспользуйтесь поиском или кнопкой сверху'**
+  /// **'друзей пока нет, воспользуйтесь кнопкой сверху'**
   String get friendsEmpty;
 
   /// No description provided for @friendsRequestsEmpty.

@@ -19,10 +19,9 @@ class AddFriendByPhonePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          PhoneFriendSearchCubit(
-            repository: context.read<IFriendsRepository>(),
-          ),
+      create: (context) => PhoneFriendSearchCubit(
+        repository: context.read<IFriendsRepository>(),
+      ),
       child: const _AddFriendByPhoneView(),
     );
   }
@@ -60,24 +59,26 @@ class _AddFriendByPhoneViewState extends State<_AddFriendByPhoneView> {
         );
         context.read<PhoneFriendSearchCubit>().clearActionError();
       },
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        backgroundColor: context.scaffoldBackgroundColor,
-        appBar: PrimaryAppBar(
-          title: context.l10n.friendsAddByPhoneTitle,
-          titleWidget: Text(
-            context.l10n.friendsAddByPhoneTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 32),
+      child: KeyboardDismissPopScope(
+        child: Scaffold(
+          extendBodyBehindAppBar: true,
+          backgroundColor: context.scaffoldBackgroundColor,
+          appBar: PrimaryAppBar(
+            title: context.l10n.friendsAddByPhoneTitle,
+            titleWidget: Text(
+              context.l10n.friendsAddByPhoneTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 32),
+            ),
           ),
-        ),
-        body: _PhoneSearchBody(
-          controller: _phoneController,
-          normalizer: _phoneNormalizer,
-          submittedPhone: _submittedPhone,
-          onChanged: _onPhoneChanged,
-          onSubmitted: _submitSearch,
+          body: _PhoneSearchBody(
+            controller: _phoneController,
+            normalizer: _phoneNormalizer,
+            submittedPhone: _submittedPhone,
+            onChanged: _onPhoneChanged,
+            onSubmitted: _submitSearch,
+          ),
         ),
       ),
     );
@@ -139,175 +140,182 @@ class _PhoneSearchBody extends StatelessWidget {
                   horizontal + systemPadding.right,
                   systemPadding.bottom + 24,
                 ),
-                child: BlocBuilder<
-                  PhoneFriendSearchCubit,
-                  PhoneFriendSearchState
-                >(
-                  builder: (context, state) {
-                    final callingCode = normalizer.localCountryCallingCode;
-                    final maximumNationalDigits =
-                        normalizer.localNationalMaxLength;
-                    final isCurrentSearch =
-                        submittedPhone != null &&
-                        state.phoneNumber == submittedPhone;
-                    final isLoading =
-                        isCurrentSearch &&
-                        state.status == PhoneFriendSearchStatus.loading;
-                    final isRefreshing =
-                        isCurrentSearch && state.isRefreshing;
-                    final candidate = isCurrentSearch &&
-                            state.status == PhoneFriendSearchStatus.success
-                        ? state.candidate
-                        : null;
-                    final searchError = !isCurrentSearch
-                        ? null
-                        : switch (state.status) {
-                            PhoneFriendSearchStatus.failure =>
-                              context.l10n.friendsUserSearchFailed,
-                            PhoneFriendSearchStatus.success
-                                when candidate == null =>
-                              context.l10n.friendsUsernameNotFound,
-                            _ => null,
-                          };
-                    final isValid =
-                        normalizer.normalizeLocalNationalNumber(
-                          controller.text,
-                        ) !=
-                        null;
-                    final errorText =
-                        _hasInvalidPhoneCharacters(controller.text)
-                        ? context.l10n.friendsPhoneInvalid
-                        : searchError;
+                child:
+                    BlocBuilder<PhoneFriendSearchCubit, PhoneFriendSearchState>(
+                      builder: (context, state) {
+                        final callingCode = normalizer.localCountryCallingCode;
+                        final maximumNationalDigits =
+                            normalizer.localNationalMaxLength;
+                        final isCurrentSearch =
+                            submittedPhone != null &&
+                            state.phoneNumber == submittedPhone;
+                        final isLoading =
+                            isCurrentSearch &&
+                            state.status == PhoneFriendSearchStatus.loading;
+                        final isRefreshing =
+                            isCurrentSearch && state.isRefreshing;
+                        final candidate =
+                            isCurrentSearch &&
+                                state.status == PhoneFriendSearchStatus.success
+                            ? state.candidate
+                            : null;
+                        final searchError = !isCurrentSearch
+                            ? null
+                            : switch (state.status) {
+                                PhoneFriendSearchStatus.failure =>
+                                  context.l10n.friendsUserSearchFailed,
+                                PhoneFriendSearchStatus.success
+                                    when candidate == null =>
+                                  context.l10n.friendsUsernameNotFound,
+                                _ => null,
+                              };
+                        final isValid =
+                            normalizer.normalizeLocalNationalNumber(
+                              controller.text,
+                            ) !=
+                            null;
+                        final errorText =
+                            _hasInvalidPhoneCharacters(controller.text)
+                            ? context.l10n.friendsPhoneInvalid
+                            : searchError;
 
-                    return Column(
-                      children: [
-                        const Spacer(flex: 4),
-                        OnboardingTextField(
-                          controller: controller,
-                          label: context.l10n.friendsPhoneLabel,
-                          hint: callingCode == null
-                              ? context.l10n.friendsPhoneHint
-                              : '',
-                          maxLength: maximumNationalDigits,
-                          maxLines: 1,
-                          tooLongText: context.l10n.friendsPhoneTooLong,
-                          errorText: errorText,
-                          textInputAction: TextInputAction.search,
-                          keyboardType: TextInputType.phone,
-                          autocorrect: false,
-                          prefixText: callingCode == null
-                              ? null
-                              : '+$callingCode',
-                          inputFormatters: callingCode == null
-                              ? null
-                              : [
-                                  _LocalPhoneNumberFormatter(
-                                    normalizer: normalizer,
-                                    callingCode: callingCode,
-                                    maxNationalDigits: maximumNationalDigits,
-                                  ),
-                                ],
-                          lengthResolver: _phoneDigitCount,
-                          onChanged: onChanged,
-                          onSubmitted: (_) => onSubmitted(),
-                        ),
-                        const SizedBox(height: 16),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.topCenter,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 180),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            child: isLoading
-                                ? const Padding(
-                                    key: ValueKey('phone-search-loading'),
-                                    padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: SizedBox.square(
-                                      dimension: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
+                        return Column(
+                          children: [
+                            const Spacer(flex: 4),
+                            OnboardingTextField(
+                              controller: controller,
+                              label: context.l10n.friendsPhoneLabel,
+                              hint: callingCode == null
+                                  ? context.l10n.friendsPhoneHint
+                                  : '',
+                              maxLength: maximumNationalDigits,
+                              maxLines: 1,
+                              tooLongText: context.l10n.friendsPhoneTooLong,
+                              errorText: errorText,
+                              textInputAction: TextInputAction.search,
+                              keyboardType: TextInputType.phone,
+                              autocorrect: false,
+                              prefixText: callingCode == null
+                                  ? null
+                                  : '+$callingCode',
+                              inputFormatters: callingCode == null
+                                  ? null
+                                  : [
+                                      _LocalPhoneNumberFormatter(
+                                        normalizer: normalizer,
+                                        callingCode: callingCode,
+                                        maxNationalDigits:
+                                            maximumNationalDigits,
                                       ),
-                                    ),
-                                  )
-                                : candidate == null
-                                ? const SizedBox(
-                                    key: ValueKey('phone-search-idle'),
-                                  )
-                                : FriendCandidateItem(
-                                    key: ValueKey('phone:${candidate.id}'),
-                                    candidate: candidate,
-                                    friendsLabel: context.l10n.friendsCount,
-                                    relationshipLabel: (relationship) => switch (
-                                      relationship
-                                    ) {
-                                      FriendRelationship.friend =>
-                                        context.l10n.friendsAlreadyAdded,
-                                      FriendRelationship.outgoing =>
-                                        context.l10n.friendsRequestSent,
-                                      FriendRelationship.incoming =>
-                                        context.l10n.friendsRequestIncoming,
-                                      FriendRelationship.none => '',
-                                    },
-                                    avatarLoader: () => context
-                                        .read<IFriendsRepository>()
-                                        .resolveCandidateAvatar(candidate),
-                                    respectSystemPadding: false,
-                                    onAdd: () => context
-                                        .read<PhoneFriendSearchCubit>()
-                                        .sendRequest(candidate),
-                                    onAccept: () => context
-                                        .read<PhoneFriendSearchCubit>()
-                                        .respondToIncoming(
-                                          candidate,
-                                          accept: true,
-                                        ),
-                                    onReject: () => context
-                                        .read<PhoneFriendSearchCubit>()
-                                        .respondToIncoming(
-                                          candidate,
-                                          accept: false,
-                                        ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 42,
-                          child: FilledButton(
-                            onPressed: isValid && !isLoading && !isRefreshing
-                                ? onSubmitted
-                                : null,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: context.colorScheme.primary,
-                              foregroundColor: context.colorScheme.onPrimary,
-                              disabledBackgroundColor: context
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.35),
-                              disabledForegroundColor: context
-                                  .colorScheme
-                                  .onPrimary
-                                  .withValues(alpha: 0.6),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(21),
-                              ),
-                              textStyle: context.textTheme.labelLarge
-                                  ?.copyWith(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                                    ],
+                              lengthResolver: _phoneDigitCount,
+                              onChanged: onChanged,
+                              onSubmitted: (_) => onSubmitted(),
                             ),
-                            child: Text(context.l10n.friendsUsernameSearch),
-                          ),
-                        ),
-                        const Spacer(flex: 5),
-                      ],
-                    );
-                  },
-                ),
+                            const SizedBox(height: 16),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 180),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                child: isLoading
+                                    ? const Padding(
+                                        key: ValueKey('phone-search-loading'),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        child: SizedBox.square(
+                                          dimension: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                          ),
+                                        ),
+                                      )
+                                    : candidate == null
+                                    ? const SizedBox(
+                                        key: ValueKey('phone-search-idle'),
+                                      )
+                                    : FriendCandidateItem(
+                                        key: ValueKey('phone:${candidate.id}'),
+                                        candidate: candidate,
+                                        friendsLabel: context.l10n.friendsCount,
+                                        relationshipLabel: (relationship) =>
+                                            switch (relationship) {
+                                              FriendRelationship.friend =>
+                                                context
+                                                    .l10n
+                                                    .friendsAlreadyAdded,
+                                              FriendRelationship.outgoing =>
+                                                context.l10n.friendsRequestSent,
+                                              FriendRelationship.incoming =>
+                                                context
+                                                    .l10n
+                                                    .friendsRequestIncoming,
+                                              FriendRelationship.none => '',
+                                            },
+                                        avatarLoader: () => context
+                                            .read<IFriendsRepository>()
+                                            .resolveCandidateAvatar(candidate),
+                                        respectSystemPadding: false,
+                                        onAdd: () => context
+                                            .read<PhoneFriendSearchCubit>()
+                                            .sendRequest(candidate),
+                                        onAccept: () => context
+                                            .read<PhoneFriendSearchCubit>()
+                                            .respondToIncoming(
+                                              candidate,
+                                              accept: true,
+                                            ),
+                                        onReject: () => context
+                                            .read<PhoneFriendSearchCubit>()
+                                            .respondToIncoming(
+                                              candidate,
+                                              accept: false,
+                                            ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 42,
+                              child: FilledButton(
+                                onPressed:
+                                    isValid && !isLoading && !isRefreshing
+                                    ? onSubmitted
+                                    : null,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: context.colorScheme.primary,
+                                  foregroundColor:
+                                      context.colorScheme.onPrimary,
+                                  disabledBackgroundColor: context
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.35),
+                                  disabledForegroundColor: context
+                                      .colorScheme
+                                      .onPrimary
+                                      .withValues(alpha: 0.6),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(21),
+                                  ),
+                                  textStyle: context.textTheme.labelLarge
+                                      ?.copyWith(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                                child: Text(context.l10n.friendsUsernameSearch),
+                              ),
+                            ),
+                            const Spacer(flex: 5),
+                          ],
+                        );
+                      },
+                    ),
               ),
             ),
           ],
@@ -320,8 +328,7 @@ class _PhoneSearchBody extends StatelessWidget {
 bool _hasInvalidPhoneCharacters(String value) =>
     value.isNotEmpty && !RegExp(r'^[0-9+().\-\s]*$').hasMatch(value);
 
-int _phoneDigitCount(String value) =>
-    RegExp(r'[0-9]').allMatches(value).length;
+int _phoneDigitCount(String value) => RegExp(r'[0-9]').allMatches(value).length;
 
 class _LocalPhoneNumberFormatter extends TextInputFormatter {
   const _LocalPhoneNumberFormatter({
@@ -340,10 +347,8 @@ class _LocalPhoneNumberFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final rawText = newValue.text;
-    final selectionEnd = newValue.selection.extentOffset.clamp(
-      0,
-      rawText.length,
-    ) as int;
+    final selectionEnd =
+        newValue.selection.extentOffset.clamp(0, rawText.length) as int;
     var digits = _digitsOnly(rawText);
     var digitsBeforeSelection = _digitsOnly(
       rawText.substring(0, selectionEnd),
@@ -353,8 +358,9 @@ class _LocalPhoneNumberFormatter extends TextInputFormatter {
         rawText.trimLeft().startsWith('+') && digits.startsWith(callingCode);
     if (containsPastedCallingCode) {
       digits = digits.substring(callingCode.length);
-      digitsBeforeSelection = (digitsBeforeSelection - callingCode.length)
-          .clamp(0, digits.length) as int;
+      digitsBeforeSelection =
+          (digitsBeforeSelection - callingCode.length).clamp(0, digits.length)
+              as int;
     }
     if (digits.length > maxNationalDigits) {
       digits = digits.substring(0, maxNationalDigits);

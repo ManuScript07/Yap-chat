@@ -33,8 +33,7 @@ class _AddFriendByUsernameView extends StatefulWidget {
       _AddFriendByUsernameViewState();
 }
 
-class _AddFriendByUsernameViewState
-    extends State<_AddFriendByUsernameView> {
+class _AddFriendByUsernameViewState extends State<_AddFriendByUsernameView> {
   final _usernameController = TextEditingController();
   String? _submittedUsername;
   FriendCandidate? _localFriendCandidate;
@@ -60,24 +59,26 @@ class _AddFriendByUsernameViewState
         );
         context.read<FriendSearchCubit>().clearActionError();
       },
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        backgroundColor: context.scaffoldBackgroundColor,
-        appBar: PrimaryAppBar(
-          title: context.l10n.friendsAddByUsernameTitle,
-          titleWidget: Text(
-            context.l10n.friendsAddByUsernameTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 32),
+      child: KeyboardDismissPopScope(
+        child: Scaffold(
+          extendBodyBehindAppBar: true,
+          backgroundColor: context.scaffoldBackgroundColor,
+          appBar: PrimaryAppBar(
+            title: context.l10n.friendsAddByUsernameTitle,
+            titleWidget: Text(
+              context.l10n.friendsAddByUsernameTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 32),
+            ),
           ),
-        ),
-        body: _UsernameSearchBody(
-          controller: _usernameController,
-          submittedUsername: _submittedUsername,
-          localFriendCandidate: _localFriendCandidate,
-          onChanged: _onUsernameChanged,
-          onSubmitted: _submitSearch,
+          body: _UsernameSearchBody(
+            controller: _usernameController,
+            submittedUsername: _submittedUsername,
+            localFriendCandidate: _localFriendCandidate,
+            onChanged: _onUsernameChanged,
+            onSubmitted: _submitSearch,
+          ),
         ),
       ),
     );
@@ -86,8 +87,7 @@ class _AddFriendByUsernameViewState
   void _onUsernameChanged(String value) {
     final normalized = _normalizedUsername(value);
     setState(() {
-      if (_submittedUsername != null &&
-          normalized != _submittedUsername) {
+      if (_submittedUsername != null && normalized != _submittedUsername) {
         _submittedUsername = null;
         _localFriendCandidate = null;
         _localSearchGeneration++;
@@ -198,9 +198,8 @@ class _UsernameSearchBody extends StatelessWidget {
                         context.l10n.friendsUsernameNotFound,
                       null => null,
                     };
-                    final errorText = _hasInvalidUsernameCharacters(
-                      controller.text,
-                    )
+                    final errorText =
+                        _hasInvalidUsernameCharacters(controller.text)
                         ? context.l10n.friendsUsernameCharactersOnly
                         : searchError;
                     return Column(
@@ -250,21 +249,19 @@ class _UsernameSearchBody extends StatelessWidget {
                                           'username:${candidate.id}',
                                         ),
                                         candidate: candidate,
-                                        friendsLabel:
-                                            context.l10n.friendsCount,
-                                        relationshipLabel:
-                                            (relationship) => switch (
-                                              relationship
-                                            ) {
-                                              FriendRelationship.friend => context
-                                                  .l10n
-                                                  .friendsAlreadyAdded,
-                                              FriendRelationship.outgoing => context
-                                                  .l10n
-                                                  .friendsRequestSent,
-                                              FriendRelationship.incoming => context
-                                                  .l10n
-                                                  .friendsRequestIncoming,
+                                        friendsLabel: context.l10n.friendsCount,
+                                        relationshipLabel: (relationship) =>
+                                            switch (relationship) {
+                                              FriendRelationship.friend =>
+                                                context
+                                                    .l10n
+                                                    .friendsAlreadyAdded,
+                                              FriendRelationship.outgoing =>
+                                                context.l10n.friendsRequestSent,
+                                              FriendRelationship.incoming =>
+                                                context
+                                                    .l10n
+                                                    .friendsRequestIncoming,
                                               FriendRelationship.none => '',
                                             },
                                         avatarLoader: () => context
@@ -288,8 +285,8 @@ class _UsernameSearchBody extends StatelessWidget {
                                             ),
                                       ),
                                     _ => const SizedBox(
-                                        key: ValueKey('username-search-idle'),
-                                      ),
+                                      key: ValueKey('username-search-idle'),
+                                    ),
                                   },
                           ),
                         ),
@@ -315,11 +312,10 @@ class _UsernameSearchBody extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(21),
                               ),
-                              textStyle: context.textTheme.labelLarge
-                                  ?.copyWith(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                              textStyle: context.textTheme.labelLarge?.copyWith(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                             child: Text(context.l10n.friendsUsernameSearch),
                           ),
@@ -339,10 +335,7 @@ class _UsernameSearchBody extends StatelessWidget {
 }
 
 class _UsernameSearchViewState {
-  const _UsernameSearchViewState({
-    this.message,
-    this.candidate,
-  });
+  const _UsernameSearchViewState({this.message, this.candidate});
 
   final _UsernameSearchMessage? message;
   final FriendCandidate? candidate;

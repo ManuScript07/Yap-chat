@@ -493,8 +493,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get friendsSearchHint => 'поиск';
 
   @override
-  String get friendsEmpty =>
-      'друзей пока нет. воспользуйтесь поиском или кнопкой сверху';
+  String get friendsEmpty => 'друзей пока нет, воспользуйтесь кнопкой сверху';
 
   @override
   String get friendsRequestsEmpty => 'заявок пока нет';

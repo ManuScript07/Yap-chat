@@ -17,4 +17,5 @@ export 'empty_chat_state.dart';
 export 'gradient_overlay.dart';
 export 'primary_icon_button.dart';
 export 'glass_text_button.dart';
+export 'keyboard_dismiss_pop_scope.dart';
 export 'primary_segmented_control.dart';

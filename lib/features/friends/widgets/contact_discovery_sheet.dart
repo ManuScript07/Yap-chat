@@ -61,6 +61,13 @@ class _ContactDiscoverySheet extends StatelessWidget {
         ? keyboardInset + 12
         : mediaQuery.padding.bottom + 12;
     final contentBottomPadding = searchBottom + 62;
+    const headerHeight = 106.0;
+    final searchTop = mediaQuery.size.height - searchBottom - 50;
+    final hideHeader =
+        mediaQuery.orientation == Orientation.landscape &&
+        keyboardInset > 0 &&
+        searchTop < headerHeight;
+    const contentTopPadding = headerHeight;
     return BlocListener<ContactDiscoveryCubit, ContactDiscoveryState>(
       listenWhen: (previous, current) =>
           previous.actionError != current.actionError &&
@@ -73,75 +80,94 @@ class _ContactDiscoverySheet extends StatelessWidget {
         );
         context.read<ContactDiscoveryCubit>().clearActionError();
       },
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.7,
-                  ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      child: KeyboardDismissPopScope(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: _ContactDiscoveryBody(
+                username: username,
+                topPadding: contentTopPadding,
+                bottomPadding: contentBottomPadding,
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    context.l10n.friendsContactsTitle,
-                    style: AppTextStyles.titleLargeFlex.copyWith(
-                      color: context.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
+            ),
+            if (!hideHeader) ...[
+              GradientOverlay(
+                height: headerHeight + 24,
+                isTop: true,
+                backgroundColor: context.scaffoldBackgroundColor,
               ),
-              BlocSelector<ContactDiscoveryCubit, ContactDiscoveryState, bool>(
-                selector: (state) => state.isRefreshing,
-                builder: (context, isRefreshing) => AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: isRefreshing
-                      ? LinearProgressIndicator(
-                          key: const ValueKey('contacts-refreshing'),
-                          minHeight: 2,
-                          color: context.colorScheme.primary,
-                          backgroundColor: Colors.transparent,
-                        )
-                      : const SizedBox(
-                          key: ValueKey('contacts-idle'),
-                          height: 2,
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.7,
                         ),
-                ),
-              ),
-              Expanded(
-                child: _ContactDiscoveryBody(
-                  username: username,
-                  bottomPadding: contentBottomPadding,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          context.l10n.friendsContactsTitle,
+                          style: AppTextStyles.titleLargeFlex.copyWith(
+                            color: context.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                    BlocSelector<
+                      ContactDiscoveryCubit,
+                      ContactDiscoveryState,
+                      bool
+                    >(
+                      selector: (state) => state.isRefreshing,
+                      builder: (context, isRefreshing) => AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: isRefreshing
+                            ? LinearProgressIndicator(
+                                key: const ValueKey('contacts-refreshing'),
+                                minHeight: 2,
+                                color: context.colorScheme.primary,
+                                backgroundColor: Colors.transparent,
+                              )
+                            : const SizedBox(
+                                key: ValueKey('contacts-idle'),
+                                height: 2,
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutQuad,
-            left: 0,
-            right: 0,
-            bottom: searchBottom,
-            child: BlocBuilder<ContactDiscoveryCubit, ContactDiscoveryState>(
-              buildWhen: (previous, current) =>
-                  previous.status != current.status,
-              builder: (context, state) => GlassSearchBar(
-                hintText: context.l10n.friendsSearchHint,
-                enabled: state.status == ContactDiscoveryStatus.success,
-                onChanged: context.read<ContactDiscoveryCubit>().queryChanged,
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuad,
+              left: 0,
+              right: 0,
+              bottom: searchBottom,
+              child: BlocBuilder<ContactDiscoveryCubit, ContactDiscoveryState>(
+                buildWhen: (previous, current) =>
+                    previous.status != current.status,
+                builder: (context, state) => GlassSearchBar(
+                  hintText: context.l10n.friendsSearchHint,
+                  enabled: state.status == ContactDiscoveryStatus.success,
+                  onChanged: context.read<ContactDiscoveryCubit>().queryChanged,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -150,10 +176,12 @@ class _ContactDiscoverySheet extends StatelessWidget {
 class _ContactDiscoveryBody extends StatelessWidget {
   const _ContactDiscoveryBody({
     required this.username,
+    required this.topPadding,
     required this.bottomPadding,
   });
 
   final String? username;
+  final double topPadding;
   final double bottomPadding;
 
   @override
@@ -164,7 +192,7 @@ class _ContactDiscoveryBody extends StatelessWidget {
         return switch (state.status) {
           ContactDiscoveryStatus.initial ||
           ContactDiscoveryStatus.loading => Padding(
-            padding: EdgeInsets.only(bottom: bottomPadding),
+            padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
             child: Center(
               child: CircularProgressIndicator(
                 color: context.colorScheme.primary,
@@ -173,7 +201,12 @@ class _ContactDiscoveryBody extends StatelessWidget {
           ),
           ContactDiscoveryStatus.failure => Center(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding),
+              padding: EdgeInsets.fromLTRB(
+                24,
+                topPadding + 24,
+                24,
+                bottomPadding,
+              ),
               child: Text(
                 context.l10n.friendsContactsLoadFailed,
                 textAlign: TextAlign.center,
@@ -182,7 +215,12 @@ class _ContactDiscoveryBody extends StatelessWidget {
           ),
           ContactDiscoveryStatus.success when state.entries.isEmpty => Center(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding),
+              padding: EdgeInsets.fromLTRB(
+                24,
+                topPadding + 24,
+                24,
+                bottomPadding,
+              ),
               child: Text(
                 context.l10n.friendsContactsEmpty,
                 textAlign: TextAlign.center,
@@ -191,21 +229,15 @@ class _ContactDiscoveryBody extends StatelessWidget {
           ),
           ContactDiscoveryStatus.success when entries.isEmpty => Center(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding),
-              child: Text(
-                context.l10n.friendsNoSearchResults,
-                textAlign: TextAlign.center,
-                style: context.textTheme.titleLarge?.copyWith(
-                  color: context.colorScheme.onSurface,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
+              padding: EdgeInsets.fromLTRB(24, topPadding, 24, bottomPadding),
+              child: EmptyChatState(
+                showImage: false,
+                message: context.l10n.friendsNoSearchResults,
               ),
             ),
           ),
           ContactDiscoveryStatus.success => ListView.builder(
-            padding: EdgeInsets.only(bottom: bottomPadding),
+            padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
             itemCount: entries.length,
             itemBuilder: (context, index) {
               final entry = entries[index];
