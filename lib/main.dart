@@ -47,7 +47,16 @@ Future<void> main() async {
     }
   }
 
-  Bloc.observer = TalkerBlocObserver(talker: talker);
+  Bloc.observer = TalkerBlocObserver(
+    talker: talker,
+    settings: const TalkerBlocLoggerSettings(
+      // Full Equatable payloads may contain image bytes and personal data.
+      // Keeping only runtime types preserves the event timeline without
+      // serializing megabytes of data on the UI isolate.
+      printEventFullData: false,
+      printStateFullData: false,
+    ),
+  );
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -79,9 +88,7 @@ Future<FirebaseMessaging?> _initializeFirebase(Talker talker) async {
 
   try {
     if (Firebase.apps.isEmpty) await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(
-      handlePushNotificationInBackground,
-    );
+    FirebaseMessaging.onBackgroundMessage(handlePushNotificationInBackground);
     return FirebaseMessaging.instance;
   } catch (error, stackTrace) {
     talker.handle(

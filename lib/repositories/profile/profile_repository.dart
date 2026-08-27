@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
@@ -13,13 +14,16 @@ class ProfileRepository implements IProfileRepository {
     required SupabaseClient client,
     required ProfileCacheDataSource cache,
     required AvatarStorageDataSource avatarStorage,
+    required Talker talker,
   }) : _client = client,
        _cache = cache,
-       _avatarStorage = avatarStorage;
+       _avatarStorage = avatarStorage,
+       _talker = talker;
 
   final SupabaseClient _client;
   final ProfileCacheDataSource _cache;
   final AvatarStorageDataSource _avatarStorage;
+  final Talker _talker;
 
   @override
   Future<UserProfile?> getCachedProfile(String userId) => _cache.read(userId);
@@ -70,6 +74,11 @@ class ProfileRepository implements IProfileRepository {
     }
 
     final userId = currentProfile.id;
+    final stopwatch = Stopwatch()..start();
+    final uploadCount = photos.where((photo) => photo.needsUpload).length;
+    _talker.info(
+      'Profile save started: photos=${photos.length}, uploads=$uploadCount',
+    );
     final uploadedPaths = <String>[];
     final savedPhotos = <ProfilePhoto>[];
     try {
@@ -137,17 +146,38 @@ class ProfileRepository implements IProfileRepository {
           unawaited(_deleteAvatarBestEffort(oldPath));
         }
       }
+      _talker.info(
+        'Profile save completed: durationMs=${stopwatch.elapsedMilliseconds}, '
+        'photos=${hydratedPhotos.length}, uploads=$uploadCount',
+      );
       return profile;
-    } on PostgrestException catch (error) {
+    } on PostgrestException catch (error, stackTrace) {
       for (final path in uploadedPaths) {
         await _deleteAvatarBestEffort(path);
       }
-      if (error.code == '23505') throw const UsernameAlreadyTakenException();
+      if (error.code == '23505') {
+        _talker.warning(
+          'Profile save rejected: code=23505, '
+          'durationMs=${stopwatch.elapsedMilliseconds}',
+        );
+        throw const UsernameAlreadyTakenException();
+      }
+      _talker.handle(
+        error,
+        stackTrace,
+        'Profile save failed: code=${error.code}, '
+        'durationMs=${stopwatch.elapsedMilliseconds}',
+      );
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
       for (final path in uploadedPaths) {
         await _deleteAvatarBestEffort(path);
       }
+      _talker.handle(
+        error,
+        stackTrace,
+        'Profile save failed: durationMs=${stopwatch.elapsedMilliseconds}',
+      );
       rethrow;
     }
   }

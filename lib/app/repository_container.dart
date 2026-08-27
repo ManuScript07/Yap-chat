@@ -105,6 +105,7 @@ class RepositoryContainer {
       profileRepository: ProfileRepository(
         client: client,
         cache: ProfileCacheDataSource(database: config.database),
+        talker: config.talker,
         avatarStorage: AvatarStorageDataSource(
           client: client,
           imageProcessor: const AvatarImageProcessor(),

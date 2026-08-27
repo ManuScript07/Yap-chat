@@ -60,7 +60,11 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
   bool _isPickingPhoto = false;
   String? _removingPhotoIdentity;
   bool _routeIsClosing = false;
+  bool _isDraggingPhoto = false;
+  double _dragDistanceSinceHaptic = 0;
   late UserProfile _baselineProfile;
+
+  static const _dragHapticDistance = 28.0;
 
   @override
   void initState() {
@@ -311,56 +315,59 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
   Widget _photoStrip({required EdgeInsets padding}) {
     return SizedBox(
       height: 128,
-      child: DragBoundary(
-        child: ReorderableListView.builder(
-          scrollDirection: Axis.horizontal,
-          buildDefaultDragHandles: false,
-          dragBoundaryProvider: DragBoundary.forRectOf,
-          onReorderStart: (_) {
-            HapticFeedback.mediumImpact();
-          },
-          padding: padding,
-          footer: Align(child: _addPhotoTile()),
-          itemCount: _photos.length,
-          onReorderItem: _reorderPhoto,
-          proxyDecorator: (child, _, animation) => FadeTransition(
-            opacity: animation.drive(Tween(begin: .76, end: 1)),
-            child: ScaleTransition(
-              scale: animation.drive(Tween(begin: 1.0, end: 1.03)),
-              child: child,
-            ),
+      child: ReorderableListView.builder(
+        scrollDirection: Axis.horizontal,
+        buildDefaultDragHandles: false,
+        autoScrollerVelocityScalar: 70,
+        onReorderStart: (_) => _startPhotoDrag(),
+        onReorderEnd: (_) => _finishPhotoDrag(),
+        padding: padding,
+        footer: Align(child: _addPhotoTile()),
+        itemCount: _photos.length,
+        onReorderItem: _reorderPhoto,
+        proxyDecorator: (child, _, animation) => FadeTransition(
+          opacity: animation.drive(Tween(begin: .76, end: 1)),
+          child: ScaleTransition(
+            scale: animation.drive(Tween(begin: 1.0, end: 1.03)),
+            child: child,
           ),
-          itemBuilder: (context, index) {
-            final photo = _photos[index];
-            final isRemoving = photo.identity == _removingPhotoIdentity;
-            return TweenAnimationBuilder<double>(
-              key: ValueKey('profile-edit-${photo.identity}'),
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeInOutCubic,
-              tween: Tween(begin: 0, end: isRemoving ? 0 : 1),
-              builder: (context, value, child) => SizedBox(
-                width: 124 * value,
-                child: Opacity(
-                  opacity: value,
-                  child: Transform.scale(
-                    scale: .94 + (.06 * value),
-                    child: child,
-                  ),
+        ),
+        itemBuilder: (context, index) {
+          final photo = _photos[index];
+          final isRemoving = photo.identity == _removingPhotoIdentity;
+          return TweenAnimationBuilder<double>(
+            key: ValueKey('profile-edit-${photo.identity}'),
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeInOutCubic,
+            tween: Tween(begin: 0, end: isRemoving ? 0 : 1),
+            builder: (context, value, child) => SizedBox(
+              width: 124 * value,
+              child: Opacity(
+                opacity: value,
+                child: Transform.scale(
+                  scale: .94 + (.06 * value),
+                  child: child,
                 ),
               ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 12),
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerMove: _onPhotoDragMove,
+                  onPointerUp: (_) => _finishPhotoDrag(),
+                  onPointerCancel: (_) => _finishPhotoDrag(),
                   child: ReorderableDelayedDragStartListener(
                     index: index,
                     child: _photoTile(photo, index),
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -524,6 +531,25 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
       _photos.insert(newIndex, photo);
       _normalizePhotoPositions();
     });
+  }
+
+  void _startPhotoDrag() {
+    _isDraggingPhoto = true;
+    _dragDistanceSinceHaptic = 0;
+    HapticFeedback.mediumImpact();
+  }
+
+  void _onPhotoDragMove(PointerMoveEvent event) {
+    if (!_isDraggingPhoto || event.delta.dx == 0) return;
+    _dragDistanceSinceHaptic += event.delta.dx.abs();
+    if (_dragDistanceSinceHaptic < _dragHapticDistance) return;
+    _dragDistanceSinceHaptic %= _dragHapticDistance;
+    HapticFeedback.selectionClick();
+  }
+
+  void _finishPhotoDrag() {
+    _isDraggingPhoto = false;
+    _dragDistanceSinceHaptic = 0;
   }
 
   Future<void> _removePhoto(int index) async {
@@ -890,7 +916,17 @@ class _BirthDateSheetState extends State<_BirthDateSheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
-            Text(_error!, style: TextStyle(color: context.colorScheme.error)),
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color.lerp(context.colorScheme.error, Colors.red, 1)!,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ],
           const SizedBox(height: 28),
           SizedBox(

@@ -95,9 +95,9 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
                     color: Color.lerp(
                       context.colorScheme.error,
                       Colors.red,
-                      .2,
+                      1,
                     ),
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                     height: 1.2,
                   ),
                 ),
