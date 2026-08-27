@@ -16,6 +16,7 @@ import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
+import 'package:yap_chat/features/profile/profile.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -280,6 +281,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               previous.session?.userId != current.session?.userId,
           listener: (context, state) {
             final userId = state.session?.userId;
+            context.read<ProfileMutationCubit>().setAuthenticatedUser(userId);
             if (state.status == AuthStatus.authenticated && userId != null) {
               unawaited(
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
@@ -315,6 +317,17 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _restorePendingChat();
             });
+          },
+        ),
+        BlocListener<ProfileMutationCubit, ProfileMutationState>(
+          listenWhen: (previous, current) =>
+              previous.savedProfile != current.savedProfile &&
+              current.status == ProfileMutationStatus.success,
+          listener: (context, state) {
+            final profile = state.savedProfile;
+            if (profile != null) {
+              context.read<AuthBloc>().add(AuthProfileUpdated(profile));
+            }
           },
         ),
         BlocListener<NotificationsCubit, NotificationsState>(

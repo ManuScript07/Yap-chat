@@ -3,29 +3,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/auth/widgets/profile_setup_widgets.dart';
 import 'package:yap_chat/features/profile/bloc/bloc.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/features/profile/widgets/profile_photo_crop_page.dart';
 import 'package:yap_chat/features/profile/widgets/profile_photo_image.dart';
-import 'package:yap_chat/repositories/profile/profile.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 Future<bool?> showProfileEditPage(
   BuildContext context, {
   required UserProfile profile,
 }) {
-  final repository = context.read<IProfileRepository>();
   return Navigator.of(context).push<bool>(
     PageRouteBuilder<bool>(
       transitionDuration: const Duration(milliseconds: 240),
       reverseTransitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (_, _, _) => BlocProvider(
-        create: (_) =>
-            ProfileEditCubit(repository: repository, initialProfile: profile),
-        child: _ProfileEditPage(profile: profile),
-      ),
+      pageBuilder: (_, _, _) => _ProfileEditPage(profile: profile),
       transitionsBuilder: (_, animation, _, child) => SlideTransition(
         position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
             .animate(
@@ -66,16 +59,38 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
   bool _allowPop = false;
   bool _isPickingPhoto = false;
   String? _removingPhotoIdentity;
+  bool _routeIsClosing = false;
+  late UserProfile _baselineProfile;
 
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: widget.profile.username);
-    _nameController = TextEditingController(text: widget.profile.displayName);
-    _bioController = TextEditingController(text: widget.profile.bio);
-    _photos = widget.profile.effectivePhotos.toList();
-    _gender = widget.profile.gender;
-    _birthDate = widget.profile.birthDate!;
+    final mutationState = context.read<ProfileMutationCubit>().state;
+    final savedProfile = mutationState.savedProfile;
+    _baselineProfile =
+        mutationState.status == ProfileMutationStatus.success &&
+            savedProfile?.id == widget.profile.id
+        ? savedProfile!
+        : widget.profile;
+    final pendingDraft = mutationState.draft;
+    final seedDraft =
+        pendingDraft?.userId == widget.profile.id &&
+            (mutationState.isSubmitting ||
+                mutationState.status == ProfileMutationStatus.failure)
+        ? pendingDraft!
+        : ProfileDraft.fromProfile(_baselineProfile);
+    _usernameController = TextEditingController(text: seedDraft.username);
+    _nameController = TextEditingController(text: seedDraft.displayName);
+    _bioController = TextEditingController(text: seedDraft.bio);
+    _photos = seedDraft.photos.toList();
+    _gender = seedDraft.gender;
+    _birthDate = seedDraft.birthDate;
+    if (mutationState.status == ProfileMutationStatus.failure &&
+        pendingDraft?.userId == widget.profile.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showMutationFailure(mutationState.failure);
+      });
+    }
   }
 
   @override
@@ -86,214 +101,207 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
     super.dispose();
   }
 
-  bool get _isDirty {
-    if (_usernameController.text.trim() != widget.profile.username ||
-        _nameController.text.trim() != widget.profile.displayName ||
-        _bioController.text.trim() != widget.profile.bio ||
-        _gender != widget.profile.gender ||
-        _birthDate != widget.profile.birthDate ||
-        _photos.length != widget.profile.effectivePhotos.length) {
-      return true;
-    }
-    for (var index = 0; index < _photos.length; index++) {
-      if (_photos[index].identity !=
-          widget.profile.effectivePhotos[index].identity) {
-        return true;
-      }
-    }
-    return false;
-  }
+  ProfileDraft get _draft => ProfileDraft(
+    userId: _baselineProfile.id,
+    displayName: _nameController.text,
+    birthDate: _birthDate,
+    gender: _gender,
+    username: _usernameController.text,
+    bio: _bioController.text,
+    photos: _photos,
+  ).normalized();
+
+  bool get _isDirty => !_draft.hasSameContent(_baselineProfile);
 
   @override
   Widget build(BuildContext context) {
-    final editState = context.watch<ProfileEditCubit>().state;
+    final mutationState = context.watch<ProfileMutationCubit>().state;
     final mediaQuery = MediaQuery.of(context);
-    return BlocListener<ProfileEditCubit, ProfileEditState>(
+    final activeDraft = mutationState.draft;
+    final currentDraftMatchesMutation =
+        (mutationState.isSubmitting ||
+            mutationState.status == ProfileMutationStatus.success) &&
+        activeDraft?.userId == _baselineProfile.id &&
+        activeDraft == _draft;
+    return BlocListener<ProfileMutationCubit, ProfileMutationState>(
       listenWhen: (previous, current) =>
           previous.status != current.status ||
           previous.failure != current.failure,
-      listener: _onEditState,
+      listener: _onMutationState,
       child: PopScope(
-        canPop: _allowPop || (!editState.isSubmitting && !_isDirty),
+        canPop: _allowPop || !_isDirty || currentDraftMatchesMutation,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _requestClose();
+          if (didPop) {
+            _routeIsClosing = true;
+          } else {
+            _requestClose();
+          }
         },
         child: Scaffold(
           backgroundColor: context.scaffoldBackgroundColor,
           resizeToAvoidBottomInset: true,
-          body: AbsorbPointer(
-            absorbing: editState.isSubmitting,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ListView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: EdgeInsets.fromLTRB(
-                      0,
-                      130,
-                      0,
-                      mediaQuery.padding.bottom + mediaQuery.viewInsets.bottom,
-                    ),
-                    children: [
-                      _photoStrip(
-                        padding: EdgeInsets.fromLTRB(
-                          16 + mediaQuery.padding.left,
-                          0,
-                          16 + mediaQuery.padding.right,
-                          0,
-                        ),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    0,
+                    130,
+                    0,
+                    mediaQuery.padding.bottom + mediaQuery.viewInsets.bottom,
+                  ),
+                  children: [
+                    _photoStrip(
+                      padding: EdgeInsets.fromLTRB(
+                        16 + mediaQuery.padding.left,
+                        0,
+                        16 + mediaQuery.padding.right,
+                        0,
                       ),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          16 + mediaQuery.padding.left,
-                          0,
-                          16 + mediaQuery.padding.right,
-                          0,
-                        ),
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 20),
-                            OnboardingTextField(
-                              controller: _usernameController,
-                              label: context.l10n.profileUsernameLabel,
-                              hint: context.l10n.profileUsernameHint,
-                              maxLength: 24,
-                              maxLines: 1,
-                              tooLongText: context.l10n.authInputTooLong,
-                              errorText: _usernameError,
-                              autocorrect: false,
-                              inputFormatters: [
-                                TextInputFormatter.withFunction((
-                                  oldValue,
-                                  newValue,
-                                ) {
-                                  return newValue.copyWith(
-                                    text: newValue.text.toLowerCase(),
-                                    selection: newValue.selection,
-                                  );
-                                }),
-                              ],
-                              onChanged: (_) {
-                                final value = _usernameController.text;
-                                final error =
-                                    value.length <= 24 &&
-                                        !_usernameCharactersPattern.hasMatch(
-                                          value,
-                                        )
-                                    ? context.l10n.authUsernameCharactersOnly
-                                    : null;
-                                if (_usernameError != error) {
-                                  setState(() => _usernameError = error);
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 18),
-                            OnboardingTextField(
-                              controller: _nameController,
-                              label: context.l10n.profileNameLabel,
-                              hint: context.l10n.profileNameHint,
-                              maxLength: 30,
-                              maxLines: 1,
-                              tooLongText: context.l10n.authInputTooLong,
-                              errorText: _nameError,
-                              textCapitalization: TextCapitalization.words,
-                              onChanged: (_) =>
-                                  setState(() => _nameError = null),
-                            ),
-                            const SizedBox(height: 18),
-                            OnboardingTextField(
-                              controller: _bioController,
-                              label: context.l10n.profileBioLabel,
-                              hint: context.l10n.profileBioHint,
-                              maxLength: 130,
-                              maxLines: 4,
-                              tooLongText: context.l10n.authInputTooLong,
-                              errorText: _bioError,
-                              textCapitalization: TextCapitalization.sentences,
-                              keyboardType: TextInputType.multiline,
-                              onChanged: (_) =>
-                                  setState(() => _bioError = null),
-                            ),
-                            const SizedBox(height: 22),
-                            _valueRow(
-                              label: context.l10n.profileGenderLabel,
-                              value: _genderLabel(context, _gender),
-                              onTap: _selectGender,
-                            ),
-                            _valueRow(
-                              label: context.l10n.profileBirthDateLabel,
-                              value: DateFormat(
-                                'dd MMM yyyy',
-                                Localizations.localeOf(context).languageCode,
-                              ).format(_birthDate).replaceAll('.', ''),
-                              onTap: _selectBirthDate,
-                            ),
-                            const SizedBox(height: 28),
-                            Center(
-                              child: SizedBox(
-                                width: 230,
-                                height: 58,
-                                child: FilledButton(
-                                  onPressed: editState.isSubmitting
-                                      ? null
-                                      : _submit,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor:
-                                        context.colorScheme.primary,
-                                    foregroundColor:
-                                        context.colorScheme.onSurface,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                    ),
-                                    shape: const StadiumBorder(),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        16 + mediaQuery.padding.left,
+                        0,
+                        16 + mediaQuery.padding.right,
+                        0,
+                      ),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+                          OnboardingTextField(
+                            controller: _usernameController,
+                            label: context.l10n.profileUsernameLabel,
+                            hint: context.l10n.profileUsernameHint,
+                            maxLength: 24,
+                            maxLines: 1,
+                            tooLongText: context.l10n.authInputTooLong,
+                            errorText: _usernameError,
+                            autocorrect: false,
+                            inputFormatters: [
+                              TextInputFormatter.withFunction((
+                                oldValue,
+                                newValue,
+                              ) {
+                                return newValue.copyWith(
+                                  text: newValue.text.toLowerCase(),
+                                  selection: newValue.selection,
+                                );
+                              }),
+                            ],
+                            onChanged: (_) {
+                              final value = _usernameController.text;
+                              final error =
+                                  value.length <= 24 &&
+                                      !_usernameCharactersPattern.hasMatch(
+                                        value,
+                                      )
+                                  ? context.l10n.authUsernameCharactersOnly
+                                  : null;
+                              setState(() => _usernameError = error);
+                            },
+                          ),
+                          const SizedBox(height: 18),
+                          OnboardingTextField(
+                            controller: _nameController,
+                            label: context.l10n.profileNameLabel,
+                            hint: context.l10n.profileNameHint,
+                            maxLength: 30,
+                            maxLines: 1,
+                            tooLongText: context.l10n.authInputTooLong,
+                            errorText: _nameError,
+                            textCapitalization: TextCapitalization.words,
+                            onChanged: (_) => setState(() => _nameError = null),
+                          ),
+                          const SizedBox(height: 18),
+                          OnboardingTextField(
+                            controller: _bioController,
+                            label: context.l10n.profileBioLabel,
+                            hint: context.l10n.profileBioHint,
+                            maxLength: 130,
+                            maxLines: 4,
+                            tooLongText: context.l10n.authInputTooLong,
+                            errorText: _bioError,
+                            textCapitalization: TextCapitalization.sentences,
+                            keyboardType: TextInputType.multiline,
+                            onChanged: (_) => setState(() => _bioError = null),
+                          ),
+                          const SizedBox(height: 22),
+                          _valueRow(
+                            label: context.l10n.profileGenderLabel,
+                            value: _genderLabel(context, _gender),
+                            onTap: _selectGender,
+                          ),
+                          _valueRow(
+                            label: context.l10n.profileBirthDateLabel,
+                            value: DateFormat(
+                              'dd MMM yyyy',
+                              Localizations.localeOf(context).languageCode,
+                            ).format(_birthDate).replaceAll('.', ''),
+                            onTap: _selectBirthDate,
+                          ),
+                          const SizedBox(height: 28),
+                          Center(
+                            child: SizedBox(
+                              width: 230,
+                              height: 58,
+                              child: FilledButton(
+                                onPressed:
+                                    mutationState.isSubmitting || !_isDirty
+                                    ? null
+                                    : _submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: context.colorScheme.primary,
+                                  foregroundColor:
+                                      context.colorScheme.onSurface,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
                                   ),
-                                  child: editState.isSubmitting
-                                      ? SizedBox.square(
-                                          dimension: 25,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            color:
-                                                context.colorScheme.onSurface,
-                                          ),
-                                        )
-                                      : Text(
-                                          context.l10n.profileSave
-                                              .toLowerCase(),
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: .5,
-                                          ),
-                                        ),
+                                  shape: const StadiumBorder(),
                                 ),
+                                child: mutationState.isSubmitting
+                                    ? SizedBox.square(
+                                        dimension: 25,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: context.colorScheme.onSurface,
+                                        ),
+                                      )
+                                    : Text(
+                                        context.l10n.profileSave.toLowerCase(),
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: .5,
+                                        ),
+                                      ),
                               ),
                             ),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: PrimaryAppBar(
-                    title: '',
-                    titleWidget: Text(
-                      context.l10n.profileEditTitle.toLowerCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.titleLargeFlex.copyWith(
-                        fontSize: 32,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: PrimaryAppBar(
+                  title: '',
+                  titleWidget: Text(
+                    context.l10n.profileEditTitle.toLowerCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 32),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -642,6 +650,8 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
 
   void _submit() {
     FocusManager.instance.primaryFocus?.unfocus();
+    final mutationCubit = context.read<ProfileMutationCubit>();
+    if (mutationCubit.state.isSubmitting || !_isDirty) return;
     final username = _usernameController.text.trim().toLowerCase();
     final name = _nameController.text.trim();
     final bio = _bioController.text.trim();
@@ -659,40 +669,64 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
     });
     if (!valid) return;
 
-    context.read<ProfileEditCubit>().submit(
-      displayName: name,
-      birthDate: _birthDate,
-      gender: _gender,
-      username: username,
-      bio: bio,
-      photos: _photos,
+    final operationId = mutationCubit.submit(
+      currentProfile: _baselineProfile,
+      draft: _draft,
     );
+    if (operationId == null) return;
   }
 
-  void _onEditState(BuildContext context, ProfileEditState state) {
-    if (state.status == ProfileEditStatus.failure) {
-      if (state.failure == ProfileEditFailure.usernameTaken) {
-        setState(() => _usernameError = context.l10n.authUsernameTaken);
-      } else {
-        showAppSnackBar(
-          context,
-          message: context.l10n.authProfileSaveFailed,
-          type: SnackBarType.error,
-        );
-      }
+  void _onMutationState(BuildContext context, ProfileMutationState state) {
+    if (state.draft?.userId != _baselineProfile.id) return;
+    if (state.status == ProfileMutationStatus.failure) {
+      _showMutationFailure(state.failure);
       return;
     }
     final savedProfile = state.savedProfile;
-    if (state.status == ProfileEditStatus.success && savedProfile != null) {
-      context.read<AuthBloc>().add(AuthProfileUpdated(savedProfile));
-      _popAfterUnlock(true);
+    final submittedDraft = state.draft;
+    if (state.status == ProfileMutationStatus.success &&
+        savedProfile != null &&
+        submittedDraft != null) {
+      final currentDraft = _draft;
+      final hasNewChanges = currentDraft != submittedDraft;
+      _baselineProfile = savedProfile;
+
+      if (!hasNewChanges) {
+        setState(() => _applyProfile(savedProfile));
+        return;
+      }
+
+      setState(() {
+        _photos = _reconcileSavedPhotos(
+          currentPhotos: _photos,
+          submittedPhotos: submittedDraft.photos,
+          savedPhotos: savedProfile.effectivePhotos,
+        );
+      });
     }
   }
 
+  void _showMutationFailure(ProfileMutationFailure? failure) {
+    if (failure == ProfileMutationFailure.usernameTaken) {
+      setState(() => _usernameError = context.l10n.authUsernameTaken);
+      return;
+    }
+    showAppSnackBar(
+      context,
+      message: context.l10n.authProfileSaveFailed,
+      type: SnackBarType.error,
+    );
+  }
+
   Future<void> _requestClose() async {
+    if (_routeIsClosing) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    if (context.read<ProfileEditCubit>().state.isSubmitting) return;
-    if (!_isDirty) {
+    final mutationState = context.read<ProfileMutationCubit>().state;
+    final currentDraftIsSaving =
+        mutationState.isSubmitting &&
+        mutationState.draft?.userId == _baselineProfile.id &&
+        mutationState.draft == _draft;
+    if (!_isDirty || currentDraftIsSaving) {
       _popAfterUnlock(false);
       return;
     }
@@ -710,8 +744,40 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
     _popAfterUnlock(false);
   }
 
+  void _applyProfile(UserProfile profile) {
+    _usernameController.text = profile.username;
+    _nameController.text = profile.displayName;
+    _bioController.text = profile.bio;
+    _photos = profile.effectivePhotos.toList();
+    _gender = profile.gender;
+    _birthDate = profile.birthDate!;
+  }
+
+  List<ProfilePhoto> _reconcileSavedPhotos({
+    required List<ProfilePhoto> currentPhotos,
+    required List<ProfilePhoto> submittedPhotos,
+    required List<ProfilePhoto> savedPhotos,
+  }) {
+    final reconciled = <ProfilePhoto>[];
+    for (final currentPhoto in currentPhotos) {
+      final submittedIndex = submittedPhotos.indexWhere(
+        (submittedPhoto) => submittedPhoto.identity == currentPhoto.identity,
+      );
+      reconciled.add(
+        submittedIndex >= 0 && submittedIndex < savedPhotos.length
+            ? savedPhotos[submittedIndex]
+            : currentPhoto,
+      );
+    }
+    return [
+      for (var index = 0; index < reconciled.length; index++)
+        reconciled[index].copyWith(position: index),
+    ];
+  }
+
   void _popAfterUnlock(bool result) {
-    if (!mounted) return;
+    if (!mounted || _routeIsClosing) return;
+    _routeIsClosing = true;
     setState(() => _allowPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Navigator.of(context).pop(result);

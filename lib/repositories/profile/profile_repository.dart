@@ -6,6 +6,7 @@ import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
 import 'package:yap_chat/repositories/profile/avatar_storage_data_source.dart';
 import 'package:yap_chat/repositories/profile/profile_cache_data_source.dart';
+import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
 
 class ProfileRepository implements IProfileRepository {
   ProfileRepository({
@@ -55,6 +56,17 @@ class ProfileRepository implements IProfileRepository {
   }) async {
     if (photos.length > 5) {
       throw const ProfilePhotoLimitException();
+    }
+    if (isProfileSaveNoOp(
+      currentProfile: currentProfile,
+      displayName: displayName,
+      birthDate: birthDate,
+      gender: gender,
+      username: username,
+      bio: bio,
+      photos: photos,
+    )) {
+      return currentProfile;
     }
 
     final userId = currentProfile.id;

@@ -9,6 +9,7 @@ import 'package:yap_chat/app/permission_reminder_coordinator.dart';
 import 'package:yap_chat/app/repository_container.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/presence/presence.dart';
+import 'package:yap_chat/features/profile/profile.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
@@ -128,6 +129,11 @@ class _AppInitializerState extends State<AppInitializer> {
                   .pushNotificationsRepository
                   .unregisterCurrentDevice,
             )..add(const AuthStarted()),
+          ),
+          BlocProvider<ProfileMutationCubit>(
+            create: (context) => ProfileMutationCubit(
+              repository: context.read<IProfileRepository>(),
+            ),
           ),
           BlocProvider<PresenceCubit>(
             create: (context) =>

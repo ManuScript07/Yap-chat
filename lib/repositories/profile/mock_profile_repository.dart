@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
+import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
 
 class MockProfileRepository implements IProfileRepository {
   MockProfileRepository({required SharedPreferences preferences})
@@ -59,6 +60,17 @@ class MockProfileRepository implements IProfileRepository {
     required String bio,
     required List<ProfilePhoto> photos,
   }) async {
+    if (isProfileSaveNoOp(
+      currentProfile: currentProfile,
+      displayName: displayName,
+      birthDate: birthDate,
+      gender: gender,
+      username: username,
+      bio: bio,
+      photos: photos,
+    )) {
+      return currentProfile;
+    }
     await Future<void>.delayed(const Duration(milliseconds: 450));
     final normalizedPhotos = [
       for (var index = 0; index < photos.length; index++)
