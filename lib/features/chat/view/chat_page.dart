@@ -1001,6 +1001,9 @@ class _MessagesList extends StatelessWidget {
               maxWidth: screenWidth * 0.8,
               peerName: chat.userName,
               peerAvatarUrl: chat.avatarUrl,
+              peerAvatarLoader: () => context
+                  .read<IChatsRepository>()
+                  .resolveAvatar(chat),
               onLongPress: onMessageLongPress,
               onReplyTap: message.replyTo == null
                   ? null

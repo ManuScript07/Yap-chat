@@ -13,12 +13,16 @@ class MessageMediaGrid extends StatelessWidget {
     required this.maxWidth,
     required this.senderName,
     this.senderAvatarUrl,
+    this.senderAvatarLoader,
+    this.senderAvatarImage,
   });
 
   final ChatMessage message;
   final double maxWidth;
   final String senderName;
   final String? senderAvatarUrl;
+  final Future<String?> Function()? senderAvatarLoader;
+  final ImageProvider? senderAvatarImage;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +43,8 @@ class MessageMediaGrid extends StatelessWidget {
             maxWidth: maxWidth,
             senderName: senderName,
             senderAvatarUrl: senderAvatarUrl,
+            senderAvatarLoader: senderAvatarLoader,
+            senderAvatarImage: senderAvatarImage,
           ),
         ],
       ],
@@ -54,6 +60,8 @@ class _MediaAlbum extends StatelessWidget {
     required this.maxWidth,
     required this.senderName,
     this.senderAvatarUrl,
+    this.senderAvatarLoader,
+    this.senderAvatarImage,
   });
 
   final List<String> paths;
@@ -62,6 +70,8 @@ class _MediaAlbum extends StatelessWidget {
   final double maxWidth;
   final String senderName;
   final String? senderAvatarUrl;
+  final Future<String?> Function()? senderAvatarLoader;
+  final ImageProvider? senderAvatarImage;
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +248,8 @@ class _MediaAlbum extends StatelessWidget {
           initialIndex: index,
           senderName: senderName,
           senderAvatarUrl: senderAvatarUrl,
+          senderAvatarLoader: senderAvatarLoader,
+          senderAvatarImage: senderAvatarImage,
           imageAspectRatios: aspectRatios,
         ),
         transitionsBuilder: (_, animation, _, child) => FadeTransition(

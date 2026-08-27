@@ -13,6 +13,8 @@ class ChatMediaGalleryPage extends StatefulWidget {
     required this.initialIndex,
     required this.senderName,
     this.senderAvatarUrl,
+    this.senderAvatarLoader,
+    this.senderAvatarImage,
     this.imageAspectRatios = const [],
   });
 
@@ -21,6 +23,8 @@ class ChatMediaGalleryPage extends StatefulWidget {
   final int initialIndex;
   final String senderName;
   final String? senderAvatarUrl;
+  final Future<String?> Function()? senderAvatarLoader;
+  final ImageProvider? senderAvatarImage;
   final List<double?> imageAspectRatios;
 
   @override
@@ -122,15 +126,18 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                     }),
                     itemBuilder: (context, index) {
                       final imagePath = widget.imagePaths[index];
-                      return _ZoomableGalleryImage(
-                        key: ValueKey(widget.heroTags[index]),
-                        path: imagePath,
-                        heroTag: widget.heroTags[index],
-                        initialAspectRatio:
-                            index < widget.imageAspectRatios.length
-                            ? widget.imageAspectRatios[index]
-                            : null,
-                        onZoomChanged: _setZoomed,
+                      return HeroMode(
+                        enabled: index == _currentIndex,
+                        child: _ZoomableGalleryImage(
+                          key: ValueKey(widget.heroTags[index]),
+                          path: imagePath,
+                          heroTag: widget.heroTags[index],
+                          initialAspectRatio:
+                              index < widget.imageAspectRatios.length
+                              ? widget.imageAspectRatios[index]
+                              : null,
+                          onZoomChanged: _setZoomed,
+                        ),
                       );
                     },
                   ),
@@ -159,6 +166,9 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                         const SizedBox(width: 12),
                         UserAvatar(
                           avatarUrl: widget.senderAvatarUrl,
+                          avatarLoader: widget.senderAvatarLoader,
+                          avatarImage: widget.senderAvatarImage,
+                          avatarRevision: widget.senderAvatarUrl,
                           size: 44,
                           borderRadius: 14,
                         ),

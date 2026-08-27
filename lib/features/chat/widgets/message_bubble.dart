@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:yap_chat/features/auth/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
@@ -18,6 +20,7 @@ class MessageBubble extends StatefulWidget {
     required this.maxWidth,
     required this.peerName,
     this.peerAvatarUrl,
+    this.peerAvatarLoader,
     this.onLongPress,
     this.onReplyTap,
   });
@@ -27,6 +30,7 @@ class MessageBubble extends StatefulWidget {
   final double maxWidth;
   final String peerName;
   final String? peerAvatarUrl;
+  final Future<String?> Function()? peerAvatarLoader;
   final ValueChanged<ChatMessage>? onLongPress;
   final VoidCallback? onReplyTap;
 
@@ -294,6 +298,13 @@ class _MessageBubbleState extends State<MessageBubble>
 
   Widget _buildImageMessage(BuildContext context, Color textColor) {
     final message = widget.message;
+    final ownAvatar = context.select<AuthBloc, (String?, Uint8List?)>((bloc) {
+      final profile = bloc.state.profile;
+      return (
+        profile?.avatarUrl ?? bloc.state.session?.avatarUrl,
+        profile?.primaryPhoto?.bytes ?? profile?.avatarBytes,
+      );
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +318,13 @@ class _MessageBubbleState extends State<MessageBubble>
               senderName: message.isMine
                   ? context.l10n.chatsMessagePrefixYou
                   : widget.peerName,
-              senderAvatarUrl: message.isMine ? null : widget.peerAvatarUrl,
+              senderAvatarUrl: message.isMine
+                  ? ownAvatar.$1
+                  : widget.peerAvatarUrl,
+              senderAvatarLoader: message.isMine ? null : widget.peerAvatarLoader,
+              senderAvatarImage: message.isMine && ownAvatar.$2 != null
+                  ? MemoryImage(ownAvatar.$2!)
+                  : null,
             ),
             Positioned(
               right: 6,
