@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
@@ -51,39 +50,27 @@ class MockProfileRepository implements IProfileRepository {
   }
 
   @override
-  Future<UserProfile> completeProfile({
-    required String userId,
+  Future<UserProfile> saveOwnProfile({
+    required UserProfile currentProfile,
     required String displayName,
     required DateTime birthDate,
     required ProfileGender gender,
-    String? username,
-    String? bio,
-    Uint8List? avatarBytes,
-    List<ProfilePhoto>? photos,
-    bool removeAvatar = false,
+    required String username,
+    required String bio,
+    required List<ProfilePhoto> photos,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
-    final current = await getOrCreateProfile(AuthSession(userId: userId));
-    final effectivePhotos =
-        photos ??
-        (avatarBytes != null
-            ? [ProfilePhoto(position: 0, bytes: avatarBytes)]
-            : removeAvatar
-            ? const <ProfilePhoto>[]
-            : current.effectivePhotos);
     final normalizedPhotos = [
-      for (var index = 0; index < effectivePhotos.length; index++)
-        effectivePhotos[index].copyWith(position: index),
+      for (var index = 0; index < photos.length; index++)
+        photos[index].copyWith(position: index),
     ];
     final primary = normalizedPhotos.firstOrNull;
-    final profile = current.copyWith(
+    final profile = currentProfile.copyWith(
       displayName: displayName.trim(),
       birthDate: birthDate,
-      username: username?.trim().isNotEmpty == true
-          ? username!.trim().toLowerCase()
-          : current.username,
+      username: username.trim().toLowerCase(),
       gender: gender,
-      bio: bio?.trim() ?? '',
+      bio: bio.trim(),
       onboardingCompleted: true,
       photos: normalizedPhotos,
       avatarUrl: primary?.avatarUrl,

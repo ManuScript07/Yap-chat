@@ -26,6 +26,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
     on<AuthSessionChanged>(_onSessionChanged, transformer: restartable());
     on<AuthProfileSubmitted>(_onProfileSubmitted, transformer: droppable());
+    on<AuthProfileUpdated>(_onProfileUpdated);
     on<AuthSignOutRequested>(_onSignOutRequested, transformer: droppable());
     on<AuthRetryRequested>(_onRetryRequested);
     on<AuthFailureCleared>(_onFailureCleared);
@@ -147,7 +148,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     final session = state.session;
-    if (session == null) return;
+    final currentProfile = state.profile;
+    if (session == null || currentProfile == null) return;
 
     final displayName = event.displayName.trim();
     if (displayName.length < 2 || displayName.length > 30) {
@@ -165,16 +167,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     emit(state.copyWith(isSubmitting: true, clearFailure: true));
     try {
-      final profile = await _profileRepository.completeProfile(
-        userId: session.userId,
+      final photos = event.photos != null
+          ? List<ProfilePhoto>.unmodifiable(event.photos!)
+          : event.avatarBytes != null
+          ? [ProfilePhoto(position: 0, bytes: event.avatarBytes)]
+          : event.removeAvatar
+          ? const <ProfilePhoto>[]
+          : currentProfile.effectivePhotos;
+      final profile = await _profileRepository.saveOwnProfile(
+        currentProfile: currentProfile,
         displayName: displayName,
         birthDate: event.birthDate,
         gender: event.gender,
-        username: username,
-        bio: event.bio,
-        avatarBytes: event.avatarBytes,
-        photos: event.photos,
-        removeAvatar: event.removeAvatar,
+        username: username?.isNotEmpty == true
+            ? username!
+            : currentProfile.username,
+        bio: event.bio ?? '',
+        photos: photos,
       );
       emit(
         state.copyWith(
@@ -192,6 +201,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         state.copyWith(failure: AuthFailure.profileSave, isSubmitting: false),
       );
     }
+  }
+
+  void _onProfileUpdated(AuthProfileUpdated event, Emitter<AuthState> emit) {
+    if (state.session?.userId != event.profile.id) return;
+    emit(
+      state.copyWith(
+        status: AuthStatus.authenticated,
+        profile: event.profile,
+        clearFailure: true,
+      ),
+    );
   }
 
   Future<void> _onSignOutRequested(

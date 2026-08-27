@@ -5,20 +5,27 @@ import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/auth/widgets/profile_setup_widgets.dart';
+import 'package:yap_chat/features/profile/bloc/bloc.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/features/profile/widgets/profile_photo_crop_page.dart';
 import 'package:yap_chat/features/profile/widgets/profile_photo_image.dart';
+import 'package:yap_chat/repositories/profile/profile.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 Future<bool?> showProfileEditPage(
   BuildContext context, {
   required UserProfile profile,
 }) {
+  final repository = context.read<IProfileRepository>();
   return Navigator.of(context).push<bool>(
     PageRouteBuilder<bool>(
       transitionDuration: const Duration(milliseconds: 240),
       reverseTransitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (_, _, _) => _ProfileEditPage(profile: profile),
+      pageBuilder: (_, _, _) => BlocProvider(
+        create: (_) =>
+            ProfileEditCubit(repository: repository, initialProfile: profile),
+        child: _ProfileEditPage(profile: profile),
+      ),
       transitionsBuilder: (_, animation, _, child) => SlideTransition(
         position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
             .animate(
@@ -56,7 +63,6 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
   String? _usernameError;
   String? _nameError;
   String? _bioError;
-  bool _submitted = false;
   bool _allowPop = false;
   bool _isPickingPhoto = false;
   String? _removingPhotoIdentity;
@@ -100,185 +106,194 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
+    final editState = context.watch<ProfileEditCubit>().state;
     final mediaQuery = MediaQuery.of(context);
-    return BlocListener<AuthBloc, AuthState>(
+    return BlocListener<ProfileEditCubit, ProfileEditState>(
       listenWhen: (previous, current) =>
-          previous.isSubmitting != current.isSubmitting ||
-          previous.failure != current.failure ||
-          previous.profile != current.profile,
-      listener: _onAuthState,
+          previous.status != current.status ||
+          previous.failure != current.failure,
+      listener: _onEditState,
       child: PopScope(
-        canPop: _allowPop || !_isDirty,
+        canPop: _allowPop || (!editState.isSubmitting && !_isDirty),
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _requestClose();
         },
         child: Scaffold(
           backgroundColor: context.scaffoldBackgroundColor,
           resizeToAvoidBottomInset: true,
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.fromLTRB(
-                    0,
-                    130,
-                    0,
-                    mediaQuery.padding.bottom + mediaQuery.viewInsets.bottom,
-                  ),
-                  children: [
-                    _photoStrip(
-                      padding: EdgeInsets.fromLTRB(
-                        16 + mediaQuery.padding.left,
-                        0,
-                        16 + mediaQuery.padding.right,
-                        0,
-                      ),
+          body: AbsorbPointer(
+            absorbing: editState.isSubmitting,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(
+                      0,
+                      130,
+                      0,
+                      mediaQuery.padding.bottom + mediaQuery.viewInsets.bottom,
                     ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16 + mediaQuery.padding.left,
-                        0,
-                        16 + mediaQuery.padding.right,
-                        0,
+                    children: [
+                      _photoStrip(
+                        padding: EdgeInsets.fromLTRB(
+                          16 + mediaQuery.padding.left,
+                          0,
+                          16 + mediaQuery.padding.right,
+                          0,
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20),
-                          OnboardingTextField(
-                            controller: _usernameController,
-                            label: context.l10n.profileUsernameLabel,
-                            hint: context.l10n.profileUsernameHint,
-                            maxLength: 24,
-                            maxLines: 1,
-                            tooLongText: context.l10n.authInputTooLong,
-                            errorText: _usernameError,
-                            autocorrect: false,
-                            inputFormatters: [
-                              TextInputFormatter.withFunction((
-                                oldValue,
-                                newValue,
-                              ) {
-                                return newValue.copyWith(
-                                  text: newValue.text.toLowerCase(),
-                                  selection: newValue.selection,
-                                );
-                              }),
-                            ],
-                            onChanged: (_) {
-                              final value = _usernameController.text;
-                              final error =
-                                  value.length <= 24 &&
-                                      !_usernameCharactersPattern.hasMatch(
-                                        value,
-                                      )
-                                  ? context.l10n.authUsernameCharactersOnly
-                                  : null;
-                              if (_usernameError != error) {
-                                setState(() => _usernameError = error);
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 18),
-                          OnboardingTextField(
-                            controller: _nameController,
-                            label: context.l10n.profileNameLabel,
-                            hint: context.l10n.profileNameHint,
-                            maxLength: 30,
-                            maxLines: 1,
-                            tooLongText: context.l10n.authInputTooLong,
-                            errorText: _nameError,
-                            textCapitalization: TextCapitalization.words,
-                            onChanged: (_) => setState(() => _nameError = null),
-                          ),
-                          const SizedBox(height: 18),
-                          OnboardingTextField(
-                            controller: _bioController,
-                            label: context.l10n.profileBioLabel,
-                            hint: context.l10n.profileBioHint,
-                            maxLength: 130,
-                            maxLines: 4,
-                            tooLongText: context.l10n.authInputTooLong,
-                            errorText: _bioError,
-                            textCapitalization: TextCapitalization.sentences,
-                            keyboardType: TextInputType.multiline,
-                            onChanged: (_) => setState(() => _bioError = null),
-                          ),
-                          const SizedBox(height: 22),
-                          _valueRow(
-                            label: context.l10n.profileGenderLabel,
-                            value: _genderLabel(context, _gender),
-                            onTap: _selectGender,
-                          ),
-                          _valueRow(
-                            label: context.l10n.profileBirthDateLabel,
-                            value: DateFormat(
-                              'dd MMM yyyy',
-                              Localizations.localeOf(context).languageCode,
-                            ).format(_birthDate).replaceAll('.', ''),
-                            onTap: _selectBirthDate,
-                          ),
-                          const SizedBox(height: 28),
-                          Center(
-                            child: SizedBox(
-                              width: 230,
-                              height: 58,
-                              child: FilledButton(
-                                onPressed: authState.isSubmitting
-                                    ? null
-                                    : _submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: context.colorScheme.primary,
-                                  foregroundColor:
-                                      context.colorScheme.onSurface,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          16 + mediaQuery.padding.left,
+                          0,
+                          16 + mediaQuery.padding.right,
+                          0,
+                        ),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 20),
+                            OnboardingTextField(
+                              controller: _usernameController,
+                              label: context.l10n.profileUsernameLabel,
+                              hint: context.l10n.profileUsernameHint,
+                              maxLength: 24,
+                              maxLines: 1,
+                              tooLongText: context.l10n.authInputTooLong,
+                              errorText: _usernameError,
+                              autocorrect: false,
+                              inputFormatters: [
+                                TextInputFormatter.withFunction((
+                                  oldValue,
+                                  newValue,
+                                ) {
+                                  return newValue.copyWith(
+                                    text: newValue.text.toLowerCase(),
+                                    selection: newValue.selection,
+                                  );
+                                }),
+                              ],
+                              onChanged: (_) {
+                                final value = _usernameController.text;
+                                final error =
+                                    value.length <= 24 &&
+                                        !_usernameCharactersPattern.hasMatch(
+                                          value,
+                                        )
+                                    ? context.l10n.authUsernameCharactersOnly
+                                    : null;
+                                if (_usernameError != error) {
+                                  setState(() => _usernameError = error);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            OnboardingTextField(
+                              controller: _nameController,
+                              label: context.l10n.profileNameLabel,
+                              hint: context.l10n.profileNameHint,
+                              maxLength: 30,
+                              maxLines: 1,
+                              tooLongText: context.l10n.authInputTooLong,
+                              errorText: _nameError,
+                              textCapitalization: TextCapitalization.words,
+                              onChanged: (_) =>
+                                  setState(() => _nameError = null),
+                            ),
+                            const SizedBox(height: 18),
+                            OnboardingTextField(
+                              controller: _bioController,
+                              label: context.l10n.profileBioLabel,
+                              hint: context.l10n.profileBioHint,
+                              maxLength: 130,
+                              maxLines: 4,
+                              tooLongText: context.l10n.authInputTooLong,
+                              errorText: _bioError,
+                              textCapitalization: TextCapitalization.sentences,
+                              keyboardType: TextInputType.multiline,
+                              onChanged: (_) =>
+                                  setState(() => _bioError = null),
+                            ),
+                            const SizedBox(height: 22),
+                            _valueRow(
+                              label: context.l10n.profileGenderLabel,
+                              value: _genderLabel(context, _gender),
+                              onTap: _selectGender,
+                            ),
+                            _valueRow(
+                              label: context.l10n.profileBirthDateLabel,
+                              value: DateFormat(
+                                'dd MMM yyyy',
+                                Localizations.localeOf(context).languageCode,
+                              ).format(_birthDate).replaceAll('.', ''),
+                              onTap: _selectBirthDate,
+                            ),
+                            const SizedBox(height: 28),
+                            Center(
+                              child: SizedBox(
+                                width: 230,
+                                height: 58,
+                                child: FilledButton(
+                                  onPressed: editState.isSubmitting
+                                      ? null
+                                      : _submit,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor:
+                                        context.colorScheme.primary,
+                                    foregroundColor:
+                                        context.colorScheme.onSurface,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                    ),
+                                    shape: const StadiumBorder(),
                                   ),
-                                  shape: const StadiumBorder(),
+                                  child: editState.isSubmitting
+                                      ? SizedBox.square(
+                                          dimension: 25,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color:
+                                                context.colorScheme.onSurface,
+                                          ),
+                                        )
+                                      : Text(
+                                          context.l10n.profileSave
+                                              .toLowerCase(),
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: .5,
+                                          ),
+                                        ),
                                 ),
-                                child: authState.isSubmitting
-                                    ? SizedBox.square(
-                                        dimension: 25,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: context.colorScheme.onSurface,
-                                        ),
-                                      )
-                                    : Text(
-                                        context.l10n.profileSave.toLowerCase(),
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: .5,
-                                        ),
-                                      ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+                            const SizedBox(height: 16),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: PrimaryAppBar(
-                  title: '',
-                  titleWidget: Text(
-                    context.l10n.profileEditTitle.toLowerCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 32),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: PrimaryAppBar(
+                    title: '',
+                    titleWidget: Text(
+                      context.l10n.profileEditTitle.toLowerCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.titleLargeFlex.copyWith(
+                        fontSize: 32,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -352,7 +367,7 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(24),
-              child: ProfilePhotoImage(photo: photo),
+              child: ProfilePhotoImage(photo: photo, cacheWidth: 224),
             ),
           ),
           Positioned(
@@ -644,30 +659,20 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
     });
     if (!valid) return;
 
-    _submitted = true;
-    context.read<AuthBloc>().add(
-      AuthProfileSubmitted(
-        displayName: name,
-        birthDate: _birthDate,
-        gender: _gender,
-        username: username,
-        bio: bio,
-        photos: _photos,
-      ),
+    context.read<ProfileEditCubit>().submit(
+      displayName: name,
+      birthDate: _birthDate,
+      gender: _gender,
+      username: username,
+      bio: bio,
+      photos: _photos,
     );
   }
 
-  void _onAuthState(BuildContext context, AuthState state) {
-    final failure = state.failure;
-    if (failure != null) {
-      _submitted = false;
-      if (failure == AuthFailure.usernameTaken ||
-          failure == AuthFailure.invalidUsername) {
-        setState(
-          () => _usernameError = failure == AuthFailure.usernameTaken
-              ? context.l10n.authUsernameTaken
-              : _usernameValidationError(context, _usernameController.text),
-        );
+  void _onEditState(BuildContext context, ProfileEditState state) {
+    if (state.status == ProfileEditStatus.failure) {
+      if (state.failure == ProfileEditFailure.usernameTaken) {
+        setState(() => _usernameError = context.l10n.authUsernameTaken);
       } else {
         showAppSnackBar(
           context,
@@ -675,17 +680,18 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
           type: SnackBarType.error,
         );
       }
-      context.read<AuthBloc>().add(const AuthFailureCleared());
       return;
     }
-    if (_submitted && !state.isSubmitting) {
-      _submitted = false;
+    final savedProfile = state.savedProfile;
+    if (state.status == ProfileEditStatus.success && savedProfile != null) {
+      context.read<AuthBloc>().add(AuthProfileUpdated(savedProfile));
       _popAfterUnlock(true);
     }
   }
 
   Future<void> _requestClose() async {
     FocusManager.instance.primaryFocus?.unfocus();
+    if (context.read<ProfileEditCubit>().state.isSubmitting) return;
     if (!_isDirty) {
       _popAfterUnlock(false);
       return;

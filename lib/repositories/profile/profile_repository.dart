@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
@@ -44,42 +44,25 @@ class ProfileRepository implements IProfileRepository {
   }
 
   @override
-  Future<UserProfile> completeProfile({
-    required String userId,
+  Future<UserProfile> saveOwnProfile({
+    required UserProfile currentProfile,
     required String displayName,
     required DateTime birthDate,
     required ProfileGender gender,
-    String? username,
-    String? bio,
-    Uint8List? avatarBytes,
-    List<ProfilePhoto>? photos,
-    bool removeAvatar = false,
+    required String username,
+    required String bio,
+    required List<ProfilePhoto> photos,
   }) async {
-    final cachedProfile = await _readCacheBestEffort(userId);
-    final remoteMap = await _client
-        .from('profiles')
-        .select()
-        .eq('id', userId)
-        .single();
-    final remoteProfile = UserProfile.fromMap(remoteMap);
-    final remotePhotos = await _loadRemotePhotos(remoteProfile);
-
-    final requestedPhotos =
-        photos ??
-        (avatarBytes != null
-            ? [ProfilePhoto(position: 0, bytes: avatarBytes)]
-            : removeAvatar
-            ? const <ProfilePhoto>[]
-            : remotePhotos);
-    if (requestedPhotos.length > 5) {
+    if (photos.length > 5) {
       throw const ProfilePhotoLimitException();
     }
 
+    final userId = currentProfile.id;
     final uploadedPaths = <String>[];
     final savedPhotos = <ProfilePhoto>[];
     try {
-      for (var index = 0; index < requestedPhotos.length; index++) {
-        final photo = requestedPhotos[index];
+      for (var index = 0; index < photos.length; index++) {
+        final photo = photos[index];
         if (photo.needsUpload) {
           final uploaded = await _avatarStorage.upload(
             userId: userId,
@@ -105,10 +88,8 @@ class ProfileRepository implements IProfileRepository {
           'p_display_name': displayName.trim(),
           'p_birth_date': birthDate.toIso8601String().split('T').first,
           'p_gender': gender.databaseValue,
-          'p_username': (username?.trim().isNotEmpty ?? false)
-              ? username!.trim().toLowerCase()
-              : remoteProfile.username,
-          'p_bio': bio?.trim() ?? '',
+          'p_username': username.trim().toLowerCase(),
+          'p_bio': bio.trim(),
           'p_photos': savedPhotos
               .map(
                 (photo) => {
@@ -127,7 +108,7 @@ class ProfileRepository implements IProfileRepository {
       );
       final hydratedPhotos = _reuseCachedPhotoBytes(
         savedPhotos,
-        cachedProfile?.photos ?? const [],
+        currentProfile.effectivePhotos,
       );
       profile = _withPhotos(profile, hydratedPhotos);
       await _writeCacheBestEffort(profile);
@@ -137,11 +118,11 @@ class ProfileRepository implements IProfileRepository {
           .whereType<String>()
           .toSet();
       for (final oldPath
-          in remotePhotos
+          in currentProfile.effectivePhotos
               .map((photo) => photo.storagePath)
               .whereType<String>()) {
         if (!keptPaths.contains(oldPath)) {
-          await _deleteAvatarBestEffort(oldPath);
+          unawaited(_deleteAvatarBestEffort(oldPath));
         }
       }
       return profile;
@@ -294,6 +275,19 @@ class ProfileRepository implements IProfileRepository {
           final stored = await _avatarStorage.copyExternal(
             sourceUrl: sourceUri,
           );
+          try {
+            final response = await _client.rpc<List<dynamic>>(
+              'adopt_imported_profile_avatar',
+              params: {
+                'p_storage_path': stored.path,
+                'p_updated_at': stored.updatedAt?.toUtc().toIso8601String(),
+              },
+            );
+            if (response.isEmpty) throw const ProfileSaveException();
+          } catch (_) {
+            await _deleteAvatarBestEffort(stored.path);
+            rethrow;
+          }
           hydrated.add(
             ProfilePhoto(
               position: photo.position,

@@ -62,6 +62,15 @@ final class AuthProfileSubmitted extends AuthEvent {
   ];
 }
 
+final class AuthProfileUpdated extends AuthEvent {
+  const AuthProfileUpdated(this.profile);
+
+  final UserProfile profile;
+
+  @override
+  List<Object?> get props => [profile];
+}
+
 final class AuthSignOutRequested extends AuthEvent {
   const AuthSignOutRequested();
 }

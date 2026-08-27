@@ -8,6 +8,7 @@ class ProfilePhotoHero extends StatelessWidget {
     required this.photo,
     required this.borderRadius,
     this.fit = BoxFit.cover,
+    this.cacheWidth,
   });
 
   static const _thumbnailRadius = 32.0;
@@ -15,10 +16,15 @@ class ProfilePhotoHero extends StatelessWidget {
   final ProfilePhoto photo;
   final double borderRadius;
   final BoxFit fit;
+  final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
-    final image = ProfilePhotoImage(photo: photo, fit: fit);
+    final image = ProfilePhotoImage(
+      photo: photo,
+      fit: fit,
+      cacheWidth: cacheWidth,
+    );
     return Hero(
       tag: 'profile-photo-${photo.identity}',
       transitionOnUserGestures: true,
@@ -56,11 +62,13 @@ class ProfilePhotoImage extends StatelessWidget {
     required this.photo,
     this.fit = BoxFit.cover,
     this.placeholderIconSize = 64,
+    this.cacheWidth,
   });
 
   final ProfilePhoto photo;
   final BoxFit fit;
   final double placeholderIconSize;
+  final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +78,7 @@ class ProfilePhotoImage extends StatelessWidget {
       return Image.memory(
         bytes,
         fit: fit,
+        cacheWidth: cacheWidth,
         gaplessPlayback: true,
         errorBuilder: errorBuilder,
       );
@@ -79,6 +88,7 @@ class ProfilePhotoImage extends StatelessWidget {
       return Image.network(
         url,
         fit: fit,
+        cacheWidth: cacheWidth,
         gaplessPlayback: true,
         errorBuilder: errorBuilder,
       );

@@ -74,6 +74,17 @@ void main() {
       expect(authenticatedState.profile?.termsAcceptedAt, termsAcceptedAt);
       expect(authenticatedState.profile?.privacyAcceptedAt, privacyAcceptedAt);
 
+      final editedProfile = authenticatedState.profile!.copyWith(
+        username: 'edited_user',
+      );
+      final profileUpdated = bloc.stream.firstWhere(
+        (state) => state.profile?.username == 'edited_user',
+      );
+      bloc.add(AuthProfileUpdated(editedProfile));
+      final editedState = await profileUpdated;
+      expect(editedState.status, AuthStatus.authenticated);
+      expect(editedState.isSubmitting, isFalse);
+
       final signedOut = bloc.stream.firstWhere(
         (state) => state.status == AuthStatus.unauthenticated,
       );

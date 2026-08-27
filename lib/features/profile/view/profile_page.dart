@@ -383,7 +383,11 @@ class _ProfilePhotoCard extends StatelessWidget {
                         child: const _ProfilePhotoPlaceholder(),
                       )
                     else
-                      ProfilePhotoHero(photo: primary, borderRadius: 32),
+                      ProfilePhotoHero(
+                        photo: primary,
+                        borderRadius: 32,
+                        cacheWidth: 352,
+                      ),
                     Material(
                       color: context.colorScheme.surface.withValues(alpha: 0),
                       child: InkWell(
