@@ -114,4 +114,15 @@ abstract class MediaService {
 
     return result.isSuccess;
   }
+
+  static Future<bool> saveImageBytesToGallery(Uint8List bytes) async {
+    if (bytes.isEmpty) return false;
+    final result = await SaverGallery.saveImage(
+      bytes,
+      fileName: 'yap_chat_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      albumPath: 'DCIM/Camera',
+      skipIfExists: false,
+    );
+    return result.isSuccess;
+  }
 }

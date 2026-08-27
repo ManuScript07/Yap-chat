@@ -16,6 +16,7 @@ abstract interface class IProfileRepository {
     String? username,
     String? bio,
     Uint8List? avatarBytes,
+    List<ProfilePhoto>? photos,
     bool removeAvatar = false,
   });
 }

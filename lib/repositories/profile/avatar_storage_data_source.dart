@@ -34,7 +34,11 @@ class AvatarStorageDataSource {
           ),
           retryAttempts: 2,
         );
-    return StoredAvatar(path: storagePath, bytes: compressedBytes);
+    return StoredAvatar(
+      path: storagePath,
+      bytes: compressedBytes,
+      updatedAt: DateTime.now().toUtc(),
+    );
   }
 
   Future<StoredAvatar> copyExternal({required Uri sourceUrl}) async {

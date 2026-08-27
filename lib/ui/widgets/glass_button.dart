@@ -8,12 +8,14 @@ class GlassButton extends StatelessWidget {
     this.onPressed,
     this.size = 40,
     this.iconSize = 24,
+    this.borderRadius = 16,
   });
 
   final IconData icon;
   final VoidCallback? onPressed;
   final double size;
   final double iconSize;
+  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +28,7 @@ class GlassButton extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           color: backgroundColor.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: backgroundColor.withValues(alpha: 0.8),
             width: 2,

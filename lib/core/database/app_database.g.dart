@@ -153,6 +153,17 @@ class $CachedProfilesTable extends CachedProfiles
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -179,6 +190,7 @@ class $CachedProfilesTable extends CachedProfiles
     onboardingCompleted,
     termsAcceptedAt,
     privacyAcceptedAt,
+    createdAt,
     cachedAt,
   ];
   @override
@@ -304,6 +316,12 @@ class $CachedProfilesTable extends CachedProfiles
         ),
       );
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -373,6 +391,10 @@ class $CachedProfilesTable extends CachedProfiles
         DriftSqlType.dateTime,
         data['${effectivePrefix}privacy_accepted_at'],
       ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      ),
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -400,6 +422,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
   final bool onboardingCompleted;
   final DateTime? termsAcceptedAt;
   final DateTime? privacyAcceptedAt;
+  final DateTime? createdAt;
   final DateTime cachedAt;
   const CachedProfile({
     required this.userId,
@@ -415,6 +438,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     required this.onboardingCompleted,
     this.termsAcceptedAt,
     this.privacyAcceptedAt,
+    this.createdAt,
     required this.cachedAt,
   });
   @override
@@ -446,6 +470,9 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     }
     if (!nullToAbsent || privacyAcceptedAt != null) {
       map['privacy_accepted_at'] = Variable<DateTime>(privacyAcceptedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
     }
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
@@ -480,6 +507,9 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       privacyAcceptedAt: privacyAcceptedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(privacyAcceptedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
       cachedAt: Value(cachedAt),
     );
   }
@@ -509,6 +539,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       privacyAcceptedAt: serializer.fromJson<DateTime?>(
         json['privacyAcceptedAt'],
       ),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -529,6 +560,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       'onboardingCompleted': serializer.toJson<bool>(onboardingCompleted),
       'termsAcceptedAt': serializer.toJson<DateTime?>(termsAcceptedAt),
       'privacyAcceptedAt': serializer.toJson<DateTime?>(privacyAcceptedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -547,6 +579,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     bool? onboardingCompleted,
     Value<DateTime?> termsAcceptedAt = const Value.absent(),
     Value<DateTime?> privacyAcceptedAt = const Value.absent(),
+    Value<DateTime?> createdAt = const Value.absent(),
     DateTime? cachedAt,
   }) => CachedProfile(
     userId: userId ?? this.userId,
@@ -570,6 +603,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     privacyAcceptedAt: privacyAcceptedAt.present
         ? privacyAcceptedAt.value
         : this.privacyAcceptedAt,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedProfile copyWithCompanion(CachedProfilesCompanion data) {
@@ -601,6 +635,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       privacyAcceptedAt: data.privacyAcceptedAt.present
           ? data.privacyAcceptedAt.value
           : this.privacyAcceptedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -621,6 +656,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
           ..write('onboardingCompleted: $onboardingCompleted, ')
           ..write('termsAcceptedAt: $termsAcceptedAt, ')
           ..write('privacyAcceptedAt: $privacyAcceptedAt, ')
+          ..write('createdAt: $createdAt, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -641,6 +677,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     onboardingCompleted,
     termsAcceptedAt,
     privacyAcceptedAt,
+    createdAt,
     cachedAt,
   );
   @override
@@ -660,6 +697,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
           other.onboardingCompleted == this.onboardingCompleted &&
           other.termsAcceptedAt == this.termsAcceptedAt &&
           other.privacyAcceptedAt == this.privacyAcceptedAt &&
+          other.createdAt == this.createdAt &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -677,6 +715,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
   final Value<bool> onboardingCompleted;
   final Value<DateTime?> termsAcceptedAt;
   final Value<DateTime?> privacyAcceptedAt;
+  final Value<DateTime?> createdAt;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedProfilesCompanion({
@@ -693,6 +732,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     this.onboardingCompleted = const Value.absent(),
     this.termsAcceptedAt = const Value.absent(),
     this.privacyAcceptedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -710,6 +750,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     required bool onboardingCompleted,
     this.termsAcceptedAt = const Value.absent(),
     this.privacyAcceptedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : userId = Value(userId),
@@ -733,6 +774,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     Expression<bool>? onboardingCompleted,
     Expression<DateTime>? termsAcceptedAt,
     Expression<DateTime>? privacyAcceptedAt,
+    Expression<DateTime>? createdAt,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -751,6 +793,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
         'onboarding_completed': onboardingCompleted,
       if (termsAcceptedAt != null) 'terms_accepted_at': termsAcceptedAt,
       if (privacyAcceptedAt != null) 'privacy_accepted_at': privacyAcceptedAt,
+      if (createdAt != null) 'created_at': createdAt,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -770,6 +813,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     Value<bool>? onboardingCompleted,
     Value<DateTime?>? termsAcceptedAt,
     Value<DateTime?>? privacyAcceptedAt,
+    Value<DateTime?>? createdAt,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -787,6 +831,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       termsAcceptedAt: termsAcceptedAt ?? this.termsAcceptedAt,
       privacyAcceptedAt: privacyAcceptedAt ?? this.privacyAcceptedAt,
+      createdAt: createdAt ?? this.createdAt,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -834,6 +879,9 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     if (privacyAcceptedAt.present) {
       map['privacy_accepted_at'] = Variable<DateTime>(privacyAcceptedAt.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -859,7 +907,435 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
           ..write('onboardingCompleted: $onboardingCompleted, ')
           ..write('termsAcceptedAt: $termsAcceptedAt, ')
           ..write('privacyAcceptedAt: $privacyAcceptedAt, ')
+          ..write('createdAt: $createdAt, ')
           ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedProfilePhotosTable extends CachedProfilePhotos
+    with TableInfo<$CachedProfilePhotosTable, CachedProfilePhoto> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedProfilePhotosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _storagePathMeta = const VerificationMeta(
+    'storagePath',
+  );
+  @override
+  late final GeneratedColumn<String> storagePath = GeneratedColumn<String>(
+    'storage_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bytesMeta = const VerificationMeta('bytes');
+  @override
+  late final GeneratedColumn<Uint8List> bytes = GeneratedColumn<Uint8List>(
+    'bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userId,
+    position,
+    avatarUrl,
+    storagePath,
+    bytes,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_profile_photos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedProfilePhoto> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
+      );
+    }
+    if (data.containsKey('storage_path')) {
+      context.handle(
+        _storagePathMeta,
+        storagePath.isAcceptableOrUnknown(
+          data['storage_path']!,
+          _storagePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bytes')) {
+      context.handle(
+        _bytesMeta,
+        bytes.isAcceptableOrUnknown(data['bytes']!, _bytesMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userId, position};
+  @override
+  CachedProfilePhoto map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedProfilePhoto(
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
+      storagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}storage_path'],
+      ),
+      bytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}bytes'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $CachedProfilePhotosTable createAlias(String alias) {
+    return $CachedProfilePhotosTable(attachedDatabase, alias);
+  }
+}
+
+class CachedProfilePhoto extends DataClass
+    implements Insertable<CachedProfilePhoto> {
+  final String userId;
+  final int position;
+  final String? avatarUrl;
+  final String? storagePath;
+  final Uint8List? bytes;
+  final DateTime? updatedAt;
+  const CachedProfilePhoto({
+    required this.userId,
+    required this.position,
+    this.avatarUrl,
+    this.storagePath,
+    this.bytes,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_id'] = Variable<String>(userId);
+    map['position'] = Variable<int>(position);
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
+    }
+    if (!nullToAbsent || storagePath != null) {
+      map['storage_path'] = Variable<String>(storagePath);
+    }
+    if (!nullToAbsent || bytes != null) {
+      map['bytes'] = Variable<Uint8List>(bytes);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  CachedProfilePhotosCompanion toCompanion(bool nullToAbsent) {
+    return CachedProfilePhotosCompanion(
+      userId: Value(userId),
+      position: Value(position),
+      avatarUrl: avatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarUrl),
+      storagePath: storagePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storagePath),
+      bytes: bytes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bytes),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory CachedProfilePhoto.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedProfilePhoto(
+      userId: serializer.fromJson<String>(json['userId']),
+      position: serializer.fromJson<int>(json['position']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
+      storagePath: serializer.fromJson<String?>(json['storagePath']),
+      bytes: serializer.fromJson<Uint8List?>(json['bytes']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userId': serializer.toJson<String>(userId),
+      'position': serializer.toJson<int>(position),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
+      'storagePath': serializer.toJson<String?>(storagePath),
+      'bytes': serializer.toJson<Uint8List?>(bytes),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  CachedProfilePhoto copyWith({
+    String? userId,
+    int? position,
+    Value<String?> avatarUrl = const Value.absent(),
+    Value<String?> storagePath = const Value.absent(),
+    Value<Uint8List?> bytes = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => CachedProfilePhoto(
+    userId: userId ?? this.userId,
+    position: position ?? this.position,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
+    storagePath: storagePath.present ? storagePath.value : this.storagePath,
+    bytes: bytes.present ? bytes.value : this.bytes,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  CachedProfilePhoto copyWithCompanion(CachedProfilePhotosCompanion data) {
+    return CachedProfilePhoto(
+      userId: data.userId.present ? data.userId.value : this.userId,
+      position: data.position.present ? data.position.value : this.position,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
+      storagePath: data.storagePath.present
+          ? data.storagePath.value
+          : this.storagePath,
+      bytes: data.bytes.present ? data.bytes.value : this.bytes,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedProfilePhoto(')
+          ..write('userId: $userId, ')
+          ..write('position: $position, ')
+          ..write('avatarUrl: $avatarUrl, ')
+          ..write('storagePath: $storagePath, ')
+          ..write('bytes: $bytes, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userId,
+    position,
+    avatarUrl,
+    storagePath,
+    $driftBlobEquality.hash(bytes),
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedProfilePhoto &&
+          other.userId == this.userId &&
+          other.position == this.position &&
+          other.avatarUrl == this.avatarUrl &&
+          other.storagePath == this.storagePath &&
+          $driftBlobEquality.equals(other.bytes, this.bytes) &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedProfilePhotosCompanion extends UpdateCompanion<CachedProfilePhoto> {
+  final Value<String> userId;
+  final Value<int> position;
+  final Value<String?> avatarUrl;
+  final Value<String?> storagePath;
+  final Value<Uint8List?> bytes;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const CachedProfilePhotosCompanion({
+    this.userId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
+    this.storagePath = const Value.absent(),
+    this.bytes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedProfilePhotosCompanion.insert({
+    required String userId,
+    required int position,
+    this.avatarUrl = const Value.absent(),
+    this.storagePath = const Value.absent(),
+    this.bytes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userId = Value(userId),
+       position = Value(position);
+  static Insertable<CachedProfilePhoto> custom({
+    Expression<String>? userId,
+    Expression<int>? position,
+    Expression<String>? avatarUrl,
+    Expression<String>? storagePath,
+    Expression<Uint8List>? bytes,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userId != null) 'user_id': userId,
+      if (position != null) 'position': position,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (storagePath != null) 'storage_path': storagePath,
+      if (bytes != null) 'bytes': bytes,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedProfilePhotosCompanion copyWith({
+    Value<String>? userId,
+    Value<int>? position,
+    Value<String?>? avatarUrl,
+    Value<String?>? storagePath,
+    Value<Uint8List?>? bytes,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedProfilePhotosCompanion(
+      userId: userId ?? this.userId,
+      position: position ?? this.position,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      storagePath: storagePath ?? this.storagePath,
+      bytes: bytes ?? this.bytes,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
+    }
+    if (storagePath.present) {
+      map['storage_path'] = Variable<String>(storagePath.value);
+    }
+    if (bytes.present) {
+      map['bytes'] = Variable<Uint8List>(bytes.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedProfilePhotosCompanion(')
+          ..write('userId: $userId, ')
+          ..write('position: $position, ')
+          ..write('avatarUrl: $avatarUrl, ')
+          ..write('storagePath: $storagePath, ')
+          ..write('bytes: $bytes, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6077,6 +6553,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CachedProfilesTable cachedProfiles = $CachedProfilesTable(this);
+  late final $CachedProfilePhotosTable cachedProfilePhotos =
+      $CachedProfilePhotosTable(this);
   late final $CachedChatsTable cachedChats = $CachedChatsTable(this);
   late final $CachedMessagesTable cachedMessages = $CachedMessagesTable(this);
   late final $PendingChatOperationsTable pendingChatOperations =
@@ -6094,6 +6572,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     cachedProfiles,
+    cachedProfilePhotos,
     cachedChats,
     cachedMessages,
     pendingChatOperations,
@@ -6119,6 +6598,7 @@ typedef $$CachedProfilesTableCreateCompanionBuilder =
       required bool onboardingCompleted,
       Value<DateTime?> termsAcceptedAt,
       Value<DateTime?> privacyAcceptedAt,
+      Value<DateTime?> createdAt,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -6137,6 +6617,7 @@ typedef $$CachedProfilesTableUpdateCompanionBuilder =
       Value<bool> onboardingCompleted,
       Value<DateTime?> termsAcceptedAt,
       Value<DateTime?> privacyAcceptedAt,
+      Value<DateTime?> createdAt,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -6212,6 +6693,11 @@ class $$CachedProfilesTableFilterComposer
 
   ColumnFilters<DateTime> get privacyAcceptedAt => $composableBuilder(
     column: $table.privacyAcceptedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6295,6 +6781,11 @@ class $$CachedProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -6363,6 +6854,9 @@ class $$CachedProfilesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
 }
@@ -6413,6 +6907,7 @@ class $$CachedProfilesTableTableManager
                 Value<bool> onboardingCompleted = const Value.absent(),
                 Value<DateTime?> termsAcceptedAt = const Value.absent(),
                 Value<DateTime?> privacyAcceptedAt = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedProfilesCompanion(
@@ -6429,6 +6924,7 @@ class $$CachedProfilesTableTableManager
                 onboardingCompleted: onboardingCompleted,
                 termsAcceptedAt: termsAcceptedAt,
                 privacyAcceptedAt: privacyAcceptedAt,
+                createdAt: createdAt,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -6447,6 +6943,7 @@ class $$CachedProfilesTableTableManager
                 required bool onboardingCompleted,
                 Value<DateTime?> termsAcceptedAt = const Value.absent(),
                 Value<DateTime?> privacyAcceptedAt = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedProfilesCompanion.insert(
@@ -6463,6 +6960,7 @@ class $$CachedProfilesTableTableManager
                 onboardingCompleted: onboardingCompleted,
                 termsAcceptedAt: termsAcceptedAt,
                 privacyAcceptedAt: privacyAcceptedAt,
+                createdAt: createdAt,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -6489,6 +6987,243 @@ typedef $$CachedProfilesTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $CachedProfilesTable, CachedProfile>,
       ),
       CachedProfile,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedProfilePhotosTableCreateCompanionBuilder =
+    CachedProfilePhotosCompanion Function({
+      required String userId,
+      required int position,
+      Value<String?> avatarUrl,
+      Value<String?> storagePath,
+      Value<Uint8List?> bytes,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedProfilePhotosTableUpdateCompanionBuilder =
+    CachedProfilePhotosCompanion Function({
+      Value<String> userId,
+      Value<int> position,
+      Value<String?> avatarUrl,
+      Value<String?> storagePath,
+      Value<Uint8List?> bytes,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedProfilePhotosTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedProfilePhotosTable> {
+  $$CachedProfilePhotosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedProfilePhotosTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedProfilePhotosTable> {
+  $$CachedProfilePhotosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedProfilePhotosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedProfilePhotosTable> {
+  $$CachedProfilePhotosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get bytes =>
+      $composableBuilder(column: $table.bytes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedProfilePhotosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedProfilePhotosTable,
+          CachedProfilePhoto,
+          $$CachedProfilePhotosTableFilterComposer,
+          $$CachedProfilePhotosTableOrderingComposer,
+          $$CachedProfilePhotosTableAnnotationComposer,
+          $$CachedProfilePhotosTableCreateCompanionBuilder,
+          $$CachedProfilePhotosTableUpdateCompanionBuilder,
+          (
+            CachedProfilePhoto,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedProfilePhotosTable,
+              CachedProfilePhoto
+            >,
+          ),
+          CachedProfilePhoto,
+          PrefetchHooks Function()
+        > {
+  $$CachedProfilePhotosTableTableManager(
+    _$AppDatabase db,
+    $CachedProfilePhotosTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedProfilePhotosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedProfilePhotosTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedProfilePhotosTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> userId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
+                Value<String?> storagePath = const Value.absent(),
+                Value<Uint8List?> bytes = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedProfilePhotosCompanion(
+                userId: userId,
+                position: position,
+                avatarUrl: avatarUrl,
+                storagePath: storagePath,
+                bytes: bytes,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userId,
+                required int position,
+                Value<String?> avatarUrl = const Value.absent(),
+                Value<String?> storagePath = const Value.absent(),
+                Value<Uint8List?> bytes = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedProfilePhotosCompanion.insert(
+                userId: userId,
+                position: position,
+                avatarUrl: avatarUrl,
+                storagePath: storagePath,
+                bytes: bytes,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedProfilePhotosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedProfilePhotosTable,
+      CachedProfilePhoto,
+      $$CachedProfilePhotosTableFilterComposer,
+      $$CachedProfilePhotosTableOrderingComposer,
+      $$CachedProfilePhotosTableAnnotationComposer,
+      $$CachedProfilePhotosTableCreateCompanionBuilder,
+      $$CachedProfilePhotosTableUpdateCompanionBuilder,
+      (
+        CachedProfilePhoto,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedProfilePhotosTable,
+          CachedProfilePhoto
+        >,
+      ),
+      CachedProfilePhoto,
       PrefetchHooks Function()
     >;
 typedef $$CachedChatsTableCreateCompanionBuilder =
@@ -8969,6 +9704,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$CachedProfilesTableTableManager get cachedProfiles =>
       $$CachedProfilesTableTableManager(_db, _db.cachedProfiles);
+  $$CachedProfilePhotosTableTableManager get cachedProfilePhotos =>
+      $$CachedProfilePhotosTableTableManager(_db, _db.cachedProfilePhotos);
   $$CachedChatsTableTableManager get cachedChats =>
       $$CachedChatsTableTableManager(_db, _db.cachedChats);
   $$CachedMessagesTableTableManager get cachedMessages =>

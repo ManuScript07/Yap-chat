@@ -423,6 +423,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Username must contain 3–24 Latin letters, digits, or _';
 
   @override
+  String get authUsernameCharactersOnly => 'only a-z, 0-9, and _';
+
+  @override
+  String get authUsernameTooShort => 'at least 3 characters';
+
+  @override
   String get authProfileSaveFailed =>
       'Could not save your profile. Please try again.';
 
@@ -656,4 +662,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationFriendRequest => 'sent you a friend request';
+
+  @override
+  String get profileEditTitle => 'Edit profile';
+
+  @override
+  String get profileSave => 'Save';
+
+  @override
+  String get profileUsernameLabel => 'username';
+
+  @override
+  String get profileUsernameHint => 'enter a username';
+
+  @override
+  String get profileNameLabel => 'name';
+
+  @override
+  String get profileNameHint => 'what should we call you?';
+
+  @override
+  String get profileBioLabel => 'bio';
+
+  @override
+  String get profileBioHint => 'tell us a little about yourself';
+
+  @override
+  String get profileGenderLabel => 'Gender';
+
+  @override
+  String get profileBirthDateLabel => 'Date of birth';
+
+  @override
+  String get profileGenderTitle => 'Who are you?';
+
+  @override
+  String get profileGenderMale => 'male';
+
+  @override
+  String get profileGenderFemale => 'female';
+
+  @override
+  String get profileGenderUnspecified => 'not specified';
+
+  @override
+  String get profileBirthDateTitle => 'You were born…';
+
+  @override
+  String get profileMainPhoto => 'main';
+
+  @override
+  String get profileCropTitle => 'Crop photo';
+
+  @override
+  String get profileCropApply => 'confirm';
+
+  @override
+  String get profileUnsavedTitle => 'Save changes?';
+
+  @override
+  String get profileUnsavedDescription => 'Your profile has unsaved changes.';
+
+  @override
+  String get profileStay => 'Stay';
+
+  @override
+  String get profileDiscard => 'Exit';
+
+  @override
+  String profilePhotoCounter(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String profileDaysWithUs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days with us',
+      one: '$count day with us',
+    );
+    return '$_temp0';
+  }
 }

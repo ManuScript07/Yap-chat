@@ -36,6 +36,7 @@ final class AuthProfileSubmitted extends AuthEvent {
     this.username,
     this.bio,
     this.avatarBytes,
+    this.photos,
     this.removeAvatar = false,
   });
 
@@ -45,6 +46,7 @@ final class AuthProfileSubmitted extends AuthEvent {
   final String? username;
   final String? bio;
   final Uint8List? avatarBytes;
+  final List<ProfilePhoto>? photos;
   final bool removeAvatar;
 
   @override
@@ -55,6 +57,7 @@ final class AuthProfileSubmitted extends AuthEvent {
     username,
     bio,
     avatarBytes,
+    photos,
     removeAvatar,
   ];
 }

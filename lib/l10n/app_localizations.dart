@@ -776,6 +776,18 @@ abstract class AppLocalizations {
   /// **'Username должен содержать от 3 до 24 латинских букв, цифр или _'**
   String get authUsernameInvalid;
 
+  /// No description provided for @authUsernameCharactersOnly.
+  ///
+  /// In ru, this message translates to:
+  /// **'только a-z, 0-9 и _'**
+  String get authUsernameCharactersOnly;
+
+  /// No description provided for @authUsernameTooShort.
+  ///
+  /// In ru, this message translates to:
+  /// **'минимум 3 символа'**
+  String get authUsernameTooShort;
+
   /// No description provided for @authProfileSaveFailed.
   ///
   /// In ru, this message translates to:
@@ -1213,6 +1225,150 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'отправил(а) вам заявку в друны'**
   String get notificationFriendRequest;
+
+  /// No description provided for @profileEditTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Редактирование'**
+  String get profileEditTitle;
+
+  /// No description provided for @profileSave.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сохранить'**
+  String get profileSave;
+
+  /// No description provided for @profileUsernameLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'никнейм'**
+  String get profileUsernameLabel;
+
+  /// No description provided for @profileUsernameHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'введите никнейм'**
+  String get profileUsernameHint;
+
+  /// No description provided for @profileNameLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'имя'**
+  String get profileNameLabel;
+
+  /// No description provided for @profileNameHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'как тебя звать?'**
+  String get profileNameHint;
+
+  /// No description provided for @profileBioLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'био'**
+  String get profileBioLabel;
+
+  /// No description provided for @profileBioHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'напишите немного о себе'**
+  String get profileBioHint;
+
+  /// No description provided for @profileGenderLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пол'**
+  String get profileGenderLabel;
+
+  /// No description provided for @profileBirthDateLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Дата рождения'**
+  String get profileBirthDateLabel;
+
+  /// No description provided for @profileGenderTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Кто ты?'**
+  String get profileGenderTitle;
+
+  /// No description provided for @profileGenderMale.
+  ///
+  /// In ru, this message translates to:
+  /// **'мужской'**
+  String get profileGenderMale;
+
+  /// No description provided for @profileGenderFemale.
+  ///
+  /// In ru, this message translates to:
+  /// **'женский'**
+  String get profileGenderFemale;
+
+  /// No description provided for @profileGenderUnspecified.
+  ///
+  /// In ru, this message translates to:
+  /// **'не указан'**
+  String get profileGenderUnspecified;
+
+  /// No description provided for @profileBirthDateTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ты родился…'**
+  String get profileBirthDateTitle;
+
+  /// No description provided for @profileMainPhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'главное'**
+  String get profileMainPhoto;
+
+  /// No description provided for @profileCropTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Обрезать фото'**
+  String get profileCropTitle;
+
+  /// No description provided for @profileCropApply.
+  ///
+  /// In ru, this message translates to:
+  /// **'подтвердить'**
+  String get profileCropApply;
+
+  /// No description provided for @profileUnsavedTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сохранить изменения?'**
+  String get profileUnsavedTitle;
+
+  /// No description provided for @profileUnsavedDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'В профиле есть несохранённые изменения.'**
+  String get profileUnsavedDescription;
+
+  /// No description provided for @profileStay.
+  ///
+  /// In ru, this message translates to:
+  /// **'Остаться'**
+  String get profileStay;
+
+  /// No description provided for @profileDiscard.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выйти'**
+  String get profileDiscard;
+
+  /// No description provided for @profilePhotoCounter.
+  ///
+  /// In ru, this message translates to:
+  /// **'{current} из {total}'**
+  String profilePhotoCounter(int current, int total);
+
+  /// No description provided for @profileDaysWithUs.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, one{{count} день с нами} few{{count} дня с нами} many{{count} дней с нами} other{{count} дня с нами}}'**
+  String profileDaysWithUs(int count);
 }
 
 class _AppLocalizationsDelegate

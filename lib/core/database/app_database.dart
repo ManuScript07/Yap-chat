@@ -17,10 +17,23 @@ class CachedProfiles extends Table {
   BoolColumn get onboardingCompleted => boolean()();
   DateTimeColumn get termsAcceptedAt => dateTime().nullable()();
   DateTimeColumn get privacyAcceptedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {userId};
+}
+
+class CachedProfilePhotos extends Table {
+  TextColumn get userId => text()();
+  IntColumn get position => integer()();
+  TextColumn get avatarUrl => text().nullable()();
+  TextColumn get storagePath => text().nullable()();
+  BlobColumn get bytes => blob().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {userId, position};
 }
 
 class CachedChats extends Table {
@@ -153,6 +166,7 @@ class CachedContactMatches extends Table {
 @DriftDatabase(
   tables: [
     CachedProfiles,
+    CachedProfilePhotos,
     CachedChats,
     CachedMessages,
     PendingChatOperations,
@@ -178,7 +192,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -207,6 +221,10 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 8) {
         await migrator.createTable(cachedFriendLocations);
+      }
+      if (from < 9) {
+        await migrator.addColumn(cachedProfiles, cachedProfiles.createdAt);
+        await migrator.createTable(cachedProfilePhotos);
       }
     },
   );

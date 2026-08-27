@@ -8,6 +8,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/auth/widgets/profile_setup_widgets.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
+import 'package:yap_chat/features/profile/widgets/profile_photo_crop_page.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -396,7 +397,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   }
 
   Future<void> _pickAvatar() async {
-    final imageBytes = await MediaService.pickImageBytesFromGallery();
+    final sourceBytes = await MediaService.pickImageBytesFromGallery();
+    if (!mounted || sourceBytes == null) return;
+    final imageBytes = await openProfilePhotoCropper(context, sourceBytes);
     if (!mounted || imageBytes == null) return;
     setState(() {
       _localAvatarBytes = imageBytes;

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:equatable/equatable.dart';
+import 'package:yap_chat/features/profile/data/models/profile_photo.dart';
 
 enum ProfileGender {
   male,
@@ -28,10 +29,12 @@ class UserProfile extends Equatable {
     this.avatarStoragePath,
     this.avatarBytes,
     this.avatarUpdatedAt,
+    this.photos = const [],
     this.gender = ProfileGender.unspecified,
     this.bio = '',
     this.termsAcceptedAt,
     this.privacyAcceptedAt,
+    this.createdAt,
   });
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
@@ -54,6 +57,7 @@ class UserProfile extends Equatable {
       privacyAcceptedAt: DateTime.tryParse(
         map['privacy_accepted_at'] as String? ?? '',
       ),
+      createdAt: DateTime.tryParse(map['created_at'] as String? ?? ''),
     );
   }
 
@@ -65,11 +69,31 @@ class UserProfile extends Equatable {
   final String? avatarStoragePath;
   final Uint8List? avatarBytes;
   final DateTime? avatarUpdatedAt;
+  final List<ProfilePhoto> photos;
   final ProfileGender gender;
   final String bio;
   final bool onboardingCompleted;
   final DateTime? termsAcceptedAt;
   final DateTime? privacyAcceptedAt;
+  final DateTime? createdAt;
+
+  List<ProfilePhoto> get effectivePhotos {
+    if (photos.isNotEmpty) return photos;
+    if (avatarUrl == null && avatarStoragePath == null && avatarBytes == null) {
+      return const [];
+    }
+    return [
+      ProfilePhoto(
+        position: 0,
+        avatarUrl: avatarStoragePath == null ? avatarUrl : null,
+        storagePath: avatarStoragePath,
+        bytes: avatarBytes,
+        updatedAt: avatarUpdatedAt,
+      ),
+    ];
+  }
+
+  ProfilePhoto? get primaryPhoto => effectivePhotos.firstOrNull;
 
   bool get hasRequiredData =>
       displayName.trim().isNotEmpty &&
@@ -85,11 +109,13 @@ class UserProfile extends Equatable {
     String? avatarStoragePath,
     Uint8List? avatarBytes,
     DateTime? avatarUpdatedAt,
+    List<ProfilePhoto>? photos,
     ProfileGender? gender,
     String? bio,
     bool? onboardingCompleted,
     DateTime? termsAcceptedAt,
     DateTime? privacyAcceptedAt,
+    DateTime? createdAt,
     bool clearAvatarUrl = false,
     bool clearAvatarStoragePath = false,
     bool clearAvatarBytes = false,
@@ -108,11 +134,13 @@ class UserProfile extends Equatable {
       avatarUpdatedAt: clearAvatarUpdatedAt
           ? null
           : avatarUpdatedAt ?? this.avatarUpdatedAt,
+      photos: photos ?? this.photos,
       gender: gender ?? this.gender,
       bio: bio ?? this.bio,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       termsAcceptedAt: termsAcceptedAt ?? this.termsAcceptedAt,
       privacyAcceptedAt: privacyAcceptedAt ?? this.privacyAcceptedAt,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -126,10 +154,12 @@ class UserProfile extends Equatable {
     avatarStoragePath,
     avatarBytes,
     avatarUpdatedAt,
+    photos,
     gender,
     bio,
     onboardingCompleted,
     termsAcceptedAt,
     privacyAcceptedAt,
+    createdAt,
   ];
 }

@@ -44,6 +44,7 @@ class MockProfileRepository implements IProfileRepository {
       onboardingCompleted: false,
       termsAcceptedAt: acceptedAt,
       privacyAcceptedAt: acceptedAt,
+      createdAt: acceptedAt,
     );
     await _save(profile);
     return profile;
@@ -58,10 +59,23 @@ class MockProfileRepository implements IProfileRepository {
     String? username,
     String? bio,
     Uint8List? avatarBytes,
+    List<ProfilePhoto>? photos,
     bool removeAvatar = false,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
     final current = await getOrCreateProfile(AuthSession(userId: userId));
+    final effectivePhotos =
+        photos ??
+        (avatarBytes != null
+            ? [ProfilePhoto(position: 0, bytes: avatarBytes)]
+            : removeAvatar
+            ? const <ProfilePhoto>[]
+            : current.effectivePhotos);
+    final normalizedPhotos = [
+      for (var index = 0; index < effectivePhotos.length; index++)
+        effectivePhotos[index].copyWith(position: index),
+    ];
+    final primary = normalizedPhotos.firstOrNull;
     final profile = current.copyWith(
       displayName: displayName.trim(),
       birthDate: birthDate,
@@ -71,11 +85,15 @@ class MockProfileRepository implements IProfileRepository {
       gender: gender,
       bio: bio?.trim() ?? '',
       onboardingCompleted: true,
-      avatarBytes: avatarBytes,
-      clearAvatarUrl: removeAvatar || avatarBytes != null,
-      clearAvatarStoragePath: removeAvatar,
-      clearAvatarBytes: removeAvatar,
-      clearAvatarUpdatedAt: removeAvatar,
+      photos: normalizedPhotos,
+      avatarUrl: primary?.avatarUrl,
+      avatarStoragePath: primary?.storagePath,
+      avatarBytes: primary?.bytes,
+      avatarUpdatedAt: primary?.updatedAt,
+      clearAvatarUrl: primary?.avatarUrl == null,
+      clearAvatarStoragePath: primary?.storagePath == null,
+      clearAvatarBytes: primary?.bytes == null,
+      clearAvatarUpdatedAt: primary?.updatedAt == null,
     );
     await _save(profile);
     return profile;
@@ -104,11 +122,13 @@ class MockProfileRepository implements IProfileRepository {
       avatarStoragePath: profile.avatarStoragePath,
       avatarBytes: profile.avatarBytes,
       avatarUpdatedAt: profile.avatarUpdatedAt,
+      photos: profile.photos,
       gender: profile.gender,
       bio: profile.bio,
       onboardingCompleted: profile.onboardingCompleted,
       termsAcceptedAt: profile.termsAcceptedAt ?? acceptedAt,
       privacyAcceptedAt: profile.privacyAcceptedAt ?? acceptedAt,
+      createdAt: profile.createdAt ?? acceptedAt,
     );
     await _save(updated);
     return updated;
@@ -133,6 +153,20 @@ class MockProfileRepository implements IProfileRepository {
         'onboarding_completed': profile.onboardingCompleted,
         'terms_accepted_at': profile.termsAcceptedAt?.toIso8601String(),
         'privacy_accepted_at': profile.privacyAcceptedAt?.toIso8601String(),
+        'created_at': profile.createdAt?.toIso8601String(),
+        'photos': profile.photos
+            .map(
+              (photo) => {
+                'position': photo.position,
+                'avatar_url': photo.avatarUrl,
+                'storage_path': photo.storagePath,
+                'bytes': photo.bytes == null
+                    ? null
+                    : base64Encode(photo.bytes!),
+                'updated_at': photo.updatedAt?.toIso8601String(),
+              },
+            )
+            .toList(growable: false),
       }),
     );
   }
@@ -140,8 +174,40 @@ class MockProfileRepository implements IProfileRepository {
   UserProfile _profileFromJson(String value) {
     final map = Map<String, dynamic>.from(jsonDecode(value) as Map);
     final encodedAvatar = map.remove('avatar_bytes') as String?;
-    return UserProfile.fromMap(map).copyWith(
+    final photoMaps = (map.remove('photos') as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    final parsed = UserProfile.fromMap(map).copyWith(
       avatarBytes: encodedAvatar == null ? null : base64Decode(encodedAvatar),
+      photos: photoMaps
+          .map(
+            (photo) => ProfilePhoto(
+              position: photo['position'] as int,
+              avatarUrl: photo['avatar_url'] as String?,
+              storagePath: photo['storage_path'] as String?,
+              bytes: photo['bytes'] == null
+                  ? null
+                  : base64Decode(photo['bytes'] as String),
+              updatedAt: DateTime.tryParse(
+                photo['updated_at'] as String? ?? '',
+              ),
+            ),
+          )
+          .toList(growable: false),
+    );
+    if (parsed.photos.isNotEmpty ||
+        (parsed.avatarUrl == null && parsed.avatarBytes == null)) {
+      return parsed;
+    }
+    return parsed.copyWith(
+      photos: [
+        ProfilePhoto(
+          position: 0,
+          avatarUrl: parsed.avatarUrl,
+          storagePath: parsed.avatarStoragePath,
+          bytes: parsed.avatarBytes,
+          updatedAt: parsed.avatarUpdatedAt,
+        ),
+      ],
     );
   }
 }

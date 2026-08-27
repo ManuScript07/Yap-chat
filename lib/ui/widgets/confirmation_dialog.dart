@@ -7,6 +7,7 @@ Future<bool?> showConfirmationDialog(
   required String title,
   required String content,
   required String confirmLabel,
+  String? cancelLabel,
 }) async {
   final l10n = context.l10n;
   final colorScheme = context.colorScheme;
@@ -50,7 +51,7 @@ Future<bool?> showConfirmationDialog(
               fontWeight: FontWeight.w500,
             ),
           ),
-          child: Text(l10n.cancel),
+          child: Text(cancelLabel ?? l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),

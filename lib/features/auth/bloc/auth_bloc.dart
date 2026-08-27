@@ -173,6 +173,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         username: username,
         bio: event.bio,
         avatarBytes: event.avatarBytes,
+        photos: event.photos,
         removeAvatar: event.removeAvatar,
       );
       emit(

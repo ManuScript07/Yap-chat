@@ -34,7 +34,11 @@ class ProfileRepository implements IProfileRepository {
     final remoteProfile = existing == null
         ? await _createProfile(session)
         : await _fillMissingYandexData(UserProfile.fromMap(existing), session);
-    final profile = await _hydrateAvatar(remoteProfile, session: session);
+    final remotePhotos = await _loadRemotePhotos(remoteProfile);
+    final profile = await _hydratePhotos(
+      remoteProfile.copyWith(photos: remotePhotos),
+      session: session,
+    );
     await _writeCacheBestEffort(profile);
     return profile;
   }
@@ -48,85 +52,111 @@ class ProfileRepository implements IProfileRepository {
     String? username,
     String? bio,
     Uint8List? avatarBytes,
+    List<ProfilePhoto>? photos,
     bool removeAvatar = false,
   }) async {
     final cachedProfile = await _readCacheBestEffort(userId);
-    final currentAvatar = await _client
+    final remoteMap = await _client
         .from('profiles')
-        .select('avatar_storage_path')
+        .select()
         .eq('id', userId)
         .single();
-    final previousStoragePath = currentAvatar['avatar_storage_path'] as String?;
-    StoredAvatar? uploadedAvatar;
+    final remoteProfile = UserProfile.fromMap(remoteMap);
+    final remotePhotos = await _loadRemotePhotos(remoteProfile);
 
-    if (avatarBytes != null) {
-      uploadedAvatar = await _avatarStorage.upload(
-        userId: userId,
-        sourceBytes: avatarBytes,
-      );
+    final requestedPhotos =
+        photos ??
+        (avatarBytes != null
+            ? [ProfilePhoto(position: 0, bytes: avatarBytes)]
+            : removeAvatar
+            ? const <ProfilePhoto>[]
+            : remotePhotos);
+    if (requestedPhotos.length > 5) {
+      throw const ProfilePhotoLimitException();
     }
 
-    final normalizedUsername = username?.trim().toLowerCase();
-    final avatarChanged = uploadedAvatar != null || removeAvatar;
-    final update = <String, dynamic>{
-      'display_name': displayName.trim(),
-      'birth_date': birthDate.toIso8601String().split('T').first,
-      'gender': gender.databaseValue,
-      'bio': bio?.trim() ?? '',
-      'onboarding_completed': true,
-      if (avatarChanged) 'avatar_url': null,
-      if (avatarChanged) 'avatar_storage_path': uploadedAvatar?.path,
-      if (avatarChanged)
-        'avatar_updated_at': uploadedAvatar == null
-            ? null
-            : DateTime.now().toUtc().toIso8601String(),
-    };
-    if (normalizedUsername != null && normalizedUsername.isNotEmpty) {
-      update['username'] = normalizedUsername;
-    }
-
-    late final Map<String, dynamic> result;
+    final uploadedPaths = <String>[];
+    final savedPhotos = <ProfilePhoto>[];
     try {
-      result = await _client
-          .from('profiles')
-          .update(update)
-          .eq('id', userId)
-          .select()
-          .single();
+      for (var index = 0; index < requestedPhotos.length; index++) {
+        final photo = requestedPhotos[index];
+        if (photo.needsUpload) {
+          final uploaded = await _avatarStorage.upload(
+            userId: userId,
+            sourceBytes: photo.bytes!,
+          );
+          uploadedPaths.add(uploaded.path);
+          savedPhotos.add(
+            ProfilePhoto(
+              position: index,
+              storagePath: uploaded.path,
+              bytes: uploaded.bytes,
+              updatedAt: uploaded.updatedAt,
+            ),
+          );
+        } else {
+          savedPhotos.add(photo.copyWith(position: index));
+        }
+      }
+
+      final response = await _client.rpc<List<dynamic>>(
+        'save_own_profile',
+        params: {
+          'p_display_name': displayName.trim(),
+          'p_birth_date': birthDate.toIso8601String().split('T').first,
+          'p_gender': gender.databaseValue,
+          'p_username': (username?.trim().isNotEmpty ?? false)
+              ? username!.trim().toLowerCase()
+              : remoteProfile.username,
+          'p_bio': bio?.trim() ?? '',
+          'p_photos': savedPhotos
+              .map(
+                (photo) => {
+                  'avatar_url': photo.avatarUrl,
+                  'storage_path': photo.storagePath,
+                  'updated_at': photo.updatedAt?.toUtc().toIso8601String(),
+                },
+              )
+              .toList(growable: false),
+        },
+      );
+      if (response.isEmpty) throw const ProfileSaveException();
+
+      var profile = UserProfile.fromMap(
+        Map<String, dynamic>.from(response.first as Map),
+      );
+      final hydratedPhotos = _reuseCachedPhotoBytes(
+        savedPhotos,
+        cachedProfile?.photos ?? const [],
+      );
+      profile = _withPhotos(profile, hydratedPhotos);
+      await _writeCacheBestEffort(profile);
+
+      final keptPaths = hydratedPhotos
+          .map((photo) => photo.storagePath)
+          .whereType<String>()
+          .toSet();
+      for (final oldPath
+          in remotePhotos
+              .map((photo) => photo.storagePath)
+              .whereType<String>()) {
+        if (!keptPaths.contains(oldPath)) {
+          await _deleteAvatarBestEffort(oldPath);
+        }
+      }
+      return profile;
     } on PostgrestException catch (error) {
-      if (uploadedAvatar != null) {
-        await _deleteAvatarBestEffort(uploadedAvatar.path);
+      for (final path in uploadedPaths) {
+        await _deleteAvatarBestEffort(path);
       }
       if (error.code == '23505') throw const UsernameAlreadyTakenException();
       rethrow;
     } catch (_) {
-      if (uploadedAvatar != null) {
-        await _deleteAvatarBestEffort(uploadedAvatar.path);
+      for (final path in uploadedPaths) {
+        await _deleteAvatarBestEffort(path);
       }
       rethrow;
     }
-
-    var profile = UserProfile.fromMap(result);
-    if (uploadedAvatar != null) {
-      profile = profile.copyWith(avatarBytes: uploadedAvatar.bytes);
-    } else if (removeAvatar) {
-      profile = profile.copyWith(
-        clearAvatarUrl: true,
-        clearAvatarStoragePath: true,
-        clearAvatarBytes: true,
-        clearAvatarUpdatedAt: true,
-      );
-    } else if (cachedProfile?.avatarStoragePath == profile.avatarStoragePath) {
-      profile = profile.copyWith(avatarBytes: cachedProfile?.avatarBytes);
-    }
-
-    await _writeCacheBestEffort(profile);
-    if (avatarChanged &&
-        previousStoragePath != null &&
-        previousStoragePath != uploadedAvatar?.path) {
-      await _deleteAvatarBestEffort(previousStoragePath);
-    }
-    return profile;
   }
 
   Future<UserProfile> _createProfile(AuthSession session) async {
@@ -195,40 +225,148 @@ class ProfileRepository implements IProfileRepository {
     return UserProfile.fromMap(updated);
   }
 
-  Future<UserProfile> _hydrateAvatar(
+  Future<List<ProfilePhoto>> _loadRemotePhotos(UserProfile profile) async {
+    final response = await _client
+        .from('profile_photos')
+        .select()
+        .eq('profile_id', profile.id)
+        .order('position');
+    final photos = response
+        .map(
+          (row) => ProfilePhoto(
+            position: (row['position'] as num).toInt(),
+            avatarUrl: row['avatar_url'] as String?,
+            storagePath: row['storage_path'] as String?,
+            updatedAt: DateTime.tryParse(row['updated_at'] as String? ?? ''),
+          ),
+        )
+        .toList(growable: false);
+    if (photos.isNotEmpty) return photos;
+    if (profile.avatarUrl == null && profile.avatarStoragePath == null) {
+      return const [];
+    }
+    return [
+      ProfilePhoto(
+        position: 0,
+        avatarUrl: profile.avatarStoragePath == null ? profile.avatarUrl : null,
+        storagePath: profile.avatarStoragePath,
+        updatedAt: profile.avatarUpdatedAt,
+      ),
+    ];
+  }
+
+  Future<UserProfile> _hydratePhotos(
     UserProfile profile, {
     required AuthSession session,
   }) async {
     final cached = await _readCacheBestEffort(profile.id);
-    final storagePath = profile.avatarStoragePath;
-    if (storagePath != null) {
-      if (cached?.avatarStoragePath == storagePath &&
-          cached?.avatarBytes != null) {
-        return profile.copyWith(avatarBytes: cached!.avatarBytes);
-      }
-      try {
-        final bytes = await _avatarStorage.download(storagePath);
-        return profile.copyWith(avatarBytes: bytes);
-      } catch (_) {
-        return profile;
-      }
-    }
-
-    final externalUrl = profile.avatarUrl ?? session.avatarUrl;
-    final sourceUri = externalUrl == null ? null : Uri.tryParse(externalUrl);
-    if (sourceUri == null || !sourceUri.hasScheme) return profile;
-
-    StoredAvatar? storedAvatar;
-    try {
-      storedAvatar = await _avatarStorage.copyExternal(sourceUrl: sourceUri);
-      return profile.copyWith(
-        avatarStoragePath: storedAvatar.path,
-        avatarBytes: storedAvatar.bytes,
-        avatarUpdatedAt: storedAvatar.updatedAt,
+    final hydrated = <ProfilePhoto>[];
+    for (final photo in profile.photos) {
+      final cachedPhoto = _matchingCachedPhoto(
+        photo,
+        cached?.photos ?? const [],
       );
-    } catch (_) {
-      return profile;
+      if (cachedPhoto?.bytes != null) {
+        hydrated.add(photo.copyWith(bytes: cachedPhoto!.bytes));
+        continue;
+      }
+
+      final storagePath = photo.storagePath;
+      if (storagePath != null) {
+        try {
+          hydrated.add(
+            photo.copyWith(bytes: await _avatarStorage.download(storagePath)),
+          );
+        } catch (_) {
+          hydrated.add(photo);
+        }
+        continue;
+      }
+
+      final sourceUri = photo.avatarUrl == null
+          ? null
+          : Uri.tryParse(photo.avatarUrl!);
+      if (photo.position == 0 &&
+          sourceUri != null &&
+          sourceUri.hasScheme &&
+          sourceUri.host == 'avatars.yandex.net') {
+        try {
+          final stored = await _avatarStorage.copyExternal(
+            sourceUrl: sourceUri,
+          );
+          hydrated.add(
+            ProfilePhoto(
+              position: photo.position,
+              storagePath: stored.path,
+              bytes: stored.bytes,
+              updatedAt: stored.updatedAt,
+            ),
+          );
+          continue;
+        } catch (_) {
+          // Внешний URL остаётся рабочим fallback при ошибке импорта.
+        }
+      }
+      hydrated.add(photo);
     }
+
+    if (hydrated.isEmpty &&
+        profile.avatarUrl == null &&
+        profile.avatarStoragePath == null &&
+        session.avatarUrl != null) {
+      hydrated.add(ProfilePhoto(position: 0, avatarUrl: session.avatarUrl));
+    }
+    return _withPhotos(profile, hydrated);
+  }
+
+  UserProfile _withPhotos(UserProfile profile, List<ProfilePhoto> photos) {
+    final normalized = [
+      for (var index = 0; index < photos.length; index++)
+        photos[index].copyWith(position: index),
+    ];
+    final primary = normalized.firstOrNull;
+    return profile.copyWith(
+      photos: normalized,
+      avatarUrl: primary?.avatarUrl,
+      avatarStoragePath: primary?.storagePath,
+      avatarBytes: primary?.bytes,
+      avatarUpdatedAt: primary?.updatedAt,
+      clearAvatarUrl: primary?.avatarUrl == null,
+      clearAvatarStoragePath: primary?.storagePath == null,
+      clearAvatarBytes: primary?.bytes == null,
+      clearAvatarUpdatedAt: primary?.updatedAt == null,
+    );
+  }
+
+  List<ProfilePhoto> _reuseCachedPhotoBytes(
+    List<ProfilePhoto> photos,
+    List<ProfilePhoto> cachedPhotos,
+  ) {
+    return photos
+        .map((photo) {
+          if (photo.bytes != null) return photo;
+          final cached = _matchingCachedPhoto(photo, cachedPhotos);
+          return cached?.bytes == null
+              ? photo
+              : photo.copyWith(bytes: cached!.bytes);
+        })
+        .toList(growable: false);
+  }
+
+  ProfilePhoto? _matchingCachedPhoto(
+    ProfilePhoto photo,
+    List<ProfilePhoto> cachedPhotos,
+  ) {
+    for (final cached in cachedPhotos) {
+      if (photo.storagePath != null &&
+          photo.storagePath == cached.storagePath) {
+        return cached;
+      }
+      if (photo.avatarUrl != null && photo.avatarUrl == cached.avatarUrl) {
+        return cached;
+      }
+    }
+    return null;
   }
 
   Future<void> _deleteAvatarBestEffort(String storagePath) async {
@@ -254,4 +392,12 @@ class ProfileRepository implements IProfileRepository {
       // Удалённый профиль остаётся источником истины при сбое локального кеша.
     }
   }
+}
+
+class ProfilePhotoLimitException implements Exception {
+  const ProfilePhotoLimitException();
+}
+
+class ProfileSaveException implements Exception {
+  const ProfileSaveException();
 }

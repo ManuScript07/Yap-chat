@@ -428,6 +428,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Username должен содержать от 3 до 24 латинских букв, цифр или _';
 
   @override
+  String get authUsernameCharactersOnly => 'только a-z, 0-9 и _';
+
+  @override
+  String get authUsernameTooShort => 'минимум 3 символа';
+
+  @override
   String get authProfileSaveFailed =>
       'Не удалось сохранить профиль. Попробуйте ещё раз.';
 
@@ -663,4 +669,89 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get notificationFriendRequest => 'отправил(а) вам заявку в друны';
+
+  @override
+  String get profileEditTitle => 'Редактирование';
+
+  @override
+  String get profileSave => 'Сохранить';
+
+  @override
+  String get profileUsernameLabel => 'никнейм';
+
+  @override
+  String get profileUsernameHint => 'введите никнейм';
+
+  @override
+  String get profileNameLabel => 'имя';
+
+  @override
+  String get profileNameHint => 'как тебя звать?';
+
+  @override
+  String get profileBioLabel => 'био';
+
+  @override
+  String get profileBioHint => 'напишите немного о себе';
+
+  @override
+  String get profileGenderLabel => 'Пол';
+
+  @override
+  String get profileBirthDateLabel => 'Дата рождения';
+
+  @override
+  String get profileGenderTitle => 'Кто ты?';
+
+  @override
+  String get profileGenderMale => 'мужской';
+
+  @override
+  String get profileGenderFemale => 'женский';
+
+  @override
+  String get profileGenderUnspecified => 'не указан';
+
+  @override
+  String get profileBirthDateTitle => 'Ты родился…';
+
+  @override
+  String get profileMainPhoto => 'главное';
+
+  @override
+  String get profileCropTitle => 'Обрезать фото';
+
+  @override
+  String get profileCropApply => 'подтвердить';
+
+  @override
+  String get profileUnsavedTitle => 'Сохранить изменения?';
+
+  @override
+  String get profileUnsavedDescription =>
+      'В профиле есть несохранённые изменения.';
+
+  @override
+  String get profileStay => 'Остаться';
+
+  @override
+  String get profileDiscard => 'Выйти';
+
+  @override
+  String profilePhotoCounter(int current, int total) {
+    return '$current из $total';
+  }
+
+  @override
+  String profileDaysWithUs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count дня с нами',
+      many: '$count дней с нами',
+      few: '$count дня с нами',
+      one: '$count день с нами',
+    );
+    return '$_temp0';
+  }
 }
