@@ -73,27 +73,15 @@ class ProfilePhotoImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget errorBuilder(_, _, _) => _placeholder(context);
-    final bytes = photo.bytes;
-    if (bytes != null) {
-      return Image.memory(
-        bytes,
-        fit: fit,
-        cacheWidth: cacheWidth,
-        gaplessPlayback: true,
-        errorBuilder: errorBuilder,
-      );
-    }
-    final url = photo.avatarUrl;
-    if (url != null && url.isNotEmpty) {
-      return Image.network(
-        url,
-        fit: fit,
-        cacheWidth: cacheWidth,
-        gaplessPlayback: true,
-        errorBuilder: errorBuilder,
-      );
-    }
-    return _placeholder(context);
+    final provider = profilePhotoImageProvider(photo, cacheWidth: cacheWidth);
+    return provider == null
+        ? _placeholder(context)
+        : Image(
+            image: provider,
+            fit: fit,
+            gaplessPlayback: true,
+            errorBuilder: errorBuilder,
+          );
   }
 
   Widget _placeholder(BuildContext context) => ColoredBox(
@@ -106,4 +94,18 @@ class ProfilePhotoImage extends StatelessWidget {
       ),
     ),
   );
+}
+
+ImageProvider<Object>? profilePhotoImageProvider(
+  ProfilePhoto photo, {
+  int? cacheWidth,
+}) {
+  final bytes = photo.bytes;
+  if (bytes != null) {
+    return ResizeImage.resizeIfNeeded(cacheWidth, null, MemoryImage(bytes));
+  }
+  final url = photo.avatarUrl;
+  return url == null || url.isEmpty
+      ? null
+      : ResizeImage.resizeIfNeeded(cacheWidth, null, NetworkImage(url));
 }

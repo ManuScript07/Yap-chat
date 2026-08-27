@@ -12,11 +12,13 @@ class ProfileGalleryPage extends StatefulWidget {
     required this.photos,
     required this.initialIndex,
     required this.displayName,
+    this.imageAspectRatios = const [],
   });
 
   final List<ProfilePhoto> photos;
   final int initialIndex;
   final String displayName;
+  final List<double?> imageAspectRatios;
 
   @override
   State<ProfileGalleryPage> createState() => _ProfileGalleryPageState();
@@ -87,6 +89,10 @@ class _ProfileGalleryPageState extends State<ProfileGalleryPage> {
                         child: _ZoomableProfilePhoto(
                           key: ValueKey(widget.photos[index].identity),
                           photo: widget.photos[index],
+                          initialAspectRatio:
+                              index < widget.imageAspectRatios.length
+                              ? widget.imageAspectRatios[index]
+                              : null,
                           onZoomChanged: (value) {
                             if (_isZoomed != value && mounted) {
                               setState(() => _isZoomed = value);
@@ -291,10 +297,12 @@ class _ZoomableProfilePhoto extends StatefulWidget {
   const _ZoomableProfilePhoto({
     super.key,
     required this.photo,
+    this.initialAspectRatio,
     required this.onZoomChanged,
   });
 
   final ProfilePhoto photo;
+  final double? initialAspectRatio;
   final ValueChanged<bool> onZoomChanged;
 
   @override
@@ -303,11 +311,18 @@ class _ZoomableProfilePhoto extends StatefulWidget {
 
 class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
   final _controller = TransformationController();
+  late double _aspectRatio;
 
   @override
   void initState() {
     super.initState();
+    _aspectRatio = widget.initialAspectRatio ?? 1;
     _controller.addListener(_onTransform);
+    if (widget.initialAspectRatio == null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _resolveAspectRatio(),
+      );
+    }
   }
 
   @override
@@ -322,6 +337,15 @@ class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
     widget.onZoomChanged(_controller.value.getMaxScaleOnAxis() > 1.01);
   }
 
+  Future<void> _resolveAspectRatio() async {
+    final provider = profilePhotoImageProvider(widget.photo);
+    if (provider == null) return;
+    final value = await resolveImageAspectRatio(context, provider);
+    if (mounted && value != null && value > 0) {
+      setState(() => _aspectRatio = value);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ClipRect(
@@ -333,7 +357,14 @@ class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
         boundaryMargin: EdgeInsets.zero,
         clipBehavior: Clip.hardEdge,
         child: Center(
-          child: ProfilePhotoHero(photo: widget.photo, borderRadius: 0),
+          child: AspectRatio(
+            aspectRatio: _aspectRatio,
+            child: ProfilePhotoHero(
+              photo: widget.photo,
+              borderRadius: 0,
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
       ),
     );

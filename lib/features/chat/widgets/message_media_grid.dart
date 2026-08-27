@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/widgets/chat_media_gallery_page.dart';
+import 'package:yap_chat/features/chat/widgets/chat_media_hero.dart';
 import 'package:yap_chat/core/core.dart';
 
 class MessageMediaGrid extends StatelessWidget {
@@ -157,9 +156,11 @@ class _MediaAlbum extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Hero(
-            tag: chatMediaHeroTag(message.id, absoluteIndex),
-            child: _ThumbnailImage(path: path),
+          ChatMediaHero(
+            path: path,
+            heroTag: chatMediaHeroTag(message.id, absoluteIndex),
+            fit: BoxFit.cover,
+            cacheWidth: path.startsWith('http') ? null : 900,
           ),
           if (!isSending && !isError)
             Material(
@@ -211,12 +212,24 @@ class _MediaAlbum extends StatelessWidget {
     );
   }
 
-  void _openGallery(BuildContext context, int index) {
+  Future<void> _openGallery(BuildContext context, int index) async {
     FocusManager.instance.primaryFocus?.unfocus();
+    final aspectRatio = await resolveImageAspectRatio(
+      context,
+      chatMediaImageProvider(
+        message.mediaUrls[index],
+        cacheWidth: message.mediaUrls[index].startsWith('http') ? null : 900,
+      ),
+    );
+    if (!context.mounted) return;
+    final aspectRatios = List<double?>.filled(message.mediaUrls.length, null);
+    aspectRatios[index] = aspectRatio;
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatMediaGalleryPage(
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 180),
+        pageBuilder: (_, _, _) => ChatMediaGalleryPage(
           imagePaths: message.mediaUrls,
           heroTags: List.generate(
             message.mediaUrls.length,
@@ -225,6 +238,15 @@ class _MediaAlbum extends StatelessWidget {
           initialIndex: index,
           senderName: senderName,
           senderAvatarUrl: senderAvatarUrl,
+          imageAspectRatios: aspectRatios,
+        ),
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+          child: child,
         ),
       ),
     );
@@ -233,40 +255,4 @@ class _MediaAlbum extends StatelessWidget {
 
 String chatMediaHeroTag(String messageId, int imageIndex) {
   return 'chat-media-$messageId-$imageIndex';
-}
-
-class _ThumbnailImage extends StatelessWidget {
-  const _ThumbnailImage({required this.path});
-
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    ColoredBox errorBuilder(_, _, _) => ColoredBox(
-      color: context.scaffoldBackgroundColor,
-      child: Center(
-        child: Icon(
-          Icons.broken_image_rounded,
-          color: context.colorScheme.surface,
-        ),
-      ),
-    );
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: errorBuilder,
-      );
-    }
-
-    return Image.file(
-      File(path),
-      fit: BoxFit.cover,
-      cacheWidth: 900,
-      gaplessPlayback: true,
-      errorBuilder: errorBuilder,
-    );
-  }
 }

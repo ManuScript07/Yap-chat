@@ -102,28 +102,34 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _openGallery(UserProfile profile, int index) {
+  Future<void> _openGallery(UserProfile profile, int index) async {
     final photos = profile.effectivePhotos;
     if (photos.isEmpty) return;
-    Navigator.of(context).push(
+    final provider = profilePhotoImageProvider(photos[index], cacheWidth: 352);
+    final aspectRatio = provider == null
+        ? null
+        : await resolveImageAspectRatio(context, provider);
+    if (!mounted) return;
+    final aspectRatios = List<double?>.filled(photos.length, null);
+    aspectRatios[index] = aspectRatio;
+    await Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 260),
-        reverseTransitionDuration: const Duration(milliseconds: 150),
+        reverseTransitionDuration: const Duration(milliseconds: 180),
         pageBuilder: (_, _, _) => ProfileGalleryPage(
           photos: photos,
           initialIndex: index,
           displayName: profile.displayName,
+          imageAspectRatios: aspectRatios,
         ),
-        transitionsBuilder: (context, animation, _, child) {
-          return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOut,
-              reverseCurve: Curves.linear,
-            ),
-            child: child,
-          );
-        },
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+          child: child,
+        ),
       ),
     );
   }
