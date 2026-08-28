@@ -12,11 +12,13 @@ class ProfileGalleryPage extends StatefulWidget {
     required this.photos,
     required this.initialIndex,
     required this.displayName,
+    this.initialThumbnailCacheWidth,
     this.imageAspectRatios = const [],
   });
 
   final List<ProfilePhoto> photos;
   final int initialIndex;
+  final int? initialThumbnailCacheWidth;
   final String displayName;
   final List<double?> imageAspectRatios;
 
@@ -92,6 +94,9 @@ class _ProfileGalleryPageState extends State<ProfileGalleryPage> {
                           initialAspectRatio:
                               index < widget.imageAspectRatios.length
                               ? widget.imageAspectRatios[index]
+                              : null,
+                          thumbnailCacheWidth: index == widget.initialIndex
+                              ? widget.initialThumbnailCacheWidth
                               : null,
                           onZoomChanged: (value) {
                             if (_isZoomed != value && mounted) {
@@ -298,11 +303,13 @@ class _ZoomableProfilePhoto extends StatefulWidget {
     super.key,
     required this.photo,
     this.initialAspectRatio,
+    this.thumbnailCacheWidth,
     required this.onZoomChanged,
   });
 
   final ProfilePhoto photo;
   final double? initialAspectRatio;
+  final int? thumbnailCacheWidth;
   final ValueChanged<bool> onZoomChanged;
 
   @override
@@ -312,11 +319,15 @@ class _ZoomableProfilePhoto extends StatefulWidget {
 class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
   final _controller = TransformationController();
   late double _aspectRatio;
+  int? _cacheWidth;
+  Animation<double>? _routeAnimation;
+  bool _upgradeScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _aspectRatio = widget.initialAspectRatio ?? 1;
+    _cacheWidth = widget.thumbnailCacheWidth;
     _controller.addListener(_onTransform);
     if (widget.initialAspectRatio == null) {
       WidgetsBinding.instance.addPostFrameCallback(
@@ -326,11 +337,51 @@ class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (!identical(animation, _routeAnimation)) {
+      _routeAnimation?.removeStatusListener(_handleRouteStatus);
+      _routeAnimation = animation;
+      animation?.addStatusListener(_handleRouteStatus);
+    }
+    if (animation == null) {
+      _scheduleFullResolutionUpgrade();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            identical(_routeAnimation, animation) &&
+            animation.status == AnimationStatus.completed) {
+          _scheduleFullResolutionUpgrade();
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_handleRouteStatus);
     _controller
       ..removeListener(_onTransform)
       ..dispose();
     super.dispose();
+  }
+
+  void _handleRouteStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _scheduleFullResolutionUpgrade();
+    }
+  }
+
+  void _scheduleFullResolutionUpgrade() {
+    if (_cacheWidth == null || _upgradeScheduled) return;
+    _upgradeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _upgradeScheduled = false;
+      if (mounted && _cacheWidth != null) {
+        setState(() => _cacheWidth = null);
+      }
+    });
   }
 
   void _onTransform() {
@@ -338,7 +389,10 @@ class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
   }
 
   Future<void> _resolveAspectRatio() async {
-    final provider = profilePhotoImageProvider(widget.photo);
+    final provider = profilePhotoImageProvider(
+      widget.photo,
+      cacheWidth: _cacheWidth,
+    );
     if (provider == null) return;
     final value = await resolveImageAspectRatio(context, provider);
     if (mounted && value != null && value > 0) {
@@ -363,6 +417,8 @@ class _ZoomableProfilePhotoState extends State<_ZoomableProfilePhoto> {
               photo: widget.photo,
               borderRadius: 0,
               fit: BoxFit.contain,
+              cacheWidth: _cacheWidth,
+              revealOnLoad: widget.thumbnailCacheWidth == null,
             ),
           ),
         ),

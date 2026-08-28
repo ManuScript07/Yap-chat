@@ -12,6 +12,7 @@ class ChatMediaGalleryPage extends StatefulWidget {
     required this.heroTags,
     required this.initialIndex,
     required this.senderName,
+    this.initialThumbnailCacheWidth,
     this.senderAvatarUrl,
     this.senderAvatarLoader,
     this.senderAvatarImage,
@@ -21,6 +22,7 @@ class ChatMediaGalleryPage extends StatefulWidget {
   final List<String> imagePaths;
   final List<String> heroTags;
   final int initialIndex;
+  final int? initialThumbnailCacheWidth;
   final String senderName;
   final String? senderAvatarUrl;
   final Future<String?> Function()? senderAvatarLoader;
@@ -135,6 +137,9 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                           initialAspectRatio:
                               index < widget.imageAspectRatios.length
                               ? widget.imageAspectRatios[index]
+                              : null,
+                          thumbnailCacheWidth: index == widget.initialIndex
+                              ? widget.initialThumbnailCacheWidth
                               : null,
                           onZoomChanged: _setZoomed,
                         ),
@@ -254,12 +259,14 @@ class _ZoomableGalleryImage extends StatefulWidget {
     required this.path,
     required this.heroTag,
     this.initialAspectRatio,
+    this.thumbnailCacheWidth,
     required this.onZoomChanged,
   });
 
   final String path;
   final String heroTag;
   final double? initialAspectRatio;
+  final int? thumbnailCacheWidth;
   final ValueChanged<bool> onZoomChanged;
 
   @override
@@ -269,11 +276,15 @@ class _ZoomableGalleryImage extends StatefulWidget {
 class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
   late final TransformationController _transformationController;
   late double _aspectRatio;
+  int? _cacheWidth;
+  Animation<double>? _routeAnimation;
+  bool _upgradeScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _aspectRatio = widget.initialAspectRatio ?? 1;
+    _cacheWidth = widget.thumbnailCacheWidth;
     _transformationController = TransformationController();
     _transformationController.addListener(_handleTransformChanged);
     if (widget.initialAspectRatio == null) {
@@ -284,10 +295,50 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (!identical(animation, _routeAnimation)) {
+      _routeAnimation?.removeStatusListener(_handleRouteStatus);
+      _routeAnimation = animation;
+      animation?.addStatusListener(_handleRouteStatus);
+    }
+    if (animation == null) {
+      _scheduleFullResolutionUpgrade();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            identical(_routeAnimation, animation) &&
+            animation.status == AnimationStatus.completed) {
+          _scheduleFullResolutionUpgrade();
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_handleRouteStatus);
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
     super.dispose();
+  }
+
+  void _handleRouteStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _scheduleFullResolutionUpgrade();
+    }
+  }
+
+  void _scheduleFullResolutionUpgrade() {
+    if (_cacheWidth == null || _upgradeScheduled) return;
+    _upgradeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _upgradeScheduled = false;
+      if (mounted && _cacheWidth != null) {
+        setState(() => _cacheWidth = null);
+      }
+    });
   }
 
   void _handleTransformChanged() {
@@ -298,7 +349,7 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
   Future<void> _resolveAspectRatio() async {
     final value = await resolveImageAspectRatio(
       context,
-      chatMediaImageProvider(widget.path),
+      chatMediaImageProvider(widget.path, cacheWidth: _cacheWidth),
     );
     if (mounted && value != null && value > 0) {
       setState(() => _aspectRatio = value);
@@ -322,6 +373,8 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
               path: widget.path,
               heroTag: widget.heroTag,
               fit: BoxFit.contain,
+              cacheWidth: _cacheWidth,
+              revealOnLoad: widget.thumbnailCacheWidth == null,
             ),
           ),
         ),

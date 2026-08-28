@@ -163,72 +163,93 @@ class _MediaAlbum extends StatelessWidget {
 
     return KeyedSubtree(
       key: ValueKey('${message.id}:media:$absoluteIndex'),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ChatMediaHero(
-            path: path,
-            heroTag: chatMediaHeroTag(message.id, absoluteIndex),
-            fit: BoxFit.cover,
-            cacheWidth: path.startsWith('http') ? null : 900,
-          ),
-          if (!isSending && !isError)
-            Material(
-              color: Colors.transparent,
-              child: InkWell(onTap: () => _openGallery(context, absoluteIndex)),
-            ),
-          if (isSending)
-            ColoredBox(
-              color: context.scaffoldBackgroundColor.withValues(alpha: 0.4),
-              child: Center(
-                child: SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: CircularProgressIndicator(
-                    color: context.colorScheme.primary,
-                    strokeWidth: 3,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cacheWidth = path.startsWith('http')
+              ? null
+              : _cacheWidthFor(context, constraints.maxWidth);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              ChatMediaHero(
+                path: path,
+                heroTag: chatMediaHeroTag(message.id, absoluteIndex),
+                fit: BoxFit.cover,
+                cacheWidth: cacheWidth,
+              ),
+              if (!isSending && !isError)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () =>
+                        _openGallery(context, absoluteIndex, cacheWidth),
                   ),
                 ),
-              ),
-            ),
-          if (isError)
-            ColoredBox(
-              color: context.scaffoldBackgroundColor.withValues(alpha: 0.4),
-              child: Center(
-                child: Material(
-                  color: context.colorScheme.primary,
-                  shape: const CircleBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => context.read<ChatBloc>().add(
-                      ChatMessageRetryRequested(message),
-                    ),
+              if (isSending)
+                ColoredBox(
+                  color: context.scaffoldBackgroundColor.withValues(alpha: 0.4),
+                  child: Center(
                     child: SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(
-                        Icons.refresh_rounded,
-                        color: context.colorScheme.surface,
-                        size: 28,
+                      width: 30,
+                      height: 30,
+                      child: CircularProgressIndicator(
+                        color: context.colorScheme.primary,
+                        strokeWidth: 3,
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-        ],
+              if (isError)
+                ColoredBox(
+                  color: context.scaffoldBackgroundColor.withValues(alpha: 0.4),
+                  child: Center(
+                    child: Material(
+                      color: context.colorScheme.primary,
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => context.read<ChatBloc>().add(
+                          ChatMessageRetryRequested(message),
+                        ),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(
+                            Icons.refresh_rounded,
+                            color: context.colorScheme.surface,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Future<void> _openGallery(BuildContext context, int index) async {
+  int _cacheWidthFor(BuildContext context, double logicalWidth) {
+    if (!logicalWidth.isFinite || logicalWidth <= 0) return 900;
+    final physicalWidth =
+        (logicalWidth * MediaQuery.devicePixelRatioOf(context)).ceil();
+    return physicalWidth.clamp(1, 900);
+  }
+
+  Future<void> _openGallery(
+    BuildContext context,
+    int index,
+    int? thumbnailCacheWidth,
+  ) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final aspectRatio = await resolveImageAspectRatio(
       context,
       chatMediaImageProvider(
         message.mediaUrls[index],
-        cacheWidth: message.mediaUrls[index].startsWith('http') ? null : 900,
+        cacheWidth: thumbnailCacheWidth,
       ),
     );
     if (!context.mounted) return;
@@ -246,6 +267,7 @@ class _MediaAlbum extends StatelessWidget {
             (imageIndex) => chatMediaHeroTag(message.id, imageIndex),
           ),
           initialIndex: index,
+          initialThumbnailCacheWidth: thumbnailCacheWidth,
           senderName: senderName,
           senderAvatarUrl: senderAvatarUrl,
           senderAvatarLoader: senderAvatarLoader,

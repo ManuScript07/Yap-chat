@@ -31,7 +31,8 @@ class UserAvatar extends StatefulWidget {
 }
 
 class _UserAvatarState extends State<UserAvatar> {
-  Future<String?>? _avatarFuture;
+  String? _resolvedAvatarPath;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -49,7 +50,22 @@ class _UserAvatarState extends State<UserAvatar> {
   }
 
   void _loadAvatar() {
-    _avatarFuture = widget.avatarLoader?.call();
+    final loader = widget.avatarLoader;
+    final generation = ++_loadGeneration;
+    if (loader == null) {
+      _resolvedAvatarPath = null;
+      return;
+    }
+
+    Future<String?>.sync(loader).then(
+      (value) {
+        if (!mounted || generation != _loadGeneration) return;
+        setState(() => _resolvedAvatarPath = value);
+      },
+      onError: (_, _) {
+        // Keep the last successfully rendered avatar on transient failures.
+      },
+    );
   }
 
   @override
@@ -76,24 +92,7 @@ class _UserAvatarState extends State<UserAvatar> {
                     targetWidth: targetWidth,
                     iconColor: iconColor,
                   )
-                : FutureBuilder<String?>(
-                    future: _avatarFuture,
-                    builder: (context, snapshot) {
-                      final value = snapshot.data ?? widget.avatarUrl;
-                      if (value == null || value.isEmpty) {
-                        return Icon(
-                          Icons.person,
-                          color: iconColor,
-                          size: widget.size * 0.65,
-                        );
-                      }
-                      return _image(
-                        _provider(value),
-                        targetWidth: targetWidth,
-                        iconColor: iconColor,
-                      );
-                    },
-                  ),
+                : _avatar(targetWidth: targetWidth, iconColor: iconColor),
           ),
         ),
         Positioned(
@@ -118,16 +117,34 @@ class _UserAvatarState extends State<UserAvatar> {
     );
   }
 
+  Widget _avatar({required int targetWidth, required Color iconColor}) {
+    final value = _resolvedAvatarPath ?? widget.avatarUrl;
+    if (value == null || value.isEmpty) {
+      return Icon(Icons.person, color: iconColor, size: widget.size * 0.65);
+    }
+    return _image(
+      _provider(value),
+      targetWidth: targetWidth,
+      iconColor: iconColor,
+    );
+  }
+
   Widget _image(
     ImageProvider provider, {
     required int targetWidth,
     required Color iconColor,
-  }) => Image(
-    image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
-    fit: BoxFit.cover,
-    gaplessPlayback: true,
-    errorBuilder: (_, _, _) =>
-        Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
+  }) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
+      Image(
+        image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        frameBuilder: _revealImageFrame,
+        errorBuilder: (_, _, _) => const SizedBox.expand(),
+      ),
+    ],
   );
 
   ImageProvider _provider(String value) {
@@ -136,4 +153,21 @@ class _UserAvatarState extends State<UserAvatar> {
         ? NetworkImage(value)
         : FileImage(File(value));
   }
+}
+
+Widget _revealImageFrame(
+  BuildContext context,
+  Widget child,
+  int? frame,
+  bool wasSynchronouslyLoaded,
+) {
+  final isReady = wasSynchronouslyLoaded || frame != null;
+  return AnimatedOpacity(
+    opacity: isReady ? 1 : 0,
+    duration: wasSynchronouslyLoaded
+        ? Duration.zero
+        : const Duration(milliseconds: 180),
+    curve: Curves.easeOutCubic,
+    child: child,
+  );
 }

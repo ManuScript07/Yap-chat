@@ -39,7 +39,10 @@ class ChatsCacheDataSource {
     return row == null ? null : _mapRow(row);
   }
 
-  Future<void> replaceAll(List<Chat> chats) async {
+  Future<bool> replaceAll(List<Chat> chats) async {
+    final cachedChats = await read();
+    if (_sameChats(cachedChats, chats)) return false;
+
     await _database.transaction(() async {
       final ownerUserId = _userIdProvider();
       final ids = chats.map((chat) => chat.id).toSet();
@@ -56,6 +59,40 @@ class ChatsCacheDataSource {
             .insertOnConflictUpdate(_companion(chat));
       }
     });
+    return true;
+  }
+
+  bool _sameChats(List<Chat> cached, List<Chat> incoming) {
+    if (cached.length != incoming.length) return false;
+    final cachedById = {for (final chat in cached) chat.id: chat};
+    return incoming.every((chat) {
+      final current = cachedById[chat.id];
+      return current != null && _sameChat(current, chat);
+    });
+  }
+
+  bool _sameChat(Chat left, Chat right) {
+    bool sameSecond(DateTime? first, DateTime? second) {
+      if (first == null || second == null) return first == second;
+      return first.millisecondsSinceEpoch ~/ 1000 ==
+          second.millisecondsSinceEpoch ~/ 1000;
+    }
+
+    return left.id == right.id &&
+        left.peerId == right.peerId &&
+        left.peerUsername == right.peerUsername &&
+        left.userName == right.userName &&
+        left.avatarUrl == right.avatarUrl &&
+        left.avatarStoragePath == right.avatarStoragePath &&
+        left.lastMessageId == right.lastMessageId &&
+        left.lastMessage == right.lastMessage &&
+        left.lastMessageType == right.lastMessageType &&
+        sameSecond(left.lastMessageTime, right.lastMessageTime) &&
+        left.unreadCount == right.unreadCount &&
+        sameSecond(left.lastSeenAt, right.lastSeenAt) &&
+        left.showsLastSeen == right.showsLastSeen &&
+        left.isLastMessageFromMe == right.isLastMessageFromMe &&
+        left.isMuted == right.isMuted;
   }
 
   Future<void> remove(Set<String> ids) async {

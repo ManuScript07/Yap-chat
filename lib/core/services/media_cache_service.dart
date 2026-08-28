@@ -62,10 +62,7 @@ class MediaCacheService {
     final resolved = _takeResolvedPath(key);
     if (resolved != null) {
       final file = File(resolved);
-      if (await file.exists()) {
-        await file.setLastModified(DateTime.now());
-        return resolved;
-      }
+      if (await _touchIfPresent(file)) return resolved;
       _forgetResolvedPath(resolved);
     }
     final localPath = await _runOnce(
@@ -124,10 +121,7 @@ class MediaCacheService {
     final resolved = _takeResolvedPath(key);
     if (resolved != null) {
       final file = File(resolved);
-      if (await file.exists()) {
-        await file.setLastModified(DateTime.now());
-        return resolved;
-      }
+      if (await _touchIfPresent(file)) return resolved;
       _forgetResolvedPath(resolved);
     }
     final localPath = await _runOnce(ownerUserId, bucket, url, () async {
@@ -386,19 +380,29 @@ class MediaCacheService {
       storagePath,
       mimeType,
     );
-    if (await file.exists()) {
-      await file.setLastModified(DateTime.now());
-      return file.path;
-    }
+    if (await _touchIfPresent(file)) return file.path;
     final legacyFile = await _legacyDestinationFile(
       ownerUserId,
       bucket,
       storagePath,
       mimeType,
     );
-    if (!await legacyFile.exists()) return null;
-    await legacyFile.setLastModified(DateTime.now());
-    return legacyFile.path;
+    return await _touchIfPresent(legacyFile) ? legacyFile.path : null;
+  }
+
+  Future<bool> _touchIfPresent(File file) async {
+    try {
+      if (!await file.exists()) return false;
+      try {
+        await file.setLastModified(DateTime.now());
+      } on FileSystemException {
+        // A metadata touch must not hide an otherwise readable cached image.
+        return await file.exists();
+      }
+      return true;
+    } on FileSystemException {
+      return false;
+    }
   }
 
   Future<String> _writeBytes({

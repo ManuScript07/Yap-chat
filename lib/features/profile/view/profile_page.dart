@@ -119,6 +119,7 @@ class _ProfilePageState extends State<ProfilePage> {
         pageBuilder: (_, _, _) => ProfileGalleryPage(
           photos: photos,
           initialIndex: index,
+          initialThumbnailCacheWidth: 352,
           displayName: profile.displayName,
           imageAspectRatios: aspectRatios,
         ),

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
@@ -10,6 +11,7 @@ class ChatMediaHero extends StatelessWidget {
     required this.heroTag,
     required this.fit,
     this.cacheWidth,
+    this.revealOnLoad = true,
   });
 
   static const _thumbnailRadius = 20.0;
@@ -18,6 +20,7 @@ class ChatMediaHero extends StatelessWidget {
   final String heroTag;
   final BoxFit fit;
   final int? cacheWidth;
+  final bool revealOnLoad;
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +41,21 @@ class ChatMediaHero extends StatelessWidget {
           ),
           child: ColoredBox(
             color: Colors.black,
-            child: ChatMediaImage(path: path, fit: BoxFit.cover),
+            child: ChatMediaImage(
+              path: path,
+              fit: BoxFit.cover,
+              cacheWidth: cacheWidth,
+              revealOnLoad: false,
+            ),
           ),
         );
       },
-      child: ChatMediaImage(path: path, fit: fit, cacheWidth: cacheWidth),
+      child: ChatMediaImage(
+        path: path,
+        fit: fit,
+        cacheWidth: cacheWidth,
+        revealOnLoad: revealOnLoad,
+      ),
     );
   }
 }
@@ -53,11 +66,13 @@ class ChatMediaImage extends StatelessWidget {
     required this.path,
     required this.fit,
     this.cacheWidth,
+    this.revealOnLoad = true,
   });
 
   final String path;
   final BoxFit fit;
   final int? cacheWidth;
+  final bool revealOnLoad;
 
   @override
   Widget build(BuildContext context) {
@@ -76,8 +91,49 @@ class ChatMediaImage extends StatelessWidget {
       image: chatMediaImageProvider(path, cacheWidth: cacheWidth),
       fit: fit,
       gaplessPlayback: true,
+      frameBuilder: revealOnLoad
+          ? (context, child, frame, wasSynchronouslyLoaded) =>
+                _revealImageFrame(
+                  context,
+                  child,
+                  frame,
+                  wasSynchronouslyLoaded,
+                  path,
+                )
+          : null,
       errorBuilder: errorBuilder,
     );
+  }
+}
+
+Widget _revealImageFrame(
+  BuildContext context,
+  Widget child,
+  int? frame,
+  bool wasSynchronouslyLoaded,
+  String path,
+) {
+  final isReady = wasSynchronouslyLoaded || frame != null;
+  final shouldReveal = !_revealedChatMediaPaths.contains(path);
+  if (isReady) _rememberRevealedChatMedia(path);
+  return AnimatedOpacity(
+    opacity: !shouldReveal || isReady ? 1 : 0,
+    duration: !shouldReveal || wasSynchronouslyLoaded
+        ? Duration.zero
+        : const Duration(milliseconds: 180),
+    curve: Curves.easeOutCubic,
+    child: child,
+  );
+}
+
+const _maxRememberedChatMediaPaths = 512;
+final LinkedHashSet<String> _revealedChatMediaPaths = LinkedHashSet<String>();
+
+void _rememberRevealedChatMedia(String path) {
+  _revealedChatMediaPaths.remove(path);
+  _revealedChatMediaPaths.add(path);
+  if (_revealedChatMediaPaths.length > _maxRememberedChatMediaPaths) {
+    _revealedChatMediaPaths.remove(_revealedChatMediaPaths.first);
   }
 }
 

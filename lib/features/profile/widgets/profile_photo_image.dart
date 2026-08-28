@@ -9,6 +9,7 @@ class ProfilePhotoHero extends StatelessWidget {
     required this.borderRadius,
     this.fit = BoxFit.cover,
     this.cacheWidth,
+    this.revealOnLoad = true,
   });
 
   static const _thumbnailRadius = 32.0;
@@ -17,6 +18,7 @@ class ProfilePhotoHero extends StatelessWidget {
   final double borderRadius;
   final BoxFit fit;
   final int? cacheWidth;
+  final bool revealOnLoad;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +26,7 @@ class ProfilePhotoHero extends StatelessWidget {
       photo: photo,
       fit: fit,
       cacheWidth: cacheWidth,
+      revealOnLoad: revealOnLoad,
     );
     return Hero(
       tag: 'profile-photo-${photo.identity}',
@@ -42,7 +45,12 @@ class ProfilePhotoHero extends StatelessWidget {
           ),
           child: ColoredBox(
             color: context.scaffoldBackgroundColor,
-            child: ProfilePhotoImage(photo: photo, fit: BoxFit.cover),
+            child: ProfilePhotoImage(
+              photo: photo,
+              fit: BoxFit.cover,
+              cacheWidth: cacheWidth,
+              revealOnLoad: false,
+            ),
           ),
         );
       },
@@ -63,12 +71,14 @@ class ProfilePhotoImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.placeholderIconSize = 64,
     this.cacheWidth,
+    this.revealOnLoad = true,
   });
 
   final ProfilePhoto photo;
   final BoxFit fit;
   final double placeholderIconSize;
   final int? cacheWidth;
+  final bool revealOnLoad;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +90,7 @@ class ProfilePhotoImage extends StatelessWidget {
             image: provider,
             fit: fit,
             gaplessPlayback: true,
+            frameBuilder: revealOnLoad ? _revealImageFrame : null,
             errorBuilder: errorBuilder,
           );
   }
@@ -93,6 +104,23 @@ class ProfilePhotoImage extends StatelessWidget {
         color: context.colorScheme.onPrimary,
       ),
     ),
+  );
+}
+
+Widget _revealImageFrame(
+  BuildContext context,
+  Widget child,
+  int? frame,
+  bool wasSynchronouslyLoaded,
+) {
+  final isReady = wasSynchronouslyLoaded || frame != null;
+  return AnimatedOpacity(
+    opacity: isReady ? 1 : 0,
+    duration: wasSynchronouslyLoaded
+        ? Duration.zero
+        : const Duration(milliseconds: 180),
+    curve: Curves.easeOutCubic,
+    child: child,
   );
 }
 

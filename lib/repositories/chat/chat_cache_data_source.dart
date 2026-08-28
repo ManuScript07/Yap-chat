@@ -69,10 +69,12 @@ class ChatCacheDataSource {
     return row == null ? null : _mapMessage(row, currentUserId);
   }
 
-  Future<void> replaceRecentMessages(
+  Future<bool> replaceRecentMessages(
     String chatId,
     List<ChatMessage> messages,
   ) async {
+    if (await _recentMessagesMatch(chatId, messages)) return false;
+
     await _database.transaction(() async {
       if (messages.isEmpty) {
         await (_database.delete(_database.cachedMessages)..where(
@@ -97,7 +99,56 @@ class ChatCacheDataSource {
       }
       await _upsertMessages(messages);
     });
+    return true;
   }
+
+  Future<bool> _recentMessagesMatch(
+    String chatId,
+    List<ChatMessage> messages,
+  ) async {
+    final ownerUserId = _userIdProvider();
+    final query = _database.select(_database.cachedMessages)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(ownerUserId) &
+            table.chatId.equals(chatId) &
+            table.isPending.not() &
+            (messages.isEmpty
+                ? const Constant(true)
+                : table.timestamp.isBiggerOrEqualValue(
+                    _normalizeTimestamp(messages.last.timestamp),
+                  )),
+      )
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.id),
+      ]);
+    if (messages.isEmpty) query.limit(1);
+    final rows = await query.get();
+    if (rows.length != messages.length) return false;
+
+    for (var index = 0; index < rows.length; index++) {
+      final cached = _mapMessage(rows[index], ownerUserId);
+      if (cached != _normalizeMessageTimestamps(messages[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  ChatMessage _normalizeMessageTimestamps(ChatMessage message) {
+    final readAt = message.readAt;
+    return message.copyWith(
+      timestamp: _normalizeTimestamp(message.timestamp),
+      readAt: readAt == null ? null : _normalizeTimestamp(readAt),
+      clearReadAt: readAt == null,
+    );
+  }
+
+  DateTime _normalizeTimestamp(DateTime value) =>
+      DateTime.fromMillisecondsSinceEpoch(
+        (value.millisecondsSinceEpoch ~/ 1000) * 1000,
+      );
 
   Future<void> upsertMessages(List<ChatMessage> messages) {
     return _database.transaction(() => _upsertMessages(messages));
