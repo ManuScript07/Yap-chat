@@ -124,7 +124,12 @@ class _AppInitializerState extends State<AppInitializer> {
             create: (context) => AuthBloc(
               authRepository: context.read<IAuthRepository>(),
               profileRepository: context.read<IProfileRepository>(),
-              clearUserCache: _repositories.mediaCache.clearUser,
+              clearUserCache: (userId) async {
+                await Future.wait([
+                  _repositories.localMediaRepository.clearUser(userId),
+                  _repositories.mediaCache.clearUser(userId),
+                ]);
+              },
               beforeSignOut: _repositories
                   .pushNotificationsRepository
                   .unregisterCurrentDevice,

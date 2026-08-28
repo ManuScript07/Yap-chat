@@ -45,4 +45,3 @@ abstract class AppTextStyles {
     height: 1.14
   );
 }
-

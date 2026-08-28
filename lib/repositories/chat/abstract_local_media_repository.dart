@@ -23,4 +23,10 @@ abstract interface class ILocalMediaRepository {
 
   /// Очищает контекст камеры после обычного возврата.
   Future<void> clearPendingChatId();
+
+  /// Удаляет локальные оригиналы и служебные ключи конкретного аккаунта.
+  Future<void> clearUser(String ownerUserId);
+
+  /// Удаляет только те оригиналы, на которые больше никто не ссылается.
+  Future<void> collectGarbage();
 }

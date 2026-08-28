@@ -28,9 +28,17 @@ class RepositoryContainer {
 
   factory RepositoryContainer.prod({required AppConfig config}) {
     final client = config.requireSupabaseClient();
+    final localMediaRepository = LocalMediaRepository(
+      preferences: config.preferences,
+      database: config.database,
+      ownerUserIdProvider: () => client.auth.currentUser?.id,
+      environment: config.environment.name,
+    );
     final mediaCache = MediaCacheService(
       database: config.database,
       client: client,
+      environment: config.environment.name,
+      talker: config.talker,
     );
     final chatsCache = ChatsCacheDataSource(
       database: config.database,
@@ -87,10 +95,9 @@ class RepositoryContainer {
         mediaProcessor: const ChatMediaProcessor(),
         mediaCache: mediaCache,
         syncService: conversationSync,
+        localMediaRepository: localMediaRepository,
       ),
-      localMediaRepository: LocalMediaRepository(
-        preferences: config.preferences,
-      ),
+      localMediaRepository: localMediaRepository,
       locationRepository: LocationRepository(
         preferences: config.preferences,
         client: client,
@@ -106,6 +113,11 @@ class RepositoryContainer {
         client: client,
         cache: ProfileCacheDataSource(database: config.database),
         talker: config.talker,
+        avatarDeletionQueue: AvatarDeletionQueue(
+          preferences: config.preferences,
+          environment: config.environment.name,
+          talker: config.talker,
+        ),
         avatarStorage: AvatarStorageDataSource(
           client: client,
           imageProcessor: const AvatarImageProcessor(),
@@ -136,24 +148,31 @@ class RepositoryContainer {
   }
 
   factory RepositoryContainer.dev({required AppConfig config}) {
+    final authRepository = MockAuthRepository(preferences: config.preferences);
+    final localMediaRepository = LocalMediaRepository(
+      preferences: config.preferences,
+      database: config.database,
+      ownerUserIdProvider: () => authRepository.currentSession?.userId,
+      environment: config.environment.name,
+    );
     final mediaCache = MediaCacheService(
       database: config.database,
       client: config.supabaseClient,
+      environment: config.environment.name,
+      talker: config.talker,
     );
     return RepositoryContainer(
       mediaCache: mediaCache,
       chatsRepository: MockChatsRepository(),
       chatRepository: MockChatRepository(),
-      localMediaRepository: LocalMediaRepository(
-        preferences: config.preferences,
-      ),
+      localMediaRepository: localMediaRepository,
       locationRepository: LocationRepository(
         preferences: config.preferences,
         client: config.supabaseClient,
       ),
       audioRecorderRepository: AudioRecorderRepository(),
       audioPlayerRepository: AudioPlayerRepository(),
-      authRepository: MockAuthRepository(preferences: config.preferences),
+      authRepository: authRepository,
       profileRepository: MockProfileRepository(preferences: config.preferences),
       presenceRepository: MockPresenceRepository(),
       pushNotificationsRepository: const MockPushNotificationsRepository(),

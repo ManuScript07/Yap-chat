@@ -14,6 +14,7 @@ import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/core/services/media_service.dart';
 import 'package:yap_chat/repositories/chat/local_media_repository.dart';
+import 'package:yap_chat/repositories/auth/mock_auth_repository.dart';
 import 'package:yap_chat/repositories/notifications/notifications.dart';
 
 Future<void> main() async {
@@ -24,8 +25,8 @@ Future<void> main() async {
 
   final talker = Talker();
   final preferences = await SharedPreferences.getInstance();
-  final database = AppDatabase();
   final environment = _resolveEnvironment(dotenv.env);
+  final database = AppDatabase(name: _databaseName(environment));
   final supabaseClient = await _initializeSupabase(dotenv.env);
   final firebaseMessaging = environment == AppEnvironment.prod
       ? await _initializeFirebase(talker)
@@ -36,7 +37,22 @@ Future<void> main() async {
     );
   }
 
-  final localMediaRepository = LocalMediaRepository(preferences: preferences);
+  String? currentOwnerUserId() {
+    if (environment == AppEnvironment.dev) {
+      final isSignedIn =
+          preferences.getBool(MockAuthRepository.signedInPreferenceKey) ??
+          false;
+      return isSignedIn ? MockAuthRepository.mockUserId : null;
+    }
+    return supabaseClient?.auth.currentUser?.id;
+  }
+
+  final localMediaRepository = LocalMediaRepository(
+    preferences: preferences,
+    database: database,
+    ownerUserIdProvider: currentOwnerUserId,
+    environment: environment.name,
+  );
   final lostPhotoPath = await MediaService.retrieveLostPhoto();
   if (lostPhotoPath != null) {
     final persistedPath = await localMediaRepository.persistMedia(
@@ -128,3 +144,9 @@ AppEnvironment _resolveEnvironment(Map<String, String> env) {
     _ => AppEnvironment.dev,
   };
 }
+
+String _databaseName(AppEnvironment environment) => switch (environment) {
+  AppEnvironment.prod => 'yap_chat_cache',
+  AppEnvironment.local => 'yap_chat_cache_local',
+  AppEnvironment.dev => 'yap_chat_cache_dev',
+};

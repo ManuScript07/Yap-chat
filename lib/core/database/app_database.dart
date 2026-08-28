@@ -177,10 +177,10 @@ class CachedContactMatches extends Table {
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase()
+  AppDatabase({String name = 'yap_chat_cache'})
     : super(
         driftDatabase(
-          name: 'yap_chat_cache',
+          name: name,
           native: const DriftNativeOptions(shareAcrossIsolates: true),
           web: DriftWebOptions(
             sqlite3Wasm: Uri.parse('sqlite3.wasm'),
@@ -192,7 +192,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -225,6 +225,15 @@ class AppDatabase extends _$AppDatabase {
       if (from < 9) {
         await migrator.addColumn(cachedProfiles, cachedProfiles.createdAt);
         await migrator.createTable(cachedProfilePhotos);
+      }
+      if (from < 10) {
+        await customStatement('UPDATE cached_profiles SET avatar_bytes = NULL');
+      }
+    },
+    beforeOpen: (details) async {
+      if (details.hadUpgrade && details.versionBefore! < 10) {
+        // Reclaim pages that previously contained duplicated avatar BLOBs.
+        await customStatement('VACUUM');
       }
     },
   );

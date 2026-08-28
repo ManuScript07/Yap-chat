@@ -1,26 +1,47 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 
 class LocalMediaRepository implements ILocalMediaRepository {
-  LocalMediaRepository({required SharedPreferences preferences})
-    : _prefs = preferences;
+  LocalMediaRepository({
+    required SharedPreferences preferences,
+    required AppDatabase database,
+    required String? Function() ownerUserIdProvider,
+    required String environment,
+    Future<Directory> Function()? documentsDirectoryProvider,
+  }) : _prefs = preferences,
+       _database = database,
+       _ownerUserIdProvider = ownerUserIdProvider,
+       _environment = environment,
+       _documentsDirectoryProvider =
+           documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
   final SharedPreferences _prefs;
-  static const _storageKey = 'recent_chat_media_paths';
-  static const _pendingStorageKey = 'pending_chat_media_path';
-  static const _pendingChatStorageKey = 'pending_chat_id';
+  final AppDatabase _database;
+  final String? Function() _ownerUserIdProvider;
+  final String _environment;
+  final Future<Directory> Function() _documentsDirectoryProvider;
+  static const _legacyStorageKey = 'recent_chat_media_paths';
+  static const _legacyPendingStorageKey = 'pending_chat_media_path';
+  static const _legacyPendingChatStorageKey = 'pending_chat_id';
+  static const _legacyOwnerKey = 'recent_chat_media_legacy_owner';
   static const maxRecentMediaCount = 50;
 
   @override
   Future<String?> persistMedia(String sourcePath) async {
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return null;
     final sourceFile = File(sourcePath);
     if (!await sourceFile.exists()) return null;
 
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _userDirectory(ownerUserId);
+    await directory.create(recursive: true);
     final extension = path.extension(sourcePath);
     final fileName =
         'chat_media_${DateTime.now().microsecondsSinceEpoch}$extension';
@@ -28,60 +49,224 @@ class LocalMediaRepository implements ILocalMediaRepository {
       path.join(directory.path, fileName),
     );
 
-    final current = getRecentMediaPaths()
-        .where((storedPath) => File(storedPath).existsSync())
-        .toList();
+    final current = _recentMediaPaths(
+      ownerUserId,
+    ).where((storedPath) => File(storedPath).existsSync()).toList();
     final updated = [
       destination.path,
       ...current,
     ].take(maxRecentMediaCount).toList();
-    await _prefs.setStringList(_storageKey, updated);
+    await _prefs.setStringList(_storageKey(ownerUserId), updated);
+    unawaited(_collectGarbage(ownerUserId));
     return destination.path;
   }
 
   @override
   List<String> getRecentMediaPaths() {
-    return _prefs.getStringList(_storageKey) ?? [];
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return const [];
+    return _recentMediaPaths(ownerUserId);
   }
 
   @override
   Future<void> deleteMedia(String mediaPath) async {
-    final updated = getRecentMediaPaths()
-        .where((storedPath) => storedPath != mediaPath)
-        .toList();
-    await _prefs.setStringList(_storageKey, updated);
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return;
+    final updated = _recentMediaPaths(
+      ownerUserId,
+    ).where((storedPath) => storedPath != mediaPath).toList();
+    await _prefs.setStringList(_storageKey(ownerUserId), updated);
+    await _collectGarbage(ownerUserId);
   }
 
   @override
   Future<void> savePendingMedia(String mediaPath) async {
-    await _prefs.setString(_pendingStorageKey, mediaPath);
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return;
+    await _prefs.setString(_pendingStorageKey(ownerUserId), mediaPath);
   }
 
   @override
   Future<String?> consumePendingMedia() async {
-    final pendingPath = _prefs.getString(_pendingStorageKey);
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return null;
+    _claimLegacyData(ownerUserId);
+    final key = _pendingStorageKey(ownerUserId);
+    final pendingPath = _prefs.getString(key);
     if (pendingPath == null) return null;
 
-    await _prefs.remove(_pendingStorageKey);
+    await _prefs.remove(key);
     return pendingPath;
   }
 
   @override
   Future<void> savePendingChatId(String chatId) async {
-    await _prefs.setString(_pendingChatStorageKey, chatId);
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return;
+    await _prefs.setString(_pendingChatStorageKey(ownerUserId), chatId);
   }
 
   @override
   Future<String?> consumePendingChatId() async {
-    final chatId = _prefs.getString(_pendingChatStorageKey);
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return null;
+    _claimLegacyData(ownerUserId);
+    final key = _pendingChatStorageKey(ownerUserId);
+    final chatId = _prefs.getString(key);
     if (chatId == null) return null;
 
-    await _prefs.remove(_pendingChatStorageKey);
+    await _prefs.remove(key);
     return chatId;
   }
 
   @override
   Future<void> clearPendingChatId() async {
-    await _prefs.remove(_pendingChatStorageKey);
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return;
+    await _prefs.remove(_pendingChatStorageKey(ownerUserId));
   }
+
+  @override
+  Future<void> collectGarbage() async {
+    final ownerUserId = _ownerUserIdProvider();
+    if (ownerUserId == null || ownerUserId.isEmpty) return;
+    await _collectGarbage(ownerUserId);
+  }
+
+  @override
+  Future<void> clearUser(String ownerUserId) async {
+    if (ownerUserId.isEmpty) return;
+    _claimLegacyData(ownerUserId);
+    final recentPaths = _recentMediaPaths(ownerUserId);
+    final pendingPath = _prefs.getString(_pendingStorageKey(ownerUserId));
+    final directory = await _userDirectory(ownerUserId);
+    if (await directory.exists()) await directory.delete(recursive: true);
+
+    final documents = await _documentsDirectoryProvider();
+    for (final value in {
+      ...recentPaths,
+      if (pendingPath != null) pendingPath,
+    }) {
+      final file = File(value);
+      if (_isLegacyOwnedFile(file, documents) && await file.exists()) {
+        await file.delete();
+      }
+    }
+    if (_prefs.getString(_legacyOwnerKey) == _ownerKey(ownerUserId) &&
+        await documents.exists()) {
+      await for (final entity in documents.list()) {
+        if (entity is File && _isLegacyOwnedFile(entity, documents)) {
+          await entity.delete();
+        }
+      }
+    }
+    await Future.wait([
+      _prefs.remove(_storageKey(ownerUserId)),
+      _prefs.remove(_pendingStorageKey(ownerUserId)),
+      _prefs.remove(_pendingChatStorageKey(ownerUserId)),
+    ]);
+  }
+
+  List<String> _recentMediaPaths(String ownerUserId) {
+    _claimLegacyData(ownerUserId);
+    return _prefs.getStringList(_storageKey(ownerUserId)) ?? const [];
+  }
+
+  void _claimLegacyData(String ownerUserId) {
+    final claimedOwner = _prefs.getString(_legacyOwnerKey);
+    if (claimedOwner != null) return;
+    _prefs.setString(_legacyOwnerKey, _ownerKey(ownerUserId));
+    final legacyRecent = _prefs.getStringList(_legacyStorageKey);
+    if (legacyRecent != null) {
+      _prefs.setStringList(_storageKey(ownerUserId), legacyRecent);
+      _prefs.remove(_legacyStorageKey);
+    }
+    final legacyPending = _prefs.getString(_legacyPendingStorageKey);
+    if (legacyPending != null) {
+      _prefs.setString(_pendingStorageKey(ownerUserId), legacyPending);
+      _prefs.remove(_legacyPendingStorageKey);
+    }
+    final legacyChatId = _prefs.getString(_legacyPendingChatStorageKey);
+    if (legacyChatId != null) {
+      _prefs.setString(_pendingChatStorageKey(ownerUserId), legacyChatId);
+      _prefs.remove(_legacyPendingChatStorageKey);
+    }
+  }
+
+  Future<void> _collectGarbage(String ownerUserId) async {
+    final protectedPaths = <String>{
+      ..._recentMediaPaths(ownerUserId),
+      if (_prefs.getString(_pendingStorageKey(ownerUserId)) case final value?)
+        value,
+    };
+    final operations = await (_database.select(
+      _database.pendingChatOperations,
+    )..where((table) => table.ownerUserId.equals(ownerUserId))).get();
+    for (final operation in operations) {
+      try {
+        final payload = jsonDecode(operation.payloadJson);
+        if (payload is! Map) continue;
+        final imagePaths = payload['image_paths'];
+        if (imagePaths is List) {
+          protectedPaths.addAll(imagePaths.whereType<String>());
+        }
+      } catch (_) {
+        // Повреждённая outbox-запись не должна блокировать сборку мусора.
+      }
+    }
+    final messages = await (_database.select(
+      _database.cachedMessages,
+    )..where((table) => table.ownerUserId.equals(ownerUserId))).get();
+    for (final message in messages) {
+      try {
+        protectedPaths.addAll(
+          (jsonDecode(message.mediaUrlsJson) as List).whereType<String>(),
+        );
+      } catch (_) {
+        // Повреждённый локальный путь будет восстановлен синхронизацией.
+      }
+    }
+
+    final directory = await _userDirectory(ownerUserId);
+    if (!await directory.exists()) return;
+    await for (final entity in directory.list()) {
+      if (entity is File && !protectedPaths.contains(entity.path)) {
+        await entity.delete();
+      }
+    }
+  }
+
+  Future<Directory> _userDirectory(String ownerUserId) async {
+    final documents = await _documentsDirectoryProvider();
+    return Directory(
+      path.join(
+        documents.path,
+        'chat_recent',
+        _safeSegment(_environment),
+        _safeSegment(ownerUserId),
+      ),
+    );
+  }
+
+  bool _isLegacyOwnedFile(File file, Directory documents) {
+    final normalizedParent = path.normalize(file.parent.absolute.path);
+    final normalizedDocuments = path.normalize(documents.absolute.path);
+    return normalizedParent == normalizedDocuments &&
+        path.basename(file.path).startsWith('chat_media_');
+  }
+
+  String _storageKey(String ownerUserId) =>
+      '${_ownerKey(ownerUserId)}.recent_chat_media_paths';
+
+  String _pendingStorageKey(String ownerUserId) =>
+      '${_ownerKey(ownerUserId)}.pending_chat_media_path';
+
+  String _pendingChatStorageKey(String ownerUserId) =>
+      '${_ownerKey(ownerUserId)}.pending_chat_id';
+
+  String _ownerKey(String ownerUserId) =>
+      'chat_media.${_safeSegment(_environment)}.${_safeSegment(ownerUserId)}';
+
+  String _safeSegment(String value) =>
+      value.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
 }

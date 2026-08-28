@@ -18,7 +18,7 @@ class ProfileCacheDataSource {
       _database.cachedProfilePhotos,
     )..where((table) => table.userId.equals(userId))).get();
     photoRows.sort((left, right) => left.position.compareTo(right.position));
-    final photos = photoRows
+    var photos = photoRows
         .map(
           (photo) => ProfilePhoto(
             position: photo.position,
@@ -29,6 +29,11 @@ class ProfileCacheDataSource {
           ),
         )
         .toList(growable: false);
+    photos = _alignPrimaryPhoto(
+      photos,
+      avatarUrl: row.avatarUrl,
+      storagePath: row.avatarStoragePath,
+    );
 
     return UserProfile(
       id: row.userId,
@@ -37,7 +42,7 @@ class ProfileCacheDataSource {
       birthDate: row.birthDate,
       avatarUrl: row.avatarUrl,
       avatarStoragePath: row.avatarStoragePath,
-      avatarBytes: row.avatarBytes,
+      avatarBytes: photos.firstOrNull?.bytes ?? row.avatarBytes,
       avatarUpdatedAt: row.avatarUpdatedAt,
       photos: photos,
       gender: ProfileGender.fromDatabaseValue(row.gender),
@@ -61,7 +66,9 @@ class ProfileCacheDataSource {
               birthDate: Value(profile.birthDate),
               avatarUrl: Value(profile.avatarUrl),
               avatarStoragePath: Value(profile.avatarStoragePath),
-              avatarBytes: Value(profile.avatarBytes),
+              // The primary photo already exists in cachedProfilePhotos.
+              // Keep the legacy column empty while retaining read compatibility.
+              avatarBytes: const Value(null),
               avatarUpdatedAt: Value(profile.avatarUpdatedAt),
               gender: profile.gender.databaseValue,
               bio: profile.bio,
@@ -76,13 +83,17 @@ class ProfileCacheDataSource {
       await (_database.delete(
         _database.cachedProfilePhotos,
       )..where((table) => table.userId.equals(profile.id))).go();
-      for (final photo in profile.photos) {
+      final photos = profile.effectivePhotos;
+      for (var index = 0; index < photos.length; index++) {
+        final photo = photos[index];
         await _database
             .into(_database.cachedProfilePhotos)
             .insert(
               CachedProfilePhotosCompanion.insert(
                 userId: profile.id,
-                position: photo.position,
+                // The list order is authoritative. A stale embedded position
+                // must never make a successful reorder revert after restart.
+                position: index,
                 avatarUrl: Value(photo.avatarUrl),
                 storagePath: Value(photo.storagePath),
                 bytes: Value(photo.bytes),
@@ -91,5 +102,26 @@ class ProfileCacheDataSource {
             );
       }
     });
+  }
+
+  List<ProfilePhoto> _alignPrimaryPhoto(
+    List<ProfilePhoto> photos, {
+    required String? avatarUrl,
+    required String? storagePath,
+  }) {
+    if (photos.length < 2) return photos;
+    final primaryIndex = photos.indexWhere(
+      (photo) => storagePath != null
+          ? photo.storagePath == storagePath
+          : avatarUrl != null && photo.avatarUrl == avatarUrl,
+    );
+    if (primaryIndex <= 0) return photos;
+
+    final aligned = photos.toList()..insert(0, photos[primaryIndex]);
+    aligned.removeAt(primaryIndex + 1);
+    return List<ProfilePhoto>.unmodifiable([
+      for (var index = 0; index < aligned.length; index++)
+        aligned[index].copyWith(position: index),
+    ]);
   }
 }

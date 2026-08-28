@@ -9,6 +9,7 @@ import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
+import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 
 class ChatRepository implements IChatRepository {
   ChatRepository({
@@ -18,6 +19,7 @@ class ChatRepository implements IChatRepository {
     required ChatMediaProcessor mediaProcessor,
     required MediaCacheService mediaCache,
     required ConversationSyncService syncService,
+    required ILocalMediaRepository localMediaRepository,
     Uuid uuid = const Uuid(),
   }) : _config = config,
        _cache = cache,
@@ -25,6 +27,7 @@ class ChatRepository implements IChatRepository {
        _mediaProcessor = mediaProcessor,
        _mediaCache = mediaCache,
        _syncService = syncService,
+       _localMediaRepository = localMediaRepository,
        _uuid = uuid;
 
   static const _retryInterval = Duration(seconds: 20);
@@ -35,6 +38,7 @@ class ChatRepository implements IChatRepository {
   final ChatMediaProcessor _mediaProcessor;
   final MediaCacheService _mediaCache;
   final ConversationSyncService _syncService;
+  final ILocalMediaRepository _localMediaRepository;
   final Uuid _uuid;
   final Set<String> _deliveringOperationIds = {};
   bool _isNetworkPaused = false;
@@ -206,6 +210,7 @@ class ChatRepository implements IChatRepository {
       await _cache.removePendingOperation(messageId);
       await _cache.removeMessage(messageId);
       await _syncService.refreshLocalPreview(chatId);
+      await _localMediaRepository.collectGarbage();
       return;
     }
     await _remote.deleteMessage(
@@ -325,6 +330,7 @@ class ChatRepository implements IChatRepository {
         operation.chatId,
         refreshAfterActive: true,
       );
+      await _localMediaRepository.collectGarbage();
     } catch (error, stackTrace) {
       if (operation.type == MessageType.image.name) {
         await _cache.markMessageStatus(operation.id, MessageStatus.error);
@@ -333,6 +339,7 @@ class ChatRepository implements IChatRepository {
       _config.talker.handle(error, stackTrace, 'Pending message upload failed');
     } finally {
       _deliveringOperationIds.remove(operation.id);
+      unawaited(_localMediaRepository.collectGarbage());
     }
   }
 

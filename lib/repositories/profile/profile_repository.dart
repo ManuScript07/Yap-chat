@@ -6,6 +6,7 @@ import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
 import 'package:yap_chat/repositories/profile/avatar_storage_data_source.dart';
+import 'package:yap_chat/repositories/profile/avatar_deletion_queue.dart';
 import 'package:yap_chat/repositories/profile/profile_cache_data_source.dart';
 import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
 
@@ -14,15 +15,18 @@ class ProfileRepository implements IProfileRepository {
     required SupabaseClient client,
     required ProfileCacheDataSource cache,
     required AvatarStorageDataSource avatarStorage,
+    required AvatarDeletionQueue avatarDeletionQueue,
     required Talker talker,
   }) : _client = client,
        _cache = cache,
        _avatarStorage = avatarStorage,
+       _avatarDeletionQueue = avatarDeletionQueue,
        _talker = talker;
 
   final SupabaseClient _client;
   final ProfileCacheDataSource _cache;
   final AvatarStorageDataSource _avatarStorage;
+  final AvatarDeletionQueue _avatarDeletionQueue;
   final Talker _talker;
 
   @override
@@ -45,6 +49,7 @@ class ProfileRepository implements IProfileRepository {
       session: session,
     );
     await _writeCacheBestEffort(profile);
+    unawaited(_reconcileAvatarDeletions(profile));
     return profile;
   }
 
@@ -79,7 +84,6 @@ class ProfileRepository implements IProfileRepository {
     _talker.info(
       'Profile save started: photos=${photos.length}, uploads=$uploadCount',
     );
-    final uploadedPaths = <String>[];
     final savedPhotos = <ProfilePhoto>[];
     try {
       for (var index = 0; index < photos.length; index++) {
@@ -89,7 +93,12 @@ class ProfileRepository implements IProfileRepository {
             userId: userId,
             sourceBytes: photo.bytes!,
           );
-          uploadedPaths.add(uploaded.path);
+          try {
+            await _avatarDeletionQueue.enqueue(userId, [uploaded.path]);
+          } catch (_) {
+            await _deleteAvatarBestEffort(uploaded.path);
+            rethrow;
+          }
           savedPhotos.add(
             ProfilePhoto(
               position: index,
@@ -102,6 +111,13 @@ class ProfileRepository implements IProfileRepository {
           savedPhotos.add(photo.copyWith(position: index));
         }
       }
+
+      await _avatarDeletionQueue.enqueue(
+        userId,
+        currentProfile.effectivePhotos
+            .map((photo) => photo.storagePath)
+            .whereType<String>(),
+      );
 
       final response = await _client.rpc<List<dynamic>>(
         'save_own_profile',
@@ -134,27 +150,13 @@ class ProfileRepository implements IProfileRepository {
       profile = _withPhotos(profile, hydratedPhotos);
       await _writeCacheBestEffort(profile);
 
-      final keptPaths = hydratedPhotos
-          .map((photo) => photo.storagePath)
-          .whereType<String>()
-          .toSet();
-      for (final oldPath
-          in currentProfile.effectivePhotos
-              .map((photo) => photo.storagePath)
-              .whereType<String>()) {
-        if (!keptPaths.contains(oldPath)) {
-          unawaited(_deleteAvatarBestEffort(oldPath));
-        }
-      }
+      unawaited(_reconcileAvatarDeletions(profile));
       _talker.info(
         'Profile save completed: durationMs=${stopwatch.elapsedMilliseconds}, '
         'photos=${hydratedPhotos.length}, uploads=$uploadCount',
       );
       return profile;
     } on PostgrestException catch (error, stackTrace) {
-      for (final path in uploadedPaths) {
-        await _deleteAvatarBestEffort(path);
-      }
       if (error.code == '23505') {
         _talker.warning(
           'Profile save rejected: code=23505, '
@@ -170,9 +172,6 @@ class ProfileRepository implements IProfileRepository {
       );
       rethrow;
     } catch (error, stackTrace) {
-      for (final path in uploadedPaths) {
-        await _deleteAvatarBestEffort(path);
-      }
       _talker.handle(
         error,
         stackTrace,
@@ -264,7 +263,7 @@ class ProfileRepository implements IProfileRepository {
           ),
         )
         .toList(growable: false);
-    if (photos.isNotEmpty) return photos;
+    if (photos.isNotEmpty) return _alignPrimaryPhoto(profile, photos);
     if (profile.avatarUrl == null && profile.avatarStoragePath == null) {
       return const [];
     }
@@ -275,6 +274,26 @@ class ProfileRepository implements IProfileRepository {
         storagePath: profile.avatarStoragePath,
         updatedAt: profile.avatarUpdatedAt,
       ),
+    ];
+  }
+
+  List<ProfilePhoto> _alignPrimaryPhoto(
+    UserProfile profile,
+    List<ProfilePhoto> photos,
+  ) {
+    if (photos.length < 2) return photos;
+    final primaryIndex = photos.indexWhere(
+      (photo) => profile.avatarStoragePath != null
+          ? photo.storagePath == profile.avatarStoragePath
+          : profile.avatarUrl != null && photo.avatarUrl == profile.avatarUrl,
+    );
+    if (primaryIndex <= 0) return photos;
+
+    final aligned = photos.toList()..insert(0, photos[primaryIndex]);
+    aligned.removeAt(primaryIndex + 1);
+    return [
+      for (var index = 0; index < aligned.length; index++)
+        aligned[index].copyWith(position: index),
     ];
   }
 
@@ -411,6 +430,17 @@ class ProfileRepository implements IProfileRepository {
     } catch (_) {
       // Удаление старого файла не должно откатывать успешно сохранённый профиль.
     }
+  }
+
+  Future<void> _reconcileAvatarDeletions(UserProfile profile) {
+    return _avatarDeletionQueue.reconcile(
+      ownerUserId: profile.id,
+      referencedPaths: profile.effectivePhotos
+          .map((photo) => photo.storagePath)
+          .whereType<String>()
+          .toSet(),
+      delete: _avatarStorage.delete,
+    );
   }
 
   Future<UserProfile?> _readCacheBestEffort(String userId) async {

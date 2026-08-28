@@ -22,6 +22,10 @@ class MockProfileRepository implements IProfileRepository {
     if (saved == null) return null;
 
     final profile = _profileFromJson(saved);
+    final normalized = _profileToJson(profile);
+    if (normalized != saved) {
+      await _preferences.setString(_storageKey, normalized);
+    }
     return profile.id == userId ? profile : null;
   }
 
@@ -31,6 +35,10 @@ class MockProfileRepository implements IProfileRepository {
     final saved = _preferences.getString(_storageKey);
     if (saved != null) {
       final profile = _profileFromJson(saved);
+      final normalized = _profileToJson(profile);
+      if (normalized != saved) {
+        await _preferences.setString(_storageKey, normalized);
+      }
       return _acceptMissingDocuments(profile);
     }
 
@@ -134,40 +142,40 @@ class MockProfileRepository implements IProfileRepository {
   }
 
   Future<void> _save(UserProfile profile) {
-    return _preferences.setString(
-      _storageKey,
-      jsonEncode({
-        'id': profile.id,
-        'username': profile.username,
-        'display_name': profile.displayName,
-        'birth_date': profile.birthDate?.toIso8601String(),
-        'avatar_url': profile.avatarUrl,
-        'avatar_storage_path': profile.avatarStoragePath,
-        'avatar_bytes': profile.avatarBytes == null
-            ? null
-            : base64Encode(profile.avatarBytes!),
-        'avatar_updated_at': profile.avatarUpdatedAt?.toIso8601String(),
-        'gender': profile.gender.databaseValue,
-        'bio': profile.bio,
-        'onboarding_completed': profile.onboardingCompleted,
-        'terms_accepted_at': profile.termsAcceptedAt?.toIso8601String(),
-        'privacy_accepted_at': profile.privacyAcceptedAt?.toIso8601String(),
-        'created_at': profile.createdAt?.toIso8601String(),
-        'photos': profile.photos
-            .map(
-              (photo) => {
-                'position': photo.position,
-                'avatar_url': photo.avatarUrl,
-                'storage_path': photo.storagePath,
-                'bytes': photo.bytes == null
-                    ? null
-                    : base64Encode(photo.bytes!),
-                'updated_at': photo.updatedAt?.toIso8601String(),
-              },
-            )
-            .toList(growable: false),
-      }),
-    );
+    return _preferences.setString(_storageKey, _profileToJson(profile));
+  }
+
+  String _profileToJson(UserProfile profile) {
+    return jsonEncode({
+      'id': profile.id,
+      'username': profile.username,
+      'display_name': profile.displayName,
+      'birth_date': profile.birthDate?.toIso8601String(),
+      'avatar_url': profile.avatarUrl,
+      'avatar_storage_path': profile.avatarStoragePath,
+      // photos[0] is the source of truth; keep this only for legacy profiles.
+      'avatar_bytes': profile.photos.isNotEmpty || profile.avatarBytes == null
+          ? null
+          : base64Encode(profile.avatarBytes!),
+      'avatar_updated_at': profile.avatarUpdatedAt?.toIso8601String(),
+      'gender': profile.gender.databaseValue,
+      'bio': profile.bio,
+      'onboarding_completed': profile.onboardingCompleted,
+      'terms_accepted_at': profile.termsAcceptedAt?.toIso8601String(),
+      'privacy_accepted_at': profile.privacyAcceptedAt?.toIso8601String(),
+      'created_at': profile.createdAt?.toIso8601String(),
+      'photos': profile.photos
+          .map(
+            (photo) => {
+              'position': photo.position,
+              'avatar_url': photo.avatarUrl,
+              'storage_path': photo.storagePath,
+              'bytes': photo.bytes == null ? null : base64Encode(photo.bytes!),
+              'updated_at': photo.updatedAt?.toIso8601String(),
+            },
+          )
+          .toList(growable: false),
+    });
   }
 
   UserProfile _profileFromJson(String value) {
@@ -177,21 +185,20 @@ class MockProfileRepository implements IProfileRepository {
         .cast<Map<String, dynamic>>();
     final parsed = UserProfile.fromMap(map).copyWith(
       avatarBytes: encodedAvatar == null ? null : base64Decode(encodedAvatar),
-      photos: photoMaps
-          .map(
-            (photo) => ProfilePhoto(
-              position: photo['position'] as int,
-              avatarUrl: photo['avatar_url'] as String?,
-              storagePath: photo['storage_path'] as String?,
-              bytes: photo['bytes'] == null
-                  ? null
-                  : base64Decode(photo['bytes'] as String),
-              updatedAt: DateTime.tryParse(
-                photo['updated_at'] as String? ?? '',
-              ),
+      photos: [
+        for (var index = 0; index < photoMaps.length; index++)
+          ProfilePhoto(
+            position: index,
+            avatarUrl: photoMaps[index]['avatar_url'] as String?,
+            storagePath: photoMaps[index]['storage_path'] as String?,
+            bytes: photoMaps[index]['bytes'] == null
+                ? null
+                : base64Decode(photoMaps[index]['bytes'] as String),
+            updatedAt: DateTime.tryParse(
+              photoMaps[index]['updated_at'] as String? ?? '',
             ),
-          )
-          .toList(growable: false),
+          ),
+      ],
     );
     if (parsed.photos.isNotEmpty ||
         (parsed.avatarUrl == null && parsed.avatarBytes == null)) {

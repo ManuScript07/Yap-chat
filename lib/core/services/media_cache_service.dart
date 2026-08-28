@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/core/database/database.dart';
 
@@ -14,20 +15,39 @@ class MediaCacheService {
   MediaCacheService({
     required AppDatabase database,
     SupabaseClient? client,
-    this.maxCacheBytes = 1024 * 1024 * 1024,
+    this.maxCacheBytes = 256 * 1024 * 1024,
+    this.maxSingleFileBytes = 16 * 1024 * 1024,
+    this.environment = 'prod',
+    this.trimDelay = const Duration(seconds: 2),
+    Talker? talker,
+    Future<Directory> Function()? cacheDirectoryProvider,
+    Future<Directory> Function()? supportDirectoryProvider,
   }) : _database = database,
-       _client = client;
+       _client = client,
+       _talker = talker,
+       _cacheDirectoryProvider =
+           cacheDirectoryProvider ?? getTemporaryDirectory,
+       _supportDirectoryProvider =
+           supportDirectoryProvider ?? getApplicationSupportDirectory;
 
   static const externalAvatarsBucket = 'external-avatars';
 
   final AppDatabase _database;
   final SupabaseClient? _client;
   final int maxCacheBytes;
+  final int maxSingleFileBytes;
+  final String environment;
+  final Duration trimDelay;
+  final Talker? _talker;
+  final Future<Directory> Function() _cacheDirectoryProvider;
+  final Future<Directory> Function() _supportDirectoryProvider;
   final Uuid _uuid = const Uuid();
   final Map<String, Future<String>> _activeWrites = {};
   final LinkedHashMap<String, String> _resolvedPaths = LinkedHashMap();
   final Queue<Completer<void>> _downloadQueue = Queue();
   final Map<String, Timer> _trimTimers = {};
+  final Map<String, Future<void>> _maintenance = {};
+  final Map<String, int> _userGenerations = {};
   int _activeDownloadCount = 0;
 
   Future<String> cacheStorageFile({
@@ -35,34 +55,52 @@ class MediaCacheService {
     required String bucket,
     required String storagePath,
     String? mimeType,
-  }) {
+  }) async {
+    await _ensureMaintenance(ownerUserId);
+    final generation = _generation(ownerUserId);
     final key = _operationKey(ownerUserId, bucket, storagePath);
     final resolved = _takeResolvedPath(key);
-    if (resolved != null) return Future.value(resolved);
-    return _runOnce(ownerUserId, bucket, storagePath, () async {
-      final cached = await _readExisting(
-        ownerUserId,
-        bucket,
-        storagePath,
-        mimeType,
-      );
-      if (cached != null) return cached;
-
-      final client = _client;
-      if (client == null) {
-        throw StateError('Supabase is required to download storage media');
+    if (resolved != null) {
+      final file = File(resolved);
+      if (await file.exists()) {
+        await file.setLastModified(DateTime.now());
+        return resolved;
       }
-      final bytes = await _withDownloadSlot(
-        () => client.storage.from(bucket).download(storagePath),
-      );
-      return _writeBytes(
-        ownerUserId: ownerUserId,
-        bucket: bucket,
-        storagePath: storagePath,
-        bytes: bytes,
-        mimeType: mimeType,
-      );
-    }).then((localPath) => _rememberResolvedPath(key, localPath));
+      _forgetResolvedPath(resolved);
+    }
+    final localPath = await _runOnce(
+      ownerUserId,
+      bucket,
+      storagePath,
+      () async {
+        final cached = await _readExisting(
+          ownerUserId,
+          bucket,
+          storagePath,
+          mimeType,
+        );
+        if (cached != null) return cached;
+
+        final client = _client;
+        if (client == null) {
+          throw StateError('Supabase is required to download storage media');
+        }
+        final bytes = await _withDownloadSlot(
+          () => client.storage.from(bucket).download(storagePath),
+        );
+        _validateFileSize(bytes.lengthInBytes);
+        return _writeBytes(
+          ownerUserId: ownerUserId,
+          bucket: bucket,
+          storagePath: storagePath,
+          bytes: bytes,
+          mimeType: mimeType,
+          expectedGeneration: generation,
+        );
+      },
+    );
+    _ensureGeneration(ownerUserId, generation);
+    return _rememberResolvedPath(key, localPath);
   }
 
   Future<String?> findStorageFile({
@@ -70,7 +108,8 @@ class MediaCacheService {
     required String bucket,
     required String storagePath,
     String? mimeType,
-  }) {
+  }) async {
+    await _ensureMaintenance(ownerUserId);
     return _readExisting(ownerUserId, bucket, storagePath, mimeType);
   }
 
@@ -78,11 +117,20 @@ class MediaCacheService {
     required String ownerUserId,
     required String url,
     String bucket = externalAvatarsBucket,
-  }) {
+  }) async {
+    await _ensureMaintenance(ownerUserId);
+    final generation = _generation(ownerUserId);
     final key = _operationKey(ownerUserId, bucket, url);
     final resolved = _takeResolvedPath(key);
-    if (resolved != null) return Future.value(resolved);
-    return _runOnce(ownerUserId, bucket, url, () async {
+    if (resolved != null) {
+      final file = File(resolved);
+      if (await file.exists()) {
+        await file.setLastModified(DateTime.now());
+        return resolved;
+      }
+      _forgetResolvedPath(resolved);
+    }
+    final localPath = await _runOnce(ownerUserId, bucket, url, () async {
       final cached = await _readExisting(ownerUserId, bucket, url, null);
       if (cached != null) return cached;
 
@@ -98,19 +146,33 @@ class MediaCacheService {
               uri: uri,
             );
           }
-          final bytes = await consolidateHttpClientResponseBytes(response);
+          final advertisedLength = response.contentLength;
+          if (advertisedLength > maxSingleFileBytes) {
+            throw const FileSystemException('Media file is too large');
+          }
+          final builder = BytesBuilder(copy: false);
+          var receivedBytes = 0;
+          await for (final chunk in response) {
+            receivedBytes += chunk.length;
+            _validateFileSize(receivedBytes);
+            builder.add(chunk);
+          }
+          final bytes = builder.takeBytes();
           return await _writeBytes(
             ownerUserId: ownerUserId,
             bucket: bucket,
             storagePath: url,
             bytes: bytes,
             mimeType: response.headers.contentType?.mimeType,
+            expectedGeneration: generation,
           );
         } finally {
           client.close(force: true);
         }
       });
-    }).then((localPath) => _rememberResolvedPath(key, localPath));
+    });
+    _ensureGeneration(ownerUserId, generation);
+    return _rememberResolvedPath(key, localPath);
   }
 
   Future<String> storeBytes({
@@ -119,8 +181,11 @@ class MediaCacheService {
     required String storagePath,
     required Uint8List bytes,
     String? mimeType,
-  }) {
-    return _runOnce(
+  }) async {
+    await _ensureMaintenance(ownerUserId);
+    _validateFileSize(bytes.lengthInBytes);
+    final generation = _generation(ownerUserId);
+    final localPath = await _runOnce(
       ownerUserId,
       bucket,
       storagePath,
@@ -130,8 +195,11 @@ class MediaCacheService {
         storagePath: storagePath,
         bytes: bytes,
         mimeType: mimeType,
+        expectedGeneration: generation,
       ),
     );
+    _ensureGeneration(ownerUserId, generation);
+    return localPath;
   }
 
   Future<String> storeFile({
@@ -164,7 +232,15 @@ class MediaCacheService {
         mimeType,
       );
       if (await file.exists()) await file.delete();
+      final legacyFile = await _legacyDestinationFile(
+        ownerUserId,
+        bucket,
+        storagePath,
+        mimeType,
+      );
+      if (await legacyFile.exists()) await legacyFile.delete();
       _forgetResolvedPath(file.path);
+      _forgetResolvedPath(legacyFile.path);
     }
   }
 
@@ -176,7 +252,10 @@ class MediaCacheService {
   }
 
   Future<void> clearUser(String ownerUserId) async {
+    _userGenerations[ownerUserId] = _generation(ownerUserId) + 1;
     _trimTimers.remove(ownerUserId)?.cancel();
+    _maintenance.remove(ownerUserId);
+    _activeWrites.removeWhere((key, _) => key.startsWith('$ownerUserId\u0000'));
     final pending = await (_database.select(
       _database.pendingChatOperations,
     )..where((table) => table.ownerUserId.equals(ownerUserId))).get();
@@ -193,8 +272,20 @@ class MediaCacheService {
       }
     }
 
-    final directory = await _userDirectory(ownerUserId);
-    if (await directory.exists()) await directory.delete(recursive: true);
+    try {
+      final directory = await _userDirectory(ownerUserId);
+      if (await directory.exists()) await directory.delete(recursive: true);
+      final legacyDirectory = await _legacyUserDirectory(ownerUserId);
+      if (await legacyDirectory.exists()) {
+        await legacyDirectory.delete(recursive: true);
+      }
+    } catch (error, stackTrace) {
+      _talker?.handle(
+        error,
+        stackTrace,
+        'Media cache directory cleanup failed',
+      );
+    }
     _resolvedPaths.removeWhere(
       (key, _) => key.startsWith('$ownerUserId\u0000'),
     );
@@ -295,9 +386,19 @@ class MediaCacheService {
       storagePath,
       mimeType,
     );
-    if (!await file.exists()) return null;
-    await file.setLastModified(DateTime.now());
-    return file.path;
+    if (await file.exists()) {
+      await file.setLastModified(DateTime.now());
+      return file.path;
+    }
+    final legacyFile = await _legacyDestinationFile(
+      ownerUserId,
+      bucket,
+      storagePath,
+      mimeType,
+    );
+    if (!await legacyFile.exists()) return null;
+    await legacyFile.setLastModified(DateTime.now());
+    return legacyFile.path;
   }
 
   Future<String> _writeBytes({
@@ -306,8 +407,11 @@ class MediaCacheService {
     required String storagePath,
     required Uint8List bytes,
     String? mimeType,
+    required int expectedGeneration,
   }) async {
     if (bytes.isEmpty) throw const FileSystemException('Empty media file');
+    _validateFileSize(bytes.lengthInBytes);
+    _ensureGeneration(ownerUserId, expectedGeneration);
     final destination = await _destinationFile(
       ownerUserId,
       bucket,
@@ -316,19 +420,28 @@ class MediaCacheService {
     );
     await destination.parent.create(recursive: true);
     final temporary = File('${destination.path}.tmp');
-    await temporary.writeAsBytes(bytes, flush: true);
-    if (await destination.exists()) await destination.delete();
-    await temporary.rename(destination.path);
-    await destination.setLastModified(DateTime.now());
-    _scheduleTrim(ownerUserId);
-    return destination.path;
+    try {
+      await temporary.writeAsBytes(bytes, flush: true);
+      _ensureGeneration(ownerUserId, expectedGeneration);
+      if (await destination.exists()) await destination.delete();
+      await temporary.rename(destination.path);
+      await destination.setLastModified(DateTime.now());
+      _scheduleTrim(ownerUserId);
+      return destination.path;
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
   }
 
   void _scheduleTrim(String ownerUserId) {
     _trimTimers.remove(ownerUserId)?.cancel();
-    _trimTimers[ownerUserId] = Timer(const Duration(seconds: 2), () {
+    _trimTimers[ownerUserId] = Timer(trimDelay, () {
       _trimTimers.remove(ownerUserId);
-      unawaited(_trim(ownerUserId).catchError((_) {}));
+      unawaited(
+        _trim(ownerUserId).catchError((Object error, StackTrace stackTrace) {
+          _talker?.handle(error, stackTrace, 'Media cache trim failed');
+        }),
+      );
     });
   }
 
@@ -342,8 +455,12 @@ class MediaCacheService {
         .toList();
     final files = <({File file, int size, DateTime accessedAt})>[];
     for (final file in entries) {
-      final stat = await file.stat();
-      files.add((file: file, size: stat.size, accessedAt: stat.modified));
+      try {
+        final stat = await file.stat();
+        files.add((file: file, size: stat.size, accessedAt: stat.modified));
+      } on FileSystemException {
+        // Файл мог исчезнуть одновременно с очисткой диалога или logout.
+      }
     }
     files.sort((left, right) => left.accessedAt.compareTo(right.accessedAt));
     var totalBytes = files.fold<int>(0, (sum, item) => sum + item.size);
@@ -356,7 +473,19 @@ class MediaCacheService {
   }
 
   Future<Directory> _userDirectory(String ownerUserId) async {
-    final support = await getApplicationSupportDirectory();
+    final cache = await _cacheDirectoryProvider();
+    return Directory(
+      path.join(
+        cache.path,
+        'media_cache',
+        _safeSegment(environment),
+        _safeSegment(ownerUserId),
+      ),
+    );
+  }
+
+  Future<Directory> _legacyUserDirectory(String ownerUserId) async {
+    final support = await _supportDirectoryProvider();
     return Directory(path.join(support.path, 'media_cache', ownerUserId));
   }
 
@@ -376,6 +505,62 @@ class MediaCacheService {
         '${_uuid.v5(Namespace.url.value, '$bucket:$storagePath')}$extension';
     return File(path.join(directory.path, fileName));
   }
+
+  Future<File> _legacyDestinationFile(
+    String ownerUserId,
+    String bucket,
+    String storagePath,
+    String? mimeType,
+  ) async {
+    final directory = Directory(
+      path.join((await _legacyUserDirectory(ownerUserId)).path, bucket),
+    );
+    return File(
+      path.join(directory.path, _fileName(bucket, storagePath, mimeType)),
+    );
+  }
+
+  String _fileName(String bucket, String storagePath, String? mimeType) {
+    final extension = bucket == externalAvatarsBucket
+        ? '.image'
+        : _extension(storagePath, mimeType);
+    return '${_uuid.v5(Namespace.url.value, '$bucket:$storagePath')}$extension';
+  }
+
+  Future<void> _ensureMaintenance(String ownerUserId) {
+    return _maintenance.putIfAbsent(ownerUserId, () async {
+      final directory = await _userDirectory(ownerUserId);
+      if (await directory.exists()) {
+        await for (final entity in directory.list(recursive: true)) {
+          if (entity is File && entity.path.endsWith('.tmp')) {
+            try {
+              await entity.delete();
+            } on FileSystemException {
+              // Параллельная запись уже могла завершить временный файл.
+            }
+          }
+        }
+      }
+      await _trim(ownerUserId);
+    });
+  }
+
+  int _generation(String ownerUserId) => _userGenerations[ownerUserId] ?? 0;
+
+  void _ensureGeneration(String ownerUserId, int expectedGeneration) {
+    if (_generation(ownerUserId) != expectedGeneration) {
+      throw const FileSystemException('Media cache was cleared');
+    }
+  }
+
+  void _validateFileSize(int size) {
+    if (size > maxSingleFileBytes) {
+      throw const FileSystemException('Media file is too large');
+    }
+  }
+
+  String _safeSegment(String value) =>
+      value.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
 
   String _extension(String storagePath, String? mimeType) {
     final uri = Uri.tryParse(storagePath);
@@ -402,5 +587,6 @@ class MediaCacheService {
     }
     _trimTimers.clear();
     _resolvedPaths.clear();
+    _maintenance.clear();
   }
 }
