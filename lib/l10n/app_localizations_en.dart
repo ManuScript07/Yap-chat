@@ -157,6 +157,72 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsPrivacy => 'Privacy';
+
+  @override
+  String get settingsVisibility => 'Visibility settings';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsHelp => 'Help';
+
+  @override
+  String get settingsAbout => 'About the app';
+
+  @override
+  String get settingsSocial => 'We are on social media';
+
+  @override
+  String get settingsLogout => 'Log out';
+
+  @override
+  String get settingsDeleteAccount => 'Delete account';
+
+  @override
+  String get settingsBlacklist => 'Blocked users';
+
+  @override
+  String get settingsSearchByUsername => 'Find by username';
+
+  @override
+  String get settingsSearchByPhone => 'Find by phone number';
+
+  @override
+  String get settingsSearchByName => 'Find by name';
+
+  @override
+  String get settingsShareLocation => 'Share my location';
+
+  @override
+  String get settingsFriendsSeeGeo => 'see your exact location';
+
+  @override
+  String get settingsLanguageRussian => 'русский';
+
+  @override
+  String get settingsLanguageEnglish => 'english';
+
+  @override
+  String get settingsSearchBlacklist => 'search';
+
+  @override
+  String get settingsNobodyHere => 'nobody here';
+
+  @override
+  String get settingsComingSoon => 'coming soon';
+
+  @override
+  String get settingsTerms => 'Terms of service';
+
+  @override
+  String get settingsPrivacyPolicy => 'Privacy policy';
+
+  @override
   String get photoHasBeenSavedToGallery => 'Photo has been saved to gallery';
 
   @override

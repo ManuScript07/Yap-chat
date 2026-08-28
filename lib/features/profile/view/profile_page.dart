@@ -10,6 +10,7 @@ import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/features/profile/view/profile_gallery_page.dart';
 import 'package:yap_chat/features/profile/widgets/widgets.dart';
+import 'package:yap_chat/features/settings/settings.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/ui/widgets/glass_button.dart';
@@ -82,7 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       size: 50,
                       iconSize: 29,
                       borderRadius: 20,
-                      onPressed: _showSettingsStub,
+                      onPressed: () => showSettingsPage(context),
                     ),
                     const Spacer(),
                     GlassButton(
@@ -132,14 +133,6 @@ class _ProfilePageState extends State<ProfilePage> {
           child: child,
         ),
       ),
-    );
-  }
-
-  void _showSettingsStub() {
-    showAppSnackBar(
-      context,
-      message: context.l10n.friendsAddComingSoon,
-      type: SnackBarType.info,
     );
   }
 

@@ -296,6 +296,138 @@ abstract class AppLocalizations {
   /// **'Настроки'**
   String get settings;
 
+  /// No description provided for @settingsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройки'**
+  String get settingsTitle;
+
+  /// No description provided for @settingsPrivacy.
+  ///
+  /// In ru, this message translates to:
+  /// **'Приватность'**
+  String get settingsPrivacy;
+
+  /// No description provided for @settingsVisibility.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройки видимости'**
+  String get settingsVisibility;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In ru, this message translates to:
+  /// **'Язык'**
+  String get settingsLanguage;
+
+  /// No description provided for @settingsHelp.
+  ///
+  /// In ru, this message translates to:
+  /// **'Помощь'**
+  String get settingsHelp;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In ru, this message translates to:
+  /// **'О приложении'**
+  String get settingsAbout;
+
+  /// No description provided for @settingsSocial.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мы в соцсетях'**
+  String get settingsSocial;
+
+  /// No description provided for @settingsLogout.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выход'**
+  String get settingsLogout;
+
+  /// No description provided for @settingsDeleteAccount.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить аккаунт'**
+  String get settingsDeleteAccount;
+
+  /// No description provided for @settingsBlacklist.
+  ///
+  /// In ru, this message translates to:
+  /// **'Чёрный список'**
+  String get settingsBlacklist;
+
+  /// No description provided for @settingsSearchByUsername.
+  ///
+  /// In ru, this message translates to:
+  /// **'Искать по никнейму'**
+  String get settingsSearchByUsername;
+
+  /// No description provided for @settingsSearchByPhone.
+  ///
+  /// In ru, this message translates to:
+  /// **'Искать по номеру'**
+  String get settingsSearchByPhone;
+
+  /// No description provided for @settingsSearchByName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Искать по имени'**
+  String get settingsSearchByName;
+
+  /// No description provided for @settingsShareLocation.
+  ///
+  /// In ru, this message translates to:
+  /// **'Делиться гео'**
+  String get settingsShareLocation;
+
+  /// No description provided for @settingsFriendsSeeGeo.
+  ///
+  /// In ru, this message translates to:
+  /// **'видят твоё точное гео'**
+  String get settingsFriendsSeeGeo;
+
+  /// No description provided for @settingsLanguageRussian.
+  ///
+  /// In ru, this message translates to:
+  /// **'русский'**
+  String get settingsLanguageRussian;
+
+  /// No description provided for @settingsLanguageEnglish.
+  ///
+  /// In ru, this message translates to:
+  /// **'english'**
+  String get settingsLanguageEnglish;
+
+  /// No description provided for @settingsSearchBlacklist.
+  ///
+  /// In ru, this message translates to:
+  /// **'поиск'**
+  String get settingsSearchBlacklist;
+
+  /// No description provided for @settingsNobodyHere.
+  ///
+  /// In ru, this message translates to:
+  /// **'тут никого нет'**
+  String get settingsNobodyHere;
+
+  /// No description provided for @settingsComingSoon.
+  ///
+  /// In ru, this message translates to:
+  /// **'скоро'**
+  String get settingsComingSoon;
+
+  /// No description provided for @settingsTerms.
+  ///
+  /// In ru, this message translates to:
+  /// **'Условия обслуживания'**
+  String get settingsTerms;
+
+  /// No description provided for @settingsPrivacyPolicy.
+  ///
+  /// In ru, this message translates to:
+  /// **'Политика конфиденциальности'**
+  String get settingsPrivacyPolicy;
+
   /// No description provided for @photoHasBeenSavedToGallery.
   ///
   /// In ru, this message translates to:

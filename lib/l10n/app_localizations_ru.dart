@@ -163,6 +163,72 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settings => 'Настроки';
 
   @override
+  String get settingsTitle => 'Настройки';
+
+  @override
+  String get settingsPrivacy => 'Приватность';
+
+  @override
+  String get settingsVisibility => 'Настройки видимости';
+
+  @override
+  String get settingsLanguage => 'Язык';
+
+  @override
+  String get settingsHelp => 'Помощь';
+
+  @override
+  String get settingsAbout => 'О приложении';
+
+  @override
+  String get settingsSocial => 'Мы в соцсетях';
+
+  @override
+  String get settingsLogout => 'Выход';
+
+  @override
+  String get settingsDeleteAccount => 'Удалить аккаунт';
+
+  @override
+  String get settingsBlacklist => 'Чёрный список';
+
+  @override
+  String get settingsSearchByUsername => 'Искать по никнейму';
+
+  @override
+  String get settingsSearchByPhone => 'Искать по номеру';
+
+  @override
+  String get settingsSearchByName => 'Искать по имени';
+
+  @override
+  String get settingsShareLocation => 'Делиться гео';
+
+  @override
+  String get settingsFriendsSeeGeo => 'видят твоё точное гео';
+
+  @override
+  String get settingsLanguageRussian => 'русский';
+
+  @override
+  String get settingsLanguageEnglish => 'english';
+
+  @override
+  String get settingsSearchBlacklist => 'поиск';
+
+  @override
+  String get settingsNobodyHere => 'тут никого нет';
+
+  @override
+  String get settingsComingSoon => 'скоро';
+
+  @override
+  String get settingsTerms => 'Условия обслуживания';
+
+  @override
+  String get settingsPrivacyPolicy => 'Политика конфиденциальности';
+
+  @override
   String get photoHasBeenSavedToGallery => 'Фото сохранено в галерею';
 
   @override
