@@ -36,6 +36,8 @@ Future<void> main() async {
     dotenv.env,
     authRedirectUrl: authRedirectUrl,
     oauthAttemptCoordinator: oauthAttemptCoordinator,
+    preferences: preferences,
+    storageNamespace: environment.name,
   );
   final accountSessionController = AccountSessionController(
     initialUserId:
@@ -140,6 +142,8 @@ Future<SupabaseClient?> _initializeSupabase(
   Map<String, String> env, {
   required String authRedirectUrl,
   required OAuthAttemptCoordinator oauthAttemptCoordinator,
+  required SharedPreferences preferences,
+  required String storageNamespace,
 }) async {
   final url = env['SUPABASE_URL']?.trim();
   final publishableKey = env['SUPABASE_PUBLISHABLE_KEY']?.trim();
@@ -150,11 +154,22 @@ Future<SupabaseClient?> _initializeSupabase(
     return null;
   }
 
+  // A verifier from the previous SharedPreferences implementation cannot be
+  // safely resumed after this upgrade. Remove it before GoTrue can observe it.
+  await preferences.remove(
+    SecureSupabasePkceStorage.legacySharedPreferencesKey,
+  );
+
   await Supabase.initialize(
     url: url,
     publishableKey: publishableKey,
     authOptions: FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
+      localStorage: SecureSupabaseSessionStorage(
+        key: _supabaseSessionStorageKey(url),
+        legacyPreferences: preferences,
+      ),
+      pkceAsyncStorage: SecureSupabasePkceStorage(namespace: storageNamespace),
       detectSessionInUriPredicate: kIsWeb
           ? null
           : (uri) =>
@@ -164,6 +179,9 @@ Future<SupabaseClient?> _initializeSupabase(
   );
   return Supabase.instance.client;
 }
+
+String _supabaseSessionStorageKey(String url) =>
+    'sb-${Uri.parse(url).host.split('.').first}-auth-token';
 
 AppEnvironment _resolveEnvironment(Map<String, String> env) {
   final rawEnvironment = env['APP_ENV']?.trim().toLowerCase();

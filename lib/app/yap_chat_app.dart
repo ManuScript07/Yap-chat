@@ -64,6 +64,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   late final ChatNavigationCoordinator _chatNavigator;
   bool _dependenciesInitialized = false;
   String? _activeUserId;
+  final Set<String> _openingNotificationChatIds = <String>{};
 
   @override
   void initState() {
@@ -145,17 +146,45 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     await _chatNavigator.openById(pendingChatId);
   }
 
-  void _openNotificationChat(String conversationId) {
+  Future<void> _openNotificationChat(String conversationId) async {
     final notifications = context.read<NotificationsCubit>();
     if (notifications.state.pendingConversationId != conversationId) return;
-
-    notifications.navigationHandled(conversationId);
-    if (notifications.state.activeConversationId == conversationId ||
-        _isConversationVisible(conversationId)) {
+    if (!_openingNotificationChatIds.add(conversationId)) {
       return;
     }
 
-    unawaited(_chatNavigator.openById(conversationId));
+    try {
+      // On a cold start the local notification plugin can deliver its launch
+      // payload before AuthGate has mounted the authenticated router. Keep the
+      // pending id until the route is actually visible instead of dropping a
+      // valid tap during that short window.
+      for (var attempt = 0; attempt < 20; attempt++) {
+        if (!mounted ||
+            notifications.state.pendingConversationId != conversationId) {
+          return;
+        }
+
+        final authRouter = await _authenticatedRouter;
+        if (authRouter == null) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          continue;
+        }
+        if (notifications.state.activeConversationId == conversationId ||
+            _isConversationVisible(conversationId)) {
+          notifications.navigationHandled(conversationId);
+          return;
+        }
+
+        await _chatNavigator.openById(conversationId);
+        if (_isConversationVisible(conversationId)) {
+          notifications.navigationHandled(conversationId);
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    } finally {
+      _openingNotificationChatIds.remove(conversationId);
+    }
   }
 
   bool _isConversationVisible(String conversationId) {
@@ -345,7 +374,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
           listener: (context, state) {
             final conversationId = state.pendingConversationId;
             if (conversationId != null) {
-              _openNotificationChat(conversationId);
+              unawaited(_openNotificationChat(conversationId));
             }
           },
         ),

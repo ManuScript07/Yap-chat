@@ -86,7 +86,7 @@ class AndroidNotificationService {
 
     final sender = Person(
       key: payload.senderId,
-      name: payload.senderName,
+      name: payload.localizedTitle(l10n),
       important: true,
     );
     final messages = <Message>[
@@ -99,7 +99,7 @@ class AndroidNotificationService {
 
     final style = MessagingStyleInformation(
       Person(name: l10n.notificationYou),
-      conversationTitle: payload.senderName,
+      conversationTitle: payload.localizedTitle(l10n),
       groupConversation: false,
       messages: visibleMessages,
     );
@@ -118,7 +118,7 @@ class AndroidNotificationService {
 
     await _plugin.show(
       id: notificationId,
-      title: payload.senderName,
+      title: payload.localizedTitle(l10n),
       body: payload.localizedBody(l10n),
       notificationDetails: NotificationDetails(android: androidDetails),
       payload: payload.toJson(),
@@ -129,6 +129,12 @@ class AndroidNotificationService {
     if (!_isAndroid || conversationId.isEmpty) return;
     await initialize();
     await _plugin.cancel(id: notificationIdFor(conversationId));
+  }
+
+  Future<void> cancelAll() async {
+    if (!_isAndroid) return;
+    await initialize();
+    await _plugin.cancelAll();
   }
 
   int notificationIdFor(String conversationId) {

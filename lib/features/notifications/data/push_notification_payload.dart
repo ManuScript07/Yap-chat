@@ -76,15 +76,21 @@ class PushNotificationPayload extends Equatable {
 
   String localizedBody(AppLocalizations l10n) {
     if (kind == PushNotificationKind.friendRequest) {
-      return l10n.notificationFriendRequest;
+      return senderName.isEmpty
+          ? l10n.notificationNewFriendRequest
+          : l10n.notificationFriendRequest;
     }
     return switch (messageType) {
-      PushMessageType.text => messageText,
+      PushMessageType.text =>
+        messageText.isEmpty ? l10n.notificationNewMessage : messageText,
       PushMessageType.image => l10n.notificationPhoto,
       PushMessageType.audio => l10n.notificationAudio,
       PushMessageType.location => l10n.notificationLocation,
     };
   }
+
+  String localizedTitle(AppLocalizations l10n) =>
+      senderName.isEmpty ? l10n.notificationAppTitle : senderName;
 
   String toJson() => jsonEncode({
     'conversation_id': conversationId,

@@ -142,6 +142,7 @@ class RepositoryContainer {
               messaging: config.firebaseMessaging!,
               preferences: config.preferences,
               talker: config.talker,
+              accountSessionController: config.accountSessionController,
             ),
       friendsRepository: FriendsRepository(
         config: config,

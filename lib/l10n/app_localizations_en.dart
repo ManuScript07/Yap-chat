@@ -531,6 +531,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationYou => 'You';
 
   @override
+  String get notificationAppTitle => 'Yap chat';
+
+  @override
+  String get notificationNewMessage => 'New message';
+
+  @override
+  String get notificationNewFriendRequest => 'New friend request';
+
+  @override
   String get notificationPhoto => 'Photo';
 
   @override

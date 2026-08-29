@@ -6,3 +6,4 @@ export 'media_cache_service.dart';
 export 'phone_number_normalizer.dart';
 export 'reconnect_backoff.dart';
 export 'account_session_controller.dart';
+export 'secure_supabase_storage.dart';

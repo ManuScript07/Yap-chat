@@ -986,6 +986,24 @@ abstract class AppLocalizations {
   /// **'Ты'**
   String get notificationYou;
 
+  /// No description provided for @notificationAppTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Yap chat'**
+  String get notificationAppTitle;
+
+  /// No description provided for @notificationNewMessage.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новое сообщение'**
+  String get notificationNewMessage;
+
+  /// No description provided for @notificationNewFriendRequest.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новая заявка в друны'**
+  String get notificationNewFriendRequest;
+
   /// No description provided for @notificationPhoto.
   ///
   /// In ru, this message translates to:

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:permission_handler/permission_handler.dart' as permissions;
+import 'package:yap_chat/core/services/account_session_controller.dart';
 import 'package:yap_chat/features/notifications/data/data.dart';
 import 'package:yap_chat/repositories/notifications/abstract_push_notifications_repository.dart';
 import 'package:yap_chat/repositories/notifications/android_notification_service.dart';
@@ -17,11 +18,13 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     required FirebaseMessaging messaging,
     required SharedPreferences preferences,
     required Talker talker,
+    required AccountSessionController accountSessionController,
     AndroidNotificationService? notificationService,
   }) : _client = client,
        _messaging = messaging,
        _preferences = preferences,
        _talker = talker,
+       _accountSessionController = accountSessionController,
        _notificationService =
            notificationService ?? AndroidNotificationService();
 
@@ -32,6 +35,7 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
   final FirebaseMessaging _messaging;
   final SharedPreferences _preferences;
   final Talker _talker;
+  final AccountSessionController _accountSessionController;
   final AndroidNotificationService _notificationService;
   final StreamController<String> _openedConversationController =
       StreamController.broadcast(sync: true);
@@ -59,15 +63,23 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
       _currentUserId = null;
       _activeConversationId = null;
       await _preferences.remove(currentUserPreferenceKey);
+      await _cancelAllNotifications();
       return;
     }
-    if (_currentUserId == normalizedUserId) return;
+
+    final snapshot = _captureCurrentSnapshot(normalizedUserId);
+    if (snapshot == null) return;
+    final accountChanged = _currentUserId != normalizedUserId;
 
     _currentUserId = normalizedUserId;
     _activeConversationId = null;
     await _preferences.setString(currentUserPreferenceKey, normalizedUserId);
     await _bindListeners();
-    await _requestPermissionAndRegisterToken();
+    // Bind the launch-payload listener before cancelAll(). Initializing the
+    // local notification plugin reads a cold-start tap exactly once; clearing
+    // notifications first would consume and drop that payload.
+    if (accountChanged) await _cancelAllNotifications();
+    await _requestPermissionAndRegisterToken(snapshot);
     await _consumeInitialFirebaseMessage();
   });
 
@@ -87,7 +99,12 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     final wasForeground = _isAppForeground;
     _isAppForeground = isForeground;
     if (!wasForeground && isForeground && _currentUserId != null) {
-      await _enqueue(_requestPermissionAndRegisterToken);
+      await _enqueue(() async {
+        final snapshot = _captureCurrentSnapshot(_currentUserId!);
+        if (snapshot != null) {
+          await _requestPermissionAndRegisterToken(snapshot);
+        }
+      });
     }
   }
 
@@ -108,12 +125,15 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     _currentUserId = null;
     _activeConversationId = null;
     await _preferences.remove(currentUserPreferenceKey);
-    if (userId == null) return;
+    await _cancelAllNotifications();
 
     String? token;
     try {
       token = await _messaging.getToken();
-      if (token != null && token.isNotEmpty) {
+      if (userId != null &&
+          token != null &&
+          token.isNotEmpty &&
+          _client.auth.currentUser?.id == userId) {
         await _client.rpc(
           'unregister_push_device',
           params: {'device_token': token},
@@ -130,6 +150,9 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     }
   });
 
+  @override
+  Future<void> cancelAll() => _enqueue(_cancelAllNotifications);
+
   Future<void> _bindListeners() async {
     if (_listenersBound) return;
     _listenersBound = true;
@@ -140,7 +163,14 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     await _notificationService.initialize();
 
     _tokenSubscription = _messaging.onTokenRefresh.listen(
-      (token) => unawaited(_registerToken(token)),
+      (token) => unawaited(
+        _enqueue(() async {
+          final userId = _currentUserId;
+          if (userId == null) return;
+          final snapshot = _captureCurrentSnapshot(userId);
+          if (snapshot != null) await _registerToken(token, snapshot);
+        }),
+      ),
       onError: (Object error, StackTrace stackTrace) {
         _talker.handle(error, stackTrace, 'FCM token stream failed');
       },
@@ -159,7 +189,9 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     );
   }
 
-  Future<void> _requestPermissionAndRegisterToken() async {
+  Future<void> _requestPermissionAndRegisterToken(
+    AccountSessionSnapshot snapshot,
+  ) async {
     try {
       var settings = await _messaging.getNotificationSettings();
       if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
@@ -172,11 +204,14 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
       final isAllowed =
           settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional;
-      if (!isAllowed || _currentUserId == null) return;
+      if (!isAllowed || !_isCurrent(snapshot)) return;
 
-      await _resetTokenAfterSenderChange();
+      await _resetTokenAfterSenderChange(snapshot);
+      if (!_isCurrent(snapshot)) return;
       final token = await _messaging.getToken();
-      if (token != null && token.isNotEmpty) await _registerToken(token);
+      if (token != null && token.isNotEmpty) {
+        await _registerToken(token, snapshot);
+      }
     } catch (error, stackTrace) {
       _talker.handle(error, stackTrace, 'Push permission setup failed');
     }
@@ -190,23 +225,33 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
         AuthorizationStatus.notDetermined => PushPermissionStatus.notDetermined,
       };
 
-  Future<void> _resetTokenAfterSenderChange() async {
+  Future<void> _resetTokenAfterSenderChange(
+    AccountSessionSnapshot snapshot,
+  ) async {
     final senderId = Firebase.app().options.messagingSenderId.trim();
     if (senderId.isEmpty) return;
     if (_preferences.getString(_senderIdPreferenceKey) == senderId) return;
 
     try {
+      if (!_isCurrent(snapshot)) return;
       await _messaging.deleteToken();
+      if (!_isCurrent(snapshot)) return;
       await _preferences.setString(_senderIdPreferenceKey, senderId);
     } catch (error, stackTrace) {
       _talker.handle(error, stackTrace, 'FCM sender migration failed');
     }
   }
 
-  Future<void> _registerToken(String token) async {
-    if (_currentUserId == null || token.isEmpty) return;
+  Future<void> _registerToken(
+    String token,
+    AccountSessionSnapshot snapshot,
+  ) async {
+    if (token.isEmpty || !_isCurrent(snapshot)) return;
 
     try {
+      // The database upsert moves a token from a previous account to this one
+      // in one transaction. Guarding the snapshot keeps an old async token
+      // callback from ever issuing that transfer after an account switch.
       await _client.rpc(
         'register_push_device',
         params: {
@@ -262,6 +307,22 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
 
   bool _belongsToCurrentUser(PushNotificationPayload payload) =>
       _currentUserId != null && payload.recipientId == _currentUserId;
+
+  AccountSessionSnapshot? _captureCurrentSnapshot(String userId) {
+    try {
+      final snapshot = _accountSessionController.capture();
+      return snapshot.userId == userId ? snapshot : null;
+    } on StaleAccountSessionException {
+      return null;
+    }
+  }
+
+  bool _isCurrent(AccountSessionSnapshot snapshot) =>
+      _currentUserId == snapshot.userId &&
+      _client.auth.currentUser?.id == snapshot.userId &&
+      _accountSessionController.isCurrent(snapshot);
+
+  Future<void> _cancelAllNotifications() => _notificationService.cancelAll();
 
   String get _deviceLanguageCode {
     final languageCode = PlatformDispatcher.instance.locale.languageCode;

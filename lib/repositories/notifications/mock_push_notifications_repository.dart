@@ -28,5 +28,8 @@ class MockPushNotificationsRepository implements IPushNotificationsRepository {
   Future<void> unregisterCurrentDevice() async {}
 
   @override
+  Future<void> cancelAll() async {}
+
+  @override
   Future<void> dispose() async {}
 }

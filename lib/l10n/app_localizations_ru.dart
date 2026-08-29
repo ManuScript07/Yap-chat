@@ -536,6 +536,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get notificationYou => 'Ты';
 
   @override
+  String get notificationAppTitle => 'Yap chat';
+
+  @override
+  String get notificationNewMessage => 'Новое сообщение';
+
+  @override
+  String get notificationNewFriendRequest => 'Новая заявка в друны';
+
+  @override
   String get notificationPhoto => 'Фотография';
 
   @override

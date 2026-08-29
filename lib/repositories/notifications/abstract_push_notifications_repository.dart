@@ -15,5 +15,7 @@ abstract interface class IPushNotificationsRepository {
 
   Future<void> unregisterCurrentDevice();
 
+  Future<void> cancelAll();
+
   Future<void> dispose();
 }

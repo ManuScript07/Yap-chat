@@ -42,7 +42,6 @@ type CompletionResult =
 type PushDevice = {
   id: string;
   token: string;
-  locale: 'ru' | 'en';
 };
 
 const maxDeliveryAttempts = 3;
@@ -124,7 +123,7 @@ Deno.serve(async (request) => {
 
   const { data: devices, error: devicesError } = await admin
     .from('push_devices')
-    .select('id, token, locale')
+    .select('id, token')
     .eq('user_id', job.recipient_user_id)
     .eq('enabled', true)
     .returns<PushDevice[]>();
@@ -153,7 +152,6 @@ Deno.serve(async (request) => {
         serviceAccount.project_id,
         accessToken,
         device.token,
-        device.locale,
         job,
       ),
     })),
@@ -214,7 +212,6 @@ async function deliverWithRetry(
   projectId: string,
   accessToken: string,
   token: string,
-  locale: PushDevice['locale'],
   job: OutboxRecord,
 ): Promise<DeliveryResult> {
   let lastResult: DeliveryResult = {
@@ -224,7 +221,7 @@ async function deliverWithRetry(
   };
 
   for (let attempt = 0; attempt < maxDeliveryAttempts; attempt += 1) {
-    lastResult = await deliver(projectId, accessToken, token, locale, job);
+    lastResult = await deliver(projectId, accessToken, token, job);
     if (lastResult.success || lastResult.invalidToken) return lastResult;
     if (attempt < maxDeliveryAttempts - 1) {
       await new Promise((resolve) =>
@@ -239,10 +236,8 @@ async function deliver(
   projectId: string,
   accessToken: string,
   token: string,
-  locale: PushDevice['locale'],
   job: OutboxRecord,
 ): Promise<DeliveryResult> {
-  const body = notificationBody(job, locale);
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
     {
@@ -254,10 +249,6 @@ async function deliver(
       body: JSON.stringify({
         message: {
           token,
-          notification: {
-            title: job.sender_name,
-            body,
-          },
           data: {
             conversation_id: job.conversation_id ?? '',
             message_id: job.message_id ?? '',
@@ -273,12 +264,6 @@ async function deliver(
           android: {
             priority: 'HIGH',
             ttl: '604800s',
-            notification: {
-              channel_id: 'chat_messages',
-              icon: 'ic_notification',
-              notification_priority: 'PRIORITY_HIGH',
-              visibility: 'PRIVATE',
-            },
           },
         },
       }),
@@ -298,28 +283,6 @@ async function deliver(
     invalidToken,
     error: `FCM ${response.status}: ${responseText}`.slice(0, 1000),
   };
-}
-
-function notificationBody(
-  job: OutboxRecord,
-  locale: PushDevice['locale'],
-): string {
-  if (job.notification_type === 'friend_request') {
-    return locale === 'en'
-      ? 'sent you a friend request'
-      : 'отправил(а) вам заявку в друны';
-  }
-  if (job.message_type === 'text') {
-    return job.message_text.trim() || (locale === 'en' ? 'New message' : 'Новое сообщение');
-  }
-  if (locale === 'en') {
-    if (job.message_type === 'image') return 'Photo';
-    if (job.message_type === 'audio') return 'Voice message';
-    return 'Location';
-  }
-  if (job.message_type === 'image') return 'Фотография';
-  if (job.message_type === 'audio') return 'Голосовое сообщение';
-  return 'Местоположение';
 }
 
 async function markCompleted(
