@@ -137,6 +137,12 @@ class MockFriendsRepository implements IFriendsRepository {
   ) async => _contactSnapshot(phoneNumbers);
 
   @override
+  Future<ContactMatchSnapshot> refreshNewFriendContactMatches(
+    List<String> phoneNumbers,
+    Set<String> friendIds,
+  ) async => _contactSnapshot(phoneNumbers);
+
+  @override
   Future<ContactMatchSnapshot> refreshPhoneMatch(String phoneNumber) async =>
       _contactSnapshot([phoneNumber]);
 

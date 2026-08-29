@@ -60,11 +60,20 @@ class ContactMatchCacheDataSource {
     final phonesByKey = {
       for (final entry in keysByPhone.entries) entry.value: entry.key,
     };
-    final query = _database.select(_database.cachedContactMatches)
-      ..where(
-        (table) => table.ownerUserId.equals(ownerUserId ?? _userIdProvider()),
-      );
-    final rows = await query.get();
+    final owner = ownerUserId ?? _userIdProvider();
+    final rows = <CachedContactMatch>[];
+    final keys = phonesByKey.keys.toList(growable: false);
+    const batchSize = 500;
+    for (var offset = 0; offset < keys.length; offset += batchSize) {
+      final end = (offset + batchSize).clamp(0, keys.length);
+      final query = _database.select(_database.cachedContactMatches)
+        ..where(
+          (table) =>
+              table.ownerUserId.equals(owner) &
+              table.phoneKey.isIn(keys.sublist(offset, end)),
+        );
+      rows.addAll(await query.get());
+    }
     return {
       for (final row in rows)
         if (phonesByKey[row.phoneKey] case final phone?)
@@ -142,6 +151,70 @@ class ContactMatchCacheDataSource {
             .go();
       }
     });
+  }
+
+  /// Adds known positive matches without changing other contact results.
+  Future<void> writeMatches({
+    required Map<String, FriendCandidate> matches,
+    required DateTime checkedAt,
+    String? ownerUserId,
+    PhoneMatchCacheScope scope = PhoneMatchCacheScope.contacts,
+  }) async {
+    if (matches.isEmpty) return;
+    final keysByPhone = await _keysByPhone(matches.keys, scope: scope);
+    final owner = ownerUserId ?? _userIdProvider();
+    final rows = keysByPhone.entries.map((entry) {
+      final candidate = matches[entry.key]!;
+      return CachedContactMatchesCompanion.insert(
+        ownerUserId: owner,
+        phoneKey: entry.value,
+        isRegistered: true,
+        candidateId: Value(candidate.id),
+        username: Value(candidate.username),
+        displayName: Value(candidate.displayName),
+        avatarUrl: Value(candidate.avatarUrl),
+        avatarStoragePath: Value(candidate.avatarStoragePath),
+        friendCount: Value(candidate.friendCount),
+        checkedAt: checkedAt.toUtc(),
+      );
+    });
+    await _database.batch(
+      (batch) => batch.insertAll(
+        _database.cachedContactMatches,
+        rows,
+        mode: InsertMode.insertOrReplace,
+      ),
+    );
+  }
+
+  /// Manual number lookups expire quickly and are not part of address-book
+  /// retention. Pruning them keeps both disk usage and point reads bounded.
+  Future<void> pruneExpiredManualSearchMatches({
+    required DateTime expiredBefore,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final manualRows = await (_database.select(_database.cachedContactMatches)
+          ..where((table) => table.ownerUserId.equals(owner)))
+        .get();
+    final expiredKeys = manualRows
+        .where(
+          (row) =>
+              _belongsToScope(row.phoneKey, PhoneMatchCacheScope.manualSearch) &&
+              !row.checkedAt.isAfter(expiredBefore.toUtc()),
+        )
+        .map((row) => row.phoneKey)
+        .toList(growable: false);
+    const batchSize = 500;
+    for (var offset = 0; offset < expiredKeys.length; offset += batchSize) {
+      final end = (offset + batchSize).clamp(0, expiredKeys.length);
+      await (_database.delete(_database.cachedContactMatches)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                table.phoneKey.isIn(expiredKeys.sublist(offset, end)),
+          ))
+          .go();
+    }
   }
 
   Future<Map<String, String>> _keysByPhone(

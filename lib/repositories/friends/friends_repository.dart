@@ -49,6 +49,9 @@ class FriendsRepository implements IFriendsRepository {
     positiveTtl: Duration(seconds: 45),
     negativeTtl: Duration(seconds: 45),
   );
+  static const _manualCachePruneInterval = Duration(minutes: 10);
+  DateTime? _lastManualCachePruneAt;
+  String? _lastManualCachePruneOwnerId;
   final Map<String, Future<FriendLocation?>> _activeLocationRequests = {};
 
   @override
@@ -171,6 +174,34 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
+  Future<ContactMatchSnapshot> refreshNewFriendContactMatches(
+    List<String> phoneNumbers,
+    Set<String> friendIds,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final uniquePhones = phoneNumbers.toSet().toList(growable: false)..sort();
+    final uniqueFriendIds = friendIds.toList(growable: false)..sort();
+    if (uniquePhones.isEmpty || uniqueFriendIds.isEmpty) {
+      return readCachedContactMatches(uniquePhones);
+    }
+    final operationKey = _operationKey(
+      scope,
+      'new-friend-contacts:${uniqueFriendIds.join('\u0000')}:${uniquePhones.join('\u0000')}',
+    );
+    final active = _activeContactRefreshes[operationKey];
+    if (active != null) return active;
+    final future = _refreshNewFriendContactMatches(
+      uniquePhones,
+      uniqueFriendIds,
+      scope,
+    );
+    _activeContactRefreshes[operationKey] = future;
+    return future.whenComplete(
+      () => _activeContactRefreshes.remove(operationKey),
+    );
+  }
+
+  @override
   Future<ContactMatchSnapshot> refreshPhoneMatch(String phoneNumber) {
     final scope = _accountSessionController.capture();
     final normalized = phoneNumber.trim();
@@ -178,17 +209,98 @@ class FriendsRepository implements IFriendsRepository {
     final operationKey = _operationKey(scope, 'manual-phone:$normalized');
     final active = _activeContactRefreshes[operationKey];
     if (active != null) return active;
-    final future = _refreshContactMatches(
-      [normalized],
+    final future = _refreshManualPhoneMatch(normalized, scope);
+    _activeContactRefreshes[operationKey] = future;
+    return future.whenComplete(
+      () => _activeContactRefreshes.remove(operationKey),
+    );
+  }
+
+  Future<ContactMatchSnapshot> _refreshManualPhoneMatch(
+    String phoneNumber,
+    AccountSessionSnapshot scope,
+  ) async {
+    final now = _clock().toUtc();
+    final lastPruneAt = _lastManualCachePruneAt;
+    if (_lastManualCachePruneOwnerId != scope.userId ||
+        lastPruneAt == null ||
+        now.difference(lastPruneAt) >= _manualCachePruneInterval) {
+      await _accountSessionController.commit(
+        scope,
+        () => _contactMatchCache.pruneExpiredManualSearchMatches(
+          expiredBefore: now.subtract(_manualPhoneSearchCachePolicy.positiveTtl),
+          ownerUserId: scope.userId,
+        ),
+      );
+      _lastManualCachePruneAt = now;
+      _lastManualCachePruneOwnerId = scope.userId;
+    }
+    return _refreshContactMatches(
+      [phoneNumber],
       retainOnlyInput: false,
       scope: scope,
       cacheScope: PhoneMatchCacheScope.manualSearch,
       cachePolicy: _manualPhoneSearchCachePolicy,
     );
-    _activeContactRefreshes[operationKey] = future;
-    return future.whenComplete(
-      () => _activeContactRefreshes.remove(operationKey),
+  }
+
+  Future<ContactMatchSnapshot> _refreshNewFriendContactMatches(
+    List<String> phoneNumbers,
+    List<String> friendIds,
+    AccountSessionSnapshot scope,
+  ) async {
+    const phoneBatchSize = 500;
+    const friendBatchSize = 100;
+    final matches = <String, FriendCandidate>{};
+    for (
+      var phoneOffset = 0;
+      phoneOffset < phoneNumbers.length;
+      phoneOffset += phoneBatchSize
+    ) {
+      final phoneEnd = (phoneOffset + phoneBatchSize).clamp(
+        0,
+        phoneNumbers.length,
+      );
+      for (
+        var friendOffset = 0;
+        friendOffset < friendIds.length;
+        friendOffset += friendBatchSize
+      ) {
+        final friendEnd = (friendOffset + friendBatchSize).clamp(
+          0,
+          friendIds.length,
+        );
+        matches.addAll(
+          await _remote.matchNewFriendContactPhones(
+            phoneNumbers.sublist(phoneOffset, phoneEnd),
+            friendIds.sublist(friendOffset, friendEnd),
+          ),
+        );
+        _accountSessionController.ensureCurrent(scope);
+      }
+    }
+    if (matches.isNotEmpty) {
+      await _accountSessionController.commit(
+        scope,
+        () => _contactMatchCache.writeMatches(
+          matches: matches,
+          checkedAt: _clock().toUtc(),
+          ownerUserId: scope.userId,
+        ),
+      );
+    }
+    final records = await _contactMatchCache.read(
+      phoneNumbers,
+      ownerUserId: scope.userId,
     );
+    _accountSessionController.ensureCurrent(scope);
+    final snapshot = await _buildContactSnapshot(
+      records,
+      freshMatches: matches,
+      ownerUserId: scope.userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return snapshot;
   }
 
   Future<ContactMatchSnapshot> _refreshContactMatches(
@@ -524,11 +636,12 @@ class FriendsRepository implements IFriendsRepository {
       _remote.fetchFriends(),
       _remote.fetchRequests(),
     ]);
+    final refreshedFriends = results[0] as List<Friend>;
     await _accountSessionController.commit(
       scope,
       () => _cache.replaceAll(
         ownerUserId: scope.userId,
-        friends: results[0] as List<Friend>,
+        friends: refreshedFriends,
         requests: results[1] as List<FriendRequest>,
       ),
     );

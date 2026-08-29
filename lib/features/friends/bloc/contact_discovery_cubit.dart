@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
@@ -73,11 +75,19 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
 
   final IContactsRepository _contactsRepository;
   final IFriendsRepository _friendsRepository;
+  StreamSubscription<List<Friend>>? _friendsSubscription;
+  Set<String>? _knownFriendIds;
+  final Set<String> _pendingNewFriendIds = {};
+  int _loadGeneration = 0;
+  bool _friendMatchRefreshRunning = false;
 
   Future<void> load() async {
+    _ensureFriendSubscription();
+    final generation = ++_loadGeneration;
     emit(const ContactDiscoveryState(status: ContactDiscoveryStatus.loading));
     try {
       final contacts = await _contactsRepository.readPhoneContacts();
+      if (isClosed || generation != _loadGeneration) return;
       final phoneNumbers = contacts
           .map((contact) => contact.normalizedPhone)
           .toList(growable: false);
@@ -89,7 +99,7 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
       } catch (_) {
         cached = const ContactMatchSnapshot();
       }
-      if (isClosed) return;
+      if (isClosed || generation != _loadGeneration) return;
       emit(
         ContactDiscoveryState(
           status: ContactDiscoveryStatus.success,
@@ -102,7 +112,7 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
         final refreshed = await _friendsRepository.refreshContactMatches(
           phoneNumbers,
         );
-        if (isClosed) return;
+        if (isClosed || generation != _loadGeneration) return;
         emit(
           state.copyWith(
             entries: _entriesFromSnapshot(contacts, refreshed),
@@ -110,13 +120,15 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
             refreshFailed: false,
           ),
         );
+        _refreshNewFriendMatchesIfNeeded();
       } catch (_) {
-        if (!isClosed) {
+        if (!isClosed && generation == _loadGeneration) {
           emit(state.copyWith(isRefreshing: false, refreshFailed: true));
+          _refreshNewFriendMatchesIfNeeded();
         }
       }
     } catch (_) {
-      if (!isClosed) {
+      if (!isClosed && generation == _loadGeneration) {
         emit(
           const ContactDiscoveryState(status: ContactDiscoveryStatus.failure),
         );
@@ -193,6 +205,81 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
   }
 
   void clearActionError() => emit(state.copyWith(clearActionError: true));
+
+  void _ensureFriendSubscription() {
+    _friendsSubscription ??= _friendsRepository.watchFriends().listen(
+      _handleFriendsChanged,
+    );
+  }
+
+  void _handleFriendsChanged(List<Friend> friends) {
+    final currentIds = friends.map((friend) => friend.id).toSet();
+    final previousIds = _knownFriendIds;
+    _knownFriendIds = currentIds;
+    if (previousIds == null) {
+      // A contact cache entry can have been written before this friendship was
+      // created (for example, while this page was closed). Reconcile the
+      // initial local friends snapshot through the narrow friends-only RPC.
+      // It never repeats the broad address-book lookup.
+      _pendingNewFriendIds.addAll(currentIds);
+    } else {
+      _pendingNewFriendIds.addAll(currentIds.difference(previousIds));
+    }
+    _refreshNewFriendMatchesIfNeeded();
+  }
+
+  void _refreshNewFriendMatchesIfNeeded() {
+    if (isClosed ||
+        _friendMatchRefreshRunning ||
+        _pendingNewFriendIds.isEmpty ||
+        state.status != ContactDiscoveryStatus.success ||
+        state.isRefreshing) {
+      return;
+    }
+    final friendIds = Set<String>.from(_pendingNewFriendIds);
+    _pendingNewFriendIds.clear();
+    final generation = _loadGeneration;
+    final contacts = state.entries
+        .map((entry) => entry.contact)
+        .toList(growable: false);
+    if (contacts.isEmpty) return;
+    _friendMatchRefreshRunning = true;
+    var failed = false;
+    unawaited(
+      _friendsRepository
+          .refreshNewFriendContactMatches(
+            contacts.map((contact) => contact.normalizedPhone).toList(),
+            friendIds,
+          )
+          .then((snapshot) {
+            if (isClosed || generation != _loadGeneration) return;
+            emit(
+              state.copyWith(
+                entries: _entriesFromSnapshot(contacts, snapshot),
+                refreshFailed: false,
+              ),
+            );
+          })
+          .catchError((_) {
+            // The ordinary cached contacts view remains valid on a transient
+            // refresh error. Keep this narrow operation queued for the next
+            // page load or friends update, but do not spin in an offline
+            // retry loop.
+            failed = true;
+            _pendingNewFriendIds.addAll(friendIds);
+          })
+          .whenComplete(() {
+            _friendMatchRefreshRunning = false;
+            if (!failed) _refreshNewFriendMatchesIfNeeded();
+          }),
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    await _friendsSubscription?.cancel();
+    return super.close();
+  }
 
   static List<ContactDiscoveryEntry> _sortEntries(
     Iterable<ContactDiscoveryEntry> entries,

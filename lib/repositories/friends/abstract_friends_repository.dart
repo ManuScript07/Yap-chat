@@ -14,6 +14,10 @@ abstract interface class IFriendsRepository {
   Future<ContactMatchSnapshot> refreshContactMatches(
     List<String> phoneNumbers,
   );
+  Future<ContactMatchSnapshot> refreshNewFriendContactMatches(
+    List<String> phoneNumbers,
+    Set<String> friendIds,
+  );
   Future<ContactMatchSnapshot> refreshPhoneMatch(String phoneNumber);
   Future<String?> resolveFriendAvatar(Friend friend);
   Future<String?> resolveRequestAvatar(FriendRequest request);

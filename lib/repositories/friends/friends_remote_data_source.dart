@@ -122,6 +122,26 @@ class FriendsRemoteDataSource {
     };
   }
 
+  Future<Map<String, FriendCandidate>> matchNewFriendContactPhones(
+    List<String> phoneNumbers,
+    List<String> friendIds,
+  ) async {
+    if (phoneNumbers.isEmpty || friendIds.isEmpty) return const {};
+    final response = await _client.rpc<List<dynamic>>(
+      'match_new_friend_contact_phones',
+      params: {
+        'phone_numbers': phoneNumbers,
+        'friend_user_ids': friendIds,
+      },
+    );
+    return {
+      for (final item in response)
+        (item as Map)['phone_number'] as String: _mapCandidate(
+          Map<String, dynamic>.from(item),
+        ),
+    };
+  }
+
   FriendCandidate _mapCandidate(Map<String, dynamic> row) {
     final storagePath = row['avatar_storage_path'] as String?;
     return FriendCandidate(
