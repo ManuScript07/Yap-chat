@@ -356,6 +356,10 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
           supportedLocales: AppLocalizations.supportedLocales,
           routerConfig: widget.router.config(
             navigatorObservers: createAppNavigatorObservers,
+            deepLinkBuilder: (deepLink) => resolveAppDeepLink(
+              deepLink,
+              authRedirectUrl: context.read<AppConfig>().authRedirectUrl,
+            ),
           ),
         ),
       ),

@@ -107,10 +107,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await _authRepository.cancelPendingSignIn();
   }
 
-  Future<void> _onSignInBrowserReturned(
+  void _onSignInBrowserReturned(
     AuthSignInBrowserReturned event,
     Emitter<AuthState> emit,
-  ) async {
+  ) {
     if (!state.isSubmitting || state.session != null) {
       return;
     }
@@ -127,7 +127,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         clearFailure: true,
       ),
     );
-    await _authRepository.cancelPendingSignIn();
   }
 
   void _onSessionStreamFailed(

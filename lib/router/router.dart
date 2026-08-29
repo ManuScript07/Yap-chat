@@ -1,11 +1,29 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:yap_chat/repositories/auth/oauth_attempt_coordinator.dart';
 import 'package:yap_chat/router/router.gr.dart';
 
 List<NavigatorObserver> createAppNavigatorObservers() => [
   HeroController(),
   AutoRouteObserver(),
 ];
+
+/// Keeps OAuth protocol callbacks out of the application's navigation stack.
+///
+/// Supabase observes the same platform link independently. At cold start the
+/// app still needs its default route while Supabase exchanges the callback;
+/// during an already running session the router must leave the current stack
+/// untouched.
+DeepLink resolveAppDeepLink(
+  PlatformDeepLink deepLink, {
+  required String authRedirectUrl,
+}) {
+  if (!isConfiguredAuthCallback(deepLink.uri, authRedirectUrl)) {
+    return deepLink;
+  }
+
+  return deepLink.initial ? DeepLink.defaultPath : DeepLink.none;
+}
 
 @AutoRouterConfig()
 class AppRouter extends RootStackRouter {
