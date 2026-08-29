@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/core/database/database.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 
 class LocalMediaRepository implements ILocalMediaRepository {
@@ -14,11 +15,13 @@ class LocalMediaRepository implements ILocalMediaRepository {
     required AppDatabase database,
     required String? Function() ownerUserIdProvider,
     required String environment,
+    required AccountSessionController accountSessionController,
     Future<Directory> Function()? documentsDirectoryProvider,
   }) : _prefs = preferences,
        _database = database,
        _ownerUserIdProvider = ownerUserIdProvider,
        _environment = environment,
+       _accountSessionController = accountSessionController,
        _documentsDirectoryProvider =
            documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
@@ -26,6 +29,7 @@ class LocalMediaRepository implements ILocalMediaRepository {
   final AppDatabase _database;
   final String? Function() _ownerUserIdProvider;
   final String _environment;
+  final AccountSessionController _accountSessionController;
   final Future<Directory> Function() _documentsDirectoryProvider;
   static const _legacyStorageKey = 'recent_chat_media_paths';
   static const _legacyPendingStorageKey = 'pending_chat_media_path';
@@ -35,8 +39,9 @@ class LocalMediaRepository implements ILocalMediaRepository {
 
   @override
   Future<String?> persistMedia(String sourcePath) async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return null;
+    final scope = _captureScope();
+    if (scope == null) return null;
+    final ownerUserId = scope.userId;
     final sourceFile = File(sourcePath);
     if (!await sourceFile.exists()) return null;
 
@@ -49,16 +54,23 @@ class LocalMediaRepository implements ILocalMediaRepository {
       path.join(directory.path, fileName),
     );
 
-    final current = _recentMediaPaths(
-      ownerUserId,
-    ).where((storedPath) => File(storedPath).existsSync()).toList();
-    final updated = [
-      destination.path,
-      ...current,
-    ].take(maxRecentMediaCount).toList();
-    await _prefs.setStringList(_storageKey(ownerUserId), updated);
-    unawaited(_collectGarbage(ownerUserId));
-    return destination.path;
+    try {
+      return await _accountSessionController.commit(scope, () async {
+        final current = _recentMediaPaths(
+          ownerUserId,
+        ).where((storedPath) => File(storedPath).existsSync()).toList();
+        final updated = [
+          destination.path,
+          ...current,
+        ].take(maxRecentMediaCount).toList();
+        await _prefs.setStringList(_storageKey(ownerUserId), updated);
+        unawaited(_collectGarbage(ownerUserId));
+        return destination.path;
+      });
+    } on StaleAccountSessionException {
+      if (await destination.exists()) await destination.delete();
+      return null;
+    }
   }
 
   @override
@@ -70,67 +82,83 @@ class LocalMediaRepository implements ILocalMediaRepository {
 
   @override
   Future<void> deleteMedia(String mediaPath) async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return;
-    final updated = _recentMediaPaths(
-      ownerUserId,
-    ).where((storedPath) => storedPath != mediaPath).toList();
-    await _prefs.setStringList(_storageKey(ownerUserId), updated);
-    await _collectGarbage(ownerUserId);
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(scope, () async {
+      final updated = _recentMediaPaths(
+        scope.userId,
+      ).where((storedPath) => storedPath != mediaPath).toList();
+      await _prefs.setStringList(_storageKey(scope.userId), updated);
+      await _collectGarbage(scope.userId);
+    });
   }
 
   @override
   Future<void> savePendingMedia(String mediaPath) async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return;
-    await _prefs.setString(_pendingStorageKey(ownerUserId), mediaPath);
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(
+      scope,
+      () => _prefs.setString(_pendingStorageKey(scope.userId), mediaPath),
+    );
   }
 
   @override
   Future<String?> consumePendingMedia() async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return null;
-    _claimLegacyData(ownerUserId);
-    final key = _pendingStorageKey(ownerUserId);
-    final pendingPath = _prefs.getString(key);
-    if (pendingPath == null) return null;
-
-    await _prefs.remove(key);
-    return pendingPath;
+    final scope = _captureScope();
+    if (scope == null) return null;
+    return _accountSessionController.commit(scope, () async {
+      _claimLegacyData(scope.userId);
+      final key = _pendingStorageKey(scope.userId);
+      final pendingPath = _prefs.getString(key);
+      if (pendingPath == null) return null;
+      await _prefs.remove(key);
+      return pendingPath;
+    });
   }
 
   @override
   Future<void> savePendingChatId(String chatId) async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return;
-    await _prefs.setString(_pendingChatStorageKey(ownerUserId), chatId);
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(
+      scope,
+      () => _prefs.setString(_pendingChatStorageKey(scope.userId), chatId),
+    );
   }
 
   @override
   Future<String?> consumePendingChatId() async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return null;
-    _claimLegacyData(ownerUserId);
-    final key = _pendingChatStorageKey(ownerUserId);
-    final chatId = _prefs.getString(key);
-    if (chatId == null) return null;
-
-    await _prefs.remove(key);
-    return chatId;
+    final scope = _captureScope();
+    if (scope == null) return null;
+    return _accountSessionController.commit(scope, () async {
+      _claimLegacyData(scope.userId);
+      final key = _pendingChatStorageKey(scope.userId);
+      final chatId = _prefs.getString(key);
+      if (chatId == null) return null;
+      await _prefs.remove(key);
+      return chatId;
+    });
   }
 
   @override
   Future<void> clearPendingChatId() async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return;
-    await _prefs.remove(_pendingChatStorageKey(ownerUserId));
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(
+      scope,
+      () => _prefs.remove(_pendingChatStorageKey(scope.userId)),
+    );
   }
 
   @override
   Future<void> collectGarbage() async {
-    final ownerUserId = _ownerUserIdProvider();
-    if (ownerUserId == null || ownerUserId.isEmpty) return;
-    await _collectGarbage(ownerUserId);
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(
+      scope,
+      () => _collectGarbage(scope.userId),
+    );
   }
 
   @override
@@ -246,6 +274,15 @@ class LocalMediaRepository implements ILocalMediaRepository {
         _safeSegment(ownerUserId),
       ),
     );
+  }
+
+  AccountSessionSnapshot? _captureScope() {
+    try {
+      final scope = _accountSessionController.capture();
+      return scope.userId == _ownerUserIdProvider() ? scope : null;
+    } on StaleAccountSessionException {
+      return null;
+    }
   }
 
   bool _isLegacyOwnedFile(File file, Directory documents) {

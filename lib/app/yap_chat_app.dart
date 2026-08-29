@@ -63,6 +63,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _isForeground = true;
   late final ChatNavigationCoordinator _chatNavigator;
   bool _dependenciesInitialized = false;
+  String? _activeUserId;
 
   @override
   void initState() {
@@ -281,6 +282,13 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               previous.session?.userId != current.session?.userId,
           listener: (context, state) {
             final userId = state.session?.userId;
+            if (_activeUserId != userId) {
+              _activeUserId = userId;
+              _pendingChatRestored = false;
+              context.read<AccountSessionController>().setAuthenticatedUser(
+                userId,
+              );
+            }
             context.read<ProfileMutationCubit>().setAuthenticatedUser(userId);
             if (state.status == AuthStatus.authenticated && userId != null) {
               unawaited(

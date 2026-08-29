@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/repositories/auth/auth.dart';
 
@@ -18,6 +19,7 @@ class AppConfig {
     required this.talker,
     required this.env,
     required this.database,
+    required this.accountSessionController,
     this.oauthAttemptCoordinator,
     this.supabaseClient,
     this.firebaseMessaging,
@@ -28,6 +30,7 @@ class AppConfig {
   final Talker talker;
   final Map<String, String> env;
   final AppDatabase database;
+  final AccountSessionController accountSessionController;
   final OAuthAttemptCoordinator? oauthAttemptCoordinator;
   final SupabaseClient? supabaseClient;
   final FirebaseMessaging? firebaseMessaging;

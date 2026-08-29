@@ -33,6 +33,7 @@ class RepositoryContainer {
       database: config.database,
       ownerUserIdProvider: () => client.auth.currentUser?.id,
       environment: config.environment.name,
+      accountSessionController: config.accountSessionController,
     );
     final mediaCache = MediaCacheService(
       database: config.database,
@@ -76,6 +77,7 @@ class RepositoryContainer {
       remote: chatRemote,
       hydrator: messageHydrator,
       chatsCache: chatsCache,
+      accountSessionController: config.accountSessionController,
     );
     return RepositoryContainer(
       mediaCache: mediaCache,
@@ -87,6 +89,7 @@ class RepositoryContainer {
         chatCache: chatCache,
         chatRemote: chatRemote,
         conversationSync: conversationSync,
+        accountSessionController: config.accountSessionController,
       ),
       chatRepository: ChatRepository(
         config: config,
@@ -96,6 +99,7 @@ class RepositoryContainer {
         mediaCache: mediaCache,
         syncService: conversationSync,
         localMediaRepository: localMediaRepository,
+        accountSessionController: config.accountSessionController,
       ),
       localMediaRepository: localMediaRepository,
       locationRepository: LocationRepository(
@@ -109,6 +113,7 @@ class RepositoryContainer {
         redirectUrl: config.authRedirectUrl,
         useAnonymousSignIn: config.isLocal,
         oauthAttemptCoordinator: config.oauthAttemptCoordinator,
+        accountSessionController: config.accountSessionController,
       ),
       profileRepository: ProfileRepository(
         client: client,
@@ -123,6 +128,7 @@ class RepositoryContainer {
           client: client,
           imageProcessor: const AvatarImageProcessor(),
         ),
+        accountSessionController: config.accountSessionController,
       ),
       presenceRepository: PresenceRepository(
         client: client,
@@ -143,6 +149,7 @@ class RepositoryContainer {
         contactMatchCache: contactMatchCache,
         remote: friendsRemote,
         mediaCache: mediaCache,
+        accountSessionController: config.accountSessionController,
       ),
       contactsRepository: ContactsRepository(),
     );
@@ -155,6 +162,7 @@ class RepositoryContainer {
       database: config.database,
       ownerUserIdProvider: () => authRepository.currentSession?.userId,
       environment: config.environment.name,
+      accountSessionController: config.accountSessionController,
     );
     final mediaCache = MediaCacheService(
       database: config.database,

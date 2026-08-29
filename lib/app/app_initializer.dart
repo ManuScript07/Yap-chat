@@ -7,6 +7,8 @@ import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/app/permission_reminder_coordinator.dart';
 import 'package:yap_chat/app/repository_container.dart';
+import 'package:yap_chat/app/user_data_cleanup_coordinator.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/profile.dart';
@@ -31,6 +33,7 @@ class _AppInitializerState extends State<AppInitializer> {
   late final AppConnectionCoordinator _connectionCoordinator;
   late final LocationTrackingCoordinator _locationTrackingCoordinator;
   late final PermissionReminderCoordinator _permissionReminderCoordinator;
+  late final UserDataCleanupCoordinator _userDataCleanupCoordinator;
 
   @override
   void initState() {
@@ -55,6 +58,14 @@ class _AppInitializerState extends State<AppInitializer> {
       locationRepository: _repositories.locationRepository,
       talker: widget.config.talker,
     );
+    _userDataCleanupCoordinator = UserDataCleanupCoordinator(
+      preferences: widget.config.preferences,
+      environment: widget.config.environment.name,
+      accountSessionController: widget.config.accountSessionController,
+      localMediaRepository: _repositories.localMediaRepository,
+      mediaCache: _repositories.mediaCache,
+      talker: widget.config.talker,
+    );
   }
 
   @override
@@ -72,6 +83,9 @@ class _AppInitializerState extends State<AppInitializer> {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppConfig>.value(value: widget.config),
+        RepositoryProvider<AccountSessionController>.value(
+          value: widget.config.accountSessionController,
+        ),
         RepositoryProvider<AppConnectionCoordinator>.value(
           value: _connectionCoordinator,
         ),
@@ -124,15 +138,39 @@ class _AppInitializerState extends State<AppInitializer> {
             create: (context) => AuthBloc(
               authRepository: context.read<IAuthRepository>(),
               profileRepository: context.read<IProfileRepository>(),
-              clearUserCache: (userId) async {
+              accountSessionController: widget.config.accountSessionController,
+              resumePendingCleanup: () async {
+                final authRepository = _repositories.authRepository;
+                final session = authRepository.currentSession;
+                if (session != null &&
+                    _userDataCleanupCoordinator.isPending(session.userId)) {
+                  widget.config.accountSessionController.setAuthenticatedUser(
+                    null,
+                  );
+                  try {
+                    await authRepository.signOut().timeout(
+                      const Duration(seconds: 12),
+                    );
+                  } catch (_) {
+                    final remainingSession = authRepository.currentSession;
+                    widget.config.accountSessionController.setAuthenticatedUser(
+                      remainingSession?.userId,
+                    );
+                    if (remainingSession != null) rethrow;
+                  }
+                }
+                await _userDataCleanupCoordinator.resumePendingCleanup();
+              },
+              markUserCleanupPending: _userDataCleanupCoordinator.markPending,
+              clearUserCache: _userDataCleanupCoordinator.clearUser,
+              beforeSignOut: (userId) async {
                 await Future.wait([
-                  _repositories.localMediaRepository.clearUser(userId),
-                  _repositories.mediaCache.clearUser(userId),
+                  _connectionCoordinator.setAuthenticatedUser(null),
+                  _locationTrackingCoordinator.setAuthenticatedUser(null),
+                  _repositories.pushNotificationsRepository
+                      .unregisterCurrentDevice(),
                 ]);
               },
-              beforeSignOut: _repositories
-                  .pushNotificationsRepository
-                  .unregisterCurrentDevice,
             )..add(const AuthStarted()),
           ),
           BlocProvider<ProfileMutationCubit>(

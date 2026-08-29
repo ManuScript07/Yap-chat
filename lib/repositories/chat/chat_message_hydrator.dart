@@ -16,18 +16,27 @@ class ChatMessageHydrator {
   final ChatRemoteDataSource _remote;
   final MediaCacheService _mediaCache;
 
-  Future<List<ChatMessage>> hydrateAll(List<ChatMessage> messages) {
-    return Future.wait(messages.map(hydrate));
+  Future<List<ChatMessage>> hydrateAll(
+    List<ChatMessage> messages, {
+    String? ownerUserId,
+  }) {
+    return Future.wait(
+      messages.map((message) => hydrate(message, ownerUserId: ownerUserId)),
+    );
   }
 
-  Future<ChatMessage> hydrate(ChatMessage message) async {
+  Future<ChatMessage> hydrate(
+    ChatMessage message, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _remote.currentUserId;
     if (message.type == MessageType.image) {
       final localPaths = <String>[];
       for (final storagePath in message.mediaStoragePaths) {
         try {
           localPaths.add(
             await _mediaCache.cacheStorageFile(
-              ownerUserId: _remote.currentUserId,
+              ownerUserId: owner,
               bucket: 'chat-images',
               storagePath: storagePath,
               mimeType: 'image/jpeg',
@@ -46,7 +55,7 @@ class ChatMessageHydrator {
     }
     try {
       final localPath = await _mediaCache.cacheStorageFile(
-        ownerUserId: _remote.currentUserId,
+        ownerUserId: owner,
         bucket: 'chat-audio',
         storagePath: audioStoragePath,
       );

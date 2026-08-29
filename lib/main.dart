@@ -12,7 +12,7 @@ import 'package:talker_bloc_logger/talker_bloc_logger.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/database/database.dart';
-import 'package:yap_chat/core/services/media_service.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/chat/local_media_repository.dart';
 import 'package:yap_chat/repositories/auth/auth.dart';
 import 'package:yap_chat/repositories/notifications/notifications.dart';
@@ -37,6 +37,14 @@ Future<void> main() async {
     authRedirectUrl: authRedirectUrl,
     oauthAttemptCoordinator: oauthAttemptCoordinator,
   );
+  final accountSessionController = AccountSessionController(
+    initialUserId:
+        environment == AppEnvironment.dev &&
+            (preferences.getBool(MockAuthRepository.signedInPreferenceKey) ??
+                false)
+        ? MockAuthRepository.mockUserId
+        : supabaseClient?.auth.currentUser?.id,
+  );
   final firebaseMessaging = environment == AppEnvironment.prod
       ? await _initializeFirebase(talker)
       : null;
@@ -59,6 +67,7 @@ Future<void> main() async {
   final localMediaRepository = LocalMediaRepository(
     preferences: preferences,
     database: database,
+    accountSessionController: accountSessionController,
     ownerUserIdProvider: currentOwnerUserId,
     environment: environment.name,
   );
@@ -101,6 +110,7 @@ Future<void> main() async {
     talker: talker,
     env: Map.unmodifiable(dotenv.env),
     database: database,
+    accountSessionController: accountSessionController,
     oauthAttemptCoordinator: oauthAttemptCoordinator,
     supabaseClient: supabaseClient,
     firebaseMessaging: firebaseMessaging,

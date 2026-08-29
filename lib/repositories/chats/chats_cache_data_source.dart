@@ -13,50 +13,52 @@ class ChatsCacheDataSource {
   final AppDatabase _database;
   final String Function() _userIdProvider;
 
-  Stream<List<Chat>> watch() {
+  Stream<List<Chat>> watch({String? ownerUserId}) {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedChats)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.lastMessageTime)]);
     return query.watch().map((rows) => List.unmodifiable(rows.map(_mapRow)));
   }
 
-  Future<List<Chat>> read() async {
+  Future<List<Chat>> read({String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedChats)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.lastMessageTime)]);
     return (await query.get()).map(_mapRow).toList(growable: false);
   }
 
-  Future<Chat?> readByPeerId(String peerId) async {
+  Future<Chat?> readByPeerId(String peerId, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedChats)
       ..where(
         (table) =>
-            table.ownerUserId.equals(_userIdProvider()) &
-            table.peerId.equals(peerId),
+            table.ownerUserId.equals(owner) & table.peerId.equals(peerId),
       )
       ..limit(1);
     final row = await query.getSingleOrNull();
     return row == null ? null : _mapRow(row);
   }
 
-  Future<bool> replaceAll(List<Chat> chats) async {
-    final cachedChats = await read();
+  Future<bool> replaceAll(List<Chat> chats, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final cachedChats = await read(ownerUserId: owner);
     if (_sameChats(cachedChats, chats)) return false;
 
     await _database.transaction(() async {
-      final ownerUserId = _userIdProvider();
       final ids = chats.map((chat) => chat.id).toSet();
       final deleteQuery = _database.delete(_database.cachedChats)
         ..where(
           (table) =>
-              table.ownerUserId.equals(ownerUserId) &
+              table.ownerUserId.equals(owner) &
               (ids.isEmpty ? const Constant(true) : table.id.isNotIn(ids)),
         );
       await deleteQuery.go();
       for (final chat in chats) {
         await _database
             .into(_database.cachedChats)
-            .insertOnConflictUpdate(_companion(chat));
+            .insertOnConflictUpdate(_companion(chat, owner));
       }
     });
     return true;
@@ -95,50 +97,51 @@ class ChatsCacheDataSource {
         left.isMuted == right.isMuted;
   }
 
-  Future<void> remove(Set<String> ids) async {
+  Future<void> remove(Set<String> ids, {String? ownerUserId}) async {
     if (ids.isEmpty) return;
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.delete(_database.cachedChats)..where(
-          (table) =>
-              table.ownerUserId.equals(_userIdProvider()) & table.id.isIn(ids),
+          (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
         ))
         .go();
   }
 
-  Future<void> markAsRead(Set<String> ids) async {
+  Future<void> markAsRead(Set<String> ids, {String? ownerUserId}) async {
     if (ids.isEmpty) return;
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.update(_database.cachedChats)..where(
-          (table) =>
-              table.ownerUserId.equals(_userIdProvider()) & table.id.isIn(ids),
+          (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
         ))
         .write(const CachedChatsCompanion(unreadCount: Value(0)));
   }
 
-  Future<void> toggleMute(Set<String> ids) async {
+  Future<void> toggleMute(Set<String> ids, {String? ownerUserId}) async {
     if (ids.isEmpty) return;
+    final owner = ownerUserId ?? _userIdProvider();
     final rows =
         await (_database.select(_database.cachedChats)..where(
-              (table) =>
-                  table.ownerUserId.equals(_userIdProvider()) &
-                  table.id.isIn(ids),
+              (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
             ))
             .get();
     await _database.transaction(() async {
       for (final row in rows) {
         await (_database.update(_database.cachedChats)..where(
               (table) =>
-                  table.ownerUserId.equals(_userIdProvider()) &
-                  table.id.equals(row.id),
+                  table.ownerUserId.equals(owner) & table.id.equals(row.id),
             ))
             .write(CachedChatsCompanion(isMuted: Value(!row.isMuted)));
       }
     });
   }
 
-  Future<void> updateLastMessage(ChatMessage message) async {
+  Future<void> updateLastMessage(
+    ChatMessage message, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.update(_database.cachedChats)..where(
           (table) =>
-              table.ownerUserId.equals(_userIdProvider()) &
-              table.id.equals(message.chatId),
+              table.ownerUserId.equals(owner) & table.id.equals(message.chatId),
         ))
         .write(
           CachedChatsCompanion(
@@ -172,9 +175,9 @@ class ChatsCacheDataSource {
     );
   }
 
-  CachedChatsCompanion _companion(Chat chat) {
+  CachedChatsCompanion _companion(Chat chat, [String? ownerUserId]) {
     return CachedChatsCompanion.insert(
-      ownerUserId: _userIdProvider(),
+      ownerUserId: ownerUserId ?? _userIdProvider(),
       id: chat.id,
       peerId: chat.peerId,
       peerUsername: chat.peerUsername,

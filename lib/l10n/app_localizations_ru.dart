@@ -187,6 +187,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsLogout => 'Выход';
 
   @override
+  String get settingsLogoutConfirmationTitle => 'Выйти из аккаунта?';
+
+  @override
+  String get settingsLogoutConfirmationContent =>
+      'Вы уверены, что хотите выйти из аккаунта?';
+
+  @override
+  String get settingsLogoutConfirm => 'Выйти';
+
+  @override
   String get settingsDeleteAccount => 'Удалить аккаунт';
 
   @override

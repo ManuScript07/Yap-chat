@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
 import 'package:yap_chat/repositories/profile/avatar_storage_data_source.dart';
 import 'package:yap_chat/repositories/profile/avatar_deletion_queue.dart';
@@ -17,10 +18,12 @@ class ProfileRepository implements IProfileRepository {
     required AvatarStorageDataSource avatarStorage,
     required AvatarDeletionQueue avatarDeletionQueue,
     required Talker talker,
+    required AccountSessionController accountSessionController,
   }) : _client = client,
        _cache = cache,
        _avatarStorage = avatarStorage,
        _avatarDeletionQueue = avatarDeletionQueue,
+       _accountSessionController = accountSessionController,
        _talker = talker;
 
   final SupabaseClient _client;
@@ -28,27 +31,43 @@ class ProfileRepository implements IProfileRepository {
   final AvatarStorageDataSource _avatarStorage;
   final AvatarDeletionQueue _avatarDeletionQueue;
   final Talker _talker;
+  final AccountSessionController _accountSessionController;
 
   @override
   Future<UserProfile?> getCachedProfile(String userId) => _cache.read(userId);
 
   @override
   Future<UserProfile> getOrCreateProfile(AuthSession session) async {
+    final scope = _accountSessionController.capture();
+    if (scope.userId != session.userId) {
+      throw const StaleAccountSessionException();
+    }
     final existing = await _client
         .from('profiles')
         .select()
         .eq('id', session.userId)
         .maybeSingle();
+    _accountSessionController.ensureCurrent(scope);
 
     final remoteProfile = existing == null
-        ? await _createProfile(session)
-        : await _fillMissingYandexData(UserProfile.fromMap(existing), session);
+        ? await _createProfile(session, scope)
+        : await _fillMissingYandexData(
+            UserProfile.fromMap(existing),
+            session,
+            scope,
+          );
+    _accountSessionController.ensureCurrent(scope);
     final remotePhotos = await _loadRemotePhotos(remoteProfile);
+    _accountSessionController.ensureCurrent(scope);
     final profile = await _hydratePhotos(
       remoteProfile.copyWith(photos: remotePhotos),
       session: session,
+      scope: scope,
     );
-    await _writeCacheBestEffort(profile);
+    await _accountSessionController.commit(
+      scope,
+      () => _writeCacheBestEffort(profile),
+    );
     unawaited(_reconcileAvatarDeletions(profile));
     return profile;
   }
@@ -63,6 +82,10 @@ class ProfileRepository implements IProfileRepository {
     required String bio,
     required List<ProfilePhoto> photos,
   }) async {
+    final scope = _accountSessionController.capture();
+    if (scope.userId != currentProfile.id) {
+      throw const StaleAccountSessionException();
+    }
     if (photos.length > 5) {
       throw const ProfilePhotoLimitException();
     }
@@ -87,6 +110,7 @@ class ProfileRepository implements IProfileRepository {
     final savedPhotos = <ProfilePhoto>[];
     try {
       for (var index = 0; index < photos.length; index++) {
+        _accountSessionController.ensureCurrent(scope);
         final photo = photos[index];
         if (photo.needsUpload) {
           final uploaded = await _avatarStorage.upload(
@@ -119,6 +143,7 @@ class ProfileRepository implements IProfileRepository {
             .whereType<String>(),
       );
 
+      _accountSessionController.ensureCurrent(scope);
       final response = await _client.rpc<List<dynamic>>(
         'save_own_profile',
         params: {
@@ -138,6 +163,7 @@ class ProfileRepository implements IProfileRepository {
               .toList(growable: false),
         },
       );
+      _accountSessionController.ensureCurrent(scope);
       if (response.isEmpty) throw const ProfileSaveException();
 
       var profile = UserProfile.fromMap(
@@ -148,7 +174,10 @@ class ProfileRepository implements IProfileRepository {
         currentProfile.effectivePhotos,
       );
       profile = _withPhotos(profile, hydratedPhotos);
-      await _writeCacheBestEffort(profile);
+      await _accountSessionController.commit(
+        scope,
+        () => _writeCacheBestEffort(profile),
+      );
 
       unawaited(_reconcileAvatarDeletions(profile));
       _talker.info(
@@ -181,7 +210,11 @@ class ProfileRepository implements IProfileRepository {
     }
   }
 
-  Future<UserProfile> _createProfile(AuthSession session) async {
+  Future<UserProfile> _createProfile(
+    AuthSession session,
+    AccountSessionSnapshot scope,
+  ) async {
+    _accountSessionController.ensureCurrent(scope);
     try {
       final acceptedAt = DateTime.now().toUtc().toIso8601String();
       final created = await _client
@@ -199,18 +232,24 @@ class ProfileRepository implements IProfileRepository {
       return UserProfile.fromMap(created);
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
+      _accountSessionController.ensureCurrent(scope);
       final profile = await _client
           .from('profiles')
           .select()
           .eq('id', session.userId)
           .single();
-      return _fillMissingYandexData(UserProfile.fromMap(profile), session);
+      return _fillMissingYandexData(
+        UserProfile.fromMap(profile),
+        session,
+        scope,
+      );
     }
   }
 
   Future<UserProfile> _fillMissingYandexData(
     UserProfile profile,
     AuthSession session,
+    AccountSessionSnapshot scope,
   ) async {
     final update = <String, dynamic>{};
     if (profile.displayName.isEmpty && session.displayName != null) {
@@ -238,6 +277,7 @@ class ProfileRepository implements IProfileRepository {
     }
     if (update.isEmpty) return profile;
 
+    _accountSessionController.ensureCurrent(scope);
     final updated = await _client
         .from('profiles')
         .update(update)
@@ -300,10 +340,12 @@ class ProfileRepository implements IProfileRepository {
   Future<UserProfile> _hydratePhotos(
     UserProfile profile, {
     required AuthSession session,
+    required AccountSessionSnapshot scope,
   }) async {
     final cached = await _readCacheBestEffort(profile.id);
     final hydrated = <ProfilePhoto>[];
     for (final photo in profile.photos) {
+      _accountSessionController.ensureCurrent(scope);
       final cachedPhoto = _matchingCachedPhoto(
         photo,
         cached?.photos ?? const [],
@@ -337,6 +379,7 @@ class ProfileRepository implements IProfileRepository {
             sourceUrl: sourceUri,
           );
           try {
+            _accountSessionController.ensureCurrent(scope);
             final response = await _client.rpc<List<dynamic>>(
               'adopt_imported_profile_avatar',
               params: {

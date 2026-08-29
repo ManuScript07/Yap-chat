@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
+import 'package:yap_chat/core/services/account_session_controller.dart';
 import 'package:yap_chat/core/services/chat_media_processor.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
@@ -20,6 +21,7 @@ class ChatRepository implements IChatRepository {
     required MediaCacheService mediaCache,
     required ConversationSyncService syncService,
     required ILocalMediaRepository localMediaRepository,
+    required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
   }) : _config = config,
        _cache = cache,
@@ -28,6 +30,7 @@ class ChatRepository implements IChatRepository {
        _mediaCache = mediaCache,
        _syncService = syncService,
        _localMediaRepository = localMediaRepository,
+       _accountSessionController = accountSessionController,
        _uuid = uuid;
 
   static const _retryInterval = Duration(seconds: 20);
@@ -39,6 +42,7 @@ class ChatRepository implements IChatRepository {
   final MediaCacheService _mediaCache;
   final ConversationSyncService _syncService;
   final ILocalMediaRepository _localMediaRepository;
+  final AccountSessionController _accountSessionController;
   final Uuid _uuid;
   final Set<String> _deliveringOperationIds = {};
   bool _isNetworkPaused = false;
@@ -48,20 +52,23 @@ class ChatRepository implements IChatRepository {
     late final StreamController<List<ChatMessage>> controller;
     StreamSubscription<List<ChatMessage>>? cacheSubscription;
     Timer? retryTimer;
+    AccountSessionSnapshot? streamScope;
 
     controller = StreamController<List<ChatMessage>>(
       onListen: () {
-        _syncService.openConversation(chatId);
+        final scope = _accountSessionController.capture();
+        streamScope = scope;
+        _syncService.openConversation(chatId, session: scope);
         cacheSubscription = _cache
-            .watchMessages(chatId, currentUserId: _remote.currentUserId)
+            .watchMessages(chatId, currentUserId: scope.userId)
             .listen(controller.add, onError: controller.addError);
         retryTimer = Timer.periodic(_retryInterval, (_) {
-          if (!_isNetworkPaused) unawaited(_retryPending(chatId));
+          if (!_isNetworkPaused) unawaited(_retryPending(chatId, scope));
         });
-        unawaited(_initializeChat(chatId));
+        unawaited(_initializeChat(chatId, scope));
       },
       onCancel: () async {
-        _syncService.closeConversation(chatId);
+        _syncService.closeConversation(chatId, session: streamScope);
         retryTimer?.cancel();
         await cacheSubscription?.cancel();
       },
@@ -69,10 +76,15 @@ class ChatRepository implements IChatRepository {
     return controller.stream;
   }
 
-  Future<void> _initializeChat(String chatId) async {
-    await _retryPending(chatId);
+  Future<void> _initializeChat(
+    String chatId,
+    AccountSessionSnapshot scope,
+  ) async {
+    await _retryPending(chatId, scope);
     try {
+      _accountSessionController.ensureCurrent(scope);
       final messages = await _syncService.synchronizeRecent(chatId);
+      _accountSessionController.ensureCurrent(scope);
       final hasUnreadIncoming = messages.any(
         (message) => !message.isMine && message.readAt == null,
       );
@@ -85,8 +97,9 @@ class ChatRepository implements IChatRepository {
   @override
   Future<void> synchronizeOpenChats() async {
     _isNetworkPaused = false;
+    final scope = _accountSessionController.capture();
     final chatIds = _syncService.openConversationIds;
-    await Future.wait(chatIds.map(_initializeChat));
+    await Future.wait(chatIds.map((chatId) => _initializeChat(chatId, scope)));
   }
 
   @override
@@ -96,9 +109,10 @@ class ChatRepository implements IChatRepository {
 
   @override
   Future<bool> loadMoreMessages(String chatId) async {
+    final scope = _accountSessionController.capture();
     final cached = await _cache.readMessages(
       chatId,
-      currentUserId: _remote.currentUserId,
+      currentUserId: scope.userId,
     );
     final serverMessages = cached
         .where((message) => message.status != MessageStatus.sending)
@@ -111,8 +125,15 @@ class ChatRepository implements IChatRepository {
       beforeMessageId: oldest.id,
       pageSize: ConversationSyncService.pageSize,
     );
-    final hydrated = await _syncService.hydrateAll(page);
-    await _cache.upsertMessages(hydrated);
+    _accountSessionController.ensureCurrent(scope);
+    final hydrated = await _syncService.hydrateAll(
+      page,
+      ownerUserId: scope.userId,
+    );
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.upsertMessages(hydrated, ownerUserId: scope.userId),
+    );
     return page.length == ConversationSyncService.pageSize;
   }
 
@@ -188,13 +209,23 @@ class ChatRepository implements IChatRepository {
 
   @override
   Future<void> retryImages(String chatId, ChatMessage message) async {
-    final operations = await _cache.readPendingOperations();
+    final scope = _accountSessionController.capture();
+    final operations = await _cache.readPendingOperations(
+      ownerUserId: scope.userId,
+    );
     final operation = operations
         .where((item) => item.id == message.id && item.chatId == chatId)
         .firstOrNull;
     if (operation == null) return;
-    await _cache.markMessageStatus(message.id, MessageStatus.sending);
-    await _deliver(operation);
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.markMessageStatus(
+        message.id,
+        MessageStatus.sending,
+        ownerUserId: scope.userId,
+      ),
+    );
+    await _deliver(operation, scope);
   }
 
   @override
@@ -203,21 +234,34 @@ class ChatRepository implements IChatRepository {
     String messageId, {
     required bool deleteForEveryone,
   }) async {
-    final pending = (await _cache.readPendingOperations())
-        .where((operation) => operation.id == messageId)
-        .firstOrNull;
+    final scope = _accountSessionController.capture();
+    final pending = (await _cache.readPendingOperations(
+      ownerUserId: scope.userId,
+    )).where((operation) => operation.id == messageId).firstOrNull;
     if (pending != null) {
-      await _cache.removePendingOperation(messageId);
-      await _cache.removeMessage(messageId);
-      await _syncService.refreshLocalPreview(chatId);
+      await _accountSessionController.commit(scope, () async {
+        await _cache.removePendingOperation(
+          messageId,
+          ownerUserId: scope.userId,
+        );
+        await _cache.removeMessage(messageId, ownerUserId: scope.userId);
+        await _syncService.refreshLocalPreview(
+          chatId,
+          ownerUserId: scope.userId,
+        );
+      });
       await _localMediaRepository.collectGarbage();
       return;
     }
+    _accountSessionController.ensureCurrent(scope);
     await _remote.deleteMessage(
       messageId,
       deleteForEveryone: deleteForEveryone,
     );
-    await _cache.removeMessage(messageId);
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.removeMessage(messageId, ownerUserId: scope.userId),
+    );
     await _syncService.synchronizeRecent(chatId, refreshAfterActive: true);
   }
 
@@ -234,12 +278,13 @@ class ChatRepository implements IChatRepository {
     double? longitude,
     String? replyToMessageId,
   }) async {
+    final scope = _accountSessionController.capture();
     final id = _uuid.v4();
-    final reply = await _createReply(replyToMessageId);
+    final reply = await _createReply(replyToMessageId, scope);
     final message = ChatMessage(
       id: id,
       chatId: chatId,
-      senderId: _remote.currentUserId,
+      senderId: scope.userId,
       text: text,
       timestamp: DateTime.now(),
       isMine: true,
@@ -270,17 +315,29 @@ class ChatRepository implements IChatRepository {
         'reply_to_message_id': replyToMessageId,
       },
     );
-    await _cache.upsertMessage(message, isPending: true);
-    await _syncService.reflectLocalMessage(message);
-    await _cache.putPendingOperation(operation);
-    await _deliver(operation);
+    await _accountSessionController.commit(scope, () async {
+      await _cache.upsertMessage(
+        message,
+        isPending: true,
+        ownerUserId: scope.userId,
+      );
+      await _syncService.reflectLocalMessage(
+        message,
+        ownerUserId: scope.userId,
+      );
+      await _cache.putPendingOperation(operation, ownerUserId: scope.userId);
+    });
+    await _deliver(operation, scope);
   }
 
-  Future<MessageReply?> _createReply(String? messageId) async {
+  Future<MessageReply?> _createReply(
+    String? messageId,
+    AccountSessionSnapshot scope,
+  ) async {
     if (messageId == null) return null;
     final message = await _cache.readMessage(
       messageId,
-      currentUserId: _remote.currentUserId,
+      currentUserId: scope.userId,
     );
     if (message == null) return null;
     return MessageReply(
@@ -292,23 +349,35 @@ class ChatRepository implements IChatRepository {
     );
   }
 
-  Future<void> _retryPending(String chatId) async {
-    final operations = await _cache.readPendingOperations();
+  Future<void> _retryPending(
+    String chatId,
+    AccountSessionSnapshot scope,
+  ) async {
+    _accountSessionController.ensureCurrent(scope);
+    final operations = await _cache.readPendingOperations(
+      ownerUserId: scope.userId,
+    );
     for (final operation in operations.where((item) => item.chatId == chatId)) {
-      await _deliver(operation);
+      await _deliver(operation, scope);
     }
   }
 
-  Future<void> _deliver(PendingMessageOperation operation) async {
-    if (!_deliveringOperationIds.add(operation.id)) return;
+  Future<void> _deliver(
+    PendingMessageOperation operation,
+    AccountSessionSnapshot scope,
+  ) async {
+    final deliveryKey = '${scope.generation}:${scope.userId}:${operation.id}';
+    if (!_deliveringOperationIds.add(deliveryKey)) return;
     try {
+      _accountSessionController.ensureCurrent(scope);
       final type = MessageType.values.byName(operation.type);
       final payload = operation.payload;
       final attachments = switch (type) {
-        MessageType.image => await _uploadImages(operation),
-        MessageType.audio => [await _uploadAudio(operation)],
+        MessageType.image => await _uploadImages(operation, scope),
+        MessageType.audio => [await _uploadAudio(operation, scope)],
         _ => const <Map<String, dynamic>>[],
       };
+      _accountSessionController.ensureCurrent(scope);
       await _remote.sendMessage(
         id: operation.id,
         chatId: operation.chatId,
@@ -319,8 +388,17 @@ class ChatRepository implements IChatRepository {
         replyToMessageId: payload['reply_to_message_id'] as String?,
         attachments: attachments,
       );
-      await _cache.markMessageStatus(operation.id, MessageStatus.sent);
-      await _cache.removePendingOperation(operation.id);
+      await _accountSessionController.commit(scope, () async {
+        await _cache.markMessageStatus(
+          operation.id,
+          MessageStatus.sent,
+          ownerUserId: scope.userId,
+        );
+        await _cache.removePendingOperation(
+          operation.id,
+          ownerUserId: scope.userId,
+        );
+      });
       if (type == MessageType.audio) {
         await _mediaProcessor.deletePersistentAudio(
           payload['audio_path'] as String?,
@@ -331,20 +409,37 @@ class ChatRepository implements IChatRepository {
         refreshAfterActive: true,
       );
       await _localMediaRepository.collectGarbage();
+    } on StaleAccountSessionException {
+      return;
     } catch (error, stackTrace) {
-      if (operation.type == MessageType.image.name) {
-        await _cache.markMessageStatus(operation.id, MessageStatus.error);
+      if (_accountSessionController.isCurrent(scope)) {
+        await _accountSessionController.commit(scope, () async {
+          if (operation.type == MessageType.image.name) {
+            await _cache.markMessageStatus(
+              operation.id,
+              MessageStatus.error,
+              ownerUserId: scope.userId,
+            );
+          }
+          await _cache.markPendingFailure(
+            operation.id,
+            error,
+            ownerUserId: scope.userId,
+          );
+        });
       }
-      await _cache.markPendingFailure(operation.id, error);
       _config.talker.handle(error, stackTrace, 'Pending message upload failed');
     } finally {
-      _deliveringOperationIds.remove(operation.id);
-      unawaited(_localMediaRepository.collectGarbage());
+      _deliveringOperationIds.remove(deliveryKey);
+      if (_accountSessionController.isCurrent(scope)) {
+        unawaited(_localMediaRepository.collectGarbage());
+      }
     }
   }
 
   Future<List<Map<String, dynamic>>> _uploadImages(
     PendingMessageOperation operation,
+    AccountSessionSnapshot scope,
   ) async {
     final sourcePaths = List<String>.from(
       operation.payload['image_paths'] as List? ?? const [],
@@ -366,6 +461,7 @@ class ChatRepository implements IChatRepository {
             operation,
             sourcePaths[index],
             index,
+            scope,
           ).then((attachment) => attachments[index] = attachment),
       ]);
     }
@@ -376,10 +472,12 @@ class ChatRepository implements IChatRepository {
     PendingMessageOperation operation,
     String sourcePath,
     int index,
+    AccountSessionSnapshot scope,
   ) async {
-    final storagePath = _storagePath(operation, '$index.jpg');
+    _accountSessionController.ensureCurrent(scope);
+    final storagePath = _storagePath(operation, '$index.jpg', scope.userId);
     final cachedPath = await _mediaCache.findStorageFile(
-      ownerUserId: _remote.currentUserId,
+      ownerUserId: scope.userId,
       bucket: 'chat-images',
       storagePath: storagePath,
       mimeType: 'image/jpeg',
@@ -390,7 +488,7 @@ class ChatRepository implements IChatRepository {
     if (cachedPath == null) {
       try {
         await _mediaCache.storeBytes(
-          ownerUserId: _remote.currentUserId,
+          ownerUserId: scope.userId,
           bucket: 'chat-images',
           storagePath: storagePath,
           bytes: processed.bytes,
@@ -424,14 +522,16 @@ class ChatRepository implements IChatRepository {
 
   Future<Map<String, dynamic>> _uploadAudio(
     PendingMessageOperation operation,
+    AccountSessionSnapshot scope,
   ) async {
+    _accountSessionController.ensureCurrent(scope);
     final sourcePath = operation.payload['audio_path'] as String;
     final bytes = await _mediaProcessor.readAudio(sourcePath);
     final mimeType =
         operation.payload['audio_mime_type'] as String? ?? 'audio/mp4';
     final extension = mimeType == 'audio/webm' ? 'webm' : 'm4a';
     final attachmentId = _attachmentId(operation.id, 0);
-    final storagePath = _storagePath(operation, '0.$extension');
+    final storagePath = _storagePath(operation, '0.$extension', scope.userId);
     await _remote.upload(
       bucket: 'chat-audio',
       storagePath: storagePath,
@@ -440,7 +540,7 @@ class ChatRepository implements IChatRepository {
     );
     try {
       await _mediaCache.storeFile(
-        ownerUserId: _remote.currentUserId,
+        ownerUserId: scope.userId,
         bucket: 'chat-audio',
         storagePath: storagePath,
         sourcePath: sourcePath,
@@ -461,8 +561,12 @@ class ChatRepository implements IChatRepository {
     };
   }
 
-  String _storagePath(PendingMessageOperation operation, String fileName) {
-    return '${operation.chatId}/${_remote.currentUserId}/'
+  String _storagePath(
+    PendingMessageOperation operation,
+    String fileName,
+    String ownerUserId,
+  ) {
+    return '${operation.chatId}/$ownerUserId/'
         '${operation.id}/$fileName';
   }
 

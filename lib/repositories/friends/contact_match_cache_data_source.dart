@@ -24,8 +24,7 @@ class ContactMatchCachePolicy {
   final Duration negativeTtl;
 
   bool shouldRefresh(ContactMatchCacheRecord? record, DateTime now) {
-    if (record == null ||
-        (record.isRegistered && record.candidate == null)) {
+    if (record == null || (record.isRegistered && record.candidate == null)) {
       return true;
     }
     final ttl = record.isRegistered ? positiveTtl : negativeTtl;
@@ -47,15 +46,18 @@ class ContactMatchCacheDataSource {
   final IContactCacheKeyService _keyService;
 
   Future<Map<String, ContactMatchCacheRecord>> read(
-    Iterable<String> phoneNumbers,
-  ) async {
+    Iterable<String> phoneNumbers, {
+    String? ownerUserId,
+  }) async {
     final keysByPhone = await _keysByPhone(phoneNumbers);
     if (keysByPhone.isEmpty) return const {};
     final phonesByKey = {
       for (final entry in keysByPhone.entries) entry.value: entry.key,
     };
     final query = _database.select(_database.cachedContactMatches)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()));
+      ..where(
+        (table) => table.ownerUserId.equals(ownerUserId ?? _userIdProvider()),
+      );
     final rows = await query.get();
     return {
       for (final row in rows)
@@ -72,9 +74,10 @@ class ContactMatchCacheDataSource {
     required Iterable<String> checkedPhoneNumbers,
     required Map<String, FriendCandidate> matches,
     required DateTime checkedAt,
+    String? ownerUserId,
   }) async {
     final keysByPhone = await _keysByPhone(checkedPhoneNumbers);
-    final owner = _userIdProvider();
+    final owner = ownerUserId ?? _userIdProvider();
     final rows = keysByPhone.entries.map((entry) {
       final candidate = matches[entry.key];
       return CachedContactMatchesCompanion.insert(
@@ -99,9 +102,12 @@ class ContactMatchCacheDataSource {
     );
   }
 
-  Future<void> retainOnly(Iterable<String> phoneNumbers) async {
+  Future<void> retainOnly(
+    Iterable<String> phoneNumbers, {
+    String? ownerUserId,
+  }) async {
     final keys = (await _keysByPhone(phoneNumbers)).values.toSet();
-    final owner = _userIdProvider();
+    final owner = ownerUserId ?? _userIdProvider();
     final existing = await (_database.select(
       _database.cachedContactMatches,
     )..where((table) => table.ownerUserId.equals(owner))).get();

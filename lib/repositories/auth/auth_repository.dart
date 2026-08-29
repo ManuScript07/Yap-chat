@@ -3,16 +3,17 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/auth/abstract_auth_repository.dart';
 import 'package:yap_chat/repositories/auth/oauth_attempt_coordinator.dart';
 
 typedef OAuthSignInLauncher =
-    Future<bool> Function(
-      OAuthProvider provider, {
-      String? redirectTo,
-      String? scopes,
-      LaunchMode authScreenLaunchMode,
-      Map<String, String>? queryParams,
+Future<bool> Function(
+    OAuthProvider provider, {
+    String? redirectTo,
+    String? scopes,
+    LaunchMode authScreenLaunchMode,
+    Map<String, String>? queryParams,
     });
 
 class AuthRepository implements IAuthRepository {
@@ -22,18 +23,22 @@ class AuthRepository implements IAuthRepository {
     bool useAnonymousSignIn = false,
     OAuthSignInLauncher? oauthSignInLauncher,
     OAuthAttemptCoordinator? oauthAttemptCoordinator,
-  }) : _client = client,
-       _redirectUrl = redirectUrl,
-       _useAnonymousSignIn = useAnonymousSignIn,
-       _oauthAttemptCoordinator = oauthAttemptCoordinator,
-       _oauthSignInLauncher =
-           oauthSignInLauncher ?? client.auth.signInWithOAuth;
+    AccountSessionController? accountSessionController,
+  })
+      : _client = client,
+        _redirectUrl = redirectUrl,
+        _useAnonymousSignIn = useAnonymousSignIn,
+        _oauthAttemptCoordinator = oauthAttemptCoordinator,
+        _accountSessionController = accountSessionController,
+        _oauthSignInLauncher =
+            oauthSignInLauncher ?? client.auth.signInWithOAuth;
 
   final SupabaseClient _client;
   final String _redirectUrl;
   final bool _useAnonymousSignIn;
   final OAuthSignInLauncher _oauthSignInLauncher;
   final OAuthAttemptCoordinator? _oauthAttemptCoordinator;
+  final AccountSessionController? _accountSessionController;
 
   static const _yandexProvider = OAuthProvider('custom:yandex');
   static const _yandexQueryParams = <String, String>{'force_confirm': 'yes'};
@@ -52,27 +57,30 @@ class AuthRepository implements IAuthRepository {
 
     return _client.auth.onAuthStateChange
         .transform(
-          StreamTransformer<AuthState, AuthState>.fromHandlers(
-            handleData: (authState, sink) {
-              if (authState.session != null) {
-                unawaited(_oauthAttemptCoordinator?.completeAttempt());
-              }
-              sink.add(authState);
-            },
-            handleError: (error, stackTrace, sink) {
-              unawaited(_oauthAttemptCoordinator?.completeAttempt());
-              sink.addError(error, stackTrace);
-            },
-          ),
-        )
+      StreamTransformer<AuthState, AuthState>.fromHandlers(
+        handleData: (authState, sink) {
+          _accountSessionController?.setAuthenticatedUser(
+            authState.session?.user.id,
+          );
+          if (authState.session != null) {
+            unawaited(_oauthAttemptCoordinator?.completeAttempt());
+          }
+          sink.add(authState);
+        },
+        handleError: (error, stackTrace, sink) {
+          unawaited(_oauthAttemptCoordinator?.completeAttempt());
+          sink.addError(error, stackTrace);
+        },
+      ),
+    )
         .map((authState) => _mapSession(authState.session))
         .where((session) {
-          if (!initialEventSkipped && session == initialSession) {
-            initialEventSkipped = true;
-            return false;
-          }
-          return true;
-        })
+      if (!initialEventSkipped && session == initialSession) {
+        initialEventSkipped = true;
+        return false;
+      }
+      return true;
+    })
         .distinct();
   }
 
@@ -121,7 +129,7 @@ class AuthRepository implements IAuthRepository {
     return AuthSession(
       userId: user.id,
       email:
-          user.email ??
+      user.email ??
           _firstString(metadata, const ['email', 'default_email']),
       displayName: _firstString(metadata, const [
         'name',
@@ -141,7 +149,9 @@ class AuthRepository implements IAuthRepository {
   String? _firstString(Map<String, dynamic> metadata, List<String> keys) {
     for (final key in keys) {
       final value = metadata[key];
-      if (value is String && value.trim().isNotEmpty) return value.trim();
+      if (value is String && value
+          .trim()
+          .isNotEmpty) return value.trim();
     }
     return null;
   }

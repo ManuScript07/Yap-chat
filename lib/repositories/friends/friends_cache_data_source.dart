@@ -12,41 +12,49 @@ class FriendsCacheDataSource {
   final AppDatabase _database;
   final String Function() _userIdProvider;
 
-  Stream<List<Friend>> watchFriends() {
+  Stream<List<Friend>> watchFriends({String? ownerUserId}) {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriends)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.friendsSince)]);
     return query.watch().map((rows) => List.unmodifiable(rows.map(_mapFriend)));
   }
 
-  Stream<List<FriendRequest>> watchRequests() {
+  Stream<List<FriendRequest>> watchRequests({String? ownerUserId}) {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriendRequests)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.requestedAt)]);
     return query.watch().map(
       (rows) => List.unmodifiable(rows.map(_mapRequest)),
     );
   }
 
-  Future<List<Friend>> readFriends() async {
+  Future<List<Friend>> readFriends({String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriends)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.friendsSince)]);
     return (await query.get()).map(_mapFriend).toList(growable: false);
   }
 
-  Future<List<FriendRequest>> readRequests() async {
+  Future<List<FriendRequest>> readRequests({String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriendRequests)
-      ..where((table) => table.ownerUserId.equals(_userIdProvider()))
+      ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.requestedAt)]);
     return (await query.get()).map(_mapRequest).toList(growable: false);
   }
 
-  Future<FriendLocation?> readLocation(String friendId) async {
+  Future<FriendLocation?> readLocation(
+    String friendId, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriendLocations)
       ..where(
         (table) =>
-            table.ownerUserId.equals(_userIdProvider()) &
+            table.ownerUserId.equals(owner) &
             table.friendUserId.equals(friendId),
       );
     final row = await query.getSingleOrNull();
@@ -61,33 +69,37 @@ class FriendsCacheDataSource {
     );
   }
 
-  Future<void> writeLocation(String friendId, FriendLocation location) =>
-      _database
-          .into(_database.cachedFriendLocations)
-          .insertOnConflictUpdate(
-            CachedFriendLocationsCompanion.insert(
-              ownerUserId: _userIdProvider(),
-              friendUserId: friendId,
-              latitude: location.latitude,
-              longitude: location.longitude,
-              locationUpdatedAtMs: location.updatedAt.millisecondsSinceEpoch,
-              cachedAt: DateTime.now().toUtc(),
-            ),
-          );
+  Future<void> writeLocation(
+    String friendId,
+    FriendLocation location, {
+    String? ownerUserId,
+  }) => _database
+      .into(_database.cachedFriendLocations)
+      .insertOnConflictUpdate(
+        CachedFriendLocationsCompanion.insert(
+          ownerUserId: ownerUserId ?? _userIdProvider(),
+          friendUserId: friendId,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          locationUpdatedAtMs: location.updatedAt.millisecondsSinceEpoch,
+          cachedAt: DateTime.now().toUtc(),
+        ),
+      );
 
-  Future<void> removeLocation(String friendId) =>
+  Future<void> removeLocation(String friendId, {String? ownerUserId}) =>
       (_database.delete(_database.cachedFriendLocations)..where(
             (table) =>
-                table.ownerUserId.equals(_userIdProvider()) &
+                table.ownerUserId.equals(ownerUserId ?? _userIdProvider()) &
                 table.friendUserId.equals(friendId),
           ))
           .go();
 
   Future<void> replaceAll({
+    String? ownerUserId,
     required List<Friend> friends,
     required List<FriendRequest> requests,
   }) => _database.transaction(() async {
-    final owner = _userIdProvider();
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.delete(
       _database.cachedFriends,
     )..where((table) => table.ownerUserId.equals(owner))).go();
@@ -95,12 +107,14 @@ class FriendsCacheDataSource {
       _database.cachedFriendRequests,
     )..where((table) => table.ownerUserId.equals(owner))).go();
     for (final friend in friends) {
-      await _database.into(_database.cachedFriends).insert(_friendRow(friend));
+      await _database
+          .into(_database.cachedFriends)
+          .insert(_friendRow(friend, owner));
     }
     for (final request in requests) {
       await _database
           .into(_database.cachedFriendRequests)
-          .insert(_requestRow(request));
+          .insert(_requestRow(request, owner));
     }
     final friendIds = friends.map((friend) => friend.id).toSet();
     final cachedLocations = await (_database.select(
@@ -131,21 +145,22 @@ class FriendsCacheDataSource {
     }
   });
 
-  Future<void> addRequest(FriendRequest request) => _database
-      .into(_database.cachedFriendRequests)
-      .insertOnConflictUpdate(_requestRow(request));
+  Future<void> addRequest(FriendRequest request, {String? ownerUserId}) =>
+      _database
+          .into(_database.cachedFriendRequests)
+          .insertOnConflictUpdate(_requestRow(request, ownerUserId));
 
-  Future<void> removeRequest(String requestId) =>
+  Future<void> removeRequest(String requestId, {String? ownerUserId}) =>
       (_database.delete(_database.cachedFriendRequests)..where(
             (table) =>
-                table.ownerUserId.equals(_userIdProvider()) &
+                table.ownerUserId.equals(ownerUserId ?? _userIdProvider()) &
                 table.requestId.equals(requestId),
           ))
           .go();
 
-  Future<void> acceptRequest(String requestId) =>
+  Future<void> acceptRequest(String requestId, {String? ownerUserId}) =>
       _database.transaction(() async {
-        final owner = _userIdProvider();
+        final owner = ownerUserId ?? _userIdProvider();
         final query = _database.select(_database.cachedFriendRequests)
           ..where(
             (table) =>
@@ -197,9 +212,9 @@ class FriendsCacheDataSource {
     requestedAt: row.requestedAt,
   );
 
-  CachedFriendsCompanion _friendRow(Friend friend) =>
+  CachedFriendsCompanion _friendRow(Friend friend, [String? ownerUserId]) =>
       CachedFriendsCompanion.insert(
-        ownerUserId: _userIdProvider(),
+        ownerUserId: ownerUserId ?? _userIdProvider(),
         userId: friend.id,
         username: friend.username,
         displayName: friend.displayName,
@@ -209,18 +224,20 @@ class FriendsCacheDataSource {
         cachedAt: DateTime.now().toUtc(),
       );
 
-  CachedFriendRequestsCompanion _requestRow(FriendRequest request) =>
-      CachedFriendRequestsCompanion.insert(
-        ownerUserId: _userIdProvider(),
-        requestId: request.id,
-        peerId: request.peerId,
-        peerUsername: request.peerUsername,
-        peerDisplayName: request.peerDisplayName,
-        peerAvatarUrl: Value(request.peerAvatarUrl),
-        peerAvatarStoragePath: Value(request.peerAvatarStoragePath),
-        peerFriendCount: Value(request.peerFriendCount),
-        direction: request.direction.name,
-        requestedAt: request.requestedAt,
-        cachedAt: DateTime.now().toUtc(),
-      );
+  CachedFriendRequestsCompanion _requestRow(
+    FriendRequest request, [
+    String? ownerUserId,
+  ]) => CachedFriendRequestsCompanion.insert(
+    ownerUserId: ownerUserId ?? _userIdProvider(),
+    requestId: request.id,
+    peerId: request.peerId,
+    peerUsername: request.peerUsername,
+    peerDisplayName: request.peerDisplayName,
+    peerAvatarUrl: Value(request.peerAvatarUrl),
+    peerAvatarStoragePath: Value(request.peerAvatarStoragePath),
+    peerFriendCount: Value(request.peerFriendCount),
+    direction: request.direction.name,
+    requestedAt: request.requestedAt,
+    cachedAt: DateTime.now().toUtc(),
+  );
 }

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
-import 'package:yap_chat/core/services/media_cache_service.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
@@ -21,6 +21,7 @@ class ChatsRepository implements IChatsRepository {
     required ChatCacheDataSource chatCache,
     required ChatRemoteDataSource chatRemote,
     required ConversationSyncService conversationSync,
+    required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
   }) : _config = config,
        _cache = cache,
@@ -29,6 +30,7 @@ class ChatsRepository implements IChatsRepository {
        _chatCache = chatCache,
        _chatRemote = chatRemote,
        _conversationSync = conversationSync,
+       _accountSessionController = accountSessionController,
        _uuid = uuid;
 
   static const _reconciliationInterval = Duration(seconds: 20);
@@ -40,6 +42,7 @@ class ChatsRepository implements IChatsRepository {
   final ChatCacheDataSource _chatCache;
   final ChatRemoteDataSource _chatRemote;
   final ConversationSyncService _conversationSync;
+  final AccountSessionController _accountSessionController;
   final Uuid _uuid;
   Future<void>? _activeSync;
   Future<void>? _activeDeletionRetry;
@@ -56,12 +59,22 @@ class ChatsRepository implements IChatsRepository {
 
     controller = StreamController<List<Chat>>(
       onListen: () {
-        cacheSubscription = _cache.watch().listen(
-          controller.add,
-          onError: controller.addError,
-        );
+        final scope = _accountSessionController.capture();
+        cacheSubscription = _cache
+            .watch(ownerUserId: scope.userId)
+            .listen(controller.add, onError: controller.addError);
         realtimeSubscription = _remote.watchChanges().listen(
-          (change) => _enqueueChange(change, controller),
+          (change) {
+            try {
+              _enqueueChange(
+                change,
+                controller,
+                _accountSessionController.capture(),
+              );
+            } on StaleAccountSessionException {
+              return;
+            }
+          },
           onError: (Object error, StackTrace stackTrace) {
             _config.talker.handle(error, stackTrace, 'Chats realtime failed');
           },
@@ -81,21 +94,26 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
-  Stream<Chat?> watchChat(String chatId) =>
-      _cache.watch().map((chats) => _findChat(chats, chatId));
+  Stream<Chat?> watchChat(String chatId) {
+    final scope = _accountSessionController.capture();
+    return _cache
+        .watch(ownerUserId: scope.userId)
+        .map((chats) => _findChat(chats, chatId));
+  }
 
   @override
   Future<List<Chat>> getChats() async {
+    final scope = _accountSessionController.capture();
     try {
-      await _retryPendingDeletions();
+      await _retryPendingDeletions(scope);
       await _synchronize(ensureLatestMessages: true);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
-      final cached = await _cache.read();
+      final cached = await _cache.read(ownerUserId: scope.userId);
       if (cached.isEmpty) rethrow;
       return cached;
     }
-    return _cache.read();
+    return _cache.read(ownerUserId: scope.userId);
   }
 
   @override
@@ -103,7 +121,11 @@ class ChatsRepository implements IChatsRepository {
     final normalizedChatId = chatId.trim();
     if (normalizedChatId.isEmpty) return null;
 
-    final cachedChat = _findChat(await _cache.read(), normalizedChatId);
+    final scope = _accountSessionController.capture();
+    final cachedChat = _findChat(
+      await _cache.read(ownerUserId: scope.userId),
+      normalizedChatId,
+    );
     if (cachedChat != null) return cachedChat;
 
     try {
@@ -113,7 +135,10 @@ class ChatsRepository implements IChatsRepository {
       return null;
     }
 
-    return _findChat(await _cache.read(), normalizedChatId);
+    return _findChat(
+      await _cache.read(ownerUserId: scope.userId),
+      normalizedChatId,
+    );
   }
 
   @override
@@ -124,17 +149,24 @@ class ChatsRepository implements IChatsRepository {
     String? peerAvatarUrl,
     String? peerAvatarStoragePath,
   }) async {
+    final scope = _accountSessionController.capture();
     final normalizedPeerId = peerId.trim();
     if (normalizedPeerId.isEmpty) {
       throw ArgumentError.value(peerId, 'peerId', 'Peer ID must not be empty');
     }
 
-    final cachedChat = await _cache.readByPeerId(normalizedPeerId);
+    final cachedChat = await _cache.readByPeerId(
+      normalizedPeerId,
+      ownerUserId: scope.userId,
+    );
     if (cachedChat != null) return cachedChat;
 
     try {
       await _synchronize();
-      final synchronizedChat = await _cache.readByPeerId(normalizedPeerId);
+      final synchronizedChat = await _cache.readByPeerId(
+        normalizedPeerId,
+        ownerUserId: scope.userId,
+      );
       if (synchronizedChat != null) return synchronizedChat;
     } catch (error, stackTrace) {
       _config.talker.handle(
@@ -155,15 +187,20 @@ class ChatsRepository implements IChatsRepository {
 
   @override
   Future<Chat> ensureDirectChat(String peerId) async {
+    final scope = _accountSessionController.capture();
     final normalizedPeerId = peerId.trim();
     if (normalizedPeerId.isEmpty) {
       throw ArgumentError.value(peerId, 'peerId', 'Peer ID must not be empty');
     }
 
-    final cachedChat = await _cache.readByPeerId(normalizedPeerId);
+    final cachedChat = await _cache.readByPeerId(
+      normalizedPeerId,
+      ownerUserId: scope.userId,
+    );
     if (cachedChat != null) return cachedChat;
 
     final chatId = await _remote.createDirectConversation(normalizedPeerId);
+    _accountSessionController.ensureCurrent(scope);
     await _synchronize();
     final chat = await getChatById(chatId);
     if (chat == null) {
@@ -175,27 +212,39 @@ class ChatsRepository implements IChatsRepository {
   @override
   Future<void> deleteChats(Set<String> ids) async {
     if (ids.isEmpty) return;
+    final scope = _accountSessionController.capture();
     final clearedAt = DateTime.now().toUtc();
-    for (final chatId in ids) {
-      await _chatCache.putPendingChatDeletion(
-        id: _uuid.v4(),
-        chatId: chatId,
-        clearedAt: clearedAt,
-      );
-    }
+    await _accountSessionController.commit(scope, () async {
+      for (final chatId in ids) {
+        await _chatCache.putPendingChatDeletion(
+          id: _uuid.v4(),
+          chatId: chatId,
+          clearedAt: clearedAt,
+          ownerUserId: scope.userId,
+        );
+      }
+    });
 
     await _waitForSynchronizationIdle();
-    await _cache.remove(ids);
-    await _clearLocalConversations(ids);
-    await _retryPendingDeletions();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.remove(ids, ownerUserId: scope.userId),
+    );
+    await _clearLocalConversations(ids, scope);
+    await _retryPendingDeletions(scope);
     await _synchronize(ensureLatestMessages: true);
   }
 
   @override
   Future<void> markAsRead(Set<String> ids) async {
     if (ids.isEmpty) return;
-    await _cache.markAsRead(ids);
+    final scope = _accountSessionController.capture();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.markAsRead(ids, ownerUserId: scope.userId),
+    );
     try {
+      _accountSessionController.ensureCurrent(scope);
       await _remote.markAsRead(ids);
     } catch (_) {
       await _synchronize();
@@ -206,8 +255,13 @@ class ChatsRepository implements IChatsRepository {
   @override
   Future<void> toggleMute(Set<String> ids) async {
     if (ids.isEmpty) return;
-    await _cache.toggleMute(ids);
+    final scope = _accountSessionController.capture();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.toggleMute(ids, ownerUserId: scope.userId),
+    );
     try {
+      _accountSessionController.ensureCurrent(scope);
       await _remote.toggleMute(ids);
     } catch (_) {
       await _synchronize();
@@ -218,6 +272,8 @@ class ChatsRepository implements IChatsRepository {
   @override
   Future<void> pauseRealtime() {
     _isRealtimePaused = true;
+    _activeSync = null;
+    _activeDeletionRetry = null;
     return _remote.pauseChanges();
   }
 
@@ -225,21 +281,22 @@ class ChatsRepository implements IChatsRepository {
   Future<void> resumeRealtime() async {
     _isRealtimePaused = false;
     await _remote.resumeChanges();
-    await _retryPendingDeletions();
+    await _retryPendingDeletions(_accountSessionController.capture());
     await _synchronize(ensureLatestMessages: true);
   }
 
   Future<void> _initialize(StreamController<List<Chat>> controller) async {
-    await _retryPendingDeletions();
+    await _retryPendingDeletions(_accountSessionController.capture());
     await _synchronizeSafely(controller, ensureLatestMessages: true);
   }
 
   void _enqueueChange(
     ConversationChange change,
     StreamController<List<Chat>> controller,
+    AccountSessionSnapshot scope,
   ) {
     _changeQueue = _changeQueue
-        .then((_) => _handleChange(change, controller))
+        .then((_) => _handleChange(change, controller, scope))
         .catchError((Object error, StackTrace stackTrace) {
           _config.talker.handle(
             error,
@@ -267,19 +324,24 @@ class ChatsRepository implements IChatsRepository {
   Future<void> _handleChange(
     ConversationChange change,
     StreamController<List<Chat>> controller,
+    AccountSessionSnapshot scope,
   ) async {
-    await _retryPendingDeletions();
+    _accountSessionController.ensureCurrent(scope);
+    await _retryPendingDeletions(scope);
     final conversationId = change.conversationId;
     if (conversationId == null) {
       await _synchronizeSafely(controller, ensureLatestMessages: true);
       return;
     }
-    final pendingIds = (await _chatCache.readPendingChatDeletions())
-        .map((item) => item.chatId)
-        .toSet();
+    final pendingIds = (await _chatCache.readPendingChatDeletions(
+      ownerUserId: scope.userId,
+    )).map((item) => item.chatId).toSet();
     if (change.reason == 'hidden') {
-      await _cache.remove({conversationId});
-      await _clearLocalConversations({conversationId});
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.remove({conversationId}, ownerUserId: scope.userId),
+      );
+      await _clearLocalConversations({conversationId}, scope);
     } else if (!pendingIds.contains(conversationId)) {
       try {
         await _synchronizeConversation(conversationId);
@@ -294,18 +356,24 @@ class ChatsRepository implements IChatsRepository {
     await _synchronizeSafely(controller);
   }
 
-  Future<void> _clearLocalConversations(Set<String> ids) async {
-    final files = await _chatCache.clearConversations(ids);
+  Future<void> _clearLocalConversations(
+    Set<String> ids,
+    AccountSessionSnapshot scope,
+  ) async {
+    final files = await _accountSessionController.commit(
+      scope,
+      () => _chatCache.clearConversations(ids, ownerUserId: scope.userId),
+    );
     try {
       await Future.wait([
         _mediaCache.removeStorageFiles(
-          ownerUserId: _remote.currentUserId,
+          ownerUserId: scope.userId,
           bucket: 'chat-images',
           storagePaths: files.imageStoragePaths,
           mimeType: 'image/jpeg',
         ),
         _mediaCache.removeStorageFiles(
-          ownerUserId: _remote.currentUserId,
+          ownerUserId: scope.userId,
           bucket: 'chat-audio',
           storagePaths: files.audioStoragePaths,
         ),
@@ -320,10 +388,11 @@ class ChatsRepository implements IChatsRepository {
     }
   }
 
-  Future<void> _retryPendingDeletions() async {
+  Future<void> _retryPendingDeletions(AccountSessionSnapshot scope) async {
+    _accountSessionController.ensureCurrent(scope);
     final activeRetry = _activeDeletionRetry;
     if (activeRetry != null) return activeRetry;
-    final retry = _performPendingDeletionsRetry();
+    final retry = _performPendingDeletionsRetry(scope);
     _activeDeletionRetry = retry;
     await retry.whenComplete(() {
       if (identical(_activeDeletionRetry, retry)) {
@@ -332,15 +401,28 @@ class ChatsRepository implements IChatsRepository {
     });
   }
 
-  Future<void> _performPendingDeletionsRetry() async {
-    final pending = await _chatCache.readPendingChatDeletions();
+  Future<void> _performPendingDeletionsRetry(
+    AccountSessionSnapshot scope,
+  ) async {
+    final pending = await _chatCache.readPendingChatDeletions(
+      ownerUserId: scope.userId,
+    );
     for (final deletion in pending) {
       try {
+        _accountSessionController.ensureCurrent(scope);
         await _remote.hideChats({
           deletion.chatId,
         }, clearedAt: deletion.clearedAt);
         await _waitForSynchronizationIdle();
-        await _chatCache.removePendingOperation(deletion.id);
+        await _accountSessionController.commit(
+          scope,
+          () => _chatCache.removePendingOperation(
+            deletion.id,
+            ownerUserId: scope.userId,
+          ),
+        );
+      } on StaleAccountSessionException {
+        return;
       } catch (error, stackTrace) {
         _config.talker.handle(
           error,
@@ -371,10 +453,12 @@ class ChatsRepository implements IChatsRepository {
   }
 
   Future<void> _performSync({required bool ensureLatestMessages}) async {
+    final scope = _accountSessionController.capture();
     final chats = await _remote.fetchChats();
-    final pendingChatIds = (await _chatCache.readPendingChatDeletions())
-        .map((item) => item.chatId)
-        .toSet();
+    _accountSessionController.ensureCurrent(scope);
+    final pendingChatIds = (await _chatCache.readPendingChatDeletions(
+      ownerUserId: scope.userId,
+    )).map((item) => item.chatId).toSet();
     final visibleChats = chats
         .where((chat) => !pendingChatIds.contains(chat.id))
         .toList(growable: false);
@@ -384,7 +468,7 @@ class ChatsRepository implements IChatsRepository {
         if (lastMessageId == null) continue;
         final cached = await _chatCache.readMessage(
           lastMessageId,
-          currentUserId: _chatRemote.currentUserId,
+          currentUserId: scope.userId,
         );
         if (cached == null || _conversationSync.isConversationOpen(chat.id)) {
           try {
@@ -399,8 +483,13 @@ class ChatsRepository implements IChatsRepository {
         }
       }
     }
-    final reconciled = await Future.wait(visibleChats.map(_mergeLocalPreview));
-    await _cache.replaceAll(reconciled);
+    final reconciled = await Future.wait(
+      visibleChats.map((chat) => _mergeLocalPreview(chat, scope)),
+    );
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.replaceAll(reconciled, ownerUserId: scope.userId),
+    );
   }
 
   Future<void> _synchronizeConversation(String chatId) async {
@@ -423,10 +512,13 @@ class ChatsRepository implements IChatsRepository {
     }
   }
 
-  Future<Chat> _mergeLocalPreview(Chat chat) async {
+  Future<Chat> _mergeLocalPreview(
+    Chat chat,
+    AccountSessionSnapshot scope,
+  ) async {
     final messages = await _chatCache.readMessages(
       chat.id,
-      currentUserId: _chatRemote.currentUserId,
+      currentUserId: scope.userId,
     );
     final latest = messages.firstOrNull;
     if (latest == null) return chat;
@@ -454,22 +546,24 @@ class ChatsRepository implements IChatsRepository {
 
   @override
   Future<String?> resolveAvatar(Chat chat) async {
+    final scope = _accountSessionController.capture();
     final storagePath = chat.avatarStoragePath;
     final remoteUrl = chat.avatarUrl;
     try {
       final localPath = storagePath != null && storagePath.isNotEmpty
           ? await _mediaCache.cacheStorageFile(
-              ownerUserId: _remote.currentUserId,
+              ownerUserId: scope.userId,
               bucket: 'avatars',
               storagePath: storagePath,
               mimeType: 'image/jpeg',
             )
           : remoteUrl != null && remoteUrl.isNotEmpty
           ? await _mediaCache.cacheNetworkFile(
-              ownerUserId: _remote.currentUserId,
+              ownerUserId: scope.userId,
               url: remoteUrl,
             )
           : null;
+      _accountSessionController.ensureCurrent(scope);
       return localPath;
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Avatar caching failed');
@@ -485,7 +579,10 @@ class ChatsRepository implements IChatsRepository {
       await _synchronize(ensureLatestMessages: ensureLatestMessages);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
-      if ((await _cache.read()).isEmpty && !controller.isClosed) {
+      final ownerUserId = _accountSessionController.userId;
+      if (ownerUserId != null &&
+          (await _cache.read(ownerUserId: ownerUserId)).isEmpty &&
+          !controller.isClosed) {
         controller.addError(error, stackTrace);
       }
     }

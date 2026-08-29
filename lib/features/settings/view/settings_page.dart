@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/settings/view/privacy_settings_page.dart';
 import 'package:yap_chat/features/settings/view/settings_routes.dart';
 import 'package:yap_chat/features/settings/view/visibility_settings_page.dart';
@@ -149,7 +151,7 @@ class _SettingsPageState extends State<_SettingsPage> {
                 const Spacer(),
                 _SettingsTextAction(
                   title: context.l10n.settingsLogout,
-                  onTap: () => _showComingSoon(context),
+                  onTap: _confirmLogout,
                 ),
                 _SettingsTextAction(
                   title: context.l10n.settingsDeleteAccount,
@@ -176,6 +178,17 @@ class _SettingsPageState extends State<_SettingsPage> {
       Uri.parse('https://t.me/heyitsyap'),
       mode: LaunchMode.externalApplication,
     );
+  }
+
+  Future<void> _confirmLogout() async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.settingsLogoutConfirmationTitle,
+      content: context.l10n.settingsLogoutConfirmationContent,
+      confirmLabel: context.l10n.settingsLogoutConfirm,
+    );
+    if (!mounted || confirmed != true) return;
+    context.read<AuthBloc>().add(const AuthSignOutRequested());
   }
 
   void _showComingSoon(BuildContext context) {

@@ -344,6 +344,24 @@ abstract class AppLocalizations {
   /// **'Выход'**
   String get settingsLogout;
 
+  /// No description provided for @settingsLogoutConfirmationTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выйти из аккаунта?'**
+  String get settingsLogoutConfirmationTitle;
+
+  /// No description provided for @settingsLogoutConfirmationContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вы уверены, что хотите выйти из аккаунта?'**
+  String get settingsLogoutConfirmationContent;
+
+  /// No description provided for @settingsLogoutConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выйти'**
+  String get settingsLogoutConfirm;
+
   /// No description provided for @settingsDeleteAccount.
   ///
   /// In ru, this message translates to:

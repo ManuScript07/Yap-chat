@@ -23,7 +23,7 @@ class ChatCacheDataSource {
     final query = _database.select(_database.cachedMessages)
       ..where(
         (table) =>
-            table.ownerUserId.equals(_userIdProvider()) &
+            table.ownerUserId.equals(currentUserId) &
             table.chatId.equals(chatId),
       )
       ..orderBy([
@@ -43,7 +43,7 @@ class ChatCacheDataSource {
     final query = _database.select(_database.cachedMessages)
       ..where(
         (table) =>
-            table.ownerUserId.equals(_userIdProvider()) &
+            table.ownerUserId.equals(currentUserId) &
             table.chatId.equals(chatId),
       )
       ..orderBy([
@@ -62,8 +62,7 @@ class ChatCacheDataSource {
     final row =
         await (_database.select(_database.cachedMessages)..where(
               (table) =>
-                  table.ownerUserId.equals(_userIdProvider()) &
-                  table.id.equals(id),
+                  table.ownerUserId.equals(currentUserId) & table.id.equals(id),
             ))
             .getSingleOrNull();
     return row == null ? null : _mapMessage(row, currentUserId);
@@ -71,15 +70,17 @@ class ChatCacheDataSource {
 
   Future<bool> replaceRecentMessages(
     String chatId,
-    List<ChatMessage> messages,
-  ) async {
-    if (await _recentMessagesMatch(chatId, messages)) return false;
+    List<ChatMessage> messages, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    if (await _recentMessagesMatch(chatId, messages, owner)) return false;
 
     await _database.transaction(() async {
       if (messages.isEmpty) {
         await (_database.delete(_database.cachedMessages)..where(
               (table) =>
-                  table.ownerUserId.equals(_userIdProvider()) &
+                  table.ownerUserId.equals(owner) &
                   table.chatId.equals(chatId) &
                   table.isPending.not(),
             ))
@@ -89,7 +90,7 @@ class ChatCacheDataSource {
         final ids = messages.map((message) => message.id).toSet();
         await (_database.delete(_database.cachedMessages)..where(
               (table) =>
-                  table.ownerUserId.equals(_userIdProvider()) &
+                  table.ownerUserId.equals(owner) &
                   table.chatId.equals(chatId) &
                   table.isPending.not() &
                   table.timestamp.isBiggerOrEqualValue(oldest) &
@@ -97,7 +98,7 @@ class ChatCacheDataSource {
             ))
             .go();
       }
-      await _upsertMessages(messages);
+      await _upsertMessages(messages, owner);
     });
     return true;
   }
@@ -105,8 +106,8 @@ class ChatCacheDataSource {
   Future<bool> _recentMessagesMatch(
     String chatId,
     List<ChatMessage> messages,
+    String ownerUserId,
   ) async {
-    final ownerUserId = _userIdProvider();
     final query = _database.select(_database.cachedMessages)
       ..where(
         (table) =>
@@ -150,22 +151,35 @@ class ChatCacheDataSource {
         (value.millisecondsSinceEpoch ~/ 1000) * 1000,
       );
 
-  Future<void> upsertMessages(List<ChatMessage> messages) {
-    return _database.transaction(() => _upsertMessages(messages));
+  Future<void> upsertMessages(
+    List<ChatMessage> messages, {
+    String? ownerUserId,
+  }) {
+    final owner = ownerUserId ?? _userIdProvider();
+    return _database.transaction(() => _upsertMessages(messages, owner));
   }
 
-  Future<void> upsertMessage(ChatMessage message, {bool isPending = false}) {
+  Future<void> upsertMessage(
+    ChatMessage message, {
+    bool isPending = false,
+    String? ownerUserId,
+  }) {
+    final owner = ownerUserId ?? _userIdProvider();
     return _database
         .into(_database.cachedMessages)
         .insertOnConflictUpdate(
-          _messageCompanion(message, isPending: isPending),
+          _messageCompanion(message, owner, isPending: isPending),
         );
   }
 
-  Future<void> markMessageStatus(String id, MessageStatus status) async {
+  Future<void> markMessageStatus(
+    String id,
+    MessageStatus status, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.update(_database.cachedMessages)..where(
-          (table) =>
-              table.ownerUserId.equals(_userIdProvider()) & table.id.equals(id),
+          (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .write(
           CachedMessagesCompanion(
@@ -177,20 +191,24 @@ class ChatCacheDataSource {
         );
   }
 
-  Future<void> removeMessage(String id) async {
+  Future<void> removeMessage(String id, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.delete(_database.cachedMessages)..where(
-          (table) =>
-              table.ownerUserId.equals(_userIdProvider()) & table.id.equals(id),
+          (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .go();
   }
 
-  Future<void> putPendingOperation(PendingMessageOperation operation) {
+  Future<void> putPendingOperation(
+    PendingMessageOperation operation, {
+    String? ownerUserId,
+  }) {
+    final owner = ownerUserId ?? _userIdProvider();
     return _database
         .into(_database.pendingChatOperations)
         .insertOnConflictUpdate(
           PendingChatOperationsCompanion.insert(
-            ownerUserId: _userIdProvider(),
+            ownerUserId: owner,
             id: operation.id,
             chatId: operation.chatId,
             type: operation.type,
@@ -202,11 +220,14 @@ class ChatCacheDataSource {
         );
   }
 
-  Future<List<PendingMessageOperation>> readPendingOperations() async {
+  Future<List<PendingMessageOperation>> readPendingOperations({
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.pendingChatOperations)
       ..where(
         (table) =>
-            table.ownerUserId.equals(_userIdProvider()) &
+            table.ownerUserId.equals(owner) &
             table.type.isIn(MessageType.values.map((type) => type.name)),
       )
       ..orderBy([(table) => OrderingTerm.asc(table.createdAt)]);
@@ -227,18 +248,20 @@ class ChatCacheDataSource {
         .toList(growable: false);
   }
 
-  Future<void> markPendingFailure(String id, Object error) async {
+  Future<void> markPendingFailure(
+    String id,
+    Object error, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final row =
         await (_database.select(_database.pendingChatOperations)..where(
-              (table) =>
-                  table.ownerUserId.equals(_userIdProvider()) &
-                  table.id.equals(id),
+              (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
             ))
             .getSingleOrNull();
     if (row == null) return;
     await (_database.update(_database.pendingChatOperations)..where(
-          (table) =>
-              table.ownerUserId.equals(_userIdProvider()) & table.id.equals(id),
+          (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .write(
           PendingChatOperationsCompanion(
@@ -248,10 +271,10 @@ class ChatCacheDataSource {
         );
   }
 
-  Future<void> removePendingOperation(String id) async {
+  Future<void> removePendingOperation(String id, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
     await (_database.delete(_database.pendingChatOperations)..where(
-          (table) =>
-              table.ownerUserId.equals(_userIdProvider()) & table.id.equals(id),
+          (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .go();
   }
@@ -260,12 +283,14 @@ class ChatCacheDataSource {
     required String id,
     required String chatId,
     required DateTime clearedAt,
+    String? ownerUserId,
   }) {
+    final owner = ownerUserId ?? _userIdProvider();
     return _database
         .into(_database.pendingChatOperations)
         .insertOnConflictUpdate(
           PendingChatOperationsCompanion.insert(
-            ownerUserId: _userIdProvider(),
+            ownerUserId: owner,
             id: id,
             chatId: chatId,
             type: pendingChatDeletionType,
@@ -277,11 +302,14 @@ class ChatCacheDataSource {
         );
   }
 
-  Future<List<PendingChatDeletion>> readPendingChatDeletions() async {
+  Future<List<PendingChatDeletion>> readPendingChatDeletions({
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.pendingChatOperations)
       ..where(
         (table) =>
-            table.ownerUserId.equals(_userIdProvider()) &
+            table.ownerUserId.equals(owner) &
             table.type.equals(pendingChatDeletionType),
       )
       ..orderBy([(table) => OrderingTerm.asc(table.createdAt)]);
@@ -303,20 +331,22 @@ class ChatCacheDataSource {
         .toList(growable: false);
   }
 
-  Future<ConversationCacheFiles> clearConversations(Set<String> chatIds) async {
+  Future<ConversationCacheFiles> clearConversations(
+    Set<String> chatIds, {
+    String? ownerUserId,
+  }) async {
     if (chatIds.isEmpty) return const ConversationCacheFiles();
-    final ownerUserId = _userIdProvider();
+    final owner = ownerUserId ?? _userIdProvider();
     final messageRows =
         await (_database.select(_database.cachedMessages)..where(
               (table) =>
-                  table.ownerUserId.equals(ownerUserId) &
-                  table.chatId.isIn(chatIds),
+                  table.ownerUserId.equals(owner) & table.chatId.isIn(chatIds),
             ))
             .get();
     final pendingRows =
         await (_database.select(_database.pendingChatOperations)..where(
               (table) =>
-                  table.ownerUserId.equals(ownerUserId) &
+                  table.ownerUserId.equals(owner) &
                   table.chatId.isIn(chatIds) &
                   table.type.equals(pendingChatDeletionType).not(),
             ))
@@ -344,13 +374,12 @@ class ChatCacheDataSource {
     await _database.transaction(() async {
       await (_database.delete(_database.cachedMessages)..where(
             (table) =>
-                table.ownerUserId.equals(ownerUserId) &
-                table.chatId.isIn(chatIds),
+                table.ownerUserId.equals(owner) & table.chatId.isIn(chatIds),
           ))
           .go();
       await (_database.delete(_database.pendingChatOperations)..where(
             (table) =>
-                table.ownerUserId.equals(ownerUserId) &
+                table.ownerUserId.equals(owner) &
                 table.chatId.isIn(chatIds) &
                 table.type.equals(pendingChatDeletionType).not(),
           ))
@@ -363,21 +392,25 @@ class ChatCacheDataSource {
     );
   }
 
-  Future<void> _upsertMessages(List<ChatMessage> messages) async {
+  Future<void> _upsertMessages(
+    List<ChatMessage> messages,
+    String ownerUserId,
+  ) async {
     for (final message in messages) {
       await _database
           .into(_database.cachedMessages)
-          .insertOnConflictUpdate(_messageCompanion(message));
+          .insertOnConflictUpdate(_messageCompanion(message, ownerUserId));
     }
   }
 
   CachedMessagesCompanion _messageCompanion(
-    ChatMessage message, {
+    ChatMessage message,
+    String ownerUserId, {
     bool isPending = false,
   }) {
     final reply = message.replyTo;
     return CachedMessagesCompanion.insert(
-      ownerUserId: _userIdProvider(),
+      ownerUserId: ownerUserId,
       id: message.id,
       chatId: message.chatId,
       senderId: message.senderId,
