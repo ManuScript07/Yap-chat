@@ -18,20 +18,27 @@ class SettingsRepository implements ISettingsRepository {
   final AccountSessionController _accountSessionController;
 
   @override
-  Future<SearchPrivacySettings> getSearchPrivacySettings() async {
+  Future<SearchPrivacySettings?> readCachedSearchPrivacySettings() async {
     final scope = _accountSessionController.capture();
-    SearchPrivacySettings? cached;
     try {
-      cached = await _cache.read(scope.userId);
+      final cached = await _cache.read(scope.userId);
+      _accountSessionController.ensureCurrent(scope);
+      return cached;
     } catch (_) {
-      // A damaged local cache must not prevent an authoritative server read.
+      // A damaged local cache must not prevent the following server refresh.
+      _accountSessionController.ensureCurrent(scope);
+      return null;
     }
+  }
+
+  @override
+  Future<SearchPrivacySettings> refreshSearchPrivacySettings() async {
+    final scope = _accountSessionController.capture();
     final SearchPrivacySettings settings;
     try {
       settings = await _remote.fetchSearchPrivacySettings();
     } catch (_) {
       _accountSessionController.ensureCurrent(scope);
-      if (cached != null) return cached;
       rethrow;
     }
     try {
@@ -49,11 +56,12 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   @override
-  Future<SearchPrivacySettings> updateSearchPrivacySettings(
-    SearchPrivacySettings settings,
+  Future<SearchPrivacySettings> updateSearchPrivacySetting(
+    SearchPrivacySettingKey key,
+    bool value,
   ) async {
     final scope = _accountSessionController.capture();
-    final updated = await _remote.updateSearchPrivacySettings(settings);
+    final updated = await _remote.updateSearchPrivacySetting(key, value);
     try {
       await _accountSessionController.commit(
         scope,

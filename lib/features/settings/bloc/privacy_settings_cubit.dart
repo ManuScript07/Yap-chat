@@ -12,7 +12,7 @@ enum PrivacySettingsFeedback { success, failure }
 class PrivacySettingsState extends Equatable {
   const PrivacySettingsState({
     this.status = PrivacySettingsStatus.initial,
-    this.settings = const SearchPrivacySettings(),
+    this.settings,
     this.isSaving = false,
     this.error,
     this.feedback,
@@ -20,7 +20,7 @@ class PrivacySettingsState extends Equatable {
   });
 
   final PrivacySettingsStatus status;
-  final SearchPrivacySettings settings;
+  final SearchPrivacySettings? settings;
   final bool isSaving;
   final Object? error;
   final PrivacySettingsFeedback? feedback;
@@ -55,21 +55,14 @@ class PrivacySettingsState extends Equatable {
   ];
 }
 
-enum PrivacySettingKey { username, phone, name }
-
 class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
   PrivacySettingsCubit({required ISettingsRepository repository})
     : _repository = repository,
       super(const PrivacySettingsState());
 
-  static const _writeDebounce = Duration(milliseconds: 350);
-  static const _minimumRequestGap = Duration(milliseconds: 350);
-
   final ISettingsRepository _repository;
   SearchPrivacySettings? _confirmed;
-  SearchPrivacySettings? _desired;
-  Timer? _debounce;
-  Future<void>? _worker;
+  int _writeGeneration = 0;
 
   Future<void> load() async {
     if (state.status == PrivacySettingsStatus.loading || state.isSaving) {
@@ -82,11 +75,31 @@ class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
         clearFeedback: true,
       ),
     );
+    SearchPrivacySettings? cached;
     try {
-      final settings = await _repository.getSearchPrivacySettings();
+      cached = await _repository.readCachedSearchPrivacySettings();
+    } catch (_) {
+      // A server refresh remains possible even if the local database failed.
+    }
+    if (cached != null && !isClosed) {
+      _confirmed = cached;
+      emit(
+        state.copyWith(
+          status: PrivacySettingsStatus.ready,
+          settings: cached,
+          isSaving: false,
+          clearError: true,
+        ),
+      );
+    }
+    final refreshWriteGeneration = _writeGeneration;
+    try {
+      final settings = await _repository.refreshSearchPrivacySettings();
       if (isClosed) return;
+      // A cached page stays interactive. Do not let an older background read
+      // replace the result of a setting write that started after that read.
+      if (refreshWriteGeneration != _writeGeneration) return;
       _confirmed = settings;
-      _desired = null;
       emit(
         state.copyWith(
           status: PrivacySettingsStatus.ready,
@@ -96,7 +109,7 @@ class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
         ),
       );
     } catch (error) {
-      if (!isClosed) {
+      if (!isClosed && cached == null) {
         emit(
           state.copyWith(
             status: PrivacySettingsStatus.failure,
@@ -108,16 +121,16 @@ class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
     }
   }
 
-  void setValue(PrivacySettingKey key, bool value) {
-    if (state.status != PrivacySettingsStatus.ready) return;
-    final next = (_desired ?? _confirmed ?? state.settings);
-    final desired = switch (key) {
-      PrivacySettingKey.username => next.copyWith(searchByUsername: value),
-      PrivacySettingKey.phone => next.copyWith(searchByPhone: value),
-      PrivacySettingKey.name => next.copyWith(searchByName: value),
-    };
-    if (desired == (_desired ?? _confirmed)) return;
-    _desired = desired;
+  void setValue(SearchPrivacySettingKey key, bool value) {
+    final confirmed = _confirmed;
+    if (state.status != PrivacySettingsStatus.ready ||
+        state.isSaving ||
+        confirmed == null ||
+        confirmed.valueFor(key) == value) {
+      return;
+    }
+    final desired = confirmed.withValue(key, value);
+    _writeGeneration++;
     emit(
       state.copyWith(
         settings: desired,
@@ -126,65 +139,39 @@ class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
         clearFeedback: true,
       ),
     );
-    _debounce?.cancel();
-    _debounce = Timer(_writeDebounce, _startWorker);
+    unawaited(_save(key, value, confirmed));
   }
 
-  void _startWorker() {
-    if (isClosed || _worker != null) return;
-    _worker = _drainWrites();
-    unawaited(_worker!.whenComplete(() => _worker = null));
-  }
-
-  Future<void> _drainWrites() async {
-    while (!isClosed) {
-      final target = _desired;
-      final confirmed = _confirmed;
-      if (target == null || target == confirmed) {
-        if (!isClosed && state.isSaving) {
-          emit(state.copyWith(isSaving: false, settings: confirmed));
-        }
-        return;
-      }
-      try {
-        final updated = await _repository.updateSearchPrivacySettings(target);
-        if (isClosed) return;
-        _confirmed = updated;
-        if (_desired == target) {
-          _desired = null;
-          emit(
-            state.copyWith(
-              settings: updated,
-              isSaving: false,
-              clearError: true,
-              feedback: PrivacySettingsFeedback.success,
-              feedbackId: state.feedbackId + 1,
-            ),
-          );
-          return;
-        }
-        emit(state.copyWith(settings: _desired!, isSaving: true));
-        await Future<void>.delayed(_minimumRequestGap);
-      } catch (error) {
-        if (isClosed) return;
-        _desired = null;
-        emit(
-          state.copyWith(
-            settings: _confirmed ?? state.settings,
-            isSaving: false,
-            error: error,
-            feedback: PrivacySettingsFeedback.failure,
-            feedbackId: state.feedbackId + 1,
-          ),
-        );
-        return;
-      }
+  Future<void> _save(
+    SearchPrivacySettingKey key,
+    bool value,
+    SearchPrivacySettings rollbackValue,
+  ) async {
+    try {
+      final updated = await _repository.updateSearchPrivacySetting(key, value);
+      if (isClosed) return;
+      _confirmed = updated;
+      emit(
+        state.copyWith(
+          settings: updated,
+          isSaving: false,
+          clearError: true,
+          feedback: PrivacySettingsFeedback.success,
+          feedbackId: state.feedbackId + 1,
+        ),
+      );
+    } catch (error) {
+      if (isClosed) return;
+      _confirmed = rollbackValue;
+      emit(
+        state.copyWith(
+          settings: rollbackValue,
+          isSaving: false,
+          error: error,
+          feedback: PrivacySettingsFeedback.failure,
+          feedbackId: state.feedbackId + 1,
+        ),
+      );
     }
-  }
-
-  @override
-  Future<void> close() {
-    _debounce?.cancel();
-    return super.close();
   }
 }

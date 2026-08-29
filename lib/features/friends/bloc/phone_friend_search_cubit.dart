@@ -59,7 +59,7 @@ class PhoneFriendSearchCubit extends Cubit<PhoneFriendSearchState> {
     ContactMatchSnapshot cached = const ContactMatchSnapshot();
     var hasCachedResult = false;
     try {
-      cached = await _repository.readCachedContactMatches([normalizedPhone]);
+      cached = await _repository.readCachedPhoneSearchMatch(normalizedPhone);
       hasCachedResult = cached.checkedPhoneNumbers.contains(normalizedPhone);
     } catch (_) {
       // Отсутствие локального кэша не должно мешать поиску по сети.

@@ -5,13 +5,19 @@ class MockSettingsRepository implements ISettingsRepository {
   SearchPrivacySettings _settings = const SearchPrivacySettings();
 
   @override
-  Future<SearchPrivacySettings> getSearchPrivacySettings() async => _settings;
+  Future<SearchPrivacySettings?> readCachedSearchPrivacySettings() async =>
+      _settings;
 
   @override
-  Future<SearchPrivacySettings> updateSearchPrivacySettings(
-    SearchPrivacySettings settings,
+  Future<SearchPrivacySettings> refreshSearchPrivacySettings() async =>
+      _settings;
+
+  @override
+  Future<SearchPrivacySettings> updateSearchPrivacySetting(
+    SearchPrivacySettingKey key,
+    bool value,
   ) async {
-    _settings = settings;
+    _settings = _settings.withValue(key, value);
     return _settings;
   }
 

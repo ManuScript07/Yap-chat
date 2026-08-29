@@ -44,6 +44,11 @@ class FriendsRepository implements IFriendsRepository {
   _searchCache = {};
   final Map<String, Future<List<FriendCandidate>>> _activeSearches = {};
   final Map<String, Future<ContactMatchSnapshot>> _activeContactRefreshes = {};
+
+  static const _manualPhoneSearchCachePolicy = ContactMatchCachePolicy(
+    positiveTtl: Duration(seconds: 45),
+    negativeTtl: Duration(seconds: 45),
+  );
   final Map<String, Future<FriendLocation?>> _activeLocationRequests = {};
 
   @override
@@ -121,6 +126,31 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
+  Future<ContactMatchSnapshot> readCachedPhoneSearchMatch(
+    String phoneNumber,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final normalized = phoneNumber.trim();
+    if (normalized.isEmpty) return const ContactMatchSnapshot();
+    final records = await _contactMatchCache.read(
+      [normalized],
+      ownerUserId: scope.userId,
+      scope: PhoneMatchCacheScope.manualSearch,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    final record = records[normalized];
+    if (_manualPhoneSearchCachePolicy.shouldRefresh(record, _clock().toUtc())) {
+      return const ContactMatchSnapshot();
+    }
+    final snapshot = await _buildContactSnapshot(
+      records,
+      ownerUserId: scope.userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return snapshot;
+  }
+
+  @override
   Future<ContactMatchSnapshot> refreshContactMatches(
     List<String> phoneNumbers,
   ) {
@@ -145,13 +175,15 @@ class FriendsRepository implements IFriendsRepository {
     final scope = _accountSessionController.capture();
     final normalized = phoneNumber.trim();
     if (normalized.isEmpty) return Future.value(const ContactMatchSnapshot());
-    final operationKey = _operationKey(scope, normalized);
+    final operationKey = _operationKey(scope, 'manual-phone:$normalized');
     final active = _activeContactRefreshes[operationKey];
     if (active != null) return active;
     final future = _refreshContactMatches(
       [normalized],
       retainOnlyInput: false,
       scope: scope,
+      cacheScope: PhoneMatchCacheScope.manualSearch,
+      cachePolicy: _manualPhoneSearchCachePolicy,
     );
     _activeContactRefreshes[operationKey] = future;
     return future.whenComplete(
@@ -163,6 +195,8 @@ class FriendsRepository implements IFriendsRepository {
     List<String> phoneNumbers, {
     required bool retainOnlyInput,
     required AccountSessionSnapshot scope,
+    PhoneMatchCacheScope cacheScope = PhoneMatchCacheScope.contacts,
+    ContactMatchCachePolicy? cachePolicy,
   }) async {
     const batchSize = 500;
     if (retainOnlyInput) {
@@ -171,18 +205,24 @@ class FriendsRepository implements IFriendsRepository {
         () => _contactMatchCache.retainOnly(
           phoneNumbers,
           ownerUserId: scope.userId,
+          scope: cacheScope,
         ),
       );
     }
     final cached = await _contactMatchCache.read(
       phoneNumbers,
       ownerUserId: scope.userId,
+      scope: cacheScope,
     );
     _accountSessionController.ensureCurrent(scope);
     final now = _clock().toUtc();
     final stalePhoneNumbers = phoneNumbers
         .where(
-          (phone) => _contactMatchCachePolicy.shouldRefresh(cached[phone], now),
+          (phone) =>
+              (cachePolicy ?? _contactMatchCachePolicy).shouldRefresh(
+                cached[phone],
+                now,
+              ),
         )
         .toList(growable: false);
 
@@ -208,12 +248,14 @@ class FriendsRepository implements IFriendsRepository {
           matches: freshMatches,
           checkedAt: now,
           ownerUserId: scope.userId,
+          scope: cacheScope,
         ),
       );
     }
     final updated = await _contactMatchCache.read(
       phoneNumbers,
       ownerUserId: scope.userId,
+      scope: cacheScope,
     );
     _accountSessionController.ensureCurrent(scope);
     final snapshot = await _buildContactSnapshot(

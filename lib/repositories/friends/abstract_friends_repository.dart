@@ -10,6 +10,7 @@ abstract interface class IFriendsRepository {
   Future<ContactMatchSnapshot> readCachedContactMatches(
     List<String> phoneNumbers,
   );
+  Future<ContactMatchSnapshot> readCachedPhoneSearchMatch(String phoneNumber);
   Future<ContactMatchSnapshot> refreshContactMatches(
     List<String> phoneNumbers,
   );

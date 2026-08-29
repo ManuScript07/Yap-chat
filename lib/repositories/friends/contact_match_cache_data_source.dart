@@ -14,6 +14,10 @@ class ContactMatchCacheRecord {
   final FriendCandidate? candidate;
 }
 
+/// Keeps manual number lookup entries physically separate from address-book
+/// matching, while retaining the same opaque HMAC storage format.
+enum PhoneMatchCacheScope { contacts, manualSearch }
+
 class ContactMatchCachePolicy {
   const ContactMatchCachePolicy({
     this.positiveTtl = const Duration(hours: 24),
@@ -44,12 +48,14 @@ class ContactMatchCacheDataSource {
   final AppDatabase _database;
   final String Function() _userIdProvider;
   final IContactCacheKeyService _keyService;
+  static const _manualKeyPrefix = 'manual-search:';
 
   Future<Map<String, ContactMatchCacheRecord>> read(
     Iterable<String> phoneNumbers, {
     String? ownerUserId,
+    PhoneMatchCacheScope scope = PhoneMatchCacheScope.contacts,
   }) async {
-    final keysByPhone = await _keysByPhone(phoneNumbers);
+    final keysByPhone = await _keysByPhone(phoneNumbers, scope: scope);
     if (keysByPhone.isEmpty) return const {};
     final phonesByKey = {
       for (final entry in keysByPhone.entries) entry.value: entry.key,
@@ -75,8 +81,12 @@ class ContactMatchCacheDataSource {
     required Map<String, FriendCandidate> matches,
     required DateTime checkedAt,
     String? ownerUserId,
+    PhoneMatchCacheScope scope = PhoneMatchCacheScope.contacts,
   }) async {
-    final keysByPhone = await _keysByPhone(checkedPhoneNumbers);
+    final keysByPhone = await _keysByPhone(
+      checkedPhoneNumbers,
+      scope: scope,
+    );
     final owner = ownerUserId ?? _userIdProvider();
     final rows = keysByPhone.entries.map((entry) {
       final candidate = matches[entry.key];
@@ -105,15 +115,20 @@ class ContactMatchCacheDataSource {
   Future<void> retainOnly(
     Iterable<String> phoneNumbers, {
     String? ownerUserId,
+    PhoneMatchCacheScope scope = PhoneMatchCacheScope.contacts,
   }) async {
-    final keys = (await _keysByPhone(phoneNumbers)).values.toSet();
+    final keys = (await _keysByPhone(phoneNumbers, scope: scope)).values
+        .toSet();
     final owner = ownerUserId ?? _userIdProvider();
     final existing = await (_database.select(
       _database.cachedContactMatches,
     )..where((table) => table.ownerUserId.equals(owner))).get();
     final obsoleteKeys = existing
         .map((row) => row.phoneKey)
-        .where((key) => !keys.contains(key))
+        .where(
+          (key) =>
+              _belongsToScope(key, scope) && !keys.contains(key),
+        )
         .toList(growable: false);
     const batchSize = 500;
     await _database.transaction(() async {
@@ -130,16 +145,33 @@ class ContactMatchCacheDataSource {
   }
 
   Future<Map<String, String>> _keysByPhone(
-    Iterable<String> phoneNumbers,
-  ) async {
+    Iterable<String> phoneNumbers, {
+    required PhoneMatchCacheScope scope,
+  }) async {
     final unique = phoneNumbers.toSet();
     final entries = await Future.wait(
       unique.map(
-        (phone) async => MapEntry(phone, await _keyService.createKey(phone)),
+        (phone) async => MapEntry(
+          phone,
+          _keyForScope(
+            await _keyService.createKey(phone),
+            scope,
+          ),
+        ),
       ),
     );
     return Map.fromEntries(entries);
   }
+
+  String _keyForScope(String phoneKey, PhoneMatchCacheScope scope) =>
+      scope == PhoneMatchCacheScope.contacts
+      ? phoneKey
+      : '$_manualKeyPrefix$phoneKey';
+
+  bool _belongsToScope(String phoneKey, PhoneMatchCacheScope scope) =>
+      scope == PhoneMatchCacheScope.manualSearch
+      ? phoneKey.startsWith(_manualKeyPrefix)
+      : !phoneKey.startsWith(_manualKeyPrefix);
 
   FriendCandidate? _mapCandidate(CachedContactMatch row) {
     if (!row.isRegistered ||

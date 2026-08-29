@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
+import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/features/settings/widgets/settings_bottom_sheets.dart';
 import 'package:yap_chat/features/settings/widgets/settings_widgets.dart';
 import 'package:yap_chat/repositories/repositories.dart';
@@ -23,15 +22,8 @@ class PrivacySettingsPage extends StatelessWidget {
   }
 }
 
-class _PrivacySettingsView extends StatefulWidget {
+class _PrivacySettingsView extends StatelessWidget {
   const _PrivacySettingsView();
-
-  @override
-  State<_PrivacySettingsView> createState() => _PrivacySettingsViewState();
-}
-
-class _PrivacySettingsViewState extends State<_PrivacySettingsView> {
-  bool _confirmationIsVisible = false;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +56,17 @@ class _PrivacySettingsViewState extends State<_PrivacySettingsView> {
             final isLoading =
                 state.status == PrivacySettingsStatus.initial ||
                 state.status == PrivacySettingsStatus.loading;
+            final settings = state.settings;
+            if (settings == null) {
+              return Center(
+                child: state.status == PrivacySettingsStatus.failure
+                    ? Text(
+                        context.l10n.settingsPrivacyLoadFailed,
+                        style: settingsValueStyle(context),
+                      )
+                    : const CircularProgressIndicator(),
+              );
+            }
             return ListView(
               padding: EdgeInsets.fromLTRB(
                 0,
@@ -81,50 +84,38 @@ class _PrivacySettingsViewState extends State<_PrivacySettingsView> {
                 SettingsToggleRow(
                   icon: Icons.alternate_email_rounded,
                   title: context.l10n.settingsSearchByUsername,
-                  value: state.settings.searchByUsername,
+                  value: settings.searchByUsername,
                   isLoading: isLoading,
-                  isSaving: state.isSaving || isLoading,
+                  isSaving: state.isSaving,
                   onChanged: isLoading
                       ? null
-                      : (value) => unawaited(
-                          _confirmAndUpdate(
-                            context,
-                            PrivacySettingKey.username,
-                            value,
-                          ),
-                        ),
+                      : (value) => context
+                          .read<PrivacySettingsCubit>()
+                          .setValue(SearchPrivacySettingKey.username, value),
                 ),
                 SettingsToggleRow(
                   icon: Icons.phone_outlined,
                   title: context.l10n.settingsSearchByPhone,
-                  value: state.settings.searchByPhone,
+                  value: settings.searchByPhone,
                   isLoading: isLoading,
-                  isSaving: state.isSaving || isLoading,
+                  isSaving: state.isSaving,
                   onChanged: isLoading
                       ? null
-                      : (value) => unawaited(
-                          _confirmAndUpdate(
-                            context,
-                            PrivacySettingKey.phone,
-                            value,
-                          ),
-                        ),
+                      : (value) => context
+                          .read<PrivacySettingsCubit>()
+                          .setValue(SearchPrivacySettingKey.phone, value),
                 ),
                 SettingsToggleRow(
                   icon: Icons.person_outline_rounded,
                   title: context.l10n.settingsSearchByName,
-                  value: state.settings.searchByName,
+                  value: settings.searchByName,
                   isLoading: isLoading,
-                  isSaving: state.isSaving || isLoading,
+                  isSaving: state.isSaving,
                   onChanged: isLoading
                       ? null
-                      : (value) => unawaited(
-                          _confirmAndUpdate(
-                            context,
-                            PrivacySettingKey.name,
-                            value,
-                          ),
-                        ),
+                      : (value) => context
+                          .read<PrivacySettingsCubit>()
+                          .setValue(SearchPrivacySettingKey.name, value),
                 ),
                 if (state.status == PrivacySettingsStatus.failure)
                   Padding(
@@ -140,23 +131,5 @@ class _PrivacySettingsViewState extends State<_PrivacySettingsView> {
         ),
       ),
     );
-  }
-
-  Future<void> _confirmAndUpdate(
-    BuildContext context,
-    PrivacySettingKey key,
-    bool value,
-  ) async {
-    if (_confirmationIsVisible) return;
-    _confirmationIsVisible = true;
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: context.l10n.settingsPrivacyChangeTitle,
-      content: context.l10n.settingsPrivacyChangeContent,
-      confirmLabel: context.l10n.settingsPrivacyChangeConfirm,
-    );
-    _confirmationIsVisible = false;
-    if (!mounted || !context.mounted || confirmed != true) return;
-    context.read<PrivacySettingsCubit>().setValue(key, value);
   }
 }

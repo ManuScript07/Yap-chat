@@ -128,7 +128,9 @@ class SettingsToggleRow extends StatelessWidget {
     return Material(
       color: colorScheme.surface.withValues(alpha: 0),
       child: InkWell(
-        onTap: isLoading || onChanged == null ? null : () => onChanged!(!value),
+        onTap: isLoading || isSaving || onChanged == null
+            ? null
+            : () => onChanged!(!value),
         borderRadius: BorderRadius.zero,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
@@ -156,28 +158,20 @@ class SettingsToggleRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Switch(
-                value: value,
-                onChanged: isLoading || onChanged == null ? null : onChanged,
-                activeTrackColor: colorScheme.primary,
-                activeThumbColor: colorScheme.onPrimary,
-                inactiveTrackColor: colorScheme.surface.withValues(alpha: .18),
-                inactiveThumbColor: colorScheme.onSurfaceVariant,
-                trackOutlineColor: WidgetStatePropertyAll(
-                  colorScheme.surface.withValues(alpha: 0),
-                ),
-              ),
-              if (isSaving) ...[
-                const SizedBox(width: 6),
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: colorScheme.primary,
+              IgnorePointer(
+                ignoring: isLoading || isSaving || onChanged == null,
+                child: Switch(
+                  value: value,
+                  onChanged: onChanged,
+                  activeTrackColor: colorScheme.primary,
+                  activeThumbColor: colorScheme.onPrimary,
+                  inactiveTrackColor: colorScheme.surface.withValues(alpha: .18),
+                  inactiveThumbColor: colorScheme.onSurfaceVariant,
+                  trackOutlineColor: WidgetStatePropertyAll(
+                    colorScheme.surface.withValues(alpha: 0),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),

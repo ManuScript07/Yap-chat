@@ -15,15 +15,15 @@ class SettingsRemoteDataSource {
     return _map(response.first);
   }
 
-  Future<SearchPrivacySettings> updateSearchPrivacySettings(
-    SearchPrivacySettings settings,
+  Future<SearchPrivacySettings> updateSearchPrivacySetting(
+    SearchPrivacySettingKey key,
+    bool value,
   ) async {
     final response = await _client.rpc<List<dynamic>>(
-      'update_my_search_privacy_settings',
+      'set_my_search_privacy_setting',
       params: {
-        'is_searchable_by_username': settings.searchByUsername,
-        'is_searchable_by_phone': settings.searchByPhone,
-        'is_searchable_by_name': settings.searchByName,
+        'setting_key': key.name,
+        'is_enabled': value,
       },
     );
     if (response.isEmpty) {
