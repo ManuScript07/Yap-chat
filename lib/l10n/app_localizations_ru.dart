@@ -212,6 +212,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsSearchByName => 'Искать по имени';
 
   @override
+  String get settingsPrivacyChangeTitle => 'Изменить видимость поиска?';
+
+  @override
+  String get settingsPrivacyChangeContent =>
+      'Это изменит, смогут ли другие пользователи найти вас этим способом. Текущие друзья по-прежнему будут вас видеть.';
+
+  @override
+  String get settingsPrivacyChangeConfirm => 'Изменить';
+
+  @override
+  String get settingsPrivacySaved => 'Настройка приватности сохранена';
+
+  @override
+  String get settingsPrivacySaveFailed =>
+      'Не удалось сохранить настройку приватности';
+
+  @override
+  String get settingsPrivacyLoadFailed =>
+      'Не удалось загрузить настройки приватности';
+
+  @override
   String get settingsShareLocation => 'Делиться гео';
 
   @override

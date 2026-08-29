@@ -206,6 +206,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSearchByName => 'Find by name';
 
   @override
+  String get settingsPrivacyChangeTitle => 'Change search visibility?';
+
+  @override
+  String get settingsPrivacyChangeContent =>
+      'This changes whether other users can find you using this method. Your current friends will still see you.';
+
+  @override
+  String get settingsPrivacyChangeConfirm => 'Change';
+
+  @override
+  String get settingsPrivacySaved => 'Privacy setting saved';
+
+  @override
+  String get settingsPrivacySaveFailed => 'Could not save privacy setting';
+
+  @override
+  String get settingsPrivacyLoadFailed => 'Could not load privacy settings';
+
+  @override
   String get settingsShareLocation => 'Share my location';
 
   @override

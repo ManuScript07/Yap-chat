@@ -6549,6 +6549,419 @@ class CachedContactMatchesCompanion
   }
 }
 
+class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
+    with
+        TableInfo<
+          $CachedSearchPrivacySettingsTable,
+          CachedSearchPrivacySetting
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedSearchPrivacySettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _searchByUsernameMeta = const VerificationMeta(
+    'searchByUsername',
+  );
+  @override
+  late final GeneratedColumn<bool> searchByUsername = GeneratedColumn<bool>(
+    'search_by_username',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("search_by_username" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _searchByPhoneMeta = const VerificationMeta(
+    'searchByPhone',
+  );
+  @override
+  late final GeneratedColumn<bool> searchByPhone = GeneratedColumn<bool>(
+    'search_by_phone',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("search_by_phone" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _searchByNameMeta = const VerificationMeta(
+    'searchByName',
+  );
+  @override
+  late final GeneratedColumn<bool> searchByName = GeneratedColumn<bool>(
+    'search_by_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("search_by_name" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    searchByUsername,
+    searchByPhone,
+    searchByName,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_search_privacy_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedSearchPrivacySetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('search_by_username')) {
+      context.handle(
+        _searchByUsernameMeta,
+        searchByUsername.isAcceptableOrUnknown(
+          data['search_by_username']!,
+          _searchByUsernameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_searchByUsernameMeta);
+    }
+    if (data.containsKey('search_by_phone')) {
+      context.handle(
+        _searchByPhoneMeta,
+        searchByPhone.isAcceptableOrUnknown(
+          data['search_by_phone']!,
+          _searchByPhoneMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_searchByPhoneMeta);
+    }
+    if (data.containsKey('search_by_name')) {
+      context.handle(
+        _searchByNameMeta,
+        searchByName.isAcceptableOrUnknown(
+          data['search_by_name']!,
+          _searchByNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_searchByNameMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId};
+  @override
+  CachedSearchPrivacySetting map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedSearchPrivacySetting(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      searchByUsername: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}search_by_username'],
+      )!,
+      searchByPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}search_by_phone'],
+      )!,
+      searchByName: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}search_by_name'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedSearchPrivacySettingsTable createAlias(String alias) {
+    return $CachedSearchPrivacySettingsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedSearchPrivacySetting extends DataClass
+    implements Insertable<CachedSearchPrivacySetting> {
+  final String ownerUserId;
+  final bool searchByUsername;
+  final bool searchByPhone;
+  final bool searchByName;
+  final DateTime cachedAt;
+  const CachedSearchPrivacySetting({
+    required this.ownerUserId,
+    required this.searchByUsername,
+    required this.searchByPhone,
+    required this.searchByName,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['search_by_username'] = Variable<bool>(searchByUsername);
+    map['search_by_phone'] = Variable<bool>(searchByPhone);
+    map['search_by_name'] = Variable<bool>(searchByName);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedSearchPrivacySettingsCompanion toCompanion(bool nullToAbsent) {
+    return CachedSearchPrivacySettingsCompanion(
+      ownerUserId: Value(ownerUserId),
+      searchByUsername: Value(searchByUsername),
+      searchByPhone: Value(searchByPhone),
+      searchByName: Value(searchByName),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedSearchPrivacySetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedSearchPrivacySetting(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      searchByUsername: serializer.fromJson<bool>(json['searchByUsername']),
+      searchByPhone: serializer.fromJson<bool>(json['searchByPhone']),
+      searchByName: serializer.fromJson<bool>(json['searchByName']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'searchByUsername': serializer.toJson<bool>(searchByUsername),
+      'searchByPhone': serializer.toJson<bool>(searchByPhone),
+      'searchByName': serializer.toJson<bool>(searchByName),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedSearchPrivacySetting copyWith({
+    String? ownerUserId,
+    bool? searchByUsername,
+    bool? searchByPhone,
+    bool? searchByName,
+    DateTime? cachedAt,
+  }) => CachedSearchPrivacySetting(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    searchByUsername: searchByUsername ?? this.searchByUsername,
+    searchByPhone: searchByPhone ?? this.searchByPhone,
+    searchByName: searchByName ?? this.searchByName,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedSearchPrivacySetting copyWithCompanion(
+    CachedSearchPrivacySettingsCompanion data,
+  ) {
+    return CachedSearchPrivacySetting(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      searchByUsername: data.searchByUsername.present
+          ? data.searchByUsername.value
+          : this.searchByUsername,
+      searchByPhone: data.searchByPhone.present
+          ? data.searchByPhone.value
+          : this.searchByPhone,
+      searchByName: data.searchByName.present
+          ? data.searchByName.value
+          : this.searchByName,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSearchPrivacySetting(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('searchByUsername: $searchByUsername, ')
+          ..write('searchByPhone: $searchByPhone, ')
+          ..write('searchByName: $searchByName, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    searchByUsername,
+    searchByPhone,
+    searchByName,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedSearchPrivacySetting &&
+          other.ownerUserId == this.ownerUserId &&
+          other.searchByUsername == this.searchByUsername &&
+          other.searchByPhone == this.searchByPhone &&
+          other.searchByName == this.searchByName &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedSearchPrivacySettingsCompanion
+    extends UpdateCompanion<CachedSearchPrivacySetting> {
+  final Value<String> ownerUserId;
+  final Value<bool> searchByUsername;
+  final Value<bool> searchByPhone;
+  final Value<bool> searchByName;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedSearchPrivacySettingsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.searchByUsername = const Value.absent(),
+    this.searchByPhone = const Value.absent(),
+    this.searchByName = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedSearchPrivacySettingsCompanion.insert({
+    required String ownerUserId,
+    required bool searchByUsername,
+    required bool searchByPhone,
+    required bool searchByName,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       searchByUsername = Value(searchByUsername),
+       searchByPhone = Value(searchByPhone),
+       searchByName = Value(searchByName),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedSearchPrivacySetting> custom({
+    Expression<String>? ownerUserId,
+    Expression<bool>? searchByUsername,
+    Expression<bool>? searchByPhone,
+    Expression<bool>? searchByName,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (searchByUsername != null) 'search_by_username': searchByUsername,
+      if (searchByPhone != null) 'search_by_phone': searchByPhone,
+      if (searchByName != null) 'search_by_name': searchByName,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedSearchPrivacySettingsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<bool>? searchByUsername,
+    Value<bool>? searchByPhone,
+    Value<bool>? searchByName,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedSearchPrivacySettingsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      searchByUsername: searchByUsername ?? this.searchByUsername,
+      searchByPhone: searchByPhone ?? this.searchByPhone,
+      searchByName: searchByName ?? this.searchByName,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (searchByUsername.present) {
+      map['search_by_username'] = Variable<bool>(searchByUsername.value);
+    }
+    if (searchByPhone.present) {
+      map['search_by_phone'] = Variable<bool>(searchByPhone.value);
+    }
+    if (searchByName.present) {
+      map['search_by_name'] = Variable<bool>(searchByName.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSearchPrivacySettingsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('searchByUsername: $searchByUsername, ')
+          ..write('searchByPhone: $searchByPhone, ')
+          ..write('searchByName: $searchByName, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6566,6 +6979,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedFriendLocationsTable(this);
   late final $CachedContactMatchesTable cachedContactMatches =
       $CachedContactMatchesTable(this);
+  late final $CachedSearchPrivacySettingsTable cachedSearchPrivacySettings =
+      $CachedSearchPrivacySettingsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6580,6 +6995,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedFriendRequests,
     cachedFriendLocations,
     cachedContactMatches,
+    cachedSearchPrivacySettings,
   ];
 }
 
@@ -9698,6 +10114,233 @@ typedef $$CachedContactMatchesTableProcessedTableManager =
       CachedContactMatch,
       PrefetchHooks Function()
     >;
+typedef $$CachedSearchPrivacySettingsTableCreateCompanionBuilder =
+    CachedSearchPrivacySettingsCompanion Function({
+      required String ownerUserId,
+      required bool searchByUsername,
+      required bool searchByPhone,
+      required bool searchByName,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedSearchPrivacySettingsTableUpdateCompanionBuilder =
+    CachedSearchPrivacySettingsCompanion Function({
+      Value<String> ownerUserId,
+      Value<bool> searchByUsername,
+      Value<bool> searchByPhone,
+      Value<bool> searchByName,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedSearchPrivacySettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedSearchPrivacySettingsTable> {
+  $$CachedSearchPrivacySettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get searchByUsername => $composableBuilder(
+    column: $table.searchByUsername,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get searchByPhone => $composableBuilder(
+    column: $table.searchByPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get searchByName => $composableBuilder(
+    column: $table.searchByName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedSearchPrivacySettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedSearchPrivacySettingsTable> {
+  $$CachedSearchPrivacySettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get searchByUsername => $composableBuilder(
+    column: $table.searchByUsername,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get searchByPhone => $composableBuilder(
+    column: $table.searchByPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get searchByName => $composableBuilder(
+    column: $table.searchByName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedSearchPrivacySettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedSearchPrivacySettingsTable> {
+  $$CachedSearchPrivacySettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get searchByUsername => $composableBuilder(
+    column: $table.searchByUsername,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get searchByPhone => $composableBuilder(
+    column: $table.searchByPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get searchByName => $composableBuilder(
+    column: $table.searchByName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedSearchPrivacySettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedSearchPrivacySettingsTable,
+          CachedSearchPrivacySetting,
+          $$CachedSearchPrivacySettingsTableFilterComposer,
+          $$CachedSearchPrivacySettingsTableOrderingComposer,
+          $$CachedSearchPrivacySettingsTableAnnotationComposer,
+          $$CachedSearchPrivacySettingsTableCreateCompanionBuilder,
+          $$CachedSearchPrivacySettingsTableUpdateCompanionBuilder,
+          (
+            CachedSearchPrivacySetting,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedSearchPrivacySettingsTable,
+              CachedSearchPrivacySetting
+            >,
+          ),
+          CachedSearchPrivacySetting,
+          PrefetchHooks Function()
+        > {
+  $$CachedSearchPrivacySettingsTableTableManager(
+    _$AppDatabase db,
+    $CachedSearchPrivacySettingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedSearchPrivacySettingsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedSearchPrivacySettingsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedSearchPrivacySettingsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<bool> searchByUsername = const Value.absent(),
+                Value<bool> searchByPhone = const Value.absent(),
+                Value<bool> searchByName = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedSearchPrivacySettingsCompanion(
+                ownerUserId: ownerUserId,
+                searchByUsername: searchByUsername,
+                searchByPhone: searchByPhone,
+                searchByName: searchByName,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required bool searchByUsername,
+                required bool searchByPhone,
+                required bool searchByName,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedSearchPrivacySettingsCompanion.insert(
+                ownerUserId: ownerUserId,
+                searchByUsername: searchByUsername,
+                searchByPhone: searchByPhone,
+                searchByName: searchByName,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedSearchPrivacySettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedSearchPrivacySettingsTable,
+      CachedSearchPrivacySetting,
+      $$CachedSearchPrivacySettingsTableFilterComposer,
+      $$CachedSearchPrivacySettingsTableOrderingComposer,
+      $$CachedSearchPrivacySettingsTableAnnotationComposer,
+      $$CachedSearchPrivacySettingsTableCreateCompanionBuilder,
+      $$CachedSearchPrivacySettingsTableUpdateCompanionBuilder,
+      (
+        CachedSearchPrivacySetting,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedSearchPrivacySettingsTable,
+          CachedSearchPrivacySetting
+        >,
+      ),
+      CachedSearchPrivacySetting,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9720,4 +10363,10 @@ class $AppDatabaseManager {
       $$CachedFriendLocationsTableTableManager(_db, _db.cachedFriendLocations);
   $$CachedContactMatchesTableTableManager get cachedContactMatches =>
       $$CachedContactMatchesTableTableManager(_db, _db.cachedContactMatches);
+  $$CachedSearchPrivacySettingsTableTableManager
+  get cachedSearchPrivacySettings =>
+      $$CachedSearchPrivacySettingsTableTableManager(
+        _db,
+        _db.cachedSearchPrivacySettings,
+      );
 }

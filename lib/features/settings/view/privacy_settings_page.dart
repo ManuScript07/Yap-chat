@@ -1,56 +1,162 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/widgets/settings_bottom_sheets.dart';
 import 'package:yap_chat/features/settings/widgets/settings_widgets.dart';
+import 'package:yap_chat/repositories/repositories.dart';
+import 'package:yap_chat/ui/ui.dart';
 
-class PrivacySettingsPage extends StatefulWidget {
+class PrivacySettingsPage extends StatelessWidget {
   const PrivacySettingsPage({super.key});
 
   @override
-  State<PrivacySettingsPage> createState() => _PrivacySettingsPageState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) =>
+          PrivacySettingsCubit(repository: context.read<ISettingsRepository>())
+            ..load(),
+      child: const _PrivacySettingsView(),
+    );
+  }
 }
 
-class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
-  bool _searchByUsername = true;
-  bool _searchByPhone = true;
-  bool _searchByName = true;
+class _PrivacySettingsView extends StatefulWidget {
+  const _PrivacySettingsView();
+
+  @override
+  State<_PrivacySettingsView> createState() => _PrivacySettingsViewState();
+}
+
+class _PrivacySettingsViewState extends State<_PrivacySettingsView> {
+  bool _confirmationIsVisible = false;
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    return Scaffold(
-      backgroundColor: context.scaffoldBackgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: SettingsPageAppBar(title: context.l10n.settingsPrivacy),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(0, 130, 0, mediaQuery.padding.bottom + 24),
-        children: [
-          SettingsRow(
-            icon: Icons.block_outlined,
-            title: context.l10n.settingsBlacklist,
-            onTap: () => showBlacklistSheet(context),
-          ),
-          const SizedBox(height: 22),
-          SettingsToggleRow(
-            icon: Icons.alternate_email_rounded,
-            title: context.l10n.settingsSearchByUsername,
-            value: _searchByUsername,
-            onChanged: (value) => setState(() => _searchByUsername = value),
-          ),
-          SettingsToggleRow(
-            icon: Icons.phone_outlined,
-            title: context.l10n.settingsSearchByPhone,
-            value: _searchByPhone,
-            onChanged: (value) => setState(() => _searchByPhone = value),
-          ),
-          SettingsToggleRow(
-            icon: Icons.person_outline_rounded,
-            title: context.l10n.settingsSearchByName,
-            value: _searchByName,
-            onChanged: (value) => setState(() => _searchByName = value),
-          ),
-        ],
+    return BlocListener<PrivacySettingsCubit, PrivacySettingsState>(
+      listenWhen: (previous, current) =>
+          previous.feedbackId != current.feedbackId && current.feedback != null,
+      listener: (context, state) {
+        final feedback = state.feedback;
+        if (feedback == PrivacySettingsFeedback.success) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.settingsPrivacySaved,
+            type: SnackBarType.success,
+          );
+        } else if (feedback == PrivacySettingsFeedback.failure) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.settingsPrivacySaveFailed,
+            type: SnackBarType.error,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: context.scaffoldBackgroundColor,
+        extendBodyBehindAppBar: true,
+        appBar: SettingsPageAppBar(title: context.l10n.settingsPrivacy),
+        body: BlocBuilder<PrivacySettingsCubit, PrivacySettingsState>(
+          builder: (context, state) {
+            final isLoading =
+                state.status == PrivacySettingsStatus.initial ||
+                state.status == PrivacySettingsStatus.loading;
+            return ListView(
+              padding: EdgeInsets.fromLTRB(
+                0,
+                130,
+                0,
+                mediaQuery.padding.bottom + 24,
+              ),
+              children: [
+                SettingsRow(
+                  icon: Icons.block_outlined,
+                  title: context.l10n.settingsBlacklist,
+                  onTap: isLoading ? null : () => showBlacklistSheet(context),
+                ),
+                const SizedBox(height: 22),
+                SettingsToggleRow(
+                  icon: Icons.alternate_email_rounded,
+                  title: context.l10n.settingsSearchByUsername,
+                  value: state.settings.searchByUsername,
+                  isLoading: isLoading,
+                  isSaving: state.isSaving || isLoading,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => unawaited(
+                          _confirmAndUpdate(
+                            context,
+                            PrivacySettingKey.username,
+                            value,
+                          ),
+                        ),
+                ),
+                SettingsToggleRow(
+                  icon: Icons.phone_outlined,
+                  title: context.l10n.settingsSearchByPhone,
+                  value: state.settings.searchByPhone,
+                  isLoading: isLoading,
+                  isSaving: state.isSaving || isLoading,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => unawaited(
+                          _confirmAndUpdate(
+                            context,
+                            PrivacySettingKey.phone,
+                            value,
+                          ),
+                        ),
+                ),
+                SettingsToggleRow(
+                  icon: Icons.person_outline_rounded,
+                  title: context.l10n.settingsSearchByName,
+                  value: state.settings.searchByName,
+                  isLoading: isLoading,
+                  isSaving: state.isSaving || isLoading,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => unawaited(
+                          _confirmAndUpdate(
+                            context,
+                            PrivacySettingKey.name,
+                            value,
+                          ),
+                        ),
+                ),
+                if (state.status == PrivacySettingsStatus.failure)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                    child: Text(
+                      context.l10n.settingsPrivacyLoadFailed,
+                      style: settingsValueStyle(context),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
+  }
+
+  Future<void> _confirmAndUpdate(
+    BuildContext context,
+    PrivacySettingKey key,
+    bool value,
+  ) async {
+    if (_confirmationIsVisible) return;
+    _confirmationIsVisible = true;
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.settingsPrivacyChangeTitle,
+      content: context.l10n.settingsPrivacyChangeContent,
+      confirmLabel: context.l10n.settingsPrivacyChangeConfirm,
+    );
+    _confirmationIsVisible = false;
+    if (!mounted || !context.mounted || confirmed != true) return;
+    context.read<PrivacySettingsCubit>().setValue(key, value);
   }
 }

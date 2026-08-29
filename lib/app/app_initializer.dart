@@ -64,6 +64,7 @@ class _AppInitializerState extends State<AppInitializer> {
       accountSessionController: widget.config.accountSessionController,
       localMediaRepository: _repositories.localMediaRepository,
       mediaCache: _repositories.mediaCache,
+      settingsRepository: _repositories.settingsRepository,
       talker: widget.config.talker,
     );
   }
@@ -130,6 +131,9 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
         RepositoryProvider<IContactsRepository>.value(
           value: _repositories.contactsRepository,
+        ),
+        RepositoryProvider<ISettingsRepository>.value(
+          value: _repositories.settingsRepository,
         ),
       ],
       child: MultiBlocProvider(

@@ -24,6 +24,7 @@ class RepositoryContainer {
     required this.pushNotificationsRepository,
     required this.friendsRepository,
     required this.contactsRepository,
+    required this.settingsRepository,
   });
 
   factory RepositoryContainer.prod({required AppConfig config}) {
@@ -65,6 +66,11 @@ class RepositoryContainer {
       database: config.database,
       userIdProvider: () => client.auth.currentUser!.id,
       keyService: ContactCacheKeyService(),
+    );
+    final settingsRepository = SettingsRepository(
+      cache: SettingsCacheDataSource(database: config.database),
+      remote: SettingsRemoteDataSource(client: client),
+      accountSessionController: config.accountSessionController,
     );
     final chatRemote = ChatRemoteDataSource(client: client);
     final messageHydrator = ChatMessageHydrator(
@@ -153,6 +159,7 @@ class RepositoryContainer {
         accountSessionController: config.accountSessionController,
       ),
       contactsRepository: ContactsRepository(),
+      settingsRepository: settingsRepository,
     );
   }
 
@@ -188,6 +195,7 @@ class RepositoryContainer {
       pushNotificationsRepository: const MockPushNotificationsRepository(),
       friendsRepository: MockFriendsRepository(),
       contactsRepository: const MockContactsRepository(),
+      settingsRepository: MockSettingsRepository(),
     );
   }
 
@@ -204,6 +212,7 @@ class RepositoryContainer {
   final IPushNotificationsRepository pushNotificationsRepository;
   final IFriendsRepository friendsRepository;
   final IContactsRepository contactsRepository;
+  final ISettingsRepository settingsRepository;
 
   Future<void> dispose() async {
     mediaCache.dispose();

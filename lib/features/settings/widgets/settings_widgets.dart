@@ -111,12 +111,16 @@ class SettingsToggleRow extends StatelessWidget {
     required this.title,
     required this.value,
     required this.onChanged,
+    this.isLoading = false,
+    this.isSaving = false,
   });
 
   final IconData icon;
   final String title;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
+  final bool isLoading;
+  final bool isSaving;
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +128,7 @@ class SettingsToggleRow extends StatelessWidget {
     return Material(
       color: colorScheme.surface.withValues(alpha: 0),
       child: InkWell(
-        onTap: () => onChanged(!value),
+        onTap: isLoading || onChanged == null ? null : () => onChanged!(!value),
         borderRadius: BorderRadius.zero,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
@@ -154,7 +158,7 @@ class SettingsToggleRow extends StatelessWidget {
               const SizedBox(width: 8),
               Switch(
                 value: value,
-                onChanged: onChanged,
+                onChanged: isLoading || onChanged == null ? null : onChanged,
                 activeTrackColor: colorScheme.primary,
                 activeThumbColor: colorScheme.onPrimary,
                 inactiveTrackColor: colorScheme.surface.withValues(alpha: .18),
@@ -163,6 +167,17 @@ class SettingsToggleRow extends StatelessWidget {
                   colorScheme.surface.withValues(alpha: 0),
                 ),
               ),
+              if (isSaving) ...[
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

@@ -5,6 +5,7 @@ import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/core/services/account_session_controller.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
+import 'package:yap_chat/repositories/settings/abstract_settings_repository.dart';
 
 /// Durable, account-scoped cleanup used by logout and startup recovery.
 class UserDataCleanupCoordinator {
@@ -14,12 +15,14 @@ class UserDataCleanupCoordinator {
     required AccountSessionController accountSessionController,
     required ILocalMediaRepository localMediaRepository,
     required MediaCacheService mediaCache,
+    ISettingsRepository? settingsRepository,
     required Talker talker,
   }) : _preferences = preferences,
        _pendingKey = 'auth.cleanup.pending.$environment',
        _accountSessionController = accountSessionController,
        _localMediaRepository = localMediaRepository,
        _mediaCache = mediaCache,
+       _settingsRepository = settingsRepository,
        _talker = talker;
 
   final SharedPreferences _preferences;
@@ -27,6 +30,7 @@ class UserDataCleanupCoordinator {
   final AccountSessionController _accountSessionController;
   final ILocalMediaRepository _localMediaRepository;
   final MediaCacheService _mediaCache;
+  final ISettingsRepository? _settingsRepository;
   final Talker _talker;
 
   Future<void> _operation = Future<void>.value();
@@ -60,6 +64,8 @@ class UserDataCleanupCoordinator {
       await Future.wait([
         _localMediaRepository.clearUser(userId),
         _mediaCache.clearUser(userId),
+        if (_settingsRepository case final repository?)
+          repository.clearUserCache(userId),
         _clearPreferences(userId),
       ]);
       final pending = _pendingUsers()..remove(userId);

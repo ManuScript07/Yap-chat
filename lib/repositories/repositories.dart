@@ -6,3 +6,4 @@ export 'presence/presence.dart';
 export 'notifications/notifications.dart';
 export 'friends/friends.dart';
 export 'contacts/contacts.dart';
+export 'settings/settings.dart';

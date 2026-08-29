@@ -163,6 +163,18 @@ class CachedContactMatches extends Table {
   Set<Column> get primaryKey => {ownerUserId, phoneKey};
 }
 
+@DataClassName('CachedSearchPrivacySetting')
+class CachedSearchPrivacySettings extends Table {
+  TextColumn get ownerUserId => text()();
+  BoolColumn get searchByUsername => boolean()();
+  BoolColumn get searchByPhone => boolean()();
+  BoolColumn get searchByName => boolean()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId};
+}
+
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -174,6 +186,7 @@ class CachedContactMatches extends Table {
     CachedFriendRequests,
     CachedFriendLocations,
     CachedContactMatches,
+    CachedSearchPrivacySettings,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -192,7 +205,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -228,6 +241,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 10) {
         await customStatement('UPDATE cached_profiles SET avatar_bytes = NULL');
+      }
+      if (from < 11) {
+        await migrator.createTable(cachedSearchPrivacySettings);
       }
     },
     beforeOpen: (details) async {

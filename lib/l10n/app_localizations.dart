@@ -392,6 +392,42 @@ abstract class AppLocalizations {
   /// **'Искать по имени'**
   String get settingsSearchByName;
 
+  /// No description provided for @settingsPrivacyChangeTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Изменить видимость поиска?'**
+  String get settingsPrivacyChangeTitle;
+
+  /// No description provided for @settingsPrivacyChangeContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Это изменит, смогут ли другие пользователи найти вас этим способом. Текущие друзья по-прежнему будут вас видеть.'**
+  String get settingsPrivacyChangeContent;
+
+  /// No description provided for @settingsPrivacyChangeConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Изменить'**
+  String get settingsPrivacyChangeConfirm;
+
+  /// No description provided for @settingsPrivacySaved.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройка приватности сохранена'**
+  String get settingsPrivacySaved;
+
+  /// No description provided for @settingsPrivacySaveFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось сохранить настройку приватности'**
+  String get settingsPrivacySaveFailed;
+
+  /// No description provided for @settingsPrivacyLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить настройки приватности'**
+  String get settingsPrivacyLoadFailed;
+
   /// No description provided for @settingsShareLocation.
   ///
   /// In ru, this message translates to:
