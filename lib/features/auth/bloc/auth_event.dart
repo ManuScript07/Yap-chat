@@ -19,6 +19,14 @@ final class YandexSignInRequested extends AuthEvent {
   const YandexSignInRequested();
 }
 
+final class AuthSignInCancelled extends AuthEvent {
+  const AuthSignInCancelled();
+}
+
+final class AuthSessionStreamFailed extends AuthEvent {
+  const AuthSessionStreamFailed();
+}
+
 final class AuthSessionChanged extends AuthEvent {
   const AuthSessionChanged(this.session);
 

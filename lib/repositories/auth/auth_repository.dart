@@ -3,18 +3,34 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/repositories/auth/abstract_auth_repository.dart';
 
+typedef OAuthSignInLauncher =
+    Future<bool> Function(
+      OAuthProvider provider, {
+      String? redirectTo,
+      String? scopes,
+      LaunchMode authScreenLaunchMode,
+      Map<String, String>? queryParams,
+    });
+
 class AuthRepository implements IAuthRepository {
   AuthRepository({
     required SupabaseClient client,
     required String redirectUrl,
     bool useAnonymousSignIn = false,
+    OAuthSignInLauncher? oauthSignInLauncher,
   }) : _client = client,
        _redirectUrl = redirectUrl,
-       _useAnonymousSignIn = useAnonymousSignIn;
+       _useAnonymousSignIn = useAnonymousSignIn,
+       _oauthSignInLauncher =
+           oauthSignInLauncher ?? client.auth.signInWithOAuth;
 
   final SupabaseClient _client;
   final String _redirectUrl;
   final bool _useAnonymousSignIn;
+  final OAuthSignInLauncher _oauthSignInLauncher;
+
+  static const _yandexProvider = OAuthProvider('custom:yandex');
+  static const _yandexQueryParams = <String, String>{'force_confirm': 'yes'};
 
   @override
   AuthSession? get currentSession => _mapSession(_client.auth.currentSession);
@@ -42,12 +58,13 @@ class AuthRepository implements IAuthRepository {
       await _client.auth.signInAnonymously();
       return;
     }
-    await _client.auth.signInWithOAuth(
-      OAuthProvider('custom:yandex'),
+    await _oauthSignInLauncher(
+      _yandexProvider,
       redirectTo: kIsWeb ? null : _redirectUrl,
       authScreenLaunchMode: kIsWeb
           ? LaunchMode.platformDefault
-          : LaunchMode.externalApplication,
+          : LaunchMode.inAppBrowserView,
+      queryParams: _yandexQueryParams,
     );
   }
 

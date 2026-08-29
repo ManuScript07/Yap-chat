@@ -270,35 +270,56 @@ class _YandexSignInButton extends StatelessWidget {
       buildWhen: (previous, current) =>
           previous.isSubmitting != current.isSubmitting,
       builder: (context, state) {
-        return SizedBox(
-          width: width,
-          height: 57,
-          child: FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: context.colorScheme.primary,
-              foregroundColor: context.colorScheme.onPrimary,
-              padding: EdgeInsets.zero,
-              shape: const StadiumBorder(),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: width,
+              height: 57,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.colorScheme.primary,
+                  foregroundColor: context.colorScheme.onPrimary,
+                  padding: EdgeInsets.zero,
+                  shape: const StadiumBorder(),
+                ),
+                onPressed: state.isSubmitting
+                    ? null
+                    : () => context.read<AuthBloc>().add(
+                        const YandexSignInRequested(),
+                      ),
+                child: state.isSubmitting
+                    ? SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.colorScheme.onPrimary,
+                        ),
+                      )
+                    : SvgPicture.asset(
+                        'assets/logo/yandex-id-seeklogo.svg',
+                        width: math.min(176, width - 32),
+                        height: 32,
+                      ),
+              ),
             ),
-            onPressed: state.isSubmitting
-                ? null
-                : () => context.read<AuthBloc>().add(
-                    const YandexSignInRequested(),
+            if (state.isSubmitting) ...[
+              const SizedBox(height: 4),
+              TextButton(
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
                   ),
-            child: state.isSubmitting
-                ? SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: context.colorScheme.onPrimary,
-                    ),
-                  )
-                : SvgPicture.asset(
-                    'assets/logo/yandex-id-seeklogo.svg',
-                    width: math.min(176, width - 32),
-                    height: 32,
-                  ),
-          ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () =>
+                    context.read<AuthBloc>().add(const AuthSignInCancelled()),
+                child: Text(context.l10n.cancel),
+              ),
+            ],
+          ],
         );
       },
     );

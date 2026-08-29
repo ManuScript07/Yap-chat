@@ -16,6 +16,7 @@ class AuthGatePage extends StatefulWidget {
 
 class _AuthGatePageState extends State<AuthGatePage> {
   bool _initialRouteSynchronizationScheduled = false;
+  Future<void> _routeSynchronization = Future<void>.value();
 
   @override
   Widget build(BuildContext context) {
@@ -49,9 +50,39 @@ class _AuthGatePageState extends State<AuthGatePage> {
 
   void _scheduleRouteSynchronization(StackRouter router, AuthStatus status) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || context.read<AuthBloc>().state.status != status) return;
-      unawaited(_synchronizeRoute(router, status));
+      if (!mounted) return;
+
+      final previousSynchronization = _routeSynchronization;
+      _routeSynchronization = _synchronizeRouteAfter(
+        previousSynchronization,
+        router,
+        status,
+      );
+      unawaited(_ignoreSynchronizationFailure(_routeSynchronization));
     });
+  }
+
+  Future<void> _synchronizeRouteAfter(
+    Future<void> previousSynchronization,
+    StackRouter router,
+    AuthStatus status,
+  ) async {
+    try {
+      await previousSynchronization;
+    } catch (_) {
+      // A failed obsolete transition must not block the latest auth state.
+    }
+
+    if (!mounted || context.read<AuthBloc>().state.status != status) return;
+    await _synchronizeRoute(router, status);
+  }
+
+  Future<void> _ignoreSynchronizationFailure(Future<void> operation) async {
+    try {
+      await operation;
+    } catch (_) {
+      // The next queued synchronization will reconcile the current route.
+    }
   }
 
   Future<void> _synchronizeRoute(StackRouter router, AuthStatus status) async {

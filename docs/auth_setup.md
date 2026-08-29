@@ -79,6 +79,10 @@ Client Secret нельзя добавлять в Flutter или коммитит
 `id/default_email/real_name/default_avatar_id/default_phone` в UserInfo-ответ,
 который ожидает Supabase Custom OAuth2.
 
+Flutter-клиент передаёт `force_confirm=yes` в OAuth-запросе. Благодаря этому
+Yandex показывает подтверждение и выбор аккаунта даже при наличии активной
+браузерной сессии, а не молча авторизует предыдущий аккаунт.
+
 ## 4. Юридические документы
 
 1. Заполните заготовки в `docs/legal/` и проверьте их с юристом.

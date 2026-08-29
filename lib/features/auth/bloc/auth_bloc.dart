@@ -24,6 +24,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       _onYandexSignInRequested,
       transformer: droppable(),
     );
+    on<AuthSignInCancelled>(_onSignInCancelled);
+    on<AuthSessionStreamFailed>(_onSessionStreamFailed);
     on<AuthSessionChanged>(_onSessionChanged, transformer: restartable());
     on<AuthProfileSubmitted>(_onProfileSubmitted, transformer: droppable());
     on<AuthProfileUpdated>(_onProfileUpdated);
@@ -41,11 +43,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   StreamSubscription<AuthSession?>? _sessionSubscription;
 
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
-    emit(state.copyWith(status: AuthStatus.loading, clearFailure: true));
+    emit(
+      state.copyWith(
+        status: AuthStatus.loading,
+        isSubmitting: false,
+        clearFailure: true,
+      ),
+    );
     await _sessionSubscription?.cancel();
     _sessionSubscription = _authRepository.observeSession().listen(
       (session) => add(AuthSessionChanged(session)),
-      onError: (_, _) => add(const AuthSessionChanged(null)),
+      onError: (_, _) => add(const AuthSessionStreamFailed()),
     );
     add(AuthSessionChanged(_authRepository.currentSession));
   }
@@ -54,10 +62,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     YandexSignInRequested event,
     Emitter<AuthState> emit,
   ) async {
+    if (state.isSubmitting) return;
+
     emit(state.copyWith(isSubmitting: true, clearFailure: true));
     try {
       await _authRepository.signInWithYandex();
-      emit(state.copyWith(isSubmitting: false));
     } catch (_) {
       emit(
         state.copyWith(
@@ -67,6 +76,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ),
       );
     }
+  }
+
+  void _onSignInCancelled(AuthSignInCancelled event, Emitter<AuthState> emit) {
+    if (!state.isSubmitting || state.session != null) return;
+    emit(state.copyWith(isSubmitting: false, clearFailure: true));
+  }
+
+  void _onSessionStreamFailed(
+    AuthSessionStreamFailed event,
+    Emitter<AuthState> emit,
+  ) {
+    final currentSession = _authRepository.currentSession;
+    if (currentSession != null) {
+      if (state.session != currentSession) {
+        add(AuthSessionChanged(currentSession));
+      } else if (state.isSubmitting) {
+        emit(state.copyWith(isSubmitting: false));
+      }
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        status: AuthStatus.unauthenticated,
+        failure: AuthFailure.signIn,
+        isSubmitting: false,
+        clearSession: true,
+        clearProfile: true,
+      ),
+    );
   }
 
   Future<void> _onSessionChanged(
@@ -90,6 +129,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       state.copyWith(
         status: AuthStatus.loading,
         session: session,
+        isSubmitting: false,
         clearFailure: true,
       ),
     );
