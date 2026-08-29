@@ -201,8 +201,15 @@ class ChatsRepository implements IChatsRepository {
 
     final chatId = await _remote.createDirectConversation(normalizedPeerId);
     _accountSessionController.ensureCurrent(scope);
-    await _synchronize();
-    final chat = await getChatById(chatId);
+    // A preceding list refresh may still be in flight. Force a fresh summary
+    // after creating/reopening the conversation so the returned id is visible
+    // before ChatBloc starts sending the first message.
+    await _synchronize(ensureLatestMessages: true);
+    _accountSessionController.ensureCurrent(scope);
+    final chat = _findChat(
+      await _cache.read(ownerUserId: scope.userId),
+      chatId,
+    );
     if (chat == null) {
       throw StateError('Created conversation is missing from summaries');
     }
