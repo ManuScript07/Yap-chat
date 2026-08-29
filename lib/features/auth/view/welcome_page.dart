@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:auto_route/auto_route.dart';
@@ -12,8 +13,52 @@ import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
-class WelcomePage extends StatelessWidget {
+class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
+
+  @override
+  State<WelcomePage> createState() => _WelcomePageState();
+}
+
+class _WelcomePageState extends State<WelcomePage> with WidgetsBindingObserver {
+  static const _callbackDeliveryGracePeriod = Duration(milliseconds: 700);
+
+  Timer? _browserReturnTimer;
+  bool _leftAppDuringSignIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _browserReturnTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (context.read<AuthBloc>().state.isSubmitting) {
+        _leftAppDuringSignIn = true;
+      }
+      return;
+    }
+
+    if (state != AppLifecycleState.resumed || !_leftAppDuringSignIn) return;
+
+    _leftAppDuringSignIn = false;
+    _browserReturnTimer?.cancel();
+    _browserReturnTimer = Timer(_callbackDeliveryGracePeriod, () {
+      if (!mounted) return;
+      context.read<AuthBloc>().add(const AuthSignInBrowserReturned());
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -268,58 +313,57 @@ class _YandexSignInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
       buildWhen: (previous, current) =>
-          previous.isSubmitting != current.isSubmitting,
+          previous.isSubmitting != current.isSubmitting ||
+          previous.isCompletingSignIn != current.isCompletingSignIn,
       builder: (context, state) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: width,
-              height: 57,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.colorScheme.primary,
-                  foregroundColor: context.colorScheme.onPrimary,
-                  padding: EdgeInsets.zero,
-                  shape: const StadiumBorder(),
-                ),
-                onPressed: state.isSubmitting
-                    ? null
-                    : () => context.read<AuthBloc>().add(
-                        const YandexSignInRequested(),
-                      ),
-                child: state.isSubmitting
-                    ? SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: context.colorScheme.onPrimary,
-                        ),
-                      )
-                    : SvgPicture.asset(
-                        'assets/logo/yandex-id-seeklogo.svg',
-                        width: math.min(176, width - 32),
-                        height: 32,
-                      ),
-              ),
+        return SizedBox(
+          width: width,
+          height: 57,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colorScheme.primary,
+              foregroundColor: context.colorScheme.onPrimary,
+              disabledBackgroundColor: context.colorScheme.primary,
+              disabledForegroundColor: context.colorScheme.onPrimary,
+              padding: EdgeInsets.zero,
+              shape: const StadiumBorder(),
             ),
-            if (state.isSubmitting) ...[
-              const SizedBox(height: 4),
-              TextButton(
-                style: TextButton.styleFrom(
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+            onPressed: state.isCompletingSignIn
+                ? null
+                : () => context.read<AuthBloc>().add(
+                    state.isSubmitting
+                        ? const AuthSignInCancelled()
+                        : const YandexSignInRequested(),
                   ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () =>
-                    context.read<AuthBloc>().add(const AuthSignInCancelled()),
-                child: Text(context.l10n.cancel),
-              ),
-            ],
-          ],
+            child: state.isSubmitting
+                ? state.isCompletingSignIn
+                      ? SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: context.colorScheme.onPrimary,
+                          ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: context.colorScheme.onPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(context.l10n.cancel),
+                          ],
+                        )
+                : SvgPicture.asset(
+                    'assets/logo/yandex-id-seeklogo.svg',
+                    width: math.min(176, width - 32),
+                    height: 32,
+                  ),
+          ),
         );
       },
     );

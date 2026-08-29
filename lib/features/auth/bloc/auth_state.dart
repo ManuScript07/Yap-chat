@@ -29,6 +29,7 @@ class AuthState extends Equatable {
     this.profile,
     this.failure,
     this.isSubmitting = false,
+    this.isCompletingSignIn = false,
   });
 
   final AuthStatus status;
@@ -36,6 +37,7 @@ class AuthState extends Equatable {
   final UserProfile? profile;
   final AuthFailure? failure;
   final bool isSubmitting;
+  final bool isCompletingSignIn;
 
   AuthState copyWith({
     AuthStatus? status,
@@ -43,6 +45,7 @@ class AuthState extends Equatable {
     UserProfile? profile,
     AuthFailure? failure,
     bool? isSubmitting,
+    bool? isCompletingSignIn,
     bool clearSession = false,
     bool clearProfile = false,
     bool clearFailure = false,
@@ -53,9 +56,17 @@ class AuthState extends Equatable {
       profile: clearProfile ? null : profile ?? this.profile,
       failure: clearFailure ? null : failure ?? this.failure,
       isSubmitting: isSubmitting ?? this.isSubmitting,
+      isCompletingSignIn: isCompletingSignIn ?? this.isCompletingSignIn,
     );
   }
 
   @override
-  List<Object?> get props => [status, session, profile, failure, isSubmitting];
+  List<Object?> get props => [
+    status,
+    session,
+    profile,
+    failure,
+    isSubmitting,
+    isCompletingSignIn,
+  ];
 }

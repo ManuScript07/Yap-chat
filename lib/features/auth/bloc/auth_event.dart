@@ -23,6 +23,10 @@ final class AuthSignInCancelled extends AuthEvent {
   const AuthSignInCancelled();
 }
 
+final class AuthSignInBrowserReturned extends AuthEvent {
+  const AuthSignInBrowserReturned();
+}
+
 final class AuthSessionStreamFailed extends AuthEvent {
   const AuthSessionStreamFailed();
 }

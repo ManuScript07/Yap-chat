@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/repositories/auth/abstract_auth_repository.dart';
+import 'package:yap_chat/repositories/auth/oauth_attempt_coordinator.dart';
 
 typedef OAuthSignInLauncher =
     Future<bool> Function(
@@ -18,9 +21,11 @@ class AuthRepository implements IAuthRepository {
     required String redirectUrl,
     bool useAnonymousSignIn = false,
     OAuthSignInLauncher? oauthSignInLauncher,
+    OAuthAttemptCoordinator? oauthAttemptCoordinator,
   }) : _client = client,
        _redirectUrl = redirectUrl,
        _useAnonymousSignIn = useAnonymousSignIn,
+       _oauthAttemptCoordinator = oauthAttemptCoordinator,
        _oauthSignInLauncher =
            oauthSignInLauncher ?? client.auth.signInWithOAuth;
 
@@ -28,6 +33,7 @@ class AuthRepository implements IAuthRepository {
   final String _redirectUrl;
   final bool _useAnonymousSignIn;
   final OAuthSignInLauncher _oauthSignInLauncher;
+  final OAuthAttemptCoordinator? _oauthAttemptCoordinator;
 
   static const _yandexProvider = OAuthProvider('custom:yandex');
   static const _yandexQueryParams = <String, String>{'force_confirm': 'yes'};
@@ -36,11 +42,29 @@ class AuthRepository implements IAuthRepository {
   AuthSession? get currentSession => _mapSession(_client.auth.currentSession);
 
   @override
+  bool get isSignInCallbackProcessing =>
+      _oauthAttemptCoordinator?.isCallbackProcessing ?? false;
+
+  @override
   Stream<AuthSession?> observeSession() {
     final initialSession = currentSession;
     var initialEventSkipped = false;
 
     return _client.auth.onAuthStateChange
+        .transform(
+          StreamTransformer<AuthState, AuthState>.fromHandlers(
+            handleData: (authState, sink) {
+              if (authState.session != null) {
+                unawaited(_oauthAttemptCoordinator?.completeAttempt());
+              }
+              sink.add(authState);
+            },
+            handleError: (error, stackTrace, sink) {
+              unawaited(_oauthAttemptCoordinator?.completeAttempt());
+              sink.addError(error, stackTrace);
+            },
+          ),
+        )
         .map((authState) => _mapSession(authState.session))
         .where((session) {
           if (!initialEventSkipped && session == initialSession) {
@@ -58,14 +82,32 @@ class AuthRepository implements IAuthRepository {
       await _client.auth.signInAnonymously();
       return;
     }
-    await _oauthSignInLauncher(
-      _yandexProvider,
-      redirectTo: kIsWeb ? null : _redirectUrl,
-      authScreenLaunchMode: kIsWeb
-          ? LaunchMode.platformDefault
-          : LaunchMode.inAppBrowserView,
-      queryParams: _yandexQueryParams,
-    );
+    try {
+      final redirectTo = kIsWeb
+          ? null
+          : _oauthAttemptCoordinator == null
+          ? _redirectUrl
+          : await _oauthAttemptCoordinator.beginAttempt(_redirectUrl);
+      final launched = await _oauthSignInLauncher(
+        _yandexProvider,
+        redirectTo: redirectTo,
+        authScreenLaunchMode: kIsWeb
+            ? LaunchMode.platformDefault
+            : LaunchMode.inAppBrowserView,
+        queryParams: _yandexQueryParams,
+      );
+      if (!launched) {
+        throw StateError('Could not launch the Yandex OAuth browser.');
+      }
+    } catch (_) {
+      await _oauthAttemptCoordinator?.cancelAttempt();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> cancelPendingSignIn() async {
+    await _oauthAttemptCoordinator?.cancelAttempt();
   }
 
   @override

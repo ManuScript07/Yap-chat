@@ -29,6 +29,9 @@ class MockAuthRepository implements IAuthRepository {
   AuthSession? get currentSession => _currentSession;
 
   @override
+  bool get isSignInCallbackProcessing => false;
+
+  @override
   Stream<AuthSession?> observeSession() => _sessionController.stream.distinct();
 
   @override
@@ -38,6 +41,9 @@ class MockAuthRepository implements IAuthRepository {
     await _preferences.setBool(signedInPreferenceKey, true);
     _sessionController.add(_currentSession);
   }
+
+  @override
+  Future<void> cancelPendingSignIn() async {}
 
   @override
   Future<void> signOut() async {

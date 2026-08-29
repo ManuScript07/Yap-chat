@@ -108,6 +108,7 @@ class RepositoryContainer {
         client: client,
         redirectUrl: config.authRedirectUrl,
         useAnonymousSignIn: config.isLocal,
+        oauthAttemptCoordinator: config.oauthAttemptCoordinator,
       ),
       profileRepository: ProfileRepository(
         client: client,

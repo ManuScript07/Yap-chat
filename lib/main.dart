@@ -14,7 +14,7 @@ import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/core/services/media_service.dart';
 import 'package:yap_chat/repositories/chat/local_media_repository.dart';
-import 'package:yap_chat/repositories/auth/mock_auth_repository.dart';
+import 'package:yap_chat/repositories/auth/auth.dart';
 import 'package:yap_chat/repositories/notifications/notifications.dart';
 
 Future<void> main() async {
@@ -26,8 +26,17 @@ Future<void> main() async {
   final talker = Talker();
   final preferences = await SharedPreferences.getInstance();
   final environment = _resolveEnvironment(dotenv.env);
+  final authRedirectUrl = AppConfig.resolveAuthRedirectUrl(dotenv.env);
+  final oauthAttemptCoordinator = OAuthAttemptCoordinator(
+    preferences: preferences,
+    namespace: environment.name,
+  );
   final database = AppDatabase(name: _databaseName(environment));
-  final supabaseClient = await _initializeSupabase(dotenv.env);
+  final supabaseClient = await _initializeSupabase(
+    dotenv.env,
+    authRedirectUrl: authRedirectUrl,
+    oauthAttemptCoordinator: oauthAttemptCoordinator,
+  );
   final firebaseMessaging = environment == AppEnvironment.prod
       ? await _initializeFirebase(talker)
       : null;
@@ -92,6 +101,7 @@ Future<void> main() async {
     talker: talker,
     env: Map.unmodifiable(dotenv.env),
     database: database,
+    oauthAttemptCoordinator: oauthAttemptCoordinator,
     supabaseClient: supabaseClient,
     firebaseMessaging: firebaseMessaging,
   );
@@ -116,7 +126,11 @@ Future<FirebaseMessaging?> _initializeFirebase(Talker talker) async {
   }
 }
 
-Future<SupabaseClient?> _initializeSupabase(Map<String, String> env) async {
+Future<SupabaseClient?> _initializeSupabase(
+  Map<String, String> env, {
+  required String authRedirectUrl,
+  required OAuthAttemptCoordinator oauthAttemptCoordinator,
+}) async {
   final url = env['SUPABASE_URL']?.trim();
   final publishableKey = env['SUPABASE_PUBLISHABLE_KEY']?.trim();
   if (url == null ||
@@ -129,8 +143,13 @@ Future<SupabaseClient?> _initializeSupabase(Map<String, String> env) async {
   await Supabase.initialize(
     url: url,
     publishableKey: publishableKey,
-    authOptions: const FlutterAuthClientOptions(
+    authOptions: FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
+      detectSessionInUriPredicate: kIsWeb
+          ? null
+          : (uri) =>
+                isConfiguredAuthCallback(uri, authRedirectUrl) &&
+                oauthAttemptCoordinator.tryAcceptCallback(uri),
     ),
   );
   return Supabase.instance.client;

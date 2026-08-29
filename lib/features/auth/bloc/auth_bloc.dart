@@ -25,6 +25,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       transformer: droppable(),
     );
     on<AuthSignInCancelled>(_onSignInCancelled);
+    on<AuthSignInBrowserReturned>(_onSignInBrowserReturned);
     on<AuthSessionStreamFailed>(_onSessionStreamFailed);
     on<AuthSessionChanged>(_onSessionChanged, transformer: restartable());
     on<AuthProfileSubmitted>(_onProfileSubmitted, transformer: droppable());
@@ -47,6 +48,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       state.copyWith(
         status: AuthStatus.loading,
         isSubmitting: false,
+        isCompletingSignIn: false,
         clearFailure: true,
       ),
     );
@@ -64,7 +66,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     if (state.isSubmitting) return;
 
-    emit(state.copyWith(isSubmitting: true, clearFailure: true));
+    emit(
+      state.copyWith(
+        isSubmitting: true,
+        isCompletingSignIn: false,
+        clearFailure: true,
+      ),
+    );
     try {
       await _authRepository.signInWithYandex();
     } catch (_) {
@@ -73,14 +81,53 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           status: AuthStatus.unauthenticated,
           failure: AuthFailure.signIn,
           isSubmitting: false,
+          isCompletingSignIn: false,
         ),
       );
     }
   }
 
-  void _onSignInCancelled(AuthSignInCancelled event, Emitter<AuthState> emit) {
-    if (!state.isSubmitting || state.session != null) return;
-    emit(state.copyWith(isSubmitting: false, clearFailure: true));
+  Future<void> _onSignInCancelled(
+    AuthSignInCancelled event,
+    Emitter<AuthState> emit,
+  ) async {
+    if (!state.isSubmitting ||
+        state.session != null ||
+        state.isCompletingSignIn ||
+        _authRepository.isSignInCallbackProcessing) {
+      return;
+    }
+    emit(
+      state.copyWith(
+        isSubmitting: false,
+        isCompletingSignIn: false,
+        clearFailure: true,
+      ),
+    );
+    await _authRepository.cancelPendingSignIn();
+  }
+
+  Future<void> _onSignInBrowserReturned(
+    AuthSignInBrowserReturned event,
+    Emitter<AuthState> emit,
+  ) async {
+    if (!state.isSubmitting || state.session != null) {
+      return;
+    }
+
+    if (_authRepository.isSignInCallbackProcessing) {
+      emit(state.copyWith(isCompletingSignIn: true));
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        isSubmitting: false,
+        isCompletingSignIn: false,
+        clearFailure: true,
+      ),
+    );
+    await _authRepository.cancelPendingSignIn();
   }
 
   void _onSessionStreamFailed(
@@ -92,7 +139,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (state.session != currentSession) {
         add(AuthSessionChanged(currentSession));
       } else if (state.isSubmitting) {
-        emit(state.copyWith(isSubmitting: false));
+        emit(state.copyWith(isSubmitting: false, isCompletingSignIn: false));
       }
       return;
     }
@@ -102,6 +149,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         status: AuthStatus.unauthenticated,
         failure: AuthFailure.signIn,
         isSubmitting: false,
+        isCompletingSignIn: false,
         clearSession: true,
         clearProfile: true,
       ),
@@ -120,6 +168,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           clearSession: true,
           clearProfile: true,
           isSubmitting: false,
+          isCompletingSignIn: false,
         ),
       );
       return;
@@ -130,6 +179,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         status: AuthStatus.loading,
         session: session,
         isSubmitting: false,
+        isCompletingSignIn: false,
         clearFailure: true,
       ),
     );
