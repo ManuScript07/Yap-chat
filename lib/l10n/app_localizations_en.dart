@@ -258,6 +258,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSaveFailed => 'Could not save language';
 
   @override
+  String get settingsSupportEmail => 'Email support';
+
+  @override
+  String get settingsCopyEmail => 'Copy email';
+
+  @override
+  String get settingsEmailCopied => 'Email copied';
+
+  @override
+  String get settingsPublicContentUnavailable =>
+      'Information is not available yet';
+
+  @override
   String get settingsSearchBlacklist => 'search';
 
   @override

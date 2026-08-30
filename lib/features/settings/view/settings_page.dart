@@ -27,16 +27,13 @@ class _SettingsPage extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     return BlocListener<AppLanguageCubit, AppLanguageState>(
       listenWhen: (previous, current) =>
-          previous.feedbackId != current.feedbackId && current.feedback != null,
+          previous.feedbackId != current.feedbackId &&
+          current.feedback == AppLanguageFeedback.failure,
       listener: (context, state) {
         showAppSnackBar(
           context,
-          message: state.feedback == AppLanguageFeedback.success
-              ? context.l10n.settingsLanguageSaved
-              : context.l10n.settingsLanguageSaveFailed,
-          type: state.feedback == AppLanguageFeedback.success
-              ? SnackBarType.success
-              : SnackBarType.error,
+          message: context.l10n.settingsLanguageSaveFailed,
+          type: SnackBarType.error,
         );
       },
       child: BlocBuilder<AppLanguageCubit, AppLanguageState>(
@@ -72,7 +69,13 @@ class _SettingsPage extends StatelessWidget {
                       icon: Icons.language_rounded,
                       title: context.l10n.settingsLanguage,
                       onTap: () async {
-                        await showLanguageSheet(context);
+                        final saved = await showLanguageSheet(context);
+                        if (!context.mounted || saved != true) return;
+                        showAppSnackBar(
+                          context,
+                          message: context.l10n.settingsLanguageSaved,
+                          type: SnackBarType.success,
+                        );
                       },
                       trailing: Text(
                         _languageLabel(context, languageState.language),
@@ -103,35 +106,42 @@ class _SettingsPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16 + mediaQuery.padding.left,
-                        0,
-                        16 + mediaQuery.padding.right,
-                        0,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Semantics(
-                          button: true,
-                          label: 'Telegram',
-                          child: GestureDetector(
-                            onTap: _openTelegram,
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: SvgPicture.asset(
-                                'assets/logo/telegram_logo.svg',
-                                width: 34,
-                                height: 34,
-                                colorFilter: ColorFilter.mode(
-                                  context.colorScheme.onSurfaceVariant,
-                                  BlendMode.srcIn,
+                    BlocBuilder<AppPublicContentCubit, AppPublicContentState>(
+                      builder: (context, contentState) {
+                        final telegramUrl = contentState.content?.telegramUrl;
+                        return Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            16 + mediaQuery.padding.left,
+                            0,
+                            16 + mediaQuery.padding.right,
+                            0,
+                          ),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Semantics(
+                              button: telegramUrl != null,
+                              label: 'Telegram',
+                              child: GestureDetector(
+                                onTap: telegramUrl == null
+                                    ? null
+                                    : () => _openTelegram(telegramUrl),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: SvgPicture.asset(
+                                    'assets/logo/telegram_logo.svg',
+                                    width: 34,
+                                    height: 34,
+                                    colorFilter: ColorFilter.mode(
+                                      context.colorScheme.onSurfaceVariant,
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 44),
                   ]),
@@ -169,11 +179,14 @@ class _SettingsPage extends StatelessWidget {
     };
   }
 
-  Future<void> _openTelegram() async {
-    await launchUrl(
-      Uri.parse('https://t.me/heyitsyap'),
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> _openTelegram(String rawUrl) async {
+    final url = Uri.tryParse(rawUrl);
+    if (url == null || url.scheme != 'https' || url.host.isEmpty) return;
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // The link is optional and unavailable platform handlers are harmless.
+    }
   }
 
   Future<void> _confirmLogout(BuildContext context) async {

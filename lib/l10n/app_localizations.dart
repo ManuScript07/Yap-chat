@@ -494,6 +494,30 @@ abstract class AppLocalizations {
   /// **'Не удалось сохранить язык'**
   String get settingsLanguageSaveFailed;
 
+  /// No description provided for @settingsSupportEmail.
+  ///
+  /// In ru, this message translates to:
+  /// **'Написать на почту'**
+  String get settingsSupportEmail;
+
+  /// No description provided for @settingsCopyEmail.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скопировать почту'**
+  String get settingsCopyEmail;
+
+  /// No description provided for @settingsEmailCopied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Почта скопирована'**
+  String get settingsEmailCopied;
+
+  /// No description provided for @settingsPublicContentUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Информация пока недоступна'**
+  String get settingsPublicContentUnavailable;
+
   /// No description provided for @settingsSearchBlacklist.
   ///
   /// In ru, this message translates to:

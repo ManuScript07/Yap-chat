@@ -7,9 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/settings/bloc/bloc.dart';
+import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
@@ -385,9 +386,9 @@ class _AuthConsentTextState extends State<_AuthConsentText> {
   void initState() {
     super.initState();
     _termsRecognizer = TapGestureRecognizer()
-      ..onTap = () => _openDocument('TERMS_OF_SERVICE_URL');
+      ..onTap = () => _openDocument(LegalDocument.terms);
     _privacyRecognizer = TapGestureRecognizer()
-      ..onTap = () => _openDocument('PRIVACY_POLICY_URL');
+      ..onTap = () => _openDocument(LegalDocument.privacyPolicy);
   }
 
   @override
@@ -437,11 +438,33 @@ class _AuthConsentTextState extends State<_AuthConsentText> {
     );
   }
 
-  Future<void> _openDocument(String envKey) async {
-    final rawUrl = context.read<AppConfig>().env[envKey];
+  Future<void> _openDocument(LegalDocument document) async {
+    final content = await context.read<AppPublicContentCubit>().ensureContent();
+    if (!mounted) return;
+    final rawUrl = content?.legalUrl(
+      document,
+      Localizations.localeOf(context).languageCode,
+    );
     final url = rawUrl == null ? null : Uri.tryParse(rawUrl);
-    if (url != null) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (url == null || url.scheme != 'https' || url.host.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.settingsPublicContentUnavailable,
+        type: SnackBarType.error,
+      );
+      return;
     }
+    bool opened;
+    try {
+      opened = await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+    } catch (_) {
+      opened = false;
+    }
+    if (!mounted || opened) return;
+    showAppSnackBar(
+      context,
+      message: context.l10n.settingsPublicContentUnavailable,
+      type: SnackBarType.error,
+    );
   }
 }

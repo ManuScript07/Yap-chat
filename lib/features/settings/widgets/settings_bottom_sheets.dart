@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
@@ -12,8 +12,8 @@ import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'settings_widgets.dart';
 
-Future<void> showLanguageSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+Future<bool?> showLanguageSheet(BuildContext context) {
+  return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: false,
@@ -23,13 +23,19 @@ Future<void> showLanguageSheet(BuildContext context) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (_) => BlocBuilder<AppLanguageCubit, AppLanguageState>(
-      builder: (context, state) => _SettingsBottomSheet(
-        title: context.l10n.settingsLanguage,
-        child: _LanguageSheet(
-          selected: state.language,
-          isSaving: state.isSaving,
-          onChanged: context.read<AppLanguageCubit>().select,
+    builder: (_) => BlocListener<AppLanguageCubit, AppLanguageState>(
+      listenWhen: (previous, current) =>
+          previous.feedbackId != current.feedbackId &&
+          current.feedback == AppLanguageFeedback.success,
+      listener: (context, _) => Navigator.of(context).pop(true),
+      child: BlocBuilder<AppLanguageCubit, AppLanguageState>(
+        builder: (context, state) => _SettingsBottomSheet(
+          title: context.l10n.settingsLanguage,
+          child: _LanguageSheet(
+            selected: state.language,
+            isSaving: state.isSaving,
+            onChanged: context.read<AppLanguageCubit>().select,
+          ),
         ),
       ),
     ),
@@ -118,20 +124,68 @@ Future<void> showHelpSheet(BuildContext context) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (_) => _SettingsBottomSheet(
-      title: context.l10n.settingsHelp,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Center(
-          child: Text(
-            context.l10n.settingsComingSoon,
-            textAlign: TextAlign.center,
-            style: settingsValueStyle(context),
-          ),
+    builder: (_) => BlocBuilder<AppPublicContentCubit, AppPublicContentState>(
+      builder: (context, state) => _SettingsBottomSheet(
+        title: context.l10n.settingsHelp,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: _SupportEmailRow(email: state.content?.supportEmail),
         ),
       ),
     ),
   );
+}
+
+class _SupportEmailRow extends StatelessWidget {
+  const _SupportEmailRow({required this.email});
+
+  final String? email;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = email;
+    if (value == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Text(
+          context.l10n.settingsPublicContentUnavailable,
+          style: settingsValueStyle(context),
+        ),
+      );
+    }
+    return Row(
+      children: [
+        Expanded(
+          child: _SheetTextRow(
+            text: value,
+            onTap: () => _openMailClient(value),
+          ),
+        ),
+        IconButton(
+          tooltip: context.l10n.settingsCopyEmail,
+          icon: const Icon(Icons.copy_outlined),
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: value));
+            if (!context.mounted) return;
+            showAppSnackBar(
+              context,
+              message: context.l10n.settingsEmailCopied,
+              type: SnackBarType.success,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _openMailClient(String email) async {
+  final uri = Uri(scheme: 'mailto', path: email);
+  try {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    // The platform may not have a mail handler; copying remains available.
+  }
 }
 
 Future<void> showAboutSheet(BuildContext context) {
@@ -145,25 +199,78 @@ Future<void> showAboutSheet(BuildContext context) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (_) => _SettingsBottomSheet(
-      title: context.l10n.settingsAbout,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _SheetTextRow(
-              text: context.l10n.settingsTerms,
-              onTap: () => _openLegalDocument(context, 'TERMS_OF_SERVICE_URL'),
+    builder: (_) => BlocBuilder<AppPublicContentCubit, AppPublicContentState>(
+      builder: (context, state) {
+        final content = state.content;
+        final languageCode = Localizations.localeOf(context).languageCode;
+        return _SettingsBottomSheet(
+          title: context.l10n.settingsAbout,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _SheetTextRow(
+                  text: context.l10n.settingsTerms,
+                  onTap: _legalTap(
+                    context,
+                    content?.legalUrl(LegalDocument.terms, languageCode),
+                  ),
+                ),
+                _SheetTextRow(
+                  text: context.l10n.settingsPrivacyPolicy,
+                  onTap: _legalTap(
+                    context,
+                    content?.legalUrl(
+                      LegalDocument.privacyPolicy,
+                      languageCode,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            _SheetTextRow(
-              text: context.l10n.settingsPrivacyPolicy,
-              onTap: () => _openLegalDocument(context, 'PRIVACY_POLICY_URL'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     ),
+  );
+}
+
+VoidCallback? _legalTap(BuildContext context, String? url) {
+  return () {
+    if (url == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.settingsPublicContentUnavailable,
+        type: SnackBarType.error,
+      );
+      return;
+    }
+    _openPublicDocument(context, url);
+  };
+}
+
+Future<void> _openPublicDocument(BuildContext context, String rawUrl) async {
+  final url = Uri.tryParse(rawUrl);
+  if (url == null || url.scheme != 'https' || url.host.isEmpty) {
+    showAppSnackBar(
+      context,
+      message: context.l10n.settingsPublicContentUnavailable,
+      type: SnackBarType.error,
+    );
+    return;
+  }
+  bool opened;
+  try {
+    opened = await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+  } catch (_) {
+    opened = false;
+  }
+  if (!context.mounted || opened) return;
+  showAppSnackBar(
+    context,
+    message: context.l10n.settingsPublicContentUnavailable,
+    type: SnackBarType.error,
   );
 }
 
@@ -411,14 +518,6 @@ class _SettingsBottomSheet extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-Future<void> _openLegalDocument(BuildContext context, String envKey) async {
-  final rawUrl = context.read<AppConfig>().env[envKey];
-  final url = rawUrl == null ? null : Uri.tryParse(rawUrl);
-  if (url != null) {
-    await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 }
 

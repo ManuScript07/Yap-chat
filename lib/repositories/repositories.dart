@@ -7,3 +7,4 @@ export 'notifications/notifications.dart';
 export 'friends/friends.dart';
 export 'contacts/contacts.dart';
 export 'settings/settings.dart';
+export 'app_content/app_content.dart';

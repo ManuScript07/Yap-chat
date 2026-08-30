@@ -35,6 +35,7 @@ class _AppInitializerState extends State<AppInitializer> {
   late final LocationTrackingCoordinator _locationTrackingCoordinator;
   late final PermissionReminderCoordinator _permissionReminderCoordinator;
   late final UserDataCleanupCoordinator _userDataCleanupCoordinator;
+  late final IAppPublicContentRepository _appPublicContentRepository;
 
   @override
   void initState() {
@@ -42,6 +43,17 @@ class _AppInitializerState extends State<AppInitializer> {
     _repositories = widget.config.isDev
         ? RepositoryContainer.dev(config: widget.config)
         : RepositoryContainer.prod(config: widget.config);
+    _appPublicContentRepository = widget.config.isDev
+        ? const MockAppPublicContentRepository()
+        : AppPublicContentRepository(
+            cache: AppPublicContentCacheDataSource(
+              preferences: widget.config.preferences,
+              environment: widget.config.environment.name,
+            ),
+            remote: AppPublicContentRemoteDataSource(
+              client: widget.config.requireSupabaseClient(),
+            ),
+          );
     _connectionCoordinator = AppConnectionCoordinator(
       chatsRepository: _repositories.chatsRepository,
       chatRepository: _repositories.chatRepository,
@@ -136,6 +148,9 @@ class _AppInitializerState extends State<AppInitializer> {
         RepositoryProvider<ISettingsRepository>.value(
           value: _repositories.settingsRepository,
         ),
+        RepositoryProvider<IAppPublicContentRepository>.value(
+          value: _appPublicContentRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -196,6 +211,11 @@ class _AppInitializerState extends State<AppInitializer> {
             create: (context) => AppLanguageCubit(
               repository: context.read<ISettingsRepository>(),
             ),
+          ),
+          BlocProvider<AppPublicContentCubit>(
+            create: (context) => AppPublicContentCubit(
+              repository: context.read<IAppPublicContentRepository>(),
+            )..load(),
           ),
         ],
         child: widget.child,

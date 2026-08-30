@@ -266,6 +266,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsLanguageSaveFailed => 'Не удалось сохранить язык';
 
   @override
+  String get settingsSupportEmail => 'Написать на почту';
+
+  @override
+  String get settingsCopyEmail => 'Скопировать почту';
+
+  @override
+  String get settingsEmailCopied => 'Почта скопирована';
+
+  @override
+  String get settingsPublicContentUnavailable => 'Информация пока недоступна';
+
+  @override
   String get settingsSearchBlacklist => 'поиск';
 
   @override
