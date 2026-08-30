@@ -52,7 +52,7 @@ class FriendsRepository implements IFriendsRepository {
   static const _manualCachePruneInterval = Duration(minutes: 10);
   DateTime? _lastManualCachePruneAt;
   String? _lastManualCachePruneOwnerId;
-  final Map<String, Future<FriendLocation?>> _activeLocationRequests = {};
+  final Map<String, Future<FriendLocationLookup>> _activeLocationRequests = {};
 
   @override
   Stream<List<Friend>> watchFriends() {
@@ -228,7 +228,9 @@ class FriendsRepository implements IFriendsRepository {
       await _accountSessionController.commit(
         scope,
         () => _contactMatchCache.pruneExpiredManualSearchMatches(
-          expiredBefore: now.subtract(_manualPhoneSearchCachePolicy.positiveTtl),
+          expiredBefore: now.subtract(
+            _manualPhoneSearchCachePolicy.positiveTtl,
+          ),
           ownerUserId: scope.userId,
         ),
       );
@@ -330,11 +332,10 @@ class FriendsRepository implements IFriendsRepository {
     final now = _clock().toUtc();
     final stalePhoneNumbers = phoneNumbers
         .where(
-          (phone) =>
-              (cachePolicy ?? _contactMatchCachePolicy).shouldRefresh(
-                cached[phone],
-                now,
-              ),
+          (phone) => (cachePolicy ?? _contactMatchCachePolicy).shouldRefresh(
+            cached[phone],
+            now,
+          ),
         )
         .toList(growable: false);
 
@@ -537,7 +538,7 @@ class FriendsRepository implements IFriendsRepository {
   }
 
   @override
-  Future<FriendLocation?> getFriendLocation(String friendId) async {
+  Future<FriendLocationLookup> getFriendLocation(String friendId) async {
     final scope = _accountSessionController.capture();
     final cached = await _cache.readLocation(
       friendId,
@@ -546,23 +547,24 @@ class FriendsRepository implements IFriendsRepository {
     _accountSessionController.ensureCurrent(scope);
     if (cached != null) {
       unawaited(_refreshFriendLocationSafely(friendId, scope));
-      return cached;
+      return FriendLocationLookup.current(cached);
     }
     return _refreshFriendLocation(friendId, scope);
   }
 
-  Future<FriendLocation?> _refreshFriendLocation(
+  Future<FriendLocationLookup> _refreshFriendLocation(
     String friendId,
     AccountSessionSnapshot scope,
   ) {
     final operationKey = _operationKey(scope, friendId);
     final active = _activeLocationRequests[operationKey];
     if (active != null) return active;
-    final future = _remote.getFriendLocation(friendId).then((location) async {
+    final future = _remote.getFriendLocation(friendId).then((lookup) async {
       await _accountSessionController.commit(scope, () async {
-        if (location == null) {
+        final location = lookup.location;
+        if (lookup.availability == FriendLocationAvailability.unavailable) {
           await _cache.removeLocation(friendId, ownerUserId: scope.userId);
-        } else {
+        } else if (location != null) {
           await _cache.writeLocation(
             friendId,
             location,
@@ -570,7 +572,7 @@ class FriendsRepository implements IFriendsRepository {
           );
         }
       });
-      return location;
+      return lookup;
     });
     _activeLocationRequests[operationKey] = future;
     return future.whenComplete(

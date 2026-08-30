@@ -248,6 +248,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsShareLocation => 'Делиться гео';
 
   @override
+  String get settingsShareDistance => 'Показывать расстояние';
+
+  @override
   String get settingsFriendsSeeGeo => 'видят твоё точное гео';
 
   @override

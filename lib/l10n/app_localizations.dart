@@ -458,6 +458,12 @@ abstract class AppLocalizations {
   /// **'Делиться гео'**
   String get settingsShareLocation;
 
+  /// No description provided for @settingsShareDistance.
+  ///
+  /// In ru, this message translates to:
+  /// **'Показывать расстояние'**
+  String get settingsShareDistance;
+
   /// No description provided for @settingsFriendsSeeGeo.
   ///
   /// In ru, this message translates to:

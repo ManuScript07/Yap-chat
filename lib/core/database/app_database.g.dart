@@ -6624,6 +6624,35 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
         requiredDuringInsert: false,
         defaultValue: const Constant('all'),
       );
+  static const VerificationMeta _sharePreciseLocationMeta =
+      const VerificationMeta('sharePreciseLocation');
+  @override
+  late final GeneratedColumn<bool> sharePreciseLocation = GeneratedColumn<bool>(
+    'share_precise_location',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("share_precise_location" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _shareDistanceMeta = const VerificationMeta(
+    'shareDistance',
+  );
+  @override
+  late final GeneratedColumn<bool> shareDistance = GeneratedColumn<bool>(
+    'share_distance',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("share_distance" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -6642,6 +6671,8 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
     searchByPhone,
     searchByName,
     lastSeenVisibility,
+    sharePreciseLocation,
+    shareDistance,
     cachedAt,
   ];
   @override
@@ -6709,6 +6740,24 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
         ),
       );
     }
+    if (data.containsKey('share_precise_location')) {
+      context.handle(
+        _sharePreciseLocationMeta,
+        sharePreciseLocation.isAcceptableOrUnknown(
+          data['share_precise_location']!,
+          _sharePreciseLocationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('share_distance')) {
+      context.handle(
+        _shareDistanceMeta,
+        shareDistance.isAcceptableOrUnknown(
+          data['share_distance']!,
+          _shareDistanceMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -6749,6 +6798,14 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
         DriftSqlType.string,
         data['${effectivePrefix}last_seen_visibility'],
       )!,
+      sharePreciseLocation: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}share_precise_location'],
+      )!,
+      shareDistance: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}share_distance'],
+      )!,
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -6769,6 +6826,8 @@ class CachedSearchPrivacySetting extends DataClass
   final bool searchByPhone;
   final bool searchByName;
   final String lastSeenVisibility;
+  final bool sharePreciseLocation;
+  final bool shareDistance;
   final DateTime cachedAt;
   const CachedSearchPrivacySetting({
     required this.ownerUserId,
@@ -6776,6 +6835,8 @@ class CachedSearchPrivacySetting extends DataClass
     required this.searchByPhone,
     required this.searchByName,
     required this.lastSeenVisibility,
+    required this.sharePreciseLocation,
+    required this.shareDistance,
     required this.cachedAt,
   });
   @override
@@ -6786,6 +6847,8 @@ class CachedSearchPrivacySetting extends DataClass
     map['search_by_phone'] = Variable<bool>(searchByPhone);
     map['search_by_name'] = Variable<bool>(searchByName);
     map['last_seen_visibility'] = Variable<String>(lastSeenVisibility);
+    map['share_precise_location'] = Variable<bool>(sharePreciseLocation);
+    map['share_distance'] = Variable<bool>(shareDistance);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -6797,6 +6860,8 @@ class CachedSearchPrivacySetting extends DataClass
       searchByPhone: Value(searchByPhone),
       searchByName: Value(searchByName),
       lastSeenVisibility: Value(lastSeenVisibility),
+      sharePreciseLocation: Value(sharePreciseLocation),
+      shareDistance: Value(shareDistance),
       cachedAt: Value(cachedAt),
     );
   }
@@ -6814,6 +6879,10 @@ class CachedSearchPrivacySetting extends DataClass
       lastSeenVisibility: serializer.fromJson<String>(
         json['lastSeenVisibility'],
       ),
+      sharePreciseLocation: serializer.fromJson<bool>(
+        json['sharePreciseLocation'],
+      ),
+      shareDistance: serializer.fromJson<bool>(json['shareDistance']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -6826,6 +6895,8 @@ class CachedSearchPrivacySetting extends DataClass
       'searchByPhone': serializer.toJson<bool>(searchByPhone),
       'searchByName': serializer.toJson<bool>(searchByName),
       'lastSeenVisibility': serializer.toJson<String>(lastSeenVisibility),
+      'sharePreciseLocation': serializer.toJson<bool>(sharePreciseLocation),
+      'shareDistance': serializer.toJson<bool>(shareDistance),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -6836,6 +6907,8 @@ class CachedSearchPrivacySetting extends DataClass
     bool? searchByPhone,
     bool? searchByName,
     String? lastSeenVisibility,
+    bool? sharePreciseLocation,
+    bool? shareDistance,
     DateTime? cachedAt,
   }) => CachedSearchPrivacySetting(
     ownerUserId: ownerUserId ?? this.ownerUserId,
@@ -6843,6 +6916,8 @@ class CachedSearchPrivacySetting extends DataClass
     searchByPhone: searchByPhone ?? this.searchByPhone,
     searchByName: searchByName ?? this.searchByName,
     lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
+    sharePreciseLocation: sharePreciseLocation ?? this.sharePreciseLocation,
+    shareDistance: shareDistance ?? this.shareDistance,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedSearchPrivacySetting copyWithCompanion(
@@ -6864,6 +6939,12 @@ class CachedSearchPrivacySetting extends DataClass
       lastSeenVisibility: data.lastSeenVisibility.present
           ? data.lastSeenVisibility.value
           : this.lastSeenVisibility,
+      sharePreciseLocation: data.sharePreciseLocation.present
+          ? data.sharePreciseLocation.value
+          : this.sharePreciseLocation,
+      shareDistance: data.shareDistance.present
+          ? data.shareDistance.value
+          : this.shareDistance,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -6876,6 +6957,8 @@ class CachedSearchPrivacySetting extends DataClass
           ..write('searchByPhone: $searchByPhone, ')
           ..write('searchByName: $searchByName, ')
           ..write('lastSeenVisibility: $lastSeenVisibility, ')
+          ..write('sharePreciseLocation: $sharePreciseLocation, ')
+          ..write('shareDistance: $shareDistance, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -6888,6 +6971,8 @@ class CachedSearchPrivacySetting extends DataClass
     searchByPhone,
     searchByName,
     lastSeenVisibility,
+    sharePreciseLocation,
+    shareDistance,
     cachedAt,
   );
   @override
@@ -6899,6 +6984,8 @@ class CachedSearchPrivacySetting extends DataClass
           other.searchByPhone == this.searchByPhone &&
           other.searchByName == this.searchByName &&
           other.lastSeenVisibility == this.lastSeenVisibility &&
+          other.sharePreciseLocation == this.sharePreciseLocation &&
+          other.shareDistance == this.shareDistance &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -6909,6 +6996,8 @@ class CachedSearchPrivacySettingsCompanion
   final Value<bool> searchByPhone;
   final Value<bool> searchByName;
   final Value<String> lastSeenVisibility;
+  final Value<bool> sharePreciseLocation;
+  final Value<bool> shareDistance;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedSearchPrivacySettingsCompanion({
@@ -6917,6 +7006,8 @@ class CachedSearchPrivacySettingsCompanion
     this.searchByPhone = const Value.absent(),
     this.searchByName = const Value.absent(),
     this.lastSeenVisibility = const Value.absent(),
+    this.sharePreciseLocation = const Value.absent(),
+    this.shareDistance = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6926,6 +7017,8 @@ class CachedSearchPrivacySettingsCompanion
     required bool searchByPhone,
     required bool searchByName,
     this.lastSeenVisibility = const Value.absent(),
+    this.sharePreciseLocation = const Value.absent(),
+    this.shareDistance = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -6939,6 +7032,8 @@ class CachedSearchPrivacySettingsCompanion
     Expression<bool>? searchByPhone,
     Expression<bool>? searchByName,
     Expression<String>? lastSeenVisibility,
+    Expression<bool>? sharePreciseLocation,
+    Expression<bool>? shareDistance,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -6949,6 +7044,9 @@ class CachedSearchPrivacySettingsCompanion
       if (searchByName != null) 'search_by_name': searchByName,
       if (lastSeenVisibility != null)
         'last_seen_visibility': lastSeenVisibility,
+      if (sharePreciseLocation != null)
+        'share_precise_location': sharePreciseLocation,
+      if (shareDistance != null) 'share_distance': shareDistance,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6960,6 +7058,8 @@ class CachedSearchPrivacySettingsCompanion
     Value<bool>? searchByPhone,
     Value<bool>? searchByName,
     Value<String>? lastSeenVisibility,
+    Value<bool>? sharePreciseLocation,
+    Value<bool>? shareDistance,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -6969,6 +7069,8 @@ class CachedSearchPrivacySettingsCompanion
       searchByPhone: searchByPhone ?? this.searchByPhone,
       searchByName: searchByName ?? this.searchByName,
       lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
+      sharePreciseLocation: sharePreciseLocation ?? this.sharePreciseLocation,
+      shareDistance: shareDistance ?? this.shareDistance,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6992,6 +7094,14 @@ class CachedSearchPrivacySettingsCompanion
     if (lastSeenVisibility.present) {
       map['last_seen_visibility'] = Variable<String>(lastSeenVisibility.value);
     }
+    if (sharePreciseLocation.present) {
+      map['share_precise_location'] = Variable<bool>(
+        sharePreciseLocation.value,
+      );
+    }
+    if (shareDistance.present) {
+      map['share_distance'] = Variable<bool>(shareDistance.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -7009,6 +7119,299 @@ class CachedSearchPrivacySettingsCompanion
           ..write('searchByPhone: $searchByPhone, ')
           ..write('searchByName: $searchByName, ')
           ..write('lastSeenVisibility: $lastSeenVisibility, ')
+          ..write('sharePreciseLocation: $sharePreciseLocation, ')
+          ..write('shareDistance: $shareDistance, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedPreciseLocationExclusionsTable
+    extends CachedPreciseLocationExclusions
+    with
+        TableInfo<
+          $CachedPreciseLocationExclusionsTable,
+          CachedPreciseLocationExclusion
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedPreciseLocationExclusionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _viewerUserIdMeta = const VerificationMeta(
+    'viewerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> viewerUserId = GeneratedColumn<String>(
+    'viewer_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [ownerUserId, viewerUserId, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_precise_location_exclusions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedPreciseLocationExclusion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('viewer_user_id')) {
+      context.handle(
+        _viewerUserIdMeta,
+        viewerUserId.isAcceptableOrUnknown(
+          data['viewer_user_id']!,
+          _viewerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_viewerUserIdMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, viewerUserId};
+  @override
+  CachedPreciseLocationExclusion map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedPreciseLocationExclusion(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      viewerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}viewer_user_id'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedPreciseLocationExclusionsTable createAlias(String alias) {
+    return $CachedPreciseLocationExclusionsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedPreciseLocationExclusion extends DataClass
+    implements Insertable<CachedPreciseLocationExclusion> {
+  final String ownerUserId;
+  final String viewerUserId;
+  final DateTime cachedAt;
+  const CachedPreciseLocationExclusion({
+    required this.ownerUserId,
+    required this.viewerUserId,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['viewer_user_id'] = Variable<String>(viewerUserId);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedPreciseLocationExclusionsCompanion toCompanion(bool nullToAbsent) {
+    return CachedPreciseLocationExclusionsCompanion(
+      ownerUserId: Value(ownerUserId),
+      viewerUserId: Value(viewerUserId),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedPreciseLocationExclusion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedPreciseLocationExclusion(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      viewerUserId: serializer.fromJson<String>(json['viewerUserId']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'viewerUserId': serializer.toJson<String>(viewerUserId),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedPreciseLocationExclusion copyWith({
+    String? ownerUserId,
+    String? viewerUserId,
+    DateTime? cachedAt,
+  }) => CachedPreciseLocationExclusion(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    viewerUserId: viewerUserId ?? this.viewerUserId,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedPreciseLocationExclusion copyWithCompanion(
+    CachedPreciseLocationExclusionsCompanion data,
+  ) {
+    return CachedPreciseLocationExclusion(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      viewerUserId: data.viewerUserId.present
+          ? data.viewerUserId.value
+          : this.viewerUserId,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedPreciseLocationExclusion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('viewerUserId: $viewerUserId, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(ownerUserId, viewerUserId, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedPreciseLocationExclusion &&
+          other.ownerUserId == this.ownerUserId &&
+          other.viewerUserId == this.viewerUserId &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedPreciseLocationExclusionsCompanion
+    extends UpdateCompanion<CachedPreciseLocationExclusion> {
+  final Value<String> ownerUserId;
+  final Value<String> viewerUserId;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedPreciseLocationExclusionsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.viewerUserId = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedPreciseLocationExclusionsCompanion.insert({
+    required String ownerUserId,
+    required String viewerUserId,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       viewerUserId = Value(viewerUserId),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedPreciseLocationExclusion> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? viewerUserId,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (viewerUserId != null) 'viewer_user_id': viewerUserId,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedPreciseLocationExclusionsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? viewerUserId,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedPreciseLocationExclusionsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      viewerUserId: viewerUserId ?? this.viewerUserId,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (viewerUserId.present) {
+      map['viewer_user_id'] = Variable<String>(viewerUserId.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedPreciseLocationExclusionsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('viewerUserId: $viewerUserId, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7035,6 +7438,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedContactMatchesTable(this);
   late final $CachedSearchPrivacySettingsTable cachedSearchPrivacySettings =
       $CachedSearchPrivacySettingsTable(this);
+  late final $CachedPreciseLocationExclusionsTable
+  cachedPreciseLocationExclusions = $CachedPreciseLocationExclusionsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7050,6 +7455,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedFriendLocations,
     cachedContactMatches,
     cachedSearchPrivacySettings,
+    cachedPreciseLocationExclusions,
   ];
 }
 
@@ -10175,6 +10581,8 @@ typedef $$CachedSearchPrivacySettingsTableCreateCompanionBuilder =
       required bool searchByPhone,
       required bool searchByName,
       Value<String> lastSeenVisibility,
+      Value<bool> sharePreciseLocation,
+      Value<bool> shareDistance,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -10185,6 +10593,8 @@ typedef $$CachedSearchPrivacySettingsTableUpdateCompanionBuilder =
       Value<bool> searchByPhone,
       Value<bool> searchByName,
       Value<String> lastSeenVisibility,
+      Value<bool> sharePreciseLocation,
+      Value<bool> shareDistance,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -10220,6 +10630,16 @@ class $$CachedSearchPrivacySettingsTableFilterComposer
 
   ColumnFilters<String> get lastSeenVisibility => $composableBuilder(
     column: $table.lastSeenVisibility,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sharePreciseLocation => $composableBuilder(
+    column: $table.sharePreciseLocation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get shareDistance => $composableBuilder(
+    column: $table.shareDistance,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10263,6 +10683,16 @@ class $$CachedSearchPrivacySettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get sharePreciseLocation => $composableBuilder(
+    column: $table.sharePreciseLocation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get shareDistance => $composableBuilder(
+    column: $table.shareDistance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -10300,6 +10730,16 @@ class $$CachedSearchPrivacySettingsTableAnnotationComposer
 
   GeneratedColumn<String> get lastSeenVisibility => $composableBuilder(
     column: $table.lastSeenVisibility,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get sharePreciseLocation => $composableBuilder(
+    column: $table.sharePreciseLocation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get shareDistance => $composableBuilder(
+    column: $table.shareDistance,
     builder: (column) => column,
   );
 
@@ -10358,6 +10798,8 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 Value<bool> searchByPhone = const Value.absent(),
                 Value<bool> searchByName = const Value.absent(),
                 Value<String> lastSeenVisibility = const Value.absent(),
+                Value<bool> sharePreciseLocation = const Value.absent(),
+                Value<bool> shareDistance = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedSearchPrivacySettingsCompanion(
@@ -10366,6 +10808,8 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 searchByPhone: searchByPhone,
                 searchByName: searchByName,
                 lastSeenVisibility: lastSeenVisibility,
+                sharePreciseLocation: sharePreciseLocation,
+                shareDistance: shareDistance,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -10376,6 +10820,8 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 required bool searchByPhone,
                 required bool searchByName,
                 Value<String> lastSeenVisibility = const Value.absent(),
+                Value<bool> sharePreciseLocation = const Value.absent(),
+                Value<bool> shareDistance = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedSearchPrivacySettingsCompanion.insert(
@@ -10384,6 +10830,8 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 searchByPhone: searchByPhone,
                 searchByName: searchByName,
                 lastSeenVisibility: lastSeenVisibility,
+                sharePreciseLocation: sharePreciseLocation,
+                shareDistance: shareDistance,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -10416,6 +10864,191 @@ typedef $$CachedSearchPrivacySettingsTableProcessedTableManager =
       CachedSearchPrivacySetting,
       PrefetchHooks Function()
     >;
+typedef $$CachedPreciseLocationExclusionsTableCreateCompanionBuilder =
+    CachedPreciseLocationExclusionsCompanion Function({
+      required String ownerUserId,
+      required String viewerUserId,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedPreciseLocationExclusionsTableUpdateCompanionBuilder =
+    CachedPreciseLocationExclusionsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> viewerUserId,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedPreciseLocationExclusionsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedPreciseLocationExclusionsTable> {
+  $$CachedPreciseLocationExclusionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get viewerUserId => $composableBuilder(
+    column: $table.viewerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedPreciseLocationExclusionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedPreciseLocationExclusionsTable> {
+  $$CachedPreciseLocationExclusionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get viewerUserId => $composableBuilder(
+    column: $table.viewerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedPreciseLocationExclusionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedPreciseLocationExclusionsTable> {
+  $$CachedPreciseLocationExclusionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get viewerUserId => $composableBuilder(
+    column: $table.viewerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedPreciseLocationExclusionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedPreciseLocationExclusionsTable,
+          CachedPreciseLocationExclusion,
+          $$CachedPreciseLocationExclusionsTableFilterComposer,
+          $$CachedPreciseLocationExclusionsTableOrderingComposer,
+          $$CachedPreciseLocationExclusionsTableAnnotationComposer,
+          $$CachedPreciseLocationExclusionsTableCreateCompanionBuilder,
+          $$CachedPreciseLocationExclusionsTableUpdateCompanionBuilder,
+          (
+            CachedPreciseLocationExclusion,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedPreciseLocationExclusionsTable,
+              CachedPreciseLocationExclusion
+            >,
+          ),
+          CachedPreciseLocationExclusion,
+          PrefetchHooks Function()
+        > {
+  $$CachedPreciseLocationExclusionsTableTableManager(
+    _$AppDatabase db,
+    $CachedPreciseLocationExclusionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedPreciseLocationExclusionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedPreciseLocationExclusionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedPreciseLocationExclusionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> viewerUserId = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedPreciseLocationExclusionsCompanion(
+                ownerUserId: ownerUserId,
+                viewerUserId: viewerUserId,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String viewerUserId,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedPreciseLocationExclusionsCompanion.insert(
+                ownerUserId: ownerUserId,
+                viewerUserId: viewerUserId,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedPreciseLocationExclusionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedPreciseLocationExclusionsTable,
+      CachedPreciseLocationExclusion,
+      $$CachedPreciseLocationExclusionsTableFilterComposer,
+      $$CachedPreciseLocationExclusionsTableOrderingComposer,
+      $$CachedPreciseLocationExclusionsTableAnnotationComposer,
+      $$CachedPreciseLocationExclusionsTableCreateCompanionBuilder,
+      $$CachedPreciseLocationExclusionsTableUpdateCompanionBuilder,
+      (
+        CachedPreciseLocationExclusion,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedPreciseLocationExclusionsTable,
+          CachedPreciseLocationExclusion
+        >,
+      ),
+      CachedPreciseLocationExclusion,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10443,5 +11076,11 @@ class $AppDatabaseManager {
       $$CachedSearchPrivacySettingsTableTableManager(
         _db,
         _db.cachedSearchPrivacySettings,
+      );
+  $$CachedPreciseLocationExclusionsTableTableManager
+  get cachedPreciseLocationExclusions =>
+      $$CachedPreciseLocationExclusionsTableTableManager(
+        _db,
+        _db.cachedPreciseLocationExclusions,
       );
 }

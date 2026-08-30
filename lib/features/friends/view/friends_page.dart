@@ -510,10 +510,12 @@ class _FriendsListState extends State<_FriendsList> {
     final startedAt = DateTime.now();
     if (mounted) setState(() {});
     try {
-      final location = await context
-          .read<IFriendsRepository>()
-          .getFriendLocation(friend.id);
+      final lookup = await context.read<IFriendsRepository>().getFriendLocation(
+        friend.id,
+      );
       if (!context.mounted) return;
+      if (lookup.availability == FriendLocationAvailability.hidden) return;
+      final location = lookup.location;
       if (location == null) {
         showAppSnackBar(
           context,

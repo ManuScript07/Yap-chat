@@ -87,6 +87,7 @@
   "settingsPrivacySaveFailed": "Could not save privacy setting",
   "settingsPrivacyLoadFailed": "Could not load privacy settings",
   "settingsShareLocation": "Share my location",
+  "settingsShareDistance": "Show distance",
   "settingsFriendsSeeGeo": "see your exact location",
   "settingsLanguageRussian": "русский",
   "settingsLanguageEnglish": "english",

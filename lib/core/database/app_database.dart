@@ -171,10 +171,22 @@ class CachedSearchPrivacySettings extends Table {
   BoolColumn get searchByName => boolean()();
   TextColumn get lastSeenVisibility =>
       text().withDefault(const Constant('all'))();
+  BoolColumn get sharePreciseLocation =>
+      boolean().withDefault(const Constant(true))();
+  BoolColumn get shareDistance => boolean().withDefault(const Constant(true))();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {ownerUserId};
+}
+
+class CachedPreciseLocationExclusions extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get viewerUserId => text()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, viewerUserId};
 }
 
 @DriftDatabase(
@@ -189,6 +201,7 @@ class CachedSearchPrivacySettings extends Table {
     CachedFriendLocations,
     CachedContactMatches,
     CachedSearchPrivacySettings,
+    CachedPreciseLocationExclusions,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -207,7 +220,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -246,12 +259,26 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 11) {
         await migrator.createTable(cachedSearchPrivacySettings);
+      } else {
+        if (from < 12) {
+          await migrator.addColumn(
+            cachedSearchPrivacySettings,
+            cachedSearchPrivacySettings.lastSeenVisibility,
+          );
+        }
+        if (from < 13) {
+          await migrator.addColumn(
+            cachedSearchPrivacySettings,
+            cachedSearchPrivacySettings.sharePreciseLocation,
+          );
+          await migrator.addColumn(
+            cachedSearchPrivacySettings,
+            cachedSearchPrivacySettings.shareDistance,
+          );
+        }
       }
-      if (from < 12) {
-        await migrator.addColumn(
-          cachedSearchPrivacySettings,
-          cachedSearchPrivacySettings.lastSeenVisibility,
-        );
+      if (from < 13) {
+        await migrator.createTable(cachedPreciseLocationExclusions);
       }
     },
     beforeOpen: (details) async {

@@ -129,10 +129,7 @@ class FriendsRemoteDataSource {
     if (phoneNumbers.isEmpty || friendIds.isEmpty) return const {};
     final response = await _client.rpc<List<dynamic>>(
       'match_new_friend_contact_phones',
-      params: {
-        'phone_numbers': phoneNumbers,
-        'friend_user_ids': friendIds,
-      },
+      params: {'phone_numbers': phoneNumbers, 'friend_user_ids': friendIds},
     );
     return {
       for (final item in response)
@@ -174,17 +171,31 @@ class FriendsRemoteDataSource {
         params: {'target_request_id': requestId, 'accept_request': accept},
       );
 
-  Future<FriendLocation?> getFriendLocation(String friendId) async {
+  Future<FriendLocationLookup> getFriendLocation(String friendId) async {
     final response = await _client.rpc<List<dynamic>>(
-      'get_friend_location',
+      'get_friend_location_visibility',
       params: {'friend_user_id': friendId},
     );
-    if (response.isEmpty) return null;
+    if (response.isEmpty) return const FriendLocationLookup.unavailable();
     final row = Map<String, dynamic>.from(response.first as Map);
-    return FriendLocation(
-      latitude: (row['latitude'] as num).toDouble(),
-      longitude: (row['longitude'] as num).toDouble(),
-      updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
+    final availability = FriendLocationAvailability.values
+        .where((value) => value.name == row['availability'])
+        .firstOrNull;
+    if (availability == FriendLocationAvailability.hidden) {
+      return const FriendLocationLookup.hidden();
+    }
+    if (availability != FriendLocationAvailability.current ||
+        row['latitude'] == null ||
+        row['longitude'] == null ||
+        row['updated_at'] == null) {
+      return const FriendLocationLookup.unavailable();
+    }
+    return FriendLocationLookup.current(
+      FriendLocation(
+        latitude: (row['latitude'] as num).toDouble(),
+        longitude: (row['longitude'] as num).toDouble(),
+        updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
+      ),
     );
   }
 

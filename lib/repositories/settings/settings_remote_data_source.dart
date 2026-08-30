@@ -53,6 +53,47 @@ class SettingsRemoteDataSource {
               .where((item) => item.name == row['last_seen_visibility'])
               .firstOrNull ??
           LastSeenVisibility.all,
+      sharePreciseLocation: row['share_precise_location'] as bool? ?? true,
+      shareDistance: row['share_distance'] as bool? ?? true,
     );
+  }
+
+  Future<SearchPrivacySettings> updateLocationVisibility({
+    required bool sharePreciseLocation,
+    required bool shareDistance,
+  }) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'set_my_location_visibility',
+      params: {
+        'is_precise_location_shared': sharePreciseLocation,
+        'is_distance_shared': shareDistance,
+      },
+    );
+    if (response.isEmpty) {
+      throw StateError('Supabase returned no privacy settings');
+    }
+    return _map(response.first);
+  }
+
+  Future<Set<String>> fetchPreciseLocationExclusions() async {
+    final response = await _client.rpc<List<dynamic>>(
+      'get_my_precise_location_exclusions',
+    );
+    return response
+        .map((row) => (row as Map)['viewer_user_id'] as String)
+        .toSet();
+  }
+
+  Future<Set<String>> setPreciseLocationExcluded(
+    String friendUserId, {
+    required bool excluded,
+  }) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'set_precise_location_excluded',
+      params: {'friend_user_id': friendUserId, 'is_excluded': excluded},
+    );
+    return response
+        .map((row) => (row as Map)['viewer_user_id'] as String)
+        .toSet();
   }
 }

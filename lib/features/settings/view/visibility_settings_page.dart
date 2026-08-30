@@ -2,54 +2,158 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
+import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/widgets/settings_widgets.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
-class VisibilitySettingsPage extends StatefulWidget {
+class VisibilitySettingsPage extends StatelessWidget {
   const VisibilitySettingsPage({super.key});
 
   @override
-  State<VisibilitySettingsPage> createState() => _VisibilitySettingsPageState();
+  Widget build(BuildContext context) => BlocProvider(
+    create: (_) =>
+        LocationVisibilityCubit(repository: context.read<ISettingsRepository>())
+          ..load(),
+    child: const _VisibilitySettingsView(),
+  );
 }
 
-class _VisibilitySettingsPageState extends State<VisibilitySettingsPage> {
-  bool _shareLocation = true;
-  final _friendVisibility = <String, bool>{};
+class _VisibilitySettingsView extends StatefulWidget {
+  const _VisibilitySettingsView();
+
+  @override
+  State<_VisibilitySettingsView> createState() =>
+      _VisibilitySettingsViewState();
+}
+
+class _VisibilitySettingsViewState extends State<_VisibilitySettingsView> {
+  late final Stream<List<Friend>> _friends;
+
+  @override
+  void initState() {
+    super.initState();
+    _friends = context.read<IFriendsRepository>().watchFriends();
+  }
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    return Scaffold(
-      backgroundColor: context.scaffoldBackgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: SettingsPageAppBar(
-        title: context.l10n.settingsVisibility,
-        wrapAfterFirstWord: true,
-      ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(0, 130, 0, mediaQuery.padding.bottom + 24),
-        children: [
-          SettingsToggleRow(
-            icon: Icons.near_me_outlined,
-            title: context.l10n.settingsShareLocation,
-            value: _shareLocation,
-            onChanged: (value) => setState(() => _shareLocation = value),
-          ),
-          const SizedBox(height: 24),
-          StreamBuilder<List<Friend>>(
-            stream: context.read<IFriendsRepository>().watchFriends(),
-            builder: (context, snapshot) => _buildFriends(context, snapshot),
-          ),
-        ],
+    return BlocListener<LocationVisibilityCubit, LocationVisibilityState>(
+      listenWhen: (previous, current) =>
+          previous.feedbackId != current.feedbackId && current.feedback != null,
+      listener: (context, state) {
+        final message = switch (state.feedback) {
+          LocationVisibilityFeedback.success =>
+            context.l10n.settingsPrivacySaved,
+          LocationVisibilityFeedback.failure =>
+            context.l10n.settingsPrivacySaveFailed,
+          null => null,
+        };
+        if (message == null) return;
+        showAppSnackBar(
+          context,
+          message: message,
+          type: state.feedback == LocationVisibilityFeedback.success
+              ? SnackBarType.success
+              : SnackBarType.error,
+        );
+      },
+      child: Scaffold(
+        backgroundColor: context.scaffoldBackgroundColor,
+        extendBodyBehindAppBar: true,
+        appBar: SettingsPageAppBar(
+          title: context.l10n.settingsVisibility,
+          wrapAfterFirstWord: true,
+        ),
+        body: BlocBuilder<LocationVisibilityCubit, LocationVisibilityState>(
+          builder: (context, state) {
+            final settings = state.settings;
+            if (settings == null) {
+              return Center(
+                child: state.status == LocationVisibilityStatus.failure
+                    ? Text(
+                        context.l10n.settingsPrivacyLoadFailed,
+                        style: settingsValueStyle(context),
+                      )
+                    : const CircularProgressIndicator(),
+              );
+            }
+            final isLoading = state.status == LocationVisibilityStatus.loading;
+            return ListView(
+              padding: EdgeInsets.fromLTRB(
+                0,
+                130,
+                0,
+                mediaQuery.padding.bottom + 24,
+              ),
+              children: [
+                SettingsToggleRow(
+                  icon: Icons.near_me_outlined,
+                  title: context.l10n.settingsShareLocation,
+                  value: settings.sharePreciseLocation,
+                  isLoading: isLoading,
+                  isSaving: state.isSaving,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => context
+                            .read<LocationVisibilityCubit>()
+                            .setGlobal(sharePreciseLocation: value),
+                ),
+                SettingsToggleRow(
+                  icon: Icons.social_distance_outlined,
+                  title: context.l10n.settingsShareDistance,
+                  value: settings.shareDistance,
+                  isLoading: isLoading,
+                  isSaving: state.isSaving,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => context
+                            .read<LocationVisibilityCubit>()
+                            .setGlobal(shareDistance: value),
+                ),
+                const SizedBox(height: 24),
+                StreamBuilder<List<Friend>>(
+                  stream: _friends,
+                  builder: (context, snapshot) => _FriendsVisibilityList(
+                    snapshot: snapshot,
+                    exactLocationEnabled: settings.sharePreciseLocation,
+                    excludedFriendIds: state.excludedFriendIds,
+                    isSaving: state.isSaving || isLoading,
+                  ),
+                ),
+                if (state.status == LocationVisibilityStatus.failure)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                    child: Text(
+                      context.l10n.settingsPrivacyLoadFailed,
+                      style: settingsValueStyle(context),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
+}
 
-  Widget _buildFriends(
-    BuildContext context,
-    AsyncSnapshot<List<Friend>> snapshot,
-  ) {
+class _FriendsVisibilityList extends StatelessWidget {
+  const _FriendsVisibilityList({
+    required this.snapshot,
+    required this.exactLocationEnabled,
+    required this.excludedFriendIds,
+    required this.isSaving,
+  });
+
+  final AsyncSnapshot<List<Friend>> snapshot;
+  final bool exactLocationEnabled;
+  final Set<String> excludedFriendIds;
+  final bool isSaving;
+
+  @override
+  Widget build(BuildContext context) {
     if (snapshot.connectionState == ConnectionState.waiting &&
         !snapshot.hasData) {
       return Padding(
@@ -71,7 +175,6 @@ class _VisibilitySettingsPageState extends State<VisibilitySettingsPage> {
         ),
       );
     }
-
     final friends = snapshot.data ?? const <Friend>[];
     if (friends.isEmpty) {
       return Padding(
@@ -85,11 +188,11 @@ class _VisibilitySettingsPageState extends State<VisibilitySettingsPage> {
         ),
       );
     }
-
-    final visibleCount = _shareLocation
-        ? friends.where((friend) => _friendVisibility[friend.id] ?? true).length
+    final visibleCount = exactLocationEnabled
+        ? friends
+              .where((friend) => !excludedFriendIds.contains(friend.id))
+              .length
         : 0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -128,14 +231,35 @@ class _VisibilitySettingsPageState extends State<VisibilitySettingsPage> {
           ),
         ),
         const SizedBox(height: 8),
-        for (final friend in friends) _friendRow(context, friend),
+        for (final friend in friends)
+          _FriendVisibilityRow(
+            friend: friend,
+            isVisible: !excludedFriendIds.contains(friend.id),
+            isSaving: isSaving,
+            exactLocationEnabled: exactLocationEnabled,
+          ),
       ],
     );
   }
+}
 
-  Widget _friendRow(BuildContext context, Friend friend) {
-    final isVisible = _friendVisibility[friend.id] ?? true;
-    return SettingsFriendRow(
+class _FriendVisibilityRow extends StatelessWidget {
+  const _FriendVisibilityRow({
+    required this.friend,
+    required this.isVisible,
+    required this.isSaving,
+    required this.exactLocationEnabled,
+  });
+
+  final Friend friend;
+  final bool isVisible;
+  final bool isSaving;
+  final bool exactLocationEnabled;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    ignoring: isSaving || !exactLocationEnabled,
+    child: SettingsFriendRow(
       avatar: UserAvatar(
         avatarUrl: friend.avatarUrl,
         avatarLoader: () =>
@@ -146,8 +270,11 @@ class _VisibilitySettingsPageState extends State<VisibilitySettingsPage> {
       ),
       name: friend.displayName,
       username: friend.username,
-      isVisible: isVisible,
-      onToggle: () => setState(() => _friendVisibility[friend.id] = !isVisible),
-    );
-  }
+      isVisible: exactLocationEnabled && isVisible,
+      onToggle: () => context.read<LocationVisibilityCubit>().setFriendExcluded(
+        friend.id,
+        excluded: isVisible,
+      ),
+    ),
+  );
 }

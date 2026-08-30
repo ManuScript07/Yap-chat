@@ -114,6 +114,9 @@ class _LanguageChoice extends StatelessWidget {
               activeColor: colorScheme.primary,
               checkColor: colorScheme.onPrimary,
               side: BorderSide(color: colorScheme.outline, width: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(5),
+              ),
               onChanged: (_) => onSelected(value),
             ),
           ],

@@ -186,17 +186,20 @@ class _LastSeenVisibilityChoice extends StatelessWidget {
         onTap: isSaving ? null : () => onSelected(visibility),
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            20 + MediaQuery.paddingOf(context).left,
+            16 + MediaQuery.paddingOf(context).left,
             2,
-            20 + MediaQuery.paddingOf(context).right,
+            16 + MediaQuery.paddingOf(context).right,
             2,
           ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
-                  label,
-                  style: settingsValueStyle(context).copyWith(fontSize: 18),
+                  label.toLowerCase(),
+                  style: settingsValueStyle(context).copyWith(
+                    color: context.colorScheme.onSurface,
+                    fontSize: 18,
+                  ),
                 ),
               ),
               IgnorePointer(
@@ -208,6 +211,9 @@ class _LastSeenVisibilityChoice extends StatelessWidget {
                   side: BorderSide(
                     color: context.colorScheme.outline,
                     width: 2,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
                   ),
                   onChanged: (_) => onSelected(visibility),
                 ),

@@ -19,6 +19,8 @@ class SettingsCacheDataSource {
       searchByPhone: row.searchByPhone,
       searchByName: row.searchByName,
       lastSeenVisibility: _lastSeenVisibility(row.lastSeenVisibility),
+      sharePreciseLocation: row.sharePreciseLocation,
+      shareDistance: row.shareDistance,
     );
   }
 
@@ -32,16 +34,54 @@ class SettingsCacheDataSource {
             searchByPhone: settings.searchByPhone,
             searchByName: settings.searchByName,
             lastSeenVisibility: Value(settings.lastSeenVisibility.name),
+            sharePreciseLocation: Value(settings.sharePreciseLocation),
+            shareDistance: Value(settings.shareDistance),
             cachedAt: DateTime.now().toUtc(),
           ),
         );
   }
 
   Future<void> clearUser(String ownerUserId) async {
-    await (_database.delete(
-      _database.cachedSearchPrivacySettings,
-    )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+    await _database.transaction(() async {
+      await (_database.delete(
+        _database.cachedSearchPrivacySettings,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedPreciseLocationExclusions,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+    });
   }
+
+  Future<Set<String>> readPreciseLocationExclusions(String ownerUserId) async {
+    final rows = await (_database.select(
+      _database.cachedPreciseLocationExclusions,
+    )..where((table) => table.ownerUserId.equals(ownerUserId))).get();
+    return rows.map((row) => row.viewerUserId).toSet();
+  }
+
+  Future<void> replacePreciseLocationExclusions(
+    String ownerUserId,
+    Set<String> viewerUserIds,
+  ) => _database.transaction(() async {
+    await (_database.delete(
+      _database.cachedPreciseLocationExclusions,
+    )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+    if (viewerUserIds.isEmpty) return;
+    await _database.batch(
+      (batch) => batch.insertAll(
+        _database.cachedPreciseLocationExclusions,
+        viewerUserIds
+            .map(
+              (viewerUserId) => CachedPreciseLocationExclusionsCompanion.insert(
+                ownerUserId: ownerUserId,
+                viewerUserId: viewerUserId,
+                cachedAt: DateTime.now().toUtc(),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  });
 
   LastSeenVisibility _lastSeenVisibility(String value) =>
       LastSeenVisibility.values

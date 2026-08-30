@@ -18,23 +18,31 @@ class SearchPrivacySettings extends Equatable {
     this.searchByPhone = true,
     this.searchByName = true,
     this.lastSeenVisibility = LastSeenVisibility.all,
+    this.sharePreciseLocation = true,
+    this.shareDistance = true,
   });
 
   final bool searchByUsername;
   final bool searchByPhone;
   final bool searchByName;
   final LastSeenVisibility lastSeenVisibility;
+  final bool sharePreciseLocation;
+  final bool shareDistance;
 
   SearchPrivacySettings copyWith({
     bool? searchByUsername,
     bool? searchByPhone,
     bool? searchByName,
     LastSeenVisibility? lastSeenVisibility,
+    bool? sharePreciseLocation,
+    bool? shareDistance,
   }) => SearchPrivacySettings(
     searchByUsername: searchByUsername ?? this.searchByUsername,
     searchByPhone: searchByPhone ?? this.searchByPhone,
     searchByName: searchByName ?? this.searchByName,
     lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
+    sharePreciseLocation: sharePreciseLocation ?? this.sharePreciseLocation,
+    shareDistance: shareDistance ?? this.shareDistance,
   );
 
   bool valueFor(SearchPrivacySettingKey key) => switch (key) {
@@ -56,5 +64,7 @@ class SearchPrivacySettings extends Equatable {
     searchByPhone,
     searchByName,
     lastSeenVisibility,
+    sharePreciseLocation,
+    shareDistance,
   ];
 }

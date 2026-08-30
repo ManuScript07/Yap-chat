@@ -222,11 +222,13 @@ class MockFriendsRepository implements IFriendsRepository {
   }
 
   @override
-  Future<FriendLocation?> getFriendLocation(String friendId) async =>
-      FriendLocation(
-        latitude: 55.751244,
-        longitude: 37.618423,
-        updatedAt: DateTime.now(),
+  Future<FriendLocationLookup> getFriendLocation(String friendId) async =>
+      FriendLocationLookup.current(
+        FriendLocation(
+          latitude: 55.751244,
+          longitude: 37.618423,
+          updatedAt: DateTime.now(),
+        ),
       );
 
   @override

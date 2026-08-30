@@ -95,5 +95,70 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   @override
+  Future<SearchPrivacySettings> updateLocationVisibility({
+    required bool sharePreciseLocation,
+    required bool shareDistance,
+  }) async {
+    final scope = _accountSessionController.capture();
+    final updated = await _remote.updateLocationVisibility(
+      sharePreciseLocation: sharePreciseLocation,
+      shareDistance: shareDistance,
+    );
+    await _writeSettings(scope, updated);
+    return updated;
+  }
+
+  @override
+  Future<Set<String>> readCachedPreciseLocationExclusions() async {
+    final scope = _accountSessionController.capture();
+    final cached = await _cache.readPreciseLocationExclusions(scope.userId);
+    _accountSessionController.ensureCurrent(scope);
+    return cached;
+  }
+
+  @override
+  Future<Set<String>> refreshPreciseLocationExclusions() async {
+    final scope = _accountSessionController.capture();
+    final exclusions = await _remote.fetchPreciseLocationExclusions();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.replacePreciseLocationExclusions(scope.userId, exclusions),
+    );
+    return exclusions;
+  }
+
+  @override
+  Future<Set<String>> setPreciseLocationExcluded(
+    String friendUserId, {
+    required bool excluded,
+  }) async {
+    final scope = _accountSessionController.capture();
+    final exclusions = await _remote.setPreciseLocationExcluded(
+      friendUserId,
+      excluded: excluded,
+    );
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.replacePreciseLocationExclusions(scope.userId, exclusions),
+    );
+    return exclusions;
+  }
+
+  Future<void> _writeSettings(
+    AccountSessionSnapshot scope,
+    SearchPrivacySettings settings,
+  ) async {
+    try {
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.write(scope.userId, settings),
+      );
+    } catch (error) {
+      if (error is StaleAccountSessionException) rethrow;
+    }
+    _accountSessionController.ensureCurrent(scope);
+  }
+
+  @override
   Future<void> clearUserCache(String userId) => _cache.clearUser(userId);
 }

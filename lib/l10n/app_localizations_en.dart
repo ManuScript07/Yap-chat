@@ -240,6 +240,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsShareLocation => 'Share my location';
 
   @override
+  String get settingsShareDistance => 'Show distance';
+
+  @override
   String get settingsFriendsSeeGeo => 'see your exact location';
 
   @override

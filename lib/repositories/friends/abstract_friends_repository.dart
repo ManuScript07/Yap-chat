@@ -11,9 +11,7 @@ abstract interface class IFriendsRepository {
     List<String> phoneNumbers,
   );
   Future<ContactMatchSnapshot> readCachedPhoneSearchMatch(String phoneNumber);
-  Future<ContactMatchSnapshot> refreshContactMatches(
-    List<String> phoneNumbers,
-  );
+  Future<ContactMatchSnapshot> refreshContactMatches(List<String> phoneNumbers);
   Future<ContactMatchSnapshot> refreshNewFriendContactMatches(
     List<String> phoneNumbers,
     Set<String> friendIds,
@@ -26,7 +24,7 @@ abstract interface class IFriendsRepository {
   Future<void> sendRequest(FriendCandidate candidate);
   Future<void> cancelRequest(String requestId);
   Future<void> respondToRequest(String requestId, {required bool accept});
-  Future<FriendLocation?> getFriendLocation(String friendId);
+  Future<FriendLocationLookup> getFriendLocation(String friendId);
 
   Future<void> pauseRealtime();
   Future<void> resumeRealtime();

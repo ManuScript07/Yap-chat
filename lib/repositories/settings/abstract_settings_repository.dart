@@ -17,5 +17,17 @@ abstract interface class ISettingsRepository {
     LastSeenVisibility visibility,
   );
 
+  Future<SearchPrivacySettings> updateLocationVisibility({
+    required bool sharePreciseLocation,
+    required bool shareDistance,
+  });
+
+  Future<Set<String>> readCachedPreciseLocationExclusions();
+  Future<Set<String>> refreshPreciseLocationExclusions();
+  Future<Set<String>> setPreciseLocationExcluded(
+    String friendUserId, {
+    required bool excluded,
+  });
+
   Future<void> clearUserCache(String userId);
 }
