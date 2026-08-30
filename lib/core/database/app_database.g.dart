@@ -7419,6 +7419,286 @@ class CachedPreciseLocationExclusionsCompanion
   }
 }
 
+class $CachedAppLanguagesTable extends CachedAppLanguages
+    with TableInfo<$CachedAppLanguagesTable, CachedAppLanguage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedAppLanguagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _languageCodeMeta = const VerificationMeta(
+    'languageCode',
+  );
+  @override
+  late final GeneratedColumn<String> languageCode = GeneratedColumn<String>(
+    'language_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [ownerUserId, languageCode, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_app_languages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedAppLanguage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('language_code')) {
+      context.handle(
+        _languageCodeMeta,
+        languageCode.isAcceptableOrUnknown(
+          data['language_code']!,
+          _languageCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_languageCodeMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId};
+  @override
+  CachedAppLanguage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedAppLanguage(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      languageCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}language_code'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedAppLanguagesTable createAlias(String alias) {
+    return $CachedAppLanguagesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedAppLanguage extends DataClass
+    implements Insertable<CachedAppLanguage> {
+  final String ownerUserId;
+  final String languageCode;
+  final DateTime cachedAt;
+  const CachedAppLanguage({
+    required this.ownerUserId,
+    required this.languageCode,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['language_code'] = Variable<String>(languageCode);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedAppLanguagesCompanion toCompanion(bool nullToAbsent) {
+    return CachedAppLanguagesCompanion(
+      ownerUserId: Value(ownerUserId),
+      languageCode: Value(languageCode),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedAppLanguage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedAppLanguage(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      languageCode: serializer.fromJson<String>(json['languageCode']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'languageCode': serializer.toJson<String>(languageCode),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedAppLanguage copyWith({
+    String? ownerUserId,
+    String? languageCode,
+    DateTime? cachedAt,
+  }) => CachedAppLanguage(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    languageCode: languageCode ?? this.languageCode,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedAppLanguage copyWithCompanion(CachedAppLanguagesCompanion data) {
+    return CachedAppLanguage(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      languageCode: data.languageCode.present
+          ? data.languageCode.value
+          : this.languageCode,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedAppLanguage(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('languageCode: $languageCode, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(ownerUserId, languageCode, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedAppLanguage &&
+          other.ownerUserId == this.ownerUserId &&
+          other.languageCode == this.languageCode &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedAppLanguagesCompanion extends UpdateCompanion<CachedAppLanguage> {
+  final Value<String> ownerUserId;
+  final Value<String> languageCode;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedAppLanguagesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.languageCode = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedAppLanguagesCompanion.insert({
+    required String ownerUserId,
+    required String languageCode,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       languageCode = Value(languageCode),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedAppLanguage> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? languageCode,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (languageCode != null) 'language_code': languageCode,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedAppLanguagesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? languageCode,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedAppLanguagesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      languageCode: languageCode ?? this.languageCode,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (languageCode.present) {
+      map['language_code'] = Variable<String>(languageCode.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedAppLanguagesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('languageCode: $languageCode, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7440,6 +7720,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedSearchPrivacySettingsTable(this);
   late final $CachedPreciseLocationExclusionsTable
   cachedPreciseLocationExclusions = $CachedPreciseLocationExclusionsTable(this);
+  late final $CachedAppLanguagesTable cachedAppLanguages =
+      $CachedAppLanguagesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7456,6 +7738,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedContactMatches,
     cachedSearchPrivacySettings,
     cachedPreciseLocationExclusions,
+    cachedAppLanguages,
   ];
 }
 
@@ -11049,6 +11332,185 @@ typedef $$CachedPreciseLocationExclusionsTableProcessedTableManager =
       CachedPreciseLocationExclusion,
       PrefetchHooks Function()
     >;
+typedef $$CachedAppLanguagesTableCreateCompanionBuilder =
+    CachedAppLanguagesCompanion Function({
+      required String ownerUserId,
+      required String languageCode,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedAppLanguagesTableUpdateCompanionBuilder =
+    CachedAppLanguagesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> languageCode,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedAppLanguagesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedAppLanguagesTable> {
+  $$CachedAppLanguagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get languageCode => $composableBuilder(
+    column: $table.languageCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedAppLanguagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedAppLanguagesTable> {
+  $$CachedAppLanguagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get languageCode => $composableBuilder(
+    column: $table.languageCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedAppLanguagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedAppLanguagesTable> {
+  $$CachedAppLanguagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get languageCode => $composableBuilder(
+    column: $table.languageCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedAppLanguagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedAppLanguagesTable,
+          CachedAppLanguage,
+          $$CachedAppLanguagesTableFilterComposer,
+          $$CachedAppLanguagesTableOrderingComposer,
+          $$CachedAppLanguagesTableAnnotationComposer,
+          $$CachedAppLanguagesTableCreateCompanionBuilder,
+          $$CachedAppLanguagesTableUpdateCompanionBuilder,
+          (
+            CachedAppLanguage,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedAppLanguagesTable,
+              CachedAppLanguage
+            >,
+          ),
+          CachedAppLanguage,
+          PrefetchHooks Function()
+        > {
+  $$CachedAppLanguagesTableTableManager(
+    _$AppDatabase db,
+    $CachedAppLanguagesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedAppLanguagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedAppLanguagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedAppLanguagesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> languageCode = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedAppLanguagesCompanion(
+                ownerUserId: ownerUserId,
+                languageCode: languageCode,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String languageCode,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedAppLanguagesCompanion.insert(
+                ownerUserId: ownerUserId,
+                languageCode: languageCode,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedAppLanguagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedAppLanguagesTable,
+      CachedAppLanguage,
+      $$CachedAppLanguagesTableFilterComposer,
+      $$CachedAppLanguagesTableOrderingComposer,
+      $$CachedAppLanguagesTableAnnotationComposer,
+      $$CachedAppLanguagesTableCreateCompanionBuilder,
+      $$CachedAppLanguagesTableUpdateCompanionBuilder,
+      (
+        CachedAppLanguage,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedAppLanguagesTable,
+          CachedAppLanguage
+        >,
+      ),
+      CachedAppLanguage,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11083,4 +11545,6 @@ class $AppDatabaseManager {
         _db,
         _db.cachedPreciseLocationExclusions,
       );
+  $$CachedAppLanguagesTableTableManager get cachedAppLanguages =>
+      $$CachedAppLanguagesTableTableManager(_db, _db.cachedAppLanguages);
 }

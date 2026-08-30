@@ -17,6 +17,7 @@ import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/features/profile/profile.dart';
+import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -319,6 +320,9 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               );
             }
             context.read<ProfileMutationCubit>().setAuthenticatedUser(userId);
+            unawaited(
+              context.read<AppLanguageCubit>().setAuthenticatedUser(userId),
+            );
             if (state.status == AuthStatus.authenticated && userId != null) {
               unawaited(
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
@@ -381,21 +385,26 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       ],
       child: RepositoryProvider<ChatNavigationCoordinator>.value(
         value: _chatNavigator,
-        child: MaterialApp.router(
-          title: 'Yap chat',
-          theme: theme,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          routerConfig: widget.router.config(
-            navigatorObservers: createAppNavigatorObservers,
-            deepLinkBuilder: (deepLink) => resolveAppDeepLink(
-              deepLink,
-              authRedirectUrl: context.read<AppConfig>().authRedirectUrl,
+        child: BlocBuilder<AppLanguageCubit, AppLanguageState>(
+          buildWhen: (previous, current) =>
+              previous.language != current.language,
+          builder: (context, languageState) => MaterialApp.router(
+            title: 'Yap chat',
+            theme: theme,
+            locale: languageState.language.locale,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: widget.router.config(
+              navigatorObservers: createAppNavigatorObservers,
+              deepLinkBuilder: (deepLink) => resolveAppDeepLink(
+                deepLink,
+                authRedirectUrl: context.read<AppConfig>().authRedirectUrl,
+              ),
             ),
           ),
         ),

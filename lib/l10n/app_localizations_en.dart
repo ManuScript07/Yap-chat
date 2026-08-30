@@ -252,6 +252,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageEnglish => 'english';
 
   @override
+  String get settingsLanguageSaved => 'Language saved';
+
+  @override
+  String get settingsLanguageSaveFailed => 'Could not save language';
+
+  @override
   String get settingsSearchBlacklist => 'search';
 
   @override

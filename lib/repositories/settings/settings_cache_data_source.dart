@@ -8,6 +8,25 @@ class SettingsCacheDataSource {
 
   final AppDatabase _database;
 
+  Future<AppLanguage?> readAppLanguage(String ownerUserId) async {
+    final row =
+        await (_database.select(_database.cachedAppLanguages)
+              ..where((table) => table.ownerUserId.equals(ownerUserId)))
+            .getSingleOrNull();
+    return AppLanguage.tryParse(row?.languageCode);
+  }
+
+  Future<void> writeAppLanguage(String ownerUserId, AppLanguage language) =>
+      _database
+          .into(_database.cachedAppLanguages)
+          .insertOnConflictUpdate(
+            CachedAppLanguagesCompanion.insert(
+              ownerUserId: ownerUserId,
+              languageCode: language.code,
+              cachedAt: DateTime.now().toUtc(),
+            ),
+          );
+
   Future<SearchPrivacySettings?> read(String ownerUserId) async {
     final row =
         await (_database.select(_database.cachedSearchPrivacySettings)
@@ -48,6 +67,9 @@ class SettingsCacheDataSource {
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
       await (_database.delete(
         _database.cachedPreciseLocationExclusions,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedAppLanguages,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
     });
   }

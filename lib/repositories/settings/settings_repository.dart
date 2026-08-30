@@ -18,6 +18,53 @@ class SettingsRepository implements ISettingsRepository {
   final AccountSessionController _accountSessionController;
 
   @override
+  Future<AppLanguage?> readCachedAppLanguage() async {
+    final scope = _accountSessionController.capture();
+    try {
+      final cached = await _cache.readAppLanguage(scope.userId);
+      _accountSessionController.ensureCurrent(scope);
+      return cached;
+    } catch (_) {
+      _accountSessionController.ensureCurrent(scope);
+      return null;
+    }
+  }
+
+  @override
+  Future<AppLanguage?> refreshAppLanguage() async {
+    final scope = _accountSessionController.capture();
+    final language = await _remote.fetchAppLanguage();
+    if (language != null) {
+      try {
+        await _accountSessionController.commit(
+          scope,
+          () => _cache.writeAppLanguage(scope.userId, language),
+        );
+      } catch (error) {
+        if (error is StaleAccountSessionException) rethrow;
+      }
+    }
+    _accountSessionController.ensureCurrent(scope);
+    return language;
+  }
+
+  @override
+  Future<AppLanguage> updateAppLanguage(AppLanguage language) async {
+    final scope = _accountSessionController.capture();
+    final updated = await _remote.updateAppLanguage(language);
+    try {
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.writeAppLanguage(scope.userId, updated),
+      );
+    } catch (error) {
+      if (error is StaleAccountSessionException) rethrow;
+    }
+    _accountSessionController.ensureCurrent(scope);
+    return updated;
+  }
+
+  @override
   Future<SearchPrivacySettings?> readCachedSearchPrivacySettings() async {
     final scope = _accountSessionController.capture();
     try {

@@ -6,18 +6,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
+import 'package:yap_chat/features/settings/bloc/bloc.dart';
+import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'settings_widgets.dart';
 
-enum SettingsLanguage { russian, english }
-
-Future<SettingsLanguage?> showLanguageSheet(
-  BuildContext context, {
-  required SettingsLanguage selected,
-  ValueChanged<SettingsLanguage>? onChanged,
-}) {
-  return showModalBottomSheet<SettingsLanguage>(
+Future<void> showLanguageSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: false,
@@ -27,62 +23,47 @@ Future<SettingsLanguage?> showLanguageSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (_) => _SettingsBottomSheet(
-      title: context.l10n.settingsLanguage,
-      child: _LanguageSheet(initialValue: selected, onChanged: onChanged),
+    builder: (_) => BlocBuilder<AppLanguageCubit, AppLanguageState>(
+      builder: (context, state) => _SettingsBottomSheet(
+        title: context.l10n.settingsLanguage,
+        child: _LanguageSheet(
+          selected: state.language,
+          isSaving: state.isSaving,
+          onChanged: context.read<AppLanguageCubit>().select,
+        ),
+      ),
     ),
   );
 }
 
-class _LanguageSheet extends StatefulWidget {
-  const _LanguageSheet({required this.initialValue, this.onChanged});
+class _LanguageSheet extends StatelessWidget {
+  const _LanguageSheet({
+    required this.selected,
+    required this.isSaving,
+    required this.onChanged,
+  });
 
-  final SettingsLanguage initialValue;
-  final ValueChanged<SettingsLanguage>? onChanged;
-
-  @override
-  State<_LanguageSheet> createState() => _LanguageSheetState();
-}
-
-class _LanguageSheetState extends State<_LanguageSheet> {
-  late SettingsLanguage _selected;
-  late final List<SettingsLanguage> _languages;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.initialValue;
-    _languages = SettingsLanguage.values.toList()
-      ..sort((left, right) {
-        if (left == _selected) return -1;
-        if (right == _selected) return 1;
-        return 0;
-      });
-  }
+  final AppLanguage selected;
+  final bool isSaving;
+  final ValueChanged<AppLanguage> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final language in _languages)
+        for (final language in AppLanguage.values)
           _LanguageChoice(
             label: switch (language) {
-              SettingsLanguage.russian => context.l10n.settingsLanguageRussian,
-              SettingsLanguage.english => context.l10n.settingsLanguageEnglish,
+              AppLanguage.russian => context.l10n.settingsLanguageRussian,
+              AppLanguage.english => context.l10n.settingsLanguageEnglish,
             },
             value: language,
-            selected: _selected,
-            onSelected: _selectLanguage,
+            selected: selected,
+            onSelected: isSaving ? null : onChanged,
           ),
       ],
     );
-  }
-
-  void _selectLanguage(SettingsLanguage language) {
-    if (_selected == language) return;
-    setState(() => _selected = language);
-    widget.onChanged?.call(language);
   }
 }
 
@@ -95,15 +76,15 @@ class _LanguageChoice extends StatelessWidget {
   });
 
   final String label;
-  final SettingsLanguage value;
-  final SettingsLanguage selected;
-  final ValueChanged<SettingsLanguage> onSelected;
+  final AppLanguage value;
+  final AppLanguage selected;
+  final ValueChanged<AppLanguage>? onSelected;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
     return InkWell(
-      onTap: () => onSelected(value),
+      onTap: onSelected == null ? null : () => onSelected!(value),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
         child: Row(
@@ -117,7 +98,7 @@ class _LanguageChoice extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(5),
               ),
-              onChanged: (_) => onSelected(value),
+              onChanged: onSelected == null ? null : (_) => onSelected!(value),
             ),
           ],
         ),

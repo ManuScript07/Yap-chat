@@ -7,6 +7,29 @@ class SettingsRemoteDataSource {
 
   final SupabaseClient _client;
 
+  Future<AppLanguage?> fetchAppLanguage() async {
+    final response = await _client.rpc<List<dynamic>>('get_my_app_language');
+    if (response.isEmpty) return null;
+    return AppLanguage.tryParse((response.first as Map)['language_code']);
+  }
+
+  Future<AppLanguage> updateAppLanguage(AppLanguage language) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'set_my_app_language',
+      params: {'language_code': language.code},
+    );
+    if (response.isEmpty) {
+      throw StateError('Supabase returned no updated app language');
+    }
+    final updated = AppLanguage.tryParse(
+      (response.first as Map)['language_code'],
+    );
+    if (updated == null) {
+      throw StateError('Supabase returned an invalid app language');
+    }
+    return updated;
+  }
+
   Future<SearchPrivacySettings> fetchSearchPrivacySettings() async {
     final response = await _client.rpc<List<dynamic>>(
       'get_my_search_privacy_settings',

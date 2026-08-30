@@ -91,6 +91,8 @@
   "settingsFriendsSeeGeo": "see your exact location",
   "settingsLanguageRussian": "русский",
   "settingsLanguageEnglish": "english",
+  "settingsLanguageSaved": "Language saved",
+  "settingsLanguageSaveFailed": "Could not save language",
   "settingsSearchBlacklist": "search",
   "settingsNobodyHere": "nobody here",
   "settingsComingSoon": "coming soon",

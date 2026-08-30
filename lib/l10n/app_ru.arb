@@ -95,6 +95,8 @@
   "settingsFriendsSeeGeo": "видят твоё точное гео",
   "settingsLanguageRussian": "русский",
   "settingsLanguageEnglish": "english",
+  "settingsLanguageSaved": "Язык сохранён",
+  "settingsLanguageSaveFailed": "Не удалось сохранить язык",
   "settingsSearchBlacklist": "поиск",
   "settingsNobodyHere": "тут никого нет",
   "settingsComingSoon": "скоро",

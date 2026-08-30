@@ -1,6 +1,15 @@
 import 'package:yap_chat/features/settings/data/data.dart';
 
 abstract interface class ISettingsRepository {
+  /// Returns the account-scoped language without contacting the server.
+  Future<AppLanguage?> readCachedAppLanguage();
+
+  /// Gets the saved account language, if it was selected by the user.
+  Future<AppLanguage?> refreshAppLanguage();
+
+  /// Persists the selected language and refreshes its local account cache.
+  Future<AppLanguage> updateAppLanguage(AppLanguage language);
+
   /// Returns the last account-scoped value, if any, without network access.
   Future<SearchPrivacySettings?> readCachedSearchPrivacySettings();
 

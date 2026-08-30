@@ -2,8 +2,19 @@ import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/repositories/settings/abstract_settings_repository.dart';
 
 class MockSettingsRepository implements ISettingsRepository {
+  AppLanguage? _appLanguage;
   SearchPrivacySettings _settings = const SearchPrivacySettings();
   final Set<String> _preciseLocationExclusions = {};
+
+  @override
+  Future<AppLanguage?> readCachedAppLanguage() async => _appLanguage;
+
+  @override
+  Future<AppLanguage?> refreshAppLanguage() async => _appLanguage;
+
+  @override
+  Future<AppLanguage> updateAppLanguage(AppLanguage language) async =>
+      _appLanguage = language;
 
   @override
   Future<SearchPrivacySettings?> readCachedSearchPrivacySettings() async =>

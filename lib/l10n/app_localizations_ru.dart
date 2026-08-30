@@ -260,6 +260,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsLanguageEnglish => 'english';
 
   @override
+  String get settingsLanguageSaved => 'Язык сохранён';
+
+  @override
+  String get settingsLanguageSaveFailed => 'Не удалось сохранить язык';
+
+  @override
   String get settingsSearchBlacklist => 'поиск';
 
   @override

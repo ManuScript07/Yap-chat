@@ -482,6 +482,18 @@ abstract class AppLocalizations {
   /// **'english'**
   String get settingsLanguageEnglish;
 
+  /// No description provided for @settingsLanguageSaved.
+  ///
+  /// In ru, this message translates to:
+  /// **'Язык сохранён'**
+  String get settingsLanguageSaved;
+
+  /// No description provided for @settingsLanguageSaveFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось сохранить язык'**
+  String get settingsLanguageSaveFailed;
+
   /// No description provided for @settingsSearchBlacklist.
   ///
   /// In ru, this message translates to:

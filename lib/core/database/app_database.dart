@@ -189,6 +189,16 @@ class CachedPreciseLocationExclusions extends Table {
   Set<Column> get primaryKey => {ownerUserId, viewerUserId};
 }
 
+@DataClassName('CachedAppLanguage')
+class CachedAppLanguages extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get languageCode => text()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId};
+}
+
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -202,6 +212,7 @@ class CachedPreciseLocationExclusions extends Table {
     CachedContactMatches,
     CachedSearchPrivacySettings,
     CachedPreciseLocationExclusions,
+    CachedAppLanguages,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -220,7 +231,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -279,6 +290,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 13) {
         await migrator.createTable(cachedPreciseLocationExclusions);
+      }
+      if (from < 14) {
+        await migrator.createTable(cachedAppLanguages);
       }
     },
     beforeOpen: (details) async {
