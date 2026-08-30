@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/friends/widgets/friend_request_reject_button.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class ContactDiscoveryItem extends StatelessWidget {
@@ -21,6 +22,7 @@ class ContactDiscoveryItem extends StatelessWidget {
     required this.onAccept,
     required this.onReject,
     this.avatarLoader,
+    this.onTap,
   });
 
   final ContactDiscoveryEntry entry;
@@ -37,16 +39,19 @@ class ContactDiscoveryItem extends StatelessWidget {
   final VoidCallback onAccept;
   final VoidCallback onReject;
   final Future<String?> Function()? avatarLoader;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final candidate = entry.candidate;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          if (candidate == null)
-            Container(
+    return InkWell(
+      onTap: candidate == null ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            if (candidate == null)
+              Container(
                 width: 54,
                 height: 54,
                 decoration: BoxDecoration(
@@ -58,73 +63,77 @@ class ContactDiscoveryItem extends StatelessWidget {
                   color: context.colorScheme.onPrimary,
                   size: 30,
                 ),
-            )
-          else
-            UserAvatar(
-              avatarUrl: candidate.avatarUrl,
-              avatarLoader: avatarLoader,
-              avatarRevision:
-                  candidate.avatarStoragePath ?? candidate.avatarUrl,
-              size: 54,
-              borderRadius: 12,
-            ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  candidate?.displayName ?? entry.contact.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.chatName.copyWith(
-                    color: context.colorScheme.onSurface,
-                  ),
+              )
+            else
+              ProfileAvatarHero(
+                avatarUrl: candidate.avatarUrl,
+                avatarStoragePath: candidate.avatarStoragePath,
+                child: UserAvatar(
+                  avatarUrl: candidate.avatarUrl,
+                  avatarLoader: avatarLoader,
+                  avatarRevision:
+                      candidate.avatarStoragePath ?? candidate.avatarUrl,
+                  size: 54,
+                  borderRadius: 12,
                 ),
-                Text(
-                  candidate == null
-                      ? switch (entry.matchStatus) {
-                          ContactMatchStatus.notRegistered =>
-                            notRegisteredLabel,
-                          ContactMatchStatus.unknown => isRefreshing
-                              ? checkingLabel
-                              : unknownLabel,
-                          ContactMatchStatus.matched => unknownLabel,
-                        }
-                      : candidate.friendCount == null
-                      ? hiddenFriendCountLabel
-                      : friendsLabel(candidate.friendCount!),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.messagePreview.copyWith(
-                    color: context.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (entry.matchStatus == ContactMatchStatus.notRegistered)
-            GlassTextButton(
-              label: inviteLabel,
-              onTap: onInvite,
-              horizontalPadding: 15,
-              backgroundColor: context.colorScheme.onSurface.withValues(
-                alpha: 0.14,
               ),
-              foregroundColor: context.colorScheme.onSurface,
-            )
-          else if (candidate != null)
-            _CandidateAction(
-              candidate: candidate,
-              relationshipLabel: relationshipLabel,
-              onAdd: onAdd,
-              onAccept: onAccept,
-              onReject: onReject,
-            )
-          else
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    candidate?.displayName ?? entry.contact.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.chatName.copyWith(
+                      color: context.colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    candidate == null
+                        ? switch (entry.matchStatus) {
+                            ContactMatchStatus.notRegistered =>
+                              notRegisteredLabel,
+                            ContactMatchStatus.unknown =>
+                              isRefreshing ? checkingLabel : unknownLabel,
+                            ContactMatchStatus.matched => unknownLabel,
+                          }
+                        : candidate.friendCount == null
+                        ? hiddenFriendCountLabel
+                        : friendsLabel(candidate.friendCount!),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.messagePreview.copyWith(
+                      color: context.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(width: 8),
-        ],
+            if (entry.matchStatus == ContactMatchStatus.notRegistered)
+              GlassTextButton(
+                label: inviteLabel,
+                onTap: onInvite,
+                horizontalPadding: 15,
+                backgroundColor: context.colorScheme.onSurface.withValues(
+                  alpha: 0.14,
+                ),
+                foregroundColor: context.colorScheme.onSurface,
+              )
+            else if (candidate != null)
+              _CandidateAction(
+                candidate: candidate,
+                relationshipLabel: relationshipLabel,
+                onAdd: onAdd,
+                onAccept: onAccept,
+                onReject: onReject,
+              )
+            else
+              const SizedBox(width: 8),
+          ],
+        ),
       ),
     );
   }

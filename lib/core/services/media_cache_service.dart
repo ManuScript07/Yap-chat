@@ -285,6 +285,12 @@ class MediaCacheService {
     );
 
     await _database.transaction(() async {
+      final viewedTargets = await (_database.select(
+        _database.cachedViewedProfileMetadata,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).get();
+      final viewedTargetIds = viewedTargets
+          .map((row) => row.targetUserId)
+          .toSet();
       await (_database.delete(
         _database.cachedChats,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
@@ -312,6 +318,26 @@ class MediaCacheService {
       await (_database.delete(
         _database.cachedContactMatches,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedViewedProfileMetadata,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedViewedProfileFriends,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedUserDistances,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedProfileViewCounts,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      if (viewedTargetIds.isNotEmpty) {
+        await (_database.delete(
+          _database.cachedProfilePhotos,
+        )..where((table) => table.userId.isIn(viewedTargetIds))).go();
+        await (_database.delete(
+          _database.cachedProfiles,
+        )..where((table) => table.userId.isIn(viewedTargetIds))).go();
+      }
     });
   }
 

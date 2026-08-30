@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -340,6 +341,14 @@ class _ProfileScrollContent extends StatelessWidget {
                       letterSpacing: .50,
                     ),
                   ),
+                  const SizedBox(width: 24),
+                  Icon(
+                    Icons.visibility_outlined,
+                    color: inactiveColor,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 6),
+                  _ProfileViewCount(userId: profile.id),
                 ],
               ),
             ),
@@ -348,6 +357,45 @@ class _ProfileScrollContent extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ProfileViewCount extends StatefulWidget {
+  const _ProfileViewCount({required this.userId});
+
+  final String userId;
+
+  @override
+  State<_ProfileViewCount> createState() => _ProfileViewCountState();
+}
+
+class _ProfileViewCountState extends State<_ProfileViewCount> {
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final repository = context.read<IProfileRepository>();
+    final cached = await repository.getCachedProfileViewCount(widget.userId);
+    if (mounted && cached != null) setState(() => _count = cached);
+    try {
+      final remote = await repository.getProfileViewCount(widget.userId);
+      if (mounted) setState(() => _count = remote);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(
+    '$_count',
+    style: TextStyle(
+      color: context.colorScheme.outline,
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+    ),
+  );
 }
 
 class _ProfilePhotoCard extends StatelessWidget {

@@ -199,6 +199,29 @@ class FriendsRemoteDataSource {
     );
   }
 
+  Future<UserDistance?> getUserDistance(String userId) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'get_user_distance',
+      params: {'target_user_id': userId},
+    );
+    if (response.isEmpty) return null;
+    final row = Map<String, dynamic>.from(response.first as Map);
+    final value = (row['distance_value'] as num?)?.toInt();
+    final updatedAt = DateTime.tryParse(row['updated_at'] as String? ?? '');
+    final unit = DistanceUnit.values
+        .where((item) => item.name == row['distance_unit'])
+        .firstOrNull;
+    if (value == null || updatedAt == null || unit == null) return null;
+    return UserDistance(
+      value: value,
+      unit: unit,
+      updatedAt: updatedAt.toLocal(),
+    );
+  }
+
+  Future<void> removeFriend(String friendId) =>
+      _client.rpc<void>('remove_friend', params: {'friend_user_id': friendId});
+
   Stream<void> watchChanges() =>
       (_changesController ??= StreamController<void>.broadcast(
         onListen: () => unawaited(_serialize(_ensureChannel)),

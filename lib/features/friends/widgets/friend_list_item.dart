@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class FriendListItem extends StatelessWidget {
@@ -40,14 +41,18 @@ class FriendListItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            UserAvatar(
+            ProfileAvatarHero(
               avatarUrl: friend.avatarUrl,
-              avatarLoader: avatarLoader,
-              avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
-              size: 54,
-              borderRadius: 12,
-              isOnline: isOnline,
-              showOnlineBadge: true,
+              avatarStoragePath: friend.avatarStoragePath,
+              child: UserAvatar(
+                avatarUrl: friend.avatarUrl,
+                avatarLoader: avatarLoader,
+                avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
+                size: 54,
+                borderRadius: 12,
+                isOnline: isOnline,
+                showOnlineBadge: true,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

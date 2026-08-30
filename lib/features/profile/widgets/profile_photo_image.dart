@@ -29,7 +29,7 @@ class ProfilePhotoHero extends StatelessWidget {
       revealOnLoad: revealOnLoad,
     );
     return Hero(
-      tag: 'profile-photo-${photo.identity}',
+      tag: profilePhotoHeroTag(photo),
       transitionOnUserGestures: true,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
       flightShuttleBuilder: (_, animation, _, _, _) {
@@ -63,6 +63,9 @@ class ProfilePhotoHero extends StatelessWidget {
     );
   }
 }
+
+String profilePhotoHeroTag(ProfilePhoto photo) =>
+    'profile-photo-${photo.identity}';
 
 class ProfilePhotoImage extends StatelessWidget {
   const ProfilePhotoImage({

@@ -9,7 +9,8 @@ import 'package:yap_chat/repositories/friends/contact_match_cache_data_source.da
 import 'package:yap_chat/repositories/friends/friends_cache_data_source.dart';
 import 'package:yap_chat/repositories/friends/friends_remote_data_source.dart';
 
-class FriendsRepository implements IFriendsRepository {
+class FriendsRepository
+    implements IFriendsRepository, IProfileFriendsRepository {
   FriendsRepository({
     required AppConfig config,
     required FriendsCacheDataSource cache,
@@ -550,6 +551,76 @@ class FriendsRepository implements IFriendsRepository {
       return FriendLocationLookup.current(cached);
     }
     return _refreshFriendLocation(friendId, scope);
+  }
+
+  @override
+  Future<FriendLocation?> getCachedFriendLocation(String friendId) {
+    final scope = _accountSessionController.capture();
+    return _cache.readLocation(friendId, ownerUserId: scope.userId);
+  }
+
+  @override
+  Future<UserDistance?> getCachedUserDistance(String userId) {
+    final scope = _accountSessionController.capture();
+    return _cache.readDistance(userId, ownerUserId: scope.userId);
+  }
+
+  @override
+  Future<UserDistance?> getUserDistance(String userId) async {
+    final scope = _accountSessionController.capture();
+    try {
+      final distance = await _remote.getUserDistance(userId);
+      await _accountSessionController.commit(scope, () async {
+        if (distance == null) {
+          await _cache.removeDistance(userId, ownerUserId: scope.userId);
+        } else {
+          await _cache.writeDistance(
+            userId,
+            distance,
+            ownerUserId: scope.userId,
+          );
+        }
+      });
+      return distance;
+    } catch (_) {
+      _accountSessionController.ensureCurrent(scope);
+      final cached = await _cache.readDistance(
+        userId,
+        ownerUserId: scope.userId,
+      );
+      if (cached != null) return cached;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> removeFriend(String friendId) async {
+    final scope = _accountSessionController.capture();
+    final previous = await _cache.readFriends(ownerUserId: scope.userId);
+    final previousRequests = await _cache.readRequests(
+      ownerUserId: scope.userId,
+    );
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.removeFriend(friendId, ownerUserId: scope.userId),
+    );
+    try {
+      await _remote.removeFriend(friendId);
+      _accountSessionController.ensureCurrent(scope);
+      _invalidateSearchCache();
+      await _synchronize();
+    } catch (_) {
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.replaceAll(
+          ownerUserId: scope.userId,
+          friends: previous,
+          requests: previousRequests,
+        ),
+      );
+      await _synchronizeSafely();
+      rethrow;
+    }
   }
 
   Future<FriendLocationLookup> _refreshFriendLocation(

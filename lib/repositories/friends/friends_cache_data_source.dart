@@ -94,6 +94,51 @@ class FriendsCacheDataSource {
           ))
           .go();
 
+  Future<UserDistance?> readDistance(
+    String targetUserId, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.select(_database.cachedUserDistances)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(owner) &
+            table.targetUserId.equals(targetUserId),
+      );
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    return UserDistance(
+      value: row.distanceValue,
+      unit: DistanceUnit.values.byName(row.distanceUnit),
+      updatedAt: row.locationUpdatedAt,
+    );
+  }
+
+  Future<void> writeDistance(
+    String targetUserId,
+    UserDistance distance, {
+    String? ownerUserId,
+  }) => _database
+      .into(_database.cachedUserDistances)
+      .insertOnConflictUpdate(
+        CachedUserDistancesCompanion.insert(
+          ownerUserId: ownerUserId ?? _userIdProvider(),
+          targetUserId: targetUserId,
+          distanceValue: distance.value,
+          distanceUnit: distance.unit.name,
+          locationUpdatedAt: distance.updatedAt,
+          cachedAt: DateTime.now().toUtc(),
+        ),
+      );
+
+  Future<void> removeDistance(String targetUserId, {String? ownerUserId}) =>
+      (_database.delete(_database.cachedUserDistances)..where(
+            (table) =>
+                table.ownerUserId.equals(ownerUserId ?? _userIdProvider()) &
+                table.targetUserId.equals(targetUserId),
+          ))
+          .go();
+
   Future<void> replaceAll({
     String? ownerUserId,
     required List<Friend> friends,
@@ -190,6 +235,14 @@ class FriendsCacheDataSource {
               ),
             );
       });
+
+  Future<void> removeFriend(String friendId, {String? ownerUserId}) =>
+      (_database.delete(_database.cachedFriends)..where(
+            (table) =>
+                table.ownerUserId.equals(ownerUserId ?? _userIdProvider()) &
+                table.userId.equals(friendId),
+          ))
+          .go();
 
   Friend _mapFriend(CachedFriend row) => Friend(
     id: row.userId,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/friends/widgets/friend_request_reject_button.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 class FriendRequestItem extends StatelessWidget {
@@ -40,13 +41,17 @@ class FriendRequestItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            UserAvatar(
+            ProfileAvatarHero(
               avatarUrl: request.peerAvatarUrl,
-              avatarLoader: avatarLoader,
-              avatarRevision:
-                  request.peerAvatarStoragePath ?? request.peerAvatarUrl,
-              size: 54,
-              borderRadius: 12,
+              avatarStoragePath: request.peerAvatarStoragePath,
+              child: UserAvatar(
+                avatarUrl: request.peerAvatarUrl,
+                avatarLoader: avatarLoader,
+                avatarRevision:
+                    request.peerAvatarStoragePath ?? request.peerAvatarUrl,
+                size: 54,
+                borderRadius: 12,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -10,8 +10,10 @@ import 'package:yap_chat/repositories/profile/avatar_storage_data_source.dart';
 import 'package:yap_chat/repositories/profile/avatar_deletion_queue.dart';
 import 'package:yap_chat/repositories/profile/profile_cache_data_source.dart';
 import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
+import 'package:yap_chat/repositories/profile/viewed_profile_cache_data_source.dart';
 
-class ProfileRepository implements IProfileRepository {
+class ProfileRepository
+    implements IProfileRepository, IViewedProfileRepository {
   ProfileRepository({
     required SupabaseClient client,
     required ProfileCacheDataSource cache,
@@ -19,11 +21,15 @@ class ProfileRepository implements IProfileRepository {
     required AvatarDeletionQueue avatarDeletionQueue,
     required Talker talker,
     required AccountSessionController accountSessionController,
+    required ViewedProfileCacheDataSource viewedProfileCache,
+    required MediaCacheService mediaCache,
   }) : _client = client,
        _cache = cache,
        _avatarStorage = avatarStorage,
        _avatarDeletionQueue = avatarDeletionQueue,
        _accountSessionController = accountSessionController,
+       _viewedProfileCache = viewedProfileCache,
+       _mediaCache = mediaCache,
        _talker = talker;
 
   final SupabaseClient _client;
@@ -32,9 +38,136 @@ class ProfileRepository implements IProfileRepository {
   final AvatarDeletionQueue _avatarDeletionQueue;
   final Talker _talker;
   final AccountSessionController _accountSessionController;
+  final ViewedProfileCacheDataSource _viewedProfileCache;
+  final MediaCacheService _mediaCache;
 
   @override
   Future<UserProfile?> getCachedProfile(String userId) => _cache.read(userId);
+
+  @override
+  Future<ViewedProfile?> getCachedViewedProfile(String userId) {
+    final scope = _accountSessionController.capture();
+    return _viewedProfileCache.read(scope.userId, userId);
+  }
+
+  @override
+  Future<ViewedProfile> getViewedProfile(
+    String userId, {
+    bool registerView = true,
+  }) async {
+    final scope = _accountSessionController.capture();
+    final response = await _client.rpc<List<dynamic>>(
+      'get_viewed_profile',
+      params: {'target_user_id': userId, 'should_register_view': registerView},
+    );
+    _accountSessionController.ensureCurrent(scope);
+    if (response.isEmpty) throw const ProfileNotFoundException();
+    final row = Map<String, dynamic>.from(response.first as Map);
+    final photos = _photoRows(row['photos']);
+    var profile = UserProfile.fromMap(row).copyWith(photos: photos);
+    profile = await _hydrateViewedProfile(profile, scope);
+    final viewedProfile = ViewedProfile(
+      profile: profile,
+      relationship: ProfileRelationship.values.byName(
+        row['relationship'] as String? ?? ProfileRelationship.none.name,
+      ),
+      requestId: row['request_id'] as String?,
+      friendCount: (row['friend_count'] as num?)?.toInt() ?? 0,
+      friendsPreview: _viewedFriends(row['friends_preview']),
+      viewCount: (row['profile_view_count'] as num?)?.toInt() ?? 0,
+      lastSeenAt: DateTime.tryParse(
+        row['last_seen_at'] as String? ?? '',
+      )?.toLocal(),
+      showsLastSeen: row['shows_last_seen'] as bool? ?? false,
+    );
+    await _accountSessionController.commit(
+      scope,
+      () => _viewedProfileCache.write(scope.userId, viewedProfile),
+    );
+    return viewedProfile;
+  }
+
+  @override
+  Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
+    String userId,
+  ) {
+    final scope = _accountSessionController.capture();
+    return _viewedProfileCache.readFriends(scope.userId, userId);
+  }
+
+  @override
+  Future<List<ViewedProfileFriend>> getViewedProfileFriends(
+    String userId,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final response = await _client.rpc<List<dynamic>>(
+      'get_user_profile_friends',
+      params: {'target_user_id': userId},
+    );
+    _accountSessionController.ensureCurrent(scope);
+    final friends = response
+        .map((item) => _viewedFriend(Map<String, dynamic>.from(item as Map)))
+        .toList(growable: false);
+    await _accountSessionController.commit(
+      scope,
+      () => _viewedProfileCache.replaceFriends(scope.userId, userId, friends),
+    );
+    return friends;
+  }
+
+  @override
+  Future<String?> resolveViewedProfileFriendAvatar(
+    ViewedProfileFriend friend,
+  ) async {
+    final scope = _accountSessionController.capture();
+    try {
+      final storagePath = friend.avatarStoragePath;
+      if (storagePath != null && storagePath.isNotEmpty) {
+        final path = await _mediaCache.cacheStorageFile(
+          ownerUserId: scope.userId,
+          bucket: AvatarStorageDataSource.bucketName,
+          storagePath: storagePath,
+          mimeType: 'image/jpeg',
+        );
+        _accountSessionController.ensureCurrent(scope);
+        return path;
+      }
+      final url = friend.avatarUrl;
+      if (url != null && url.isNotEmpty) {
+        final path = await _mediaCache.cacheNetworkFile(
+          ownerUserId: scope.userId,
+          url: url,
+        );
+        _accountSessionController.ensureCurrent(scope);
+        return path;
+      }
+    } catch (error, stackTrace) {
+      _talker.handle(error, stackTrace, 'Viewed profile avatar caching failed');
+    }
+    return null;
+  }
+
+  @override
+  Future<int?> getCachedProfileViewCount(String userId) {
+    final scope = _accountSessionController.capture();
+    return _viewedProfileCache.readViewCount(scope.userId, userId);
+  }
+
+  @override
+  Future<int> getProfileViewCount(String userId) async {
+    final scope = _accountSessionController.capture();
+    final value = await _client.rpc<num>(
+      'get_profile_view_count',
+      params: {'target_user_id': userId},
+    );
+    _accountSessionController.ensureCurrent(scope);
+    final count = value.toInt();
+    await _accountSessionController.commit(
+      scope,
+      () => _viewedProfileCache.writeViewCount(scope.userId, userId, count),
+    );
+    return count;
+  }
 
   @override
   Future<UserProfile> getOrCreateProfile(AuthSession session) async {
@@ -287,6 +420,72 @@ class ProfileRepository implements IProfileRepository {
     return UserProfile.fromMap(updated);
   }
 
+  List<ProfilePhoto> _photoRows(Object? value) {
+    final rows = value is List<dynamic> ? value : const <dynamic>[];
+    return rows
+        .map((item) {
+          final row = Map<String, dynamic>.from(item as Map);
+          return ProfilePhoto(
+            position: (row['position'] as num?)?.toInt() ?? 0,
+            avatarUrl: row['avatar_url'] as String?,
+            storagePath: row['storage_path'] as String?,
+            updatedAt: DateTime.tryParse(row['updated_at'] as String? ?? ''),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  List<ViewedProfileFriend> _viewedFriends(Object? value) {
+    final rows = value is List<dynamic> ? value : const <dynamic>[];
+    return rows
+        .map((item) => _viewedFriend(Map<String, dynamic>.from(item as Map)))
+        .toList(growable: false);
+  }
+
+  ViewedProfileFriend _viewedFriend(Map<String, dynamic> row) {
+    final storagePath = row['avatar_storage_path'] as String?;
+    return ViewedProfileFriend(
+      id: row['id'] as String,
+      username: row['username'] as String? ?? '',
+      displayName: row['display_name'] as String? ?? '',
+      avatarUrl: storagePath == null ? row['avatar_url'] as String? : null,
+      avatarStoragePath: storagePath,
+    );
+  }
+
+  Future<UserProfile> _hydrateViewedProfile(
+    UserProfile profile,
+    AccountSessionSnapshot scope,
+  ) async {
+    final cached = await _readCacheBestEffort(profile.id);
+    final hydrated = <ProfilePhoto>[];
+    for (final photo in profile.photos) {
+      _accountSessionController.ensureCurrent(scope);
+      final cachedPhoto = _matchingCachedPhoto(
+        photo,
+        cached?.photos ?? const [],
+      );
+      if (cachedPhoto?.bytes != null) {
+        hydrated.add(photo.copyWith(bytes: cachedPhoto!.bytes));
+        continue;
+      }
+      final storagePath = photo.storagePath;
+      if (storagePath == null) {
+        hydrated.add(photo);
+        continue;
+      }
+      try {
+        hydrated.add(
+          photo.copyWith(bytes: await _avatarStorage.download(storagePath)),
+        );
+      } catch (error, stackTrace) {
+        _talker.handle(error, stackTrace, 'Viewed profile photo load failed');
+        hydrated.add(photo);
+      }
+    }
+    return _withPhotos(profile, hydrated);
+  }
+
   Future<List<ProfilePhoto>> _loadRemotePhotos(UserProfile profile) async {
     final response = await _client
         .from('profile_photos')
@@ -501,6 +700,10 @@ class ProfileRepository implements IProfileRepository {
       // Удалённый профиль остаётся источником истины при сбое локального кеша.
     }
   }
+}
+
+class ProfileNotFoundException implements Exception {
+  const ProfileNotFoundException();
 }
 
 class ProfilePhotoLimitException implements Exception {

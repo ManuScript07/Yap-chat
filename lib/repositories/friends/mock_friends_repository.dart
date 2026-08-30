@@ -4,7 +4,8 @@ import 'package:uuid/uuid.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/friends/abstract_friends_repository.dart';
 
-class MockFriendsRepository implements IFriendsRepository {
+class MockFriendsRepository
+    implements IFriendsRepository, IProfileFriendsRepository {
   MockFriendsRepository()
     : _friends = [
         // Friend(
@@ -230,6 +231,26 @@ class MockFriendsRepository implements IFriendsRepository {
           updatedAt: DateTime.now(),
         ),
       );
+
+  @override
+  Future<FriendLocation?> getCachedFriendLocation(String friendId) async =>
+      null;
+
+  @override
+  Future<UserDistance?> getCachedUserDistance(String userId) async => null;
+
+  @override
+  Future<UserDistance?> getUserDistance(String userId) async => UserDistance(
+    value: 3,
+    unit: DistanceUnit.kilometers,
+    updatedAt: DateTime.now(),
+  );
+
+  @override
+  Future<void> removeFriend(String friendId) async {
+    _friends.removeWhere((friend) => friend.id == friendId);
+    _friendsController.add(_friendsSnapshot);
+  }
 
   @override
   Future<void> pauseRealtime() async {}

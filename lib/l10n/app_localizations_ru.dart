@@ -900,4 +900,70 @@ class AppLocalizationsRu extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get viewedProfileLoadFailed => 'Не удалось загрузить профиль';
+
+  @override
+  String get viewedProfileOpenChat => 'открыть чат';
+
+  @override
+  String get viewedProfileWrite => 'написать';
+
+  @override
+  String get viewedProfileAddFriend => 'добавить';
+
+  @override
+  String get viewedProfileRequestSent => 'отправлено';
+
+  @override
+  String get viewedProfileCancelRequestTitle => 'Отменить заявку?';
+
+  @override
+  String get viewedProfileCancelRequestContent =>
+      'Пользователь больше не увидит эту заявку в друны.';
+
+  @override
+  String get viewedProfileRemoveFriend => 'Удалить из друнов';
+
+  @override
+  String get viewedProfileRemoveFriendTitle => 'Удалить из друнов?';
+
+  @override
+  String viewedProfileRemoveFriendContent(String name) {
+    return 'Удалить $name из друнов?';
+  }
+
+  @override
+  String get viewedProfileMute => 'Убрать звук';
+
+  @override
+  String get viewedProfileUnmute => 'Включить звук';
+
+  @override
+  String get viewedProfileBlock => 'Заблокировать';
+
+  @override
+  String get viewedProfileReport => 'Пожаловаться';
+
+  @override
+  String get viewedProfileStub => 'Функция появится позже';
+
+  @override
+  String viewedProfileDistanceMeters(int value) {
+    return '$value м';
+  }
+
+  @override
+  String viewedProfileDistanceKilometers(int value) {
+    return '$value км';
+  }
+
+  @override
+  String get viewedProfileUsernameCopied => 'Никнейм скопирован';
+
+  @override
+  String viewedProfileUserFriends(String name) {
+    return 'Друны $name';
+  }
 }

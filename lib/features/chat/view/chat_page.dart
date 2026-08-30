@@ -10,6 +10,7 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -325,6 +326,13 @@ class _ChatViewState extends State<_ChatView>
                         onBack: () {
                           Navigator.of(context).maybePop();
                         },
+                        onProfileTap: widget.chat.peerId.isEmpty
+                            ? null
+                            : () => openViewedProfile(
+                                context,
+                                userId: widget.chat.peerId,
+                                originChatId: widget.chat.id,
+                              ),
                       ),
                     ),
                     _KeyboardAwareInput(
@@ -1001,9 +1009,8 @@ class _MessagesList extends StatelessWidget {
               maxWidth: screenWidth * 0.8,
               peerName: chat.userName,
               peerAvatarUrl: chat.avatarUrl,
-              peerAvatarLoader: () => context
-                  .read<IChatsRepository>()
-                  .resolveAvatar(chat),
+              peerAvatarLoader: () =>
+                  context.read<IChatsRepository>().resolveAvatar(chat),
               onLongPress: onMessageLongPress,
               onReplyTap: message.replyTo == null
                   ? null

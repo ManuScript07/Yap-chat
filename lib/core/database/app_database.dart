@@ -189,6 +189,58 @@ class CachedPreciseLocationExclusions extends Table {
   Set<Column> get primaryKey => {ownerUserId, viewerUserId};
 }
 
+class CachedViewedProfileMetadata extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get targetUserId => text()();
+  TextColumn get relationship => text()();
+  TextColumn get requestId => text().nullable()();
+  IntColumn get friendCount => integer()();
+  TextColumn get friendsPreviewJson => text()();
+  IntColumn get viewCount => integer()();
+  DateTimeColumn get lastSeenAt => dateTime().nullable()();
+  BoolColumn get showsLastSeen => boolean()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, targetUserId};
+}
+
+class CachedViewedProfileFriends extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get targetUserId => text()();
+  TextColumn get friendUserId => text()();
+  TextColumn get username => text()();
+  TextColumn get displayName => text()();
+  TextColumn get avatarUrl => text().nullable()();
+  TextColumn get avatarStoragePath => text().nullable()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, targetUserId, friendUserId};
+}
+
+class CachedUserDistances extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get targetUserId => text()();
+  IntColumn get distanceValue => integer()();
+  TextColumn get distanceUnit => text()();
+  DateTimeColumn get locationUpdatedAt => dateTime()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, targetUserId};
+}
+
+class CachedProfileViewCounts extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get targetUserId => text()();
+  IntColumn get viewCount => integer()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, targetUserId};
+}
+
 @DataClassName('CachedAppLanguage')
 class CachedAppLanguages extends Table {
   TextColumn get ownerUserId => text()();
@@ -212,6 +264,10 @@ class CachedAppLanguages extends Table {
     CachedContactMatches,
     CachedSearchPrivacySettings,
     CachedPreciseLocationExclusions,
+    CachedViewedProfileMetadata,
+    CachedViewedProfileFriends,
+    CachedUserDistances,
+    CachedProfileViewCounts,
     CachedAppLanguages,
   ],
 )
@@ -231,7 +287,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -293,6 +349,12 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 14) {
         await migrator.createTable(cachedAppLanguages);
+      }
+      if (from < 15) {
+        await migrator.createTable(cachedViewedProfileMetadata);
+        await migrator.createTable(cachedViewedProfileFriends);
+        await migrator.createTable(cachedUserDistances);
+        await migrator.createTable(cachedProfileViewCounts);
       }
     },
     beforeOpen: (details) async {

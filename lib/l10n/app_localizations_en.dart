@@ -889,4 +889,70 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get viewedProfileLoadFailed => 'Unable to load profile';
+
+  @override
+  String get viewedProfileOpenChat => 'open chat';
+
+  @override
+  String get viewedProfileWrite => 'message';
+
+  @override
+  String get viewedProfileAddFriend => 'add friend';
+
+  @override
+  String get viewedProfileRequestSent => 'sent';
+
+  @override
+  String get viewedProfileCancelRequestTitle => 'Cancel request?';
+
+  @override
+  String get viewedProfileCancelRequestContent =>
+      'This user will no longer see your friend request.';
+
+  @override
+  String get viewedProfileRemoveFriend => 'Remove friend';
+
+  @override
+  String get viewedProfileRemoveFriendTitle => 'Remove friend?';
+
+  @override
+  String viewedProfileRemoveFriendContent(String name) {
+    return 'Remove $name from your friends?';
+  }
+
+  @override
+  String get viewedProfileMute => 'Mute';
+
+  @override
+  String get viewedProfileUnmute => 'Unmute';
+
+  @override
+  String get viewedProfileBlock => 'Block';
+
+  @override
+  String get viewedProfileReport => 'Report';
+
+  @override
+  String get viewedProfileStub => 'This feature is coming later';
+
+  @override
+  String viewedProfileDistanceMeters(int value) {
+    return '$value m';
+  }
+
+  @override
+  String viewedProfileDistanceKilometers(int value) {
+    return '$value km';
+  }
+
+  @override
+  String get viewedProfileUsernameCopied => 'Username copied';
+
+  @override
+  String viewedProfileUserFriends(String name) {
+    return '$name\'s friends';
+  }
 }

@@ -72,6 +72,11 @@ class RepositoryContainer {
       remote: SettingsRemoteDataSource(client: client),
       accountSessionController: config.accountSessionController,
     );
+    final profileCache = ProfileCacheDataSource(database: config.database);
+    final viewedProfileCache = ViewedProfileCacheDataSource(
+      database: config.database,
+      profileCache: profileCache,
+    );
     final chatRemote = ChatRemoteDataSource(client: client);
     final messageHydrator = ChatMessageHydrator(
       config: config,
@@ -123,7 +128,9 @@ class RepositoryContainer {
       ),
       profileRepository: ProfileRepository(
         client: client,
-        cache: ProfileCacheDataSource(database: config.database),
+        cache: profileCache,
+        viewedProfileCache: viewedProfileCache,
+        mediaCache: mediaCache,
         talker: config.talker,
         avatarDeletionQueue: AvatarDeletionQueue(
           preferences: config.preferences,

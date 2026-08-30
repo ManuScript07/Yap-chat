@@ -8,6 +8,7 @@ import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/friends.dart';
 import 'package:yap_chat/repositories/repositories.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -382,6 +383,8 @@ class _FriendsListState extends State<_FriendsList> {
                             .read<IFriendsRepository>()
                             .resolveFriendAvatar(friend),
                         onChat: () => _openChat(context, friend),
+                        onTap: () =>
+                            openViewedProfile(context, userId: friend.id),
                         onLocation: () => _openLocation(context, friend),
                         isLocationEnabled: !_openingLocations.contains(
                           friend.id,
@@ -454,6 +457,7 @@ class _FriendsListState extends State<_FriendsList> {
           },
           avatarLoader: () => repository.resolveCandidateAvatar(candidate),
           onAdd: () => cubit.sendRequest(candidate),
+          onTap: () => openViewedProfile(context, userId: candidate.id),
           onAccept: () => cubit.respondToIncoming(candidate, accept: true),
           onReject: () => cubit.respondToIncoming(candidate, accept: false),
         ),
@@ -638,6 +642,7 @@ class _RequestsList extends StatelessWidget {
       friendsLabel: context.l10n.friendsCount,
       onCancel: () =>
           context.read<FriendsBloc>().add(FriendRequestCancelled(request.id)),
+      onTap: () => openViewedProfile(context, userId: request.peerId),
       onAccept: () => context.read<FriendsBloc>().add(
         FriendRequestResponded(request.id, accept: true),
       ),

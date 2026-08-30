@@ -6,6 +6,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/bloc/bloc.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/friends/widgets/contact_discovery_item.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -267,6 +268,9 @@ class _ContactDiscoveryBody extends StatelessWidget {
                     : () => context
                           .read<IFriendsRepository>()
                           .resolveCandidateAvatar(candidate),
+                onTap: candidate == null
+                    ? null
+                    : () => openViewedProfile(context, userId: candidate.id),
                 onAdd: () => cubit.sendRequest(entry),
                 onInvite: () => cubit.invite(_invitationText(context)),
                 onAccept: () => cubit.respondToIncoming(entry, accept: true),

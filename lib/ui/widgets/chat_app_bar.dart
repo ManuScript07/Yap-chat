@@ -3,6 +3,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
 import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
 import 'package:yap_chat/ui/widgets/user_avatar.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/utils/utils.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -16,6 +17,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.avatarLoader,
     this.avatarRevision,
     this.onBack,
+    this.onProfileTap,
   });
 
   final String userName;
@@ -26,6 +28,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Future<String?> Function()? avatarLoader;
   final Object? avatarRevision;
   final VoidCallback? onBack;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -48,43 +51,56 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             onTap: onBack ?? () => Navigator.of(context).pop(),
           ),
           const SizedBox(width: 16),
-          UserAvatar(
-            avatarUrl: avatarUrl,
-            avatarLoader: avatarLoader,
-            avatarRevision: avatarRevision,
-            size: 48,
-            borderRadius: 10,
+          GestureDetector(
+            onTap: onProfileTap,
+            child: ProfileAvatarHero(
+              avatarUrl: avatarUrl,
+              avatarStoragePath: avatarRevision is String
+                  ? avatarRevision as String
+                  : null,
+              child: UserAvatar(
+                avatarUrl: avatarUrl,
+                avatarLoader: avatarLoader,
+                avatarRevision: avatarRevision,
+                size: 48,
+                borderRadius: 10,
+              ),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: TextStyle(
-                    fontSize: 20,
-                    height: 1.2,
-                    fontWeight: FontWeight.bold,
-                    color: surface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                AnimatedStatusSwitcher(
-                  child: Text(
-                    statusText,
-                    key: ValueKey(statusText),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onProfileTap,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    userName,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 20,
                       height: 1.2,
-                      color: onSurface,
+                      fontWeight: FontWeight.bold,
+                      color: surface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  AnimatedStatusSwitcher(
+                    child: Text(
+                      statusText,
+                      key: ValueKey(statusText),
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.2,
+                        color: onSurface,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

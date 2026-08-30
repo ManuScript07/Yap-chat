@@ -1651,6 +1651,120 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'{count, plural, one{{count} день с нами} few{{count} дня с нами} many{{count} дней с нами} other{{count} дня с нами}}'**
   String profileDaysWithUs(int count);
+
+  /// No description provided for @viewedProfileLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить профиль'**
+  String get viewedProfileLoadFailed;
+
+  /// No description provided for @viewedProfileOpenChat.
+  ///
+  /// In ru, this message translates to:
+  /// **'открыть чат'**
+  String get viewedProfileOpenChat;
+
+  /// No description provided for @viewedProfileWrite.
+  ///
+  /// In ru, this message translates to:
+  /// **'написать'**
+  String get viewedProfileWrite;
+
+  /// No description provided for @viewedProfileAddFriend.
+  ///
+  /// In ru, this message translates to:
+  /// **'добавить'**
+  String get viewedProfileAddFriend;
+
+  /// No description provided for @viewedProfileRequestSent.
+  ///
+  /// In ru, this message translates to:
+  /// **'отправлено'**
+  String get viewedProfileRequestSent;
+
+  /// No description provided for @viewedProfileCancelRequestTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отменить заявку?'**
+  String get viewedProfileCancelRequestTitle;
+
+  /// No description provided for @viewedProfileCancelRequestContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пользователь больше не увидит эту заявку в друны.'**
+  String get viewedProfileCancelRequestContent;
+
+  /// No description provided for @viewedProfileRemoveFriend.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить из друнов'**
+  String get viewedProfileRemoveFriend;
+
+  /// No description provided for @viewedProfileRemoveFriendTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить из друнов?'**
+  String get viewedProfileRemoveFriendTitle;
+
+  /// No description provided for @viewedProfileRemoveFriendContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить {name} из друнов?'**
+  String viewedProfileRemoveFriendContent(String name);
+
+  /// No description provided for @viewedProfileMute.
+  ///
+  /// In ru, this message translates to:
+  /// **'Убрать звук'**
+  String get viewedProfileMute;
+
+  /// No description provided for @viewedProfileUnmute.
+  ///
+  /// In ru, this message translates to:
+  /// **'Включить звук'**
+  String get viewedProfileUnmute;
+
+  /// No description provided for @viewedProfileBlock.
+  ///
+  /// In ru, this message translates to:
+  /// **'Заблокировать'**
+  String get viewedProfileBlock;
+
+  /// No description provided for @viewedProfileReport.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пожаловаться'**
+  String get viewedProfileReport;
+
+  /// No description provided for @viewedProfileStub.
+  ///
+  /// In ru, this message translates to:
+  /// **'Функция появится позже'**
+  String get viewedProfileStub;
+
+  /// No description provided for @viewedProfileDistanceMeters.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} м'**
+  String viewedProfileDistanceMeters(int value);
+
+  /// No description provided for @viewedProfileDistanceKilometers.
+  ///
+  /// In ru, this message translates to:
+  /// **'{value} км'**
+  String viewedProfileDistanceKilometers(int value);
+
+  /// No description provided for @viewedProfileUsernameCopied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Никнейм скопирован'**
+  String get viewedProfileUsernameCopied;
+
+  /// No description provided for @viewedProfileUserFriends.
+  ///
+  /// In ru, this message translates to:
+  /// **'Друны {name}'**
+  String viewedProfileUserFriends(String name);
 }
 
 class _AppLocalizationsDelegate

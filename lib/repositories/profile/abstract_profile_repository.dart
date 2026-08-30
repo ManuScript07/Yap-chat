@@ -17,6 +17,45 @@ abstract interface class IProfileRepository {
   });
 }
 
+abstract interface class IViewedProfileRepository {
+  Future<ViewedProfile?> getCachedViewedProfile(String userId);
+  Future<ViewedProfile> getViewedProfile(
+    String userId, {
+    bool registerView = true,
+  });
+  Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
+    String userId,
+  );
+  Future<List<ViewedProfileFriend>> getViewedProfileFriends(String userId);
+  Future<String?> resolveViewedProfileFriendAvatar(ViewedProfileFriend friend);
+  Future<int?> getCachedProfileViewCount(String userId);
+  Future<int> getProfileViewCount(String userId);
+}
+
+extension ViewedProfileRepositoryAccess on IProfileRepository {
+  IViewedProfileRepository get _viewedProfiles =>
+      this as IViewedProfileRepository;
+
+  Future<ViewedProfile?> getCachedViewedProfile(String userId) =>
+      _viewedProfiles.getCachedViewedProfile(userId);
+  Future<ViewedProfile> getViewedProfile(
+    String userId, {
+    bool registerView = true,
+  }) => _viewedProfiles.getViewedProfile(userId, registerView: registerView);
+  Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
+    String userId,
+  ) => _viewedProfiles.getCachedViewedProfileFriends(userId);
+  Future<List<ViewedProfileFriend>> getViewedProfileFriends(String userId) =>
+      _viewedProfiles.getViewedProfileFriends(userId);
+  Future<String?> resolveViewedProfileFriendAvatar(
+    ViewedProfileFriend friend,
+  ) => _viewedProfiles.resolveViewedProfileFriendAvatar(friend);
+  Future<int?> getCachedProfileViewCount(String userId) =>
+      _viewedProfiles.getCachedProfileViewCount(userId);
+  Future<int> getProfileViewCount(String userId) =>
+      _viewedProfiles.getProfileViewCount(userId);
+}
+
 class UsernameAlreadyTakenException implements Exception {
   const UsernameAlreadyTakenException();
 }

@@ -7,7 +7,8 @@ import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
 import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
 
-class MockProfileRepository implements IProfileRepository {
+class MockProfileRepository
+    implements IProfileRepository, IViewedProfileRepository {
   MockProfileRepository({required SharedPreferences preferences})
     : _preferences = preferences;
 
@@ -28,6 +29,54 @@ class MockProfileRepository implements IProfileRepository {
     }
     return profile.id == userId ? profile : null;
   }
+
+  @override
+  Future<ViewedProfile?> getCachedViewedProfile(String userId) async => null;
+
+  @override
+  Future<ViewedProfile> getViewedProfile(
+    String userId, {
+    bool registerView = true,
+  }) async {
+    final now = DateTime.now();
+    return ViewedProfile(
+      profile: UserProfile(
+        id: userId,
+        username: userId.replaceAll(RegExp('[^a-zA-Z0-9_]'), '_'),
+        displayName: 'Пользователь',
+        bio: 'Профиль пользователя Yap',
+        onboardingCompleted: true,
+        createdAt: now.subtract(const Duration(days: 42)),
+      ),
+      relationship: ProfileRelationship.none,
+      friendCount: 0,
+      friendsPreview: const [],
+      viewCount: 1,
+      showsLastSeen: true,
+      lastSeenAt: now.subtract(const Duration(minutes: 12)),
+    );
+  }
+
+  @override
+  Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
+    String userId,
+  ) async => const [];
+
+  @override
+  Future<List<ViewedProfileFriend>> getViewedProfileFriends(
+    String userId,
+  ) async => const [];
+
+  @override
+  Future<String?> resolveViewedProfileFriendAvatar(
+    ViewedProfileFriend friend,
+  ) async => friend.avatarUrl;
+
+  @override
+  Future<int?> getCachedProfileViewCount(String userId) async => 0;
+
+  @override
+  Future<int> getProfileViewCount(String userId) async => 0;
 
   @override
   Future<UserProfile> getOrCreateProfile(AuthSession session) async {

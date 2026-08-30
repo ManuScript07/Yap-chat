@@ -25,7 +25,26 @@ abstract interface class IFriendsRepository {
   Future<void> cancelRequest(String requestId);
   Future<void> respondToRequest(String requestId, {required bool accept});
   Future<FriendLocationLookup> getFriendLocation(String friendId);
-
   Future<void> pauseRealtime();
   Future<void> resumeRealtime();
+}
+
+abstract interface class IProfileFriendsRepository {
+  Future<FriendLocation?> getCachedFriendLocation(String friendId);
+  Future<UserDistance?> getCachedUserDistance(String userId);
+  Future<UserDistance?> getUserDistance(String userId);
+  Future<void> removeFriend(String friendId);
+}
+
+extension ProfileFriendsRepositoryAccess on IFriendsRepository {
+  IProfileFriendsRepository get _profiles => this as IProfileFriendsRepository;
+
+  Future<FriendLocation?> getCachedFriendLocation(String friendId) =>
+      _profiles.getCachedFriendLocation(friendId);
+  Future<UserDistance?> getCachedUserDistance(String userId) =>
+      _profiles.getCachedUserDistance(userId);
+  Future<UserDistance?> getUserDistance(String userId) =>
+      _profiles.getUserDistance(userId);
+  Future<void> removeFriend(String friendId) =>
+      _profiles.removeFriend(friendId);
 }

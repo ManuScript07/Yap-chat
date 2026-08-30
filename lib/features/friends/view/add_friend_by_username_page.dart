@@ -8,6 +8,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/friends/bloc/bloc.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/friends/widgets/widgets.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -268,6 +269,10 @@ class _UsernameSearchBody extends StatelessWidget {
                                             .read<IFriendsRepository>()
                                             .resolveCandidateAvatar(candidate),
                                         respectSystemPadding: false,
+                                        onTap: () => openViewedProfile(
+                                          context,
+                                          userId: candidate.id,
+                                        ),
                                         onAdd: () => context
                                             .read<FriendSearchCubit>()
                                             .sendRequest(candidate),
