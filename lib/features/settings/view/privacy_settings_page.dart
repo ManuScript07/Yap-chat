@@ -90,8 +90,8 @@ class _PrivacySettingsView extends StatelessWidget {
                   onChanged: isLoading
                       ? null
                       : (value) => context
-                          .read<PrivacySettingsCubit>()
-                          .setValue(SearchPrivacySettingKey.username, value),
+                            .read<PrivacySettingsCubit>()
+                            .setValue(SearchPrivacySettingKey.username, value),
                 ),
                 SettingsToggleRow(
                   icon: Icons.phone_outlined,
@@ -102,8 +102,8 @@ class _PrivacySettingsView extends StatelessWidget {
                   onChanged: isLoading
                       ? null
                       : (value) => context
-                          .read<PrivacySettingsCubit>()
-                          .setValue(SearchPrivacySettingKey.phone, value),
+                            .read<PrivacySettingsCubit>()
+                            .setValue(SearchPrivacySettingKey.phone, value),
                 ),
                 SettingsToggleRow(
                   icon: Icons.person_outline_rounded,
@@ -114,9 +114,35 @@ class _PrivacySettingsView extends StatelessWidget {
                   onChanged: isLoading
                       ? null
                       : (value) => context
-                          .read<PrivacySettingsCubit>()
-                          .setValue(SearchPrivacySettingKey.name, value),
+                            .read<PrivacySettingsCubit>()
+                            .setValue(SearchPrivacySettingKey.name, value),
                 ),
+                const SizedBox(height: 28),
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16 + mediaQuery.padding.left,
+                  ),
+                  child: Text(
+                    context.l10n.settingsLastSeenVisibility,
+                    style: TextStyle(
+                      color: context.colorScheme.onSurfaceVariant,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                      letterSpacing: .4,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final visibility in LastSeenVisibility.values)
+                  _LastSeenVisibilityChoice(
+                    visibility: visibility,
+                    selected: settings.lastSeenVisibility,
+                    isSaving: state.isSaving,
+                    onSelected: (value) => context
+                        .read<PrivacySettingsCubit>()
+                        .setLastSeenVisibility(value),
+                  ),
                 if (state.status == PrivacySettingsStatus.failure)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -128,6 +154,66 @@ class _PrivacySettingsView extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _LastSeenVisibilityChoice extends StatelessWidget {
+  const _LastSeenVisibilityChoice({
+    required this.visibility,
+    required this.selected,
+    required this.isSaving,
+    required this.onSelected,
+  });
+
+  final LastSeenVisibility visibility;
+  final LastSeenVisibility selected;
+  final bool isSaving;
+  final ValueChanged<LastSeenVisibility> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (visibility) {
+      LastSeenVisibility.all => context.l10n.settingsLastSeenAll,
+      LastSeenVisibility.friends => context.l10n.settingsLastSeenFriends,
+      LastSeenVisibility.nobody => context.l10n.settingsLastSeenNobody,
+    };
+    return Material(
+      color: context.colorScheme.surface.withValues(alpha: 0),
+      child: InkWell(
+        onTap: isSaving ? null : () => onSelected(visibility),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20 + MediaQuery.paddingOf(context).left,
+            2,
+            20 + MediaQuery.paddingOf(context).right,
+            2,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: settingsValueStyle(context).copyWith(fontSize: 18),
+                ),
+              ),
+              IgnorePointer(
+                ignoring: isSaving,
+                child: Checkbox(
+                  value: selected == visibility,
+                  activeColor: context.colorScheme.primary,
+                  checkColor: context.colorScheme.onPrimary,
+                  side: BorderSide(
+                    color: context.colorScheme.outline,
+                    width: 2,
+                  ),
+                  onChanged: (_) => onSelected(visibility),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

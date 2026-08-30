@@ -21,13 +21,23 @@ class SettingsRemoteDataSource {
   ) async {
     final response = await _client.rpc<List<dynamic>>(
       'set_my_search_privacy_setting',
-      params: {
-        'setting_key': key.name,
-        'is_enabled': value,
-      },
+      params: {'setting_key': key.name, 'is_enabled': value},
     );
     if (response.isEmpty) {
       throw StateError('Supabase returned no updated search privacy settings');
+    }
+    return _map(response.first);
+  }
+
+  Future<SearchPrivacySettings> updateLastSeenVisibility(
+    LastSeenVisibility visibility,
+  ) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'set_my_last_seen_visibility',
+      params: {'visibility': visibility.name},
+    );
+    if (response.isEmpty) {
+      throw StateError('Supabase returned no updated privacy settings');
     }
     return _map(response.first);
   }
@@ -38,6 +48,11 @@ class SettingsRemoteDataSource {
       searchByUsername: row['search_by_username'] as bool? ?? true,
       searchByPhone: row['search_by_phone'] as bool? ?? true,
       searchByName: row['search_by_name'] as bool? ?? true,
+      lastSeenVisibility:
+          LastSeenVisibility.values
+              .where((item) => item.name == row['last_seen_visibility'])
+              .firstOrNull ??
+          LastSeenVisibility.all,
     );
   }
 }

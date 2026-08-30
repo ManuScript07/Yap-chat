@@ -4,7 +4,10 @@ import 'package:equatable/equatable.dart';
 /// write never needs to send a stale snapshot of the other settings.
 enum SearchPrivacySettingKey { username, phone, name }
 
-/// Privacy switches that control how the current user can be discovered.
+/// Controls who may receive the precise last-seen timestamp.
+enum LastSeenVisibility { all, friends, nobody }
+
+/// Account privacy settings shared by search and chat surfaces.
 ///
 /// A missing row on the server means the default value (`true`) for every
 /// switch. Keeping this model independent from the page makes it possible to
@@ -14,20 +17,24 @@ class SearchPrivacySettings extends Equatable {
     this.searchByUsername = true,
     this.searchByPhone = true,
     this.searchByName = true,
+    this.lastSeenVisibility = LastSeenVisibility.all,
   });
 
   final bool searchByUsername;
   final bool searchByPhone;
   final bool searchByName;
+  final LastSeenVisibility lastSeenVisibility;
 
   SearchPrivacySettings copyWith({
     bool? searchByUsername,
     bool? searchByPhone,
     bool? searchByName,
+    LastSeenVisibility? lastSeenVisibility,
   }) => SearchPrivacySettings(
     searchByUsername: searchByUsername ?? this.searchByUsername,
     searchByPhone: searchByPhone ?? this.searchByPhone,
     searchByName: searchByName ?? this.searchByName,
+    lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
   );
 
   bool valueFor(SearchPrivacySettingKey key) => switch (key) {
@@ -44,5 +51,10 @@ class SearchPrivacySettings extends Equatable {
       };
 
   @override
-  List<Object> get props => [searchByUsername, searchByPhone, searchByName];
+  List<Object> get props => [
+    searchByUsername,
+    searchByPhone,
+    searchByName,
+    lastSeenVisibility,
+  ];
 }

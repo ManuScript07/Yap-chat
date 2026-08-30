@@ -13,5 +13,9 @@ abstract interface class ISettingsRepository {
     bool value,
   );
 
+  Future<SearchPrivacySettings> updateLastSeenVisibility(
+    LastSeenVisibility visibility,
+  );
+
   Future<void> clearUserCache(String userId);
 }

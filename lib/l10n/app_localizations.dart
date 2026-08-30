@@ -392,6 +392,30 @@ abstract class AppLocalizations {
   /// **'Искать по имени'**
   String get settingsSearchByName;
 
+  /// No description provided for @settingsLastSeenVisibility.
+  ///
+  /// In ru, this message translates to:
+  /// **'отображение времени захода'**
+  String get settingsLastSeenVisibility;
+
+  /// No description provided for @settingsLastSeenAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все'**
+  String get settingsLastSeenAll;
+
+  /// No description provided for @settingsLastSeenFriends.
+  ///
+  /// In ru, this message translates to:
+  /// **'Только друзья'**
+  String get settingsLastSeenFriends;
+
+  /// No description provided for @settingsLastSeenNobody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Никто'**
+  String get settingsLastSeenNobody;
+
   /// No description provided for @settingsPrivacyChangeTitle.
   ///
   /// In ru, this message translates to:

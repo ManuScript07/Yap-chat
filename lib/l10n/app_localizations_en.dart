@@ -206,6 +206,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSearchByName => 'Find by name';
 
   @override
+  String get settingsLastSeenVisibility => 'last seen visibility';
+
+  @override
+  String get settingsLastSeenAll => 'Everyone';
+
+  @override
+  String get settingsLastSeenFriends => 'Friends only';
+
+  @override
+  String get settingsLastSeenNobody => 'Nobody';
+
+  @override
   String get settingsPrivacyChangeTitle => 'Change search visibility?';
 
   @override

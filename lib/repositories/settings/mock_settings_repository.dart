@@ -22,5 +22,13 @@ class MockSettingsRepository implements ISettingsRepository {
   }
 
   @override
+  Future<SearchPrivacySettings> updateLastSeenVisibility(
+    LastSeenVisibility visibility,
+  ) async {
+    _settings = _settings.copyWith(lastSeenVisibility: visibility);
+    return _settings;
+  }
+
+  @override
   Future<void> clearUserCache(String userId) async {}
 }

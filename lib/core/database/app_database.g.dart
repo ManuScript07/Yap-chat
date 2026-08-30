@@ -6612,6 +6612,18 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
       'CHECK ("search_by_name" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _lastSeenVisibilityMeta =
+      const VerificationMeta('lastSeenVisibility');
+  @override
+  late final GeneratedColumn<String> lastSeenVisibility =
+      GeneratedColumn<String>(
+        'last_seen_visibility',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('all'),
+      );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -6629,6 +6641,7 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
     searchByUsername,
     searchByPhone,
     searchByName,
+    lastSeenVisibility,
     cachedAt,
   ];
   @override
@@ -6687,6 +6700,15 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
     } else if (isInserting) {
       context.missing(_searchByNameMeta);
     }
+    if (data.containsKey('last_seen_visibility')) {
+      context.handle(
+        _lastSeenVisibilityMeta,
+        lastSeenVisibility.isAcceptableOrUnknown(
+          data['last_seen_visibility']!,
+          _lastSeenVisibilityMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -6723,6 +6745,10 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
         DriftSqlType.bool,
         data['${effectivePrefix}search_by_name'],
       )!,
+      lastSeenVisibility: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_seen_visibility'],
+      )!,
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -6742,12 +6768,14 @@ class CachedSearchPrivacySetting extends DataClass
   final bool searchByUsername;
   final bool searchByPhone;
   final bool searchByName;
+  final String lastSeenVisibility;
   final DateTime cachedAt;
   const CachedSearchPrivacySetting({
     required this.ownerUserId,
     required this.searchByUsername,
     required this.searchByPhone,
     required this.searchByName,
+    required this.lastSeenVisibility,
     required this.cachedAt,
   });
   @override
@@ -6757,6 +6785,7 @@ class CachedSearchPrivacySetting extends DataClass
     map['search_by_username'] = Variable<bool>(searchByUsername);
     map['search_by_phone'] = Variable<bool>(searchByPhone);
     map['search_by_name'] = Variable<bool>(searchByName);
+    map['last_seen_visibility'] = Variable<String>(lastSeenVisibility);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -6767,6 +6796,7 @@ class CachedSearchPrivacySetting extends DataClass
       searchByUsername: Value(searchByUsername),
       searchByPhone: Value(searchByPhone),
       searchByName: Value(searchByName),
+      lastSeenVisibility: Value(lastSeenVisibility),
       cachedAt: Value(cachedAt),
     );
   }
@@ -6781,6 +6811,9 @@ class CachedSearchPrivacySetting extends DataClass
       searchByUsername: serializer.fromJson<bool>(json['searchByUsername']),
       searchByPhone: serializer.fromJson<bool>(json['searchByPhone']),
       searchByName: serializer.fromJson<bool>(json['searchByName']),
+      lastSeenVisibility: serializer.fromJson<String>(
+        json['lastSeenVisibility'],
+      ),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -6792,6 +6825,7 @@ class CachedSearchPrivacySetting extends DataClass
       'searchByUsername': serializer.toJson<bool>(searchByUsername),
       'searchByPhone': serializer.toJson<bool>(searchByPhone),
       'searchByName': serializer.toJson<bool>(searchByName),
+      'lastSeenVisibility': serializer.toJson<String>(lastSeenVisibility),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -6801,12 +6835,14 @@ class CachedSearchPrivacySetting extends DataClass
     bool? searchByUsername,
     bool? searchByPhone,
     bool? searchByName,
+    String? lastSeenVisibility,
     DateTime? cachedAt,
   }) => CachedSearchPrivacySetting(
     ownerUserId: ownerUserId ?? this.ownerUserId,
     searchByUsername: searchByUsername ?? this.searchByUsername,
     searchByPhone: searchByPhone ?? this.searchByPhone,
     searchByName: searchByName ?? this.searchByName,
+    lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedSearchPrivacySetting copyWithCompanion(
@@ -6825,6 +6861,9 @@ class CachedSearchPrivacySetting extends DataClass
       searchByName: data.searchByName.present
           ? data.searchByName.value
           : this.searchByName,
+      lastSeenVisibility: data.lastSeenVisibility.present
+          ? data.lastSeenVisibility.value
+          : this.lastSeenVisibility,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -6836,6 +6875,7 @@ class CachedSearchPrivacySetting extends DataClass
           ..write('searchByUsername: $searchByUsername, ')
           ..write('searchByPhone: $searchByPhone, ')
           ..write('searchByName: $searchByName, ')
+          ..write('lastSeenVisibility: $lastSeenVisibility, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -6847,6 +6887,7 @@ class CachedSearchPrivacySetting extends DataClass
     searchByUsername,
     searchByPhone,
     searchByName,
+    lastSeenVisibility,
     cachedAt,
   );
   @override
@@ -6857,6 +6898,7 @@ class CachedSearchPrivacySetting extends DataClass
           other.searchByUsername == this.searchByUsername &&
           other.searchByPhone == this.searchByPhone &&
           other.searchByName == this.searchByName &&
+          other.lastSeenVisibility == this.lastSeenVisibility &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -6866,6 +6908,7 @@ class CachedSearchPrivacySettingsCompanion
   final Value<bool> searchByUsername;
   final Value<bool> searchByPhone;
   final Value<bool> searchByName;
+  final Value<String> lastSeenVisibility;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedSearchPrivacySettingsCompanion({
@@ -6873,6 +6916,7 @@ class CachedSearchPrivacySettingsCompanion
     this.searchByUsername = const Value.absent(),
     this.searchByPhone = const Value.absent(),
     this.searchByName = const Value.absent(),
+    this.lastSeenVisibility = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6881,6 +6925,7 @@ class CachedSearchPrivacySettingsCompanion
     required bool searchByUsername,
     required bool searchByPhone,
     required bool searchByName,
+    this.lastSeenVisibility = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -6893,6 +6938,7 @@ class CachedSearchPrivacySettingsCompanion
     Expression<bool>? searchByUsername,
     Expression<bool>? searchByPhone,
     Expression<bool>? searchByName,
+    Expression<String>? lastSeenVisibility,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -6901,6 +6947,8 @@ class CachedSearchPrivacySettingsCompanion
       if (searchByUsername != null) 'search_by_username': searchByUsername,
       if (searchByPhone != null) 'search_by_phone': searchByPhone,
       if (searchByName != null) 'search_by_name': searchByName,
+      if (lastSeenVisibility != null)
+        'last_seen_visibility': lastSeenVisibility,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6911,6 +6959,7 @@ class CachedSearchPrivacySettingsCompanion
     Value<bool>? searchByUsername,
     Value<bool>? searchByPhone,
     Value<bool>? searchByName,
+    Value<String>? lastSeenVisibility,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -6919,6 +6968,7 @@ class CachedSearchPrivacySettingsCompanion
       searchByUsername: searchByUsername ?? this.searchByUsername,
       searchByPhone: searchByPhone ?? this.searchByPhone,
       searchByName: searchByName ?? this.searchByName,
+      lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6939,6 +6989,9 @@ class CachedSearchPrivacySettingsCompanion
     if (searchByName.present) {
       map['search_by_name'] = Variable<bool>(searchByName.value);
     }
+    if (lastSeenVisibility.present) {
+      map['last_seen_visibility'] = Variable<String>(lastSeenVisibility.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -6955,6 +7008,7 @@ class CachedSearchPrivacySettingsCompanion
           ..write('searchByUsername: $searchByUsername, ')
           ..write('searchByPhone: $searchByPhone, ')
           ..write('searchByName: $searchByName, ')
+          ..write('lastSeenVisibility: $lastSeenVisibility, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -10120,6 +10174,7 @@ typedef $$CachedSearchPrivacySettingsTableCreateCompanionBuilder =
       required bool searchByUsername,
       required bool searchByPhone,
       required bool searchByName,
+      Value<String> lastSeenVisibility,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -10129,6 +10184,7 @@ typedef $$CachedSearchPrivacySettingsTableUpdateCompanionBuilder =
       Value<bool> searchByUsername,
       Value<bool> searchByPhone,
       Value<bool> searchByName,
+      Value<String> lastSeenVisibility,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -10159,6 +10215,11 @@ class $$CachedSearchPrivacySettingsTableFilterComposer
 
   ColumnFilters<bool> get searchByName => $composableBuilder(
     column: $table.searchByName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastSeenVisibility => $composableBuilder(
+    column: $table.lastSeenVisibility,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10197,6 +10258,11 @@ class $$CachedSearchPrivacySettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lastSeenVisibility => $composableBuilder(
+    column: $table.lastSeenVisibility,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -10229,6 +10295,11 @@ class $$CachedSearchPrivacySettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get searchByName => $composableBuilder(
     column: $table.searchByName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastSeenVisibility => $composableBuilder(
+    column: $table.lastSeenVisibility,
     builder: (column) => column,
   );
 
@@ -10286,6 +10357,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 Value<bool> searchByUsername = const Value.absent(),
                 Value<bool> searchByPhone = const Value.absent(),
                 Value<bool> searchByName = const Value.absent(),
+                Value<String> lastSeenVisibility = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedSearchPrivacySettingsCompanion(
@@ -10293,6 +10365,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 searchByUsername: searchByUsername,
                 searchByPhone: searchByPhone,
                 searchByName: searchByName,
+                lastSeenVisibility: lastSeenVisibility,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -10302,6 +10375,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 required bool searchByUsername,
                 required bool searchByPhone,
                 required bool searchByName,
+                Value<String> lastSeenVisibility = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedSearchPrivacySettingsCompanion.insert(
@@ -10309,6 +10383,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 searchByUsername: searchByUsername,
                 searchByPhone: searchByPhone,
                 searchByName: searchByName,
+                lastSeenVisibility: lastSeenVisibility,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),

@@ -169,6 +169,8 @@ class CachedSearchPrivacySettings extends Table {
   BoolColumn get searchByUsername => boolean()();
   BoolColumn get searchByPhone => boolean()();
   BoolColumn get searchByName => boolean()();
+  TextColumn get lastSeenVisibility =>
+      text().withDefault(const Constant('all'))();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
@@ -205,7 +207,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -244,6 +246,12 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 11) {
         await migrator.createTable(cachedSearchPrivacySettings);
+      }
+      if (from < 12) {
+        await migrator.addColumn(
+          cachedSearchPrivacySettings,
+          cachedSearchPrivacySettings.lastSeenVisibility,
+        );
       }
     },
     beforeOpen: (details) async {

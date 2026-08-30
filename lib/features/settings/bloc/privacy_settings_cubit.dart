@@ -142,6 +142,26 @@ class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
     unawaited(_save(key, value, confirmed));
   }
 
+  void setLastSeenVisibility(LastSeenVisibility visibility) {
+    final confirmed = _confirmed;
+    if (state.status != PrivacySettingsStatus.ready ||
+        state.isSaving ||
+        confirmed == null ||
+        confirmed.lastSeenVisibility == visibility) {
+      return;
+    }
+    _writeGeneration++;
+    emit(
+      state.copyWith(
+        settings: confirmed.copyWith(lastSeenVisibility: visibility),
+        isSaving: true,
+        clearError: true,
+        clearFeedback: true,
+      ),
+    );
+    unawaited(_saveLastSeenVisibility(visibility, confirmed));
+  }
+
   Future<void> _save(
     SearchPrivacySettingKey key,
     bool value,
@@ -149,6 +169,38 @@ class PrivacySettingsCubit extends Cubit<PrivacySettingsState> {
   ) async {
     try {
       final updated = await _repository.updateSearchPrivacySetting(key, value);
+      if (isClosed) return;
+      _confirmed = updated;
+      emit(
+        state.copyWith(
+          settings: updated,
+          isSaving: false,
+          clearError: true,
+          feedback: PrivacySettingsFeedback.success,
+          feedbackId: state.feedbackId + 1,
+        ),
+      );
+    } catch (error) {
+      if (isClosed) return;
+      _confirmed = rollbackValue;
+      emit(
+        state.copyWith(
+          settings: rollbackValue,
+          isSaving: false,
+          error: error,
+          feedback: PrivacySettingsFeedback.failure,
+          feedbackId: state.feedbackId + 1,
+        ),
+      );
+    }
+  }
+
+  Future<void> _saveLastSeenVisibility(
+    LastSeenVisibility visibility,
+    SearchPrivacySettings rollbackValue,
+  ) async {
+    try {
+      final updated = await _repository.updateLastSeenVisibility(visibility);
       if (isClosed) return;
       _confirmed = updated;
       emit(

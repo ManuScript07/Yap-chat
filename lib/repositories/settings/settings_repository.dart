@@ -77,5 +77,23 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   @override
+  Future<SearchPrivacySettings> updateLastSeenVisibility(
+    LastSeenVisibility visibility,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final updated = await _remote.updateLastSeenVisibility(visibility);
+    try {
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.write(scope.userId, updated),
+      );
+    } catch (error) {
+      if (error is StaleAccountSessionException) rethrow;
+    }
+    _accountSessionController.ensureCurrent(scope);
+    return updated;
+  }
+
+  @override
   Future<void> clearUserCache(String userId) => _cache.clearUser(userId);
 }

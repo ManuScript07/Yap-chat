@@ -212,6 +212,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsSearchByName => 'Искать по имени';
 
   @override
+  String get settingsLastSeenVisibility => 'отображение времени захода';
+
+  @override
+  String get settingsLastSeenAll => 'Все';
+
+  @override
+  String get settingsLastSeenFriends => 'Только друзья';
+
+  @override
+  String get settingsLastSeenNobody => 'Никто';
+
+  @override
   String get settingsPrivacyChangeTitle => 'Изменить видимость поиска?';
 
   @override
