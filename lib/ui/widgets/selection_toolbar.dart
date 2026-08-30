@@ -11,6 +11,7 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
     this.onToggleNotifications,
     this.onMarkAsRead,
     this.onDelete,
+    this.isLoading = false,
   });
 
   final int selectedCount;
@@ -19,6 +20,7 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onToggleNotifications;
   final VoidCallback? onMarkAsRead;
   final VoidCallback? onDelete;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +40,10 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
             children: [
               Row(
                 children: [
-                  GlassButton(icon: Icons.close_rounded, onPressed: onClose),
+                  GlassButton(
+                    icon: Icons.close_rounded,
+                    onPressed: isLoading ? null : onClose,
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     '$selectedCount',
@@ -54,21 +59,33 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
 
               Row(
                 children: [
-                  GlassButton(
-                    icon: isMuted
-                        ? Icons.notifications_off_rounded
-                        : Icons.notifications_active_rounded,
-                    onPressed: onToggleNotifications,
-                  ),
+                  if (isLoading)
+                    const SizedBox.square(
+                      dimension: 34,
+                      child: Padding(
+                        padding: EdgeInsets.all(7),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  else
+                    GlassButton(
+                      icon: isMuted
+                          ? Icons.notifications_off_rounded
+                          : Icons.notifications_active_rounded,
+                      onPressed: onToggleNotifications,
+                    ),
                   const SizedBox(width: 12),
                   GlassButton(
                     icon: Icons.done_all_rounded,
-                    onPressed: onMarkAsRead,
+                    onPressed: isLoading ? null : onMarkAsRead,
                   ),
                   const SizedBox(width: 12),
                   GlassButton(
                     icon: Icons.delete_outline_rounded,
-                    onPressed: onDelete,
+                    onPressed: isLoading ? null : onDelete,
                   ),
                 ],
               ),

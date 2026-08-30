@@ -1100,6 +1100,18 @@ abstract class AppLocalizations {
   /// **'Уведомления отключены'**
   String get chatsNotificationsDisabled;
 
+  /// No description provided for @chatsActionCompleted.
+  ///
+  /// In ru, this message translates to:
+  /// **'Действие выполнено'**
+  String get chatsActionCompleted;
+
+  /// No description provided for @chatsActionFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось выполнить действие. Проверьте подключение к интернету'**
+  String get chatsActionFailed;
+
   /// No description provided for @newChatTitle.
   ///
   /// In ru, this message translates to:

@@ -219,6 +219,8 @@
   "notificationLocation": "Местоположение",
   "chatsNotificationsEnabled": "Уведомления включены",
   "chatsNotificationsDisabled": "Уведомления отключены",
+  "chatsActionCompleted": "Действие выполнено",
+  "chatsActionFailed": "Не удалось выполнить действие. Проверьте подключение к интернету",
   "newChatTitle": "написать",
   "newChatFindUser": "найти пользователя",
   "friendsTabFriends": "друны",

@@ -221,59 +221,74 @@ class ChatsRepository implements IChatsRepository {
     if (ids.isEmpty) return;
     final scope = _accountSessionController.capture();
     final clearedAt = DateTime.now().toUtc();
+    final pendingIds = <String>[];
     await _accountSessionController.commit(scope, () async {
       for (final chatId in ids) {
+        final pendingId = _uuid.v4();
+        pendingIds.add(pendingId);
         await _chatCache.putPendingChatDeletion(
-          id: _uuid.v4(),
+          id: pendingId,
           chatId: chatId,
           clearedAt: clearedAt,
           ownerUserId: scope.userId,
         );
       }
     });
-
-    await _waitForSynchronizationIdle();
+    try {
+      await _remote.hideChats(ids, clearedAt: clearedAt);
+      _accountSessionController.ensureCurrent(scope);
+    } catch (_) {
+      await _accountSessionController.commit(scope, () async {
+        for (final pendingId in pendingIds) {
+          await _chatCache.removePendingOperation(
+            pendingId,
+            ownerUserId: scope.userId,
+          );
+        }
+      });
+      rethrow;
+    }
+    try {
+      await _waitForSynchronizationIdle();
+    } catch (_) {
+      // The server already accepted the hide operation. Pending rows shield
+      // this local commit from a stale list synchronization.
+    }
     await _accountSessionController.commit(
       scope,
       () => _cache.remove(ids, ownerUserId: scope.userId),
     );
     await _clearLocalConversations(ids, scope);
-    await _retryPendingDeletions(scope);
-    await _synchronize(ensureLatestMessages: true);
+    await _accountSessionController.commit(scope, () async {
+      for (final pendingId in pendingIds) {
+        await _chatCache.removePendingOperation(
+          pendingId,
+          ownerUserId: scope.userId,
+        );
+      }
+    });
   }
 
   @override
   Future<void> markAsRead(Set<String> ids) async {
     if (ids.isEmpty) return;
     final scope = _accountSessionController.capture();
+    await _remote.markAsRead(ids);
     await _accountSessionController.commit(
       scope,
       () => _cache.markAsRead(ids, ownerUserId: scope.userId),
     );
-    try {
-      _accountSessionController.ensureCurrent(scope);
-      await _remote.markAsRead(ids);
-    } catch (_) {
-      await _synchronize();
-      rethrow;
-    }
   }
 
   @override
   Future<void> toggleMute(Set<String> ids) async {
     if (ids.isEmpty) return;
     final scope = _accountSessionController.capture();
+    await _remote.toggleMute(ids);
     await _accountSessionController.commit(
       scope,
       () => _cache.toggleMute(ids, ownerUserId: scope.userId),
     );
-    try {
-      _accountSessionController.ensureCurrent(scope);
-      await _remote.toggleMute(ids);
-    } catch (_) {
-      await _synchronize();
-      rethrow;
-    }
   }
 
   @override

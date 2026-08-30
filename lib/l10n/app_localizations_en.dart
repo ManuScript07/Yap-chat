@@ -589,6 +589,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsNotificationsDisabled => 'Notifications disabled';
 
   @override
+  String get chatsActionCompleted => 'Action completed';
+
+  @override
+  String get chatsActionFailed =>
+      'Could not complete the action. Check your internet connection';
+
+  @override
   String get newChatTitle => 'write';
 
   @override

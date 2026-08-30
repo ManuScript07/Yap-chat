@@ -215,6 +215,8 @@
   "notificationLocation": "Location",
   "chatsNotificationsEnabled": "Notifications enabled",
   "chatsNotificationsDisabled": "Notifications disabled",
+  "chatsActionCompleted": "Action completed",
+  "chatsActionFailed": "Could not complete the action. Check your internet connection",
   "newChatTitle": "write",
   "newChatFindUser": "find a user",
   "friendsTabFriends": "friends",

@@ -58,6 +58,7 @@ viewInsets.bottom: ${MediaQuery.viewInsetsOf(context).bottom}
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
+        heightFactor: 1,
         child: SizedBox(
           width: navBarWidth,
           height: 70,

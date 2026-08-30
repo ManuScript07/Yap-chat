@@ -596,6 +596,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatsNotificationsDisabled => 'Уведомления отключены';
 
   @override
+  String get chatsActionCompleted => 'Действие выполнено';
+
+  @override
+  String get chatsActionFailed =>
+      'Не удалось выполнить действие. Проверьте подключение к интернету';
+
+  @override
   String get newChatTitle => 'написать';
 
   @override

@@ -82,6 +82,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     ChatSelectionToggled event,
     Emitter<ChatsState> emit,
   ) {
+    if (state.isBulkActionInProgress) return;
     final selectedChatIds = Set<String>.of(state.selectedChatIds);
 
     if (!selectedChatIds.add(event.id)) {
@@ -95,28 +96,21 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     ChatSelectionCleared event,
     Emitter<ChatsState> emit,
   ) {
+    if (state.isBulkActionInProgress) return;
     emit(state.copyWith(selectedChatIds: const {}));
   }
 
   Future<void> _onDeleted(ChatsDeleted event, Emitter<ChatsState> emit) async {
     final selectedIds = Set<String>.of(state.selectedChatIds);
-    if (selectedIds.isEmpty) return;
-
-    emit(state.copyWith(selectedChatIds: const {}));
-
-    try {
-      await _chatsRepository.deleteChats(selectedIds);
-      final chats = state.chats
+    await _performBulkAction(
+      selectedIds,
+      ChatsBulkAction.delete,
+      () => _chatsRepository.deleteChats(selectedIds),
+      (chats) => chats
           .where((chat) => !selectedIds.contains(chat.id))
-          .toList(growable: false);
-
-      emit(
-        state.copyWith(
-          chats: chats,
-          filteredChats: _filterChats(chats, state.searchQuery),
-        ),
-      );
-    } catch (_) {}
+          .toList(growable: false),
+      emit,
+    );
   }
 
   Future<void> _onMarkedAsRead(
@@ -124,25 +118,16 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     Emitter<ChatsState> emit,
   ) async {
     final selectedIds = Set<String>.of(state.selectedChatIds);
-    if (selectedIds.isEmpty) return;
-
-    try {
-      await _chatsRepository.markAsRead(selectedIds);
-      final chats = _updateSelectedChats(
+    await _performBulkAction(
+      selectedIds,
+      ChatsBulkAction.markRead,
+      () => _chatsRepository.markAsRead(selectedIds),
+      (chats) => _updateSelectedChats(
         selectedIds,
         (chat) => chat.copyWith(unreadCount: 0),
-      );
-
-      emit(
-        state.copyWith(
-          chats: chats,
-          filteredChats: _filterChats(chats, state.searchQuery),
-          selectedChatIds: const {},
-        ),
-      );
-    } catch (_) {
-      emit(state.copyWith(selectedChatIds: const {}));
-    }
+      ),
+      emit,
+    );
   }
 
   Future<void> _onMuteToggled(
@@ -150,24 +135,50 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     Emitter<ChatsState> emit,
   ) async {
     final selectedIds = Set<String>.of(state.selectedChatIds);
-    if (selectedIds.isEmpty) return;
-
-    try {
-      await _chatsRepository.toggleMute(selectedIds);
-      final chats = _updateSelectedChats(
+    await _performBulkAction(
+      selectedIds,
+      ChatsBulkAction.toggleMute,
+      () => _chatsRepository.toggleMute(selectedIds),
+      (chats) => _updateSelectedChats(
         selectedIds,
         (chat) => chat.copyWith(isMuted: !chat.isMuted),
-      );
+      ),
+      emit,
+    );
+  }
 
+  Future<void> _performBulkAction(
+    Set<String> selectedIds,
+    ChatsBulkAction action,
+    Future<void> Function() operation,
+    List<Chat> Function(List<Chat>) updateChats,
+    Emitter<ChatsState> emit,
+  ) async {
+    if (selectedIds.isEmpty || state.isBulkActionInProgress) return;
+    emit(state.copyWith(isBulkActionInProgress: true, clearFeedback: true));
+    try {
+      await operation();
+      final chats = updateChats(state.chats);
       emit(
         state.copyWith(
           chats: chats,
           filteredChats: _filterChats(chats, state.searchQuery),
           selectedChatIds: const {},
+          isBulkActionInProgress: false,
+          feedback: ChatsBulkActionFeedback.success,
+          feedbackAction: action,
+          feedbackId: state.feedbackId + 1,
         ),
       );
     } catch (_) {
-      emit(state.copyWith(selectedChatIds: const {}));
+      emit(
+        state.copyWith(
+          isBulkActionInProgress: false,
+          feedback: ChatsBulkActionFeedback.failure,
+          feedbackAction: action,
+          feedbackId: state.feedbackId + 1,
+        ),
+      );
     }
   }
 

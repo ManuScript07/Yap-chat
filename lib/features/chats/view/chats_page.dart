@@ -29,7 +29,8 @@ class ChatsPage extends StatelessWidget {
 
         return previous.isSelectionMode != current.isSelectionMode ||
             previous.selectedChatIds.length != current.selectedChatIds.length ||
-            prevMuted != currMuted;
+            prevMuted != currMuted ||
+            previous.isBulkActionInProgress != current.isBulkActionInProgress;
       },
       builder: (context, state) {
         final mediaQuery = MediaQuery.of(context);
@@ -39,9 +40,7 @@ class ChatsPage extends StatelessWidget {
         const appBarHeight = 130.0;
         const searchBarHeight = 50.0;
         const searchBarSpacing = 16.0;
-        const navigationBarHeight = 70.0;
-        const navigationBarBottomOffset = 0.0;
-        const snackBarSearchGap = 8.0;
+        const notificationSnackBarBottomMargin = 156.0;
         final searchBarTop =
             mediaQuery.size.height -
             mediaQuery.viewInsets.bottom -
@@ -51,14 +50,6 @@ class ChatsPage extends StatelessWidget {
             !state.isSelectionMode &&
             isLandscapeKeyboard &&
             searchBarTop < appBarHeight;
-        final notificationSnackBarBottomMargin =
-            mediaQuery.viewPadding.bottom +
-            navigationBarHeight +
-            navigationBarBottomOffset +
-            searchBarHeight +
-            searchBarSpacing +
-            snackBarSearchGap;
-
         final selectedChats = state.chats.where(
           (chat) => state.selectedChatIds.contains(chat.id),
         );
@@ -66,101 +57,121 @@ class ChatsPage extends StatelessWidget {
 
         return ScaffoldMessenger(
           child: Builder(
-            builder: (scaffoldContext) => Scaffold(
-              resizeToAvoidBottomInset: false,
-              backgroundColor: context.scaffoldBackgroundColor,
-              extendBodyBehindAppBar: true,
-              appBar: hideAppBarForKeyboard
-                  ? null
-                  : PreferredSize(
-                      preferredSize: const Size.fromHeight(130),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        reverseDuration: const Duration(milliseconds: 180),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) {
-                          final slideAnimation = Tween<Offset>(
-                            begin: const Offset(0, -0.06),
-                            end: Offset.zero,
-                          ).animate(animation);
+            builder: (scaffoldContext) => BlocListener<ChatsBloc, ChatsState>(
+              listenWhen: (previous, current) =>
+                  previous.feedbackId != current.feedbackId &&
+                  current.feedback != null,
+              listener: (context, actionState) {
+                final action = actionState.feedbackAction;
+                if (action == null) return;
+                final isSuccess =
+                    actionState.feedback == ChatsBulkActionFeedback.success;
+                final message = isSuccess
+                    ? switch (action) {
+                        ChatsBulkAction.toggleMute =>
+                          firstSelectedMuted
+                              ? context.l10n.chatsNotificationsEnabled
+                              : context.l10n.chatsNotificationsDisabled,
+                        ChatsBulkAction.delete =>
+                          context.l10n.chatsActionCompleted,
+                        ChatsBulkAction.markRead =>
+                          context.l10n.chatsActionCompleted,
+                      }
+                    : context.l10n.chatsActionFailed;
+                showAppSnackBar(
+                  scaffoldContext,
+                  message: message,
+                  type: isSuccess ? SnackBarType.success : SnackBarType.error,
+                  bottomMargin: notificationSnackBarBottomMargin,
+                );
+              },
+              child: Scaffold(
+                resizeToAvoidBottomInset: false,
+                backgroundColor: context.scaffoldBackgroundColor,
+                extendBodyBehindAppBar: true,
+                appBar: hideAppBarForKeyboard
+                    ? null
+                    : PreferredSize(
+                        preferredSize: const Size.fromHeight(130),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          reverseDuration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) {
+                            final slideAnimation = Tween<Offset>(
+                              begin: const Offset(0, -0.06),
+                              end: Offset.zero,
+                            ).animate(animation);
 
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: slideAnimation,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: state.isSelectionMode
-                            ? SelectionToolbar(
-                                key: const ValueKey('selection_toolbar'),
-                                selectedCount: state.selectedChatIds.length,
-                                onClose: () => context.read<ChatsBloc>().add(
-                                  const ChatSelectionCleared(),
-                                ),
-                                isMuted: firstSelectedMuted,
-                                onToggleNotifications: () {
-                                  context.read<ChatsBloc>().add(
-                                    const ChatsMuteToggled(),
-                                  );
-                                  showAppSnackBar(
-                                    scaffoldContext,
-                                    message: firstSelectedMuted
-                                        ? context.l10n.chatsNotificationsEnabled
-                                        : context
-                                              .l10n
-                                              .chatsNotificationsDisabled,
-                                    type: SnackBarType.info,
-                                    bottomMargin:
-                                        notificationSnackBarBottomMargin,
-                                  );
-                                },
-                                onMarkAsRead: () => context
-                                    .read<ChatsBloc>()
-                                    .add(const ChatsMarkedAsRead()),
-                                onDelete: () async {
-                                  final count = state.selectedChatIds.length;
-                                  final confirmed =
-                                      await showConfirmationDialog(
-                                        context,
-                                        title: context.l10n.chatsDeleteTitle(
-                                          count,
-                                        ),
-                                        content: context.l10n
-                                            .chatsDeleteConfirmation(count),
-                                        confirmLabel:
-                                            context.l10n.chatActionDelete,
-                                      );
-                                  if (confirmed == true && context.mounted) {
-                                    context.read<ChatsBloc>().add(
-                                      const ChatsDeleted(),
-                                    );
-                                  }
-                                },
-                              )
-                            : PrimaryAppBar(
-                                key: const ValueKey('primary_app_bar'),
-                                title: context.l10n.navChats,
-                                actionIcon: Icons.add_comment_rounded,
-                                onActionPressed: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  FocusScope.of(context).unfocus();
-                                  final authRouter = context.router.root
-                                      .innerRouterOf<StackRouter>(
-                                        AuthGateRoute.name,
-                                      );
-                                  if (authRouter != null) {
-                                    unawaited(
-                                      authRouter.push(const NewChatRoute()),
-                                    );
-                                  }
-                                },
+                            return FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: slideAnimation,
+                                child: child,
                               ),
+                            );
+                          },
+                          child: state.isSelectionMode
+                              ? SelectionToolbar(
+                                  key: const ValueKey('selection_toolbar'),
+                                  selectedCount: state.selectedChatIds.length,
+                                  onClose: () => context.read<ChatsBloc>().add(
+                                    const ChatSelectionCleared(),
+                                  ),
+                                  isMuted: firstSelectedMuted,
+                                  isLoading: state.isBulkActionInProgress,
+                                  onToggleNotifications: () {
+                                    context.read<ChatsBloc>().add(
+                                      const ChatsMuteToggled(),
+                                    );
+                                  },
+                                  onMarkAsRead: () => context
+                                      .read<ChatsBloc>()
+                                      .add(const ChatsMarkedAsRead()),
+                                  onDelete: () async {
+                                    final count = state.selectedChatIds.length;
+                                    final confirmed =
+                                        await showConfirmationDialog(
+                                          context,
+                                          title: context.l10n.chatsDeleteTitle(
+                                            count,
+                                          ),
+                                          content: context.l10n
+                                              .chatsDeleteConfirmation(count),
+                                          confirmLabel:
+                                              context.l10n.chatActionDelete,
+                                        );
+                                    if (confirmed == true && context.mounted) {
+                                      context.read<ChatsBloc>().add(
+                                        const ChatsDeleted(),
+                                      );
+                                    }
+                                  },
+                                )
+                              : PrimaryAppBar(
+                                  key: const ValueKey('primary_app_bar'),
+                                  title: context.l10n.navChats,
+                                  actionIcon: Icons.add_comment_rounded,
+                                  onActionPressed: () {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                    FocusScope.of(context).unfocus();
+                                    final authRouter = context.router.root
+                                        .innerRouterOf<StackRouter>(
+                                          AuthGateRoute.name,
+                                        );
+                                    if (authRouter != null) {
+                                      unawaited(
+                                        authRouter.push(const NewChatRoute()),
+                                      );
+                                    }
+                                  },
+                                ),
+                        ),
                       ),
-                    ),
-              body: const _ChatsBody(),
+                body: const _ChatsBody(),
+              ),
             ),
           ),
         );

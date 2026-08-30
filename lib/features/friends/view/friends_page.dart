@@ -514,7 +514,6 @@ class _FriendsListState extends State<_FriendsList> {
         friend.id,
       );
       if (!context.mounted) return;
-      if (lookup.availability == FriendLocationAvailability.hidden) return;
       final location = lookup.location;
       if (location == null) {
         showAppSnackBar(
