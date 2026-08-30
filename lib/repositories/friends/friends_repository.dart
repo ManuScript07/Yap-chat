@@ -11,6 +11,8 @@ import 'package:yap_chat/repositories/friends/friends_remote_data_source.dart';
 
 class FriendsRepository
     implements IFriendsRepository, IProfileFriendsRepository {
+  static const _locationCacheTtl = Duration(minutes: 10);
+
   FriendsRepository({
     required AppConfig config,
     required FriendsCacheDataSource cache,
@@ -39,7 +41,9 @@ class FriendsRepository
   final AccountSessionController _accountSessionController;
   final DateTime Function() _clock;
   final Uuid _uuid = const Uuid();
-  StreamSubscription<void>? _changesSubscription;
+  StreamSubscription<FriendChange>? _changesSubscription;
+  final StreamController<String> _profileChangesController =
+      StreamController<String>.broadcast();
   Future<void>? _activeSync;
   final Map<String, ({DateTime cachedAt, List<FriendCandidate> results})>
   _searchCache = {};
@@ -67,6 +71,12 @@ class FriendsRepository
     final scope = _accountSessionController.capture();
     unawaited(_ensureStarted());
     return _cache.watchRequests(ownerUserId: scope.userId);
+  }
+
+  @override
+  Stream<String> watchProfileChanges() {
+    unawaited(_ensureStarted());
+    return _profileChangesController.stream;
   }
 
   @override
@@ -547,7 +557,14 @@ class FriendsRepository
     );
     _accountSessionController.ensureCurrent(scope);
     if (cached != null) {
-      unawaited(_refreshFriendLocationSafely(friendId, scope));
+      final isFresh = await _cache.hasFreshLocation(
+        friendId,
+        maxAge: _locationCacheTtl,
+        ownerUserId: scope.userId,
+      );
+      if (!isFresh) {
+        unawaited(_refreshFriendLocationSafely(friendId, scope));
+      }
       return FriendLocationLookup.current(cached);
     }
     return _refreshFriendLocation(friendId, scope);
@@ -566,8 +583,37 @@ class FriendsRepository
   }
 
   @override
+  Future<bool> isCachedUserDistanceFresh(String userId) {
+    final scope = _accountSessionController.capture();
+    return _cache.hasFreshDistance(
+      userId,
+      maxAge: _locationCacheTtl,
+      ownerUserId: scope.userId,
+    );
+  }
+
+  @override
+  Future<void> cacheUserDistance(String userId, UserDistance distance) async {
+    final scope = _accountSessionController.capture();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.writeDistance(userId, distance, ownerUserId: scope.userId),
+    );
+  }
+
+  @override
   Future<UserDistance?> getUserDistance(String userId) async {
     final scope = _accountSessionController.capture();
+    final cached = await _cache.readDistance(userId, ownerUserId: scope.userId);
+    _accountSessionController.ensureCurrent(scope);
+    if (cached != null &&
+        await _cache.hasFreshDistance(
+          userId,
+          maxAge: _locationCacheTtl,
+          ownerUserId: scope.userId,
+        )) {
+      return cached;
+    }
     try {
       final distance = await _remote.getUserDistance(userId);
       await _accountSessionController.commit(scope, () async {
@@ -584,11 +630,11 @@ class FriendsRepository
       return distance;
     } catch (_) {
       _accountSessionController.ensureCurrent(scope);
-      final cached = await _cache.readDistance(
+      final fallback = await _cache.readDistance(
         userId,
         ownerUserId: scope.userId,
       );
-      if (cached != null) return cached;
+      if (fallback != null) return fallback;
       rethrow;
     }
   }
@@ -686,7 +732,13 @@ class FriendsRepository
 
   Future<void> _ensureStarted() async {
     _changesSubscription ??= _remote.watchChanges().listen(
-      (_) => unawaited(_synchronizeSafely()),
+      (change) {
+        final profileId = change.profileId;
+        if (profileId != null && !_profileChangesController.isClosed) {
+          _profileChangesController.add(profileId);
+        }
+        unawaited(_synchronizeSafely());
+      },
       onError: (Object error, StackTrace stackTrace) =>
           _config.talker.handle(error, stackTrace, 'Friends stream failed'),
     );

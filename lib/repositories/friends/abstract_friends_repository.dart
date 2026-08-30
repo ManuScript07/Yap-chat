@@ -30,8 +30,11 @@ abstract interface class IFriendsRepository {
 }
 
 abstract interface class IProfileFriendsRepository {
+  Stream<String> watchProfileChanges();
   Future<FriendLocation?> getCachedFriendLocation(String friendId);
   Future<UserDistance?> getCachedUserDistance(String userId);
+  Future<bool> isCachedUserDistanceFresh(String userId);
+  Future<void> cacheUserDistance(String userId, UserDistance distance);
   Future<UserDistance?> getUserDistance(String userId);
   Future<void> removeFriend(String friendId);
 }
@@ -39,10 +42,16 @@ abstract interface class IProfileFriendsRepository {
 extension ProfileFriendsRepositoryAccess on IFriendsRepository {
   IProfileFriendsRepository get _profiles => this as IProfileFriendsRepository;
 
+  Stream<String> watchProfileChanges() => _profiles.watchProfileChanges();
+
   Future<FriendLocation?> getCachedFriendLocation(String friendId) =>
       _profiles.getCachedFriendLocation(friendId);
   Future<UserDistance?> getCachedUserDistance(String userId) =>
       _profiles.getCachedUserDistance(userId);
+  Future<bool> isCachedUserDistanceFresh(String userId) =>
+      _profiles.isCachedUserDistanceFresh(userId);
+  Future<void> cacheUserDistance(String userId, UserDistance distance) =>
+      _profiles.cacheUserDistance(userId, distance);
   Future<UserDistance?> getUserDistance(String userId) =>
       _profiles.getUserDistance(userId);
   Future<void> removeFriend(String friendId) =>

@@ -67,7 +67,7 @@ class ProfilePhotoHero extends StatelessWidget {
 String profilePhotoHeroTag(ProfilePhoto photo) =>
     'profile-photo-${photo.identity}';
 
-class ProfilePhotoImage extends StatelessWidget {
+class ProfilePhotoImage extends StatefulWidget {
   const ProfilePhotoImage({
     super.key,
     required this.photo,
@@ -84,16 +84,37 @@ class ProfilePhotoImage extends StatelessWidget {
   final bool revealOnLoad;
 
   @override
+  State<ProfilePhotoImage> createState() => _ProfilePhotoImageState();
+}
+
+class _ProfilePhotoImageState extends State<ProfilePhotoImage> {
+  late ProfilePhoto _displayedPhoto = widget.photo;
+
+  @override
+  void didUpdateWidget(covariant ProfilePhotoImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final isNewPhoto = oldWidget.photo.identity != widget.photo.identity;
+    final hasNewCachedBytes =
+        oldWidget.photo.bytes == null && widget.photo.bytes != null;
+    if (isNewPhoto || hasNewCachedBytes) {
+      _displayedPhoto = widget.photo;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     Widget errorBuilder(_, _, _) => _placeholder(context);
-    final provider = profilePhotoImageProvider(photo, cacheWidth: cacheWidth);
+    final provider = profilePhotoImageProvider(
+      _displayedPhoto,
+      cacheWidth: widget.cacheWidth,
+    );
     return provider == null
         ? _placeholder(context)
         : Image(
             image: provider,
-            fit: fit,
+            fit: widget.fit,
             gaplessPlayback: true,
-            frameBuilder: revealOnLoad ? _revealImageFrame : null,
+            frameBuilder: widget.revealOnLoad ? _revealImageFrame : null,
             errorBuilder: errorBuilder,
           );
   }
@@ -103,7 +124,7 @@ class ProfilePhotoImage extends StatelessWidget {
     child: Center(
       child: Icon(
         Icons.person_rounded,
-        size: placeholderIconSize,
+        size: widget.placeholderIconSize,
         color: context.colorScheme.onPrimary,
       ),
     ),

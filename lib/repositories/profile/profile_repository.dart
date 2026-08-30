@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -64,7 +65,13 @@ class ProfileRepository
     if (response.isEmpty) throw const ProfileNotFoundException();
     final row = Map<String, dynamic>.from(response.first as Map);
     final photos = _photoRows(row['photos']);
-    var profile = UserProfile.fromMap(row).copyWith(photos: photos);
+    final baseProfile = UserProfile.fromMap(row);
+    // Older profiles can have only the primary avatar columns populated. Keep
+    // that avatar in the photo list as well, so it is hydrated and persisted
+    // by the same offline cache as every other profile photo.
+    var profile = baseProfile.copyWith(
+      photos: photos.isEmpty ? baseProfile.effectivePhotos : photos,
+    );
     profile = await _hydrateViewedProfile(profile, scope);
     final viewedProfile = ViewedProfile(
       profile: profile,
@@ -83,6 +90,14 @@ class ProfileRepository
     await _accountSessionController.commit(
       scope,
       () => _viewedProfileCache.write(scope.userId, viewedProfile),
+    );
+    // The page always shows this small set of avatars. Warm their shared media
+    // cache without delaying profile rendering, so an offline reopen has the
+    // same result as friend and chat lists.
+    unawaited(
+      Future.wait(
+        viewedProfile.friendsPreview.map(resolveViewedProfileFriendAvatar),
+      ),
     );
     return viewedProfile;
   }
@@ -470,14 +485,25 @@ class ProfileRepository
         continue;
       }
       final storagePath = photo.storagePath;
-      if (storagePath == null) {
-        hydrated.add(photo);
-        continue;
-      }
       try {
-        hydrated.add(
-          photo.copyWith(bytes: await _avatarStorage.download(storagePath)),
-        );
+        if (storagePath != null) {
+          hydrated.add(
+            photo.copyWith(bytes: await _avatarStorage.download(storagePath)),
+          );
+          continue;
+        }
+        final url = photo.avatarUrl;
+        if (url != null && url.isNotEmpty) {
+          final localPath = await _mediaCache.cacheNetworkFile(
+            ownerUserId: scope.userId,
+            url: url,
+          );
+          hydrated.add(
+            photo.copyWith(bytes: await File(localPath).readAsBytes()),
+          );
+          continue;
+        }
+        hydrated.add(photo);
       } catch (error, stackTrace) {
         _talker.handle(error, stackTrace, 'Viewed profile photo load failed');
         hydrated.add(photo);

@@ -60,6 +60,7 @@ class ViewedProfile extends Equatable {
     int? viewCount,
     DateTime? lastSeenAt,
     bool? showsLastSeen,
+    bool clearLastSeenAt = false,
   }) => ViewedProfile(
     profile: profile,
     relationship: relationship ?? this.relationship,
@@ -67,7 +68,7 @@ class ViewedProfile extends Equatable {
     friendCount: friendCount ?? this.friendCount,
     friendsPreview: friendsPreview ?? this.friendsPreview,
     viewCount: viewCount ?? this.viewCount,
-    lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+    lastSeenAt: clearLastSeenAt ? null : lastSeenAt ?? this.lastSeenAt,
     showsLastSeen: showsLastSeen ?? this.showsLastSeen,
   );
 

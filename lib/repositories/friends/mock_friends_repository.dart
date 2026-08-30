@@ -73,6 +73,9 @@ class MockFriendsRepository
   Future<List<FriendRequest>> getRequests() async => _requestsSnapshot;
 
   @override
+  Stream<String> watchProfileChanges() => const Stream.empty();
+
+  @override
   Future<List<FriendCandidate>> searchUsers(String query) async {
     final normalized = query.trim().toLowerCase();
     final usernameSearch = normalized.startsWith('@');
@@ -238,6 +241,12 @@ class MockFriendsRepository
 
   @override
   Future<UserDistance?> getCachedUserDistance(String userId) async => null;
+
+  @override
+  Future<bool> isCachedUserDistanceFresh(String userId) async => false;
+
+  @override
+  Future<void> cacheUserDistance(String userId, UserDistance distance) async {}
 
   @override
   Future<UserDistance?> getUserDistance(String userId) async => UserDistance(

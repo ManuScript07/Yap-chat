@@ -5,6 +5,12 @@ import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/core/services/reconnect_backoff.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 
+class FriendChange {
+  const FriendChange({this.profileId});
+
+  final String? profileId;
+}
+
 class FriendsRemoteDataSource {
   FriendsRemoteDataSource({
     required SupabaseClient client,
@@ -19,7 +25,7 @@ class FriendsRemoteDataSource {
   final SupabaseClient _client;
   final Talker _talker;
   final ReconnectBackoff _backoff;
-  StreamController<void>? _changesController;
+  StreamController<FriendChange>? _changesController;
   RealtimeChannel? _channel;
   Future<void> _channelOperation = Future<void>.value();
   bool _paused = false;
@@ -222,8 +228,8 @@ class FriendsRemoteDataSource {
   Future<void> removeFriend(String friendId) =>
       _client.rpc<void>('remove_friend', params: {'friend_user_id': friendId});
 
-  Stream<void> watchChanges() =>
-      (_changesController ??= StreamController<void>.broadcast(
+  Stream<FriendChange> watchChanges() =>
+      (_changesController ??= StreamController<FriendChange>.broadcast(
         onListen: () => unawaited(_serialize(_ensureChannel)),
         onCancel: () => unawaited(_serialize(_removeCurrentChannel)),
       )).stream;
@@ -257,9 +263,15 @@ class FriendsRemoteDataSource {
         )
         .onBroadcast(
           event: 'changed',
-          callback: (_) {
+          callback: (event) {
             if (identical(_channel, channel) && !controller.isClosed) {
-              controller.add(null);
+              final nested = event['payload'];
+              final payload = nested is Map
+                  ? Map<String, dynamic>.from(nested)
+                  : event;
+              controller.add(
+                FriendChange(profileId: payload['profile_id'] as String?),
+              );
             }
           },
         );
@@ -270,7 +282,7 @@ class FriendsRemoteDataSource {
         case RealtimeSubscribeStatus.subscribed:
           _backoff.reset();
           _talker.debug('Friends realtime subscribed');
-          controller.add(null);
+          controller.add(const FriendChange());
         case RealtimeSubscribeStatus.closed:
         case RealtimeSubscribeStatus.channelError:
         case RealtimeSubscribeStatus.timedOut:

@@ -86,6 +86,23 @@ class FriendsCacheDataSource {
         ),
       );
 
+  Future<bool> hasFreshLocation(
+    String friendId, {
+    required Duration maxAge,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.select(_database.cachedFriendLocations)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(owner) &
+            table.friendUserId.equals(friendId),
+      );
+    final row = await query.getSingleOrNull();
+    return row != null &&
+        row.cachedAt.isAfter(DateTime.now().toUtc().subtract(maxAge));
+  }
+
   Future<void> removeLocation(String friendId, {String? ownerUserId}) =>
       (_database.delete(_database.cachedFriendLocations)..where(
             (table) =>
@@ -130,6 +147,23 @@ class FriendsCacheDataSource {
           cachedAt: DateTime.now().toUtc(),
         ),
       );
+
+  Future<bool> hasFreshDistance(
+    String targetUserId, {
+    required Duration maxAge,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.select(_database.cachedUserDistances)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(owner) &
+            table.targetUserId.equals(targetUserId),
+      );
+    final row = await query.getSingleOrNull();
+    return row != null &&
+        row.cachedAt.isAfter(DateTime.now().toUtc().subtract(maxAge));
+  }
 
   Future<void> removeDistance(String targetUserId, {String? ownerUserId}) =>
       (_database.delete(_database.cachedUserDistances)..where(

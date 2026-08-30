@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
@@ -79,8 +81,19 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   final IFriendsRepository _friendsRepository;
   final IChatsRepository _chatsRepository;
   final ILocationRepository _locationRepository;
+  StreamSubscription<List<Chat>>? _chatsSubscription;
+  StreamSubscription<String>? _friendsSubscription;
+  bool _isRealtimeProfileRefreshPending = false;
 
   Future<void> load() async {
+    _chatsSubscription ??= _chatsRepository.watchChats().listen(
+      _syncLastSeenFromChats,
+      onError: (_, _) {},
+    );
+    _friendsSubscription ??= _friendsRepository.watchProfileChanges().listen(
+      _syncProfileFromFriendChange,
+      onError: (_, _) {},
+    );
     emit(state.copyWith(status: ViewedProfileStatus.loading));
     final cached = await _profileRepository.getCachedViewedProfile(_userId);
     if (cached != null && !isClosed) {
@@ -133,12 +146,27 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   }
 
   Future<void> _loadLocation(ViewedProfile profile) async {
+    final cachedDistance = await _friendsRepository.getCachedUserDistance(
+      _userId,
+    );
+    var isCachedDistanceFresh = await _friendsRepository
+        .isCachedUserDistanceFresh(_userId);
+    var distanceLocationUpdatedAt = cachedDistance?.updatedAt;
+    if (cachedDistance != null && !isClosed) {
+      emit(state.copyWith(distance: cachedDistance));
+    }
+
     FriendLocation? exactLocation;
     if (profile.isFriend) {
       exactLocation = await _friendsRepository.getCachedFriendLocation(_userId);
       if (exactLocation != null && !isClosed) {
         emit(state.copyWith(location: exactLocation));
-        await _setLocalDistance(exactLocation);
+        if (distanceLocationUpdatedAt != exactLocation.updatedAt ||
+            !isCachedDistanceFresh) {
+          await _setLocalDistance(exactLocation);
+          distanceLocationUpdatedAt = exactLocation.updatedAt;
+          isCachedDistanceFresh = true;
+        }
       }
       try {
         final lookup = await _friendsRepository.getFriendLocation(_userId);
@@ -146,18 +174,17 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
         if (received != null) {
           exactLocation = received;
           if (!isClosed) emit(state.copyWith(location: received));
-          await _setLocalDistance(received);
+          if (distanceLocationUpdatedAt != received.updatedAt ||
+              !isCachedDistanceFresh) {
+            await _setLocalDistance(received);
+            distanceLocationUpdatedAt = received.updatedAt;
+            isCachedDistanceFresh = true;
+          }
         }
       } catch (_) {}
     }
     if (exactLocation != null) return;
 
-    final cachedDistance = await _friendsRepository.getCachedUserDistance(
-      _userId,
-    );
-    if (cachedDistance != null && !isClosed) {
-      emit(state.copyWith(distance: cachedDistance));
-    }
     try {
       final distance = await _friendsRepository.getUserDistance(_userId);
       if (!isClosed) {
@@ -190,6 +217,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
               unit: DistanceUnit.kilometers,
               updatedAt: location.updatedAt,
             );
+      await _friendsRepository.cacheUserDistance(_userId, distance);
       if (!isClosed) emit(state.copyWith(distance: distance));
     } catch (_) {
       try {
@@ -292,5 +320,69 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
         viewedProfile: profile.copyWith(lastSeenAt: DateTime.now()),
       ),
     );
+  }
+
+  void _syncLastSeenFromChats(List<Chat> chats) {
+    if (isClosed) return;
+    Chat? chat;
+    for (final candidate in chats) {
+      if (candidate.peerId == _userId) {
+        chat = candidate;
+        break;
+      }
+    }
+    final viewedProfile = state.viewedProfile;
+    if (chat == null || viewedProfile == null) return;
+    final identityChanged =
+        viewedProfile.profile.username != chat.peerUsername ||
+        viewedProfile.profile.displayName != chat.userName ||
+        viewedProfile.profile.avatarUrl != chat.avatarUrl ||
+        viewedProfile.profile.avatarStoragePath != chat.avatarStoragePath;
+    final lastSeenChanged =
+        viewedProfile.showsLastSeen != chat.showsLastSeen ||
+        viewedProfile.lastSeenAt != chat.lastSeenAt;
+    if (lastSeenChanged) {
+      emit(
+        state.copyWith(
+          chat: chat,
+          viewedProfile: viewedProfile.copyWith(
+            showsLastSeen: chat.showsLastSeen,
+            lastSeenAt: chat.lastSeenAt,
+            clearLastSeenAt: !chat.showsLastSeen || chat.lastSeenAt == null,
+          ),
+        ),
+      );
+    }
+    if (identityChanged) unawaited(_refreshProfileFromRealtime());
+  }
+
+  void _syncProfileFromFriendChange(String profileId) {
+    if (profileId == _userId) unawaited(_refreshProfileFromRealtime());
+  }
+
+  Future<void> _refreshProfileFromRealtime() async {
+    if (_isRealtimeProfileRefreshPending) return;
+    _isRealtimeProfileRefreshPending = true;
+    try {
+      final refreshed = await _profileRepository.getViewedProfile(
+        _userId,
+        registerView: false,
+      );
+      if (!isClosed) {
+        emit(state.copyWith(viewedProfile: refreshed));
+        await _loadSupportingData(refreshed);
+      }
+    } catch (_) {
+      // Keep the cached profile visible until the next successful update.
+    } finally {
+      _isRealtimeProfileRefreshPending = false;
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _chatsSubscription?.cancel();
+    await _friendsSubscription?.cancel();
+    return super.close();
   }
 }
