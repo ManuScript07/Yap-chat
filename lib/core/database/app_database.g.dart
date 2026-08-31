@@ -98,6 +98,20 @@ class $CachedProfilesTable extends CachedProfiles
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _yandexAvatarDisabledMeta =
+      const VerificationMeta('yandexAvatarDisabled');
+  @override
+  late final GeneratedColumn<bool> yandexAvatarDisabled = GeneratedColumn<bool>(
+    'yandex_avatar_disabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("yandex_avatar_disabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _genderMeta = const VerificationMeta('gender');
   @override
   late final GeneratedColumn<String> gender = GeneratedColumn<String>(
@@ -185,6 +199,7 @@ class $CachedProfilesTable extends CachedProfiles
     avatarStoragePath,
     avatarBytes,
     avatarUpdatedAt,
+    yandexAvatarDisabled,
     gender,
     bio,
     onboardingCompleted,
@@ -268,6 +283,15 @@ class $CachedProfilesTable extends CachedProfiles
         avatarUpdatedAt.isAcceptableOrUnknown(
           data['avatar_updated_at']!,
           _avatarUpdatedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('yandex_avatar_disabled')) {
+      context.handle(
+        _yandexAvatarDisabledMeta,
+        yandexAvatarDisabled.isAcceptableOrUnknown(
+          data['yandex_avatar_disabled']!,
+          _yandexAvatarDisabledMeta,
         ),
       );
     }
@@ -371,6 +395,10 @@ class $CachedProfilesTable extends CachedProfiles
         DriftSqlType.dateTime,
         data['${effectivePrefix}avatar_updated_at'],
       ),
+      yandexAvatarDisabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}yandex_avatar_disabled'],
+      )!,
       gender: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}gender'],
@@ -417,6 +445,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
   final String? avatarStoragePath;
   final Uint8List? avatarBytes;
   final DateTime? avatarUpdatedAt;
+  final bool yandexAvatarDisabled;
   final String gender;
   final String bio;
   final bool onboardingCompleted;
@@ -433,6 +462,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     this.avatarStoragePath,
     this.avatarBytes,
     this.avatarUpdatedAt,
+    required this.yandexAvatarDisabled,
     required this.gender,
     required this.bio,
     required this.onboardingCompleted,
@@ -462,6 +492,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     if (!nullToAbsent || avatarUpdatedAt != null) {
       map['avatar_updated_at'] = Variable<DateTime>(avatarUpdatedAt);
     }
+    map['yandex_avatar_disabled'] = Variable<bool>(yandexAvatarDisabled);
     map['gender'] = Variable<String>(gender);
     map['bio'] = Variable<String>(bio);
     map['onboarding_completed'] = Variable<bool>(onboardingCompleted);
@@ -498,6 +529,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       avatarUpdatedAt: avatarUpdatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(avatarUpdatedAt),
+      yandexAvatarDisabled: Value(yandexAvatarDisabled),
       gender: Value(gender),
       bio: Value(bio),
       onboardingCompleted: Value(onboardingCompleted),
@@ -530,6 +562,9 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       ),
       avatarBytes: serializer.fromJson<Uint8List?>(json['avatarBytes']),
       avatarUpdatedAt: serializer.fromJson<DateTime?>(json['avatarUpdatedAt']),
+      yandexAvatarDisabled: serializer.fromJson<bool>(
+        json['yandexAvatarDisabled'],
+      ),
       gender: serializer.fromJson<String>(json['gender']),
       bio: serializer.fromJson<String>(json['bio']),
       onboardingCompleted: serializer.fromJson<bool>(
@@ -555,6 +590,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       'avatarStoragePath': serializer.toJson<String?>(avatarStoragePath),
       'avatarBytes': serializer.toJson<Uint8List?>(avatarBytes),
       'avatarUpdatedAt': serializer.toJson<DateTime?>(avatarUpdatedAt),
+      'yandexAvatarDisabled': serializer.toJson<bool>(yandexAvatarDisabled),
       'gender': serializer.toJson<String>(gender),
       'bio': serializer.toJson<String>(bio),
       'onboardingCompleted': serializer.toJson<bool>(onboardingCompleted),
@@ -574,6 +610,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     Value<String?> avatarStoragePath = const Value.absent(),
     Value<Uint8List?> avatarBytes = const Value.absent(),
     Value<DateTime?> avatarUpdatedAt = const Value.absent(),
+    bool? yandexAvatarDisabled,
     String? gender,
     String? bio,
     bool? onboardingCompleted,
@@ -594,6 +631,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     avatarUpdatedAt: avatarUpdatedAt.present
         ? avatarUpdatedAt.value
         : this.avatarUpdatedAt,
+    yandexAvatarDisabled: yandexAvatarDisabled ?? this.yandexAvatarDisabled,
     gender: gender ?? this.gender,
     bio: bio ?? this.bio,
     onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
@@ -624,6 +662,9 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       avatarUpdatedAt: data.avatarUpdatedAt.present
           ? data.avatarUpdatedAt.value
           : this.avatarUpdatedAt,
+      yandexAvatarDisabled: data.yandexAvatarDisabled.present
+          ? data.yandexAvatarDisabled.value
+          : this.yandexAvatarDisabled,
       gender: data.gender.present ? data.gender.value : this.gender,
       bio: data.bio.present ? data.bio.value : this.bio,
       onboardingCompleted: data.onboardingCompleted.present
@@ -651,6 +692,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
           ..write('avatarStoragePath: $avatarStoragePath, ')
           ..write('avatarBytes: $avatarBytes, ')
           ..write('avatarUpdatedAt: $avatarUpdatedAt, ')
+          ..write('yandexAvatarDisabled: $yandexAvatarDisabled, ')
           ..write('gender: $gender, ')
           ..write('bio: $bio, ')
           ..write('onboardingCompleted: $onboardingCompleted, ')
@@ -672,6 +714,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     avatarStoragePath,
     $driftBlobEquality.hash(avatarBytes),
     avatarUpdatedAt,
+    yandexAvatarDisabled,
     gender,
     bio,
     onboardingCompleted,
@@ -692,6 +735,7 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
           other.avatarStoragePath == this.avatarStoragePath &&
           $driftBlobEquality.equals(other.avatarBytes, this.avatarBytes) &&
           other.avatarUpdatedAt == this.avatarUpdatedAt &&
+          other.yandexAvatarDisabled == this.yandexAvatarDisabled &&
           other.gender == this.gender &&
           other.bio == this.bio &&
           other.onboardingCompleted == this.onboardingCompleted &&
@@ -710,6 +754,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
   final Value<String?> avatarStoragePath;
   final Value<Uint8List?> avatarBytes;
   final Value<DateTime?> avatarUpdatedAt;
+  final Value<bool> yandexAvatarDisabled;
   final Value<String> gender;
   final Value<String> bio;
   final Value<bool> onboardingCompleted;
@@ -727,6 +772,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     this.avatarStoragePath = const Value.absent(),
     this.avatarBytes = const Value.absent(),
     this.avatarUpdatedAt = const Value.absent(),
+    this.yandexAvatarDisabled = const Value.absent(),
     this.gender = const Value.absent(),
     this.bio = const Value.absent(),
     this.onboardingCompleted = const Value.absent(),
@@ -745,6 +791,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     this.avatarStoragePath = const Value.absent(),
     this.avatarBytes = const Value.absent(),
     this.avatarUpdatedAt = const Value.absent(),
+    this.yandexAvatarDisabled = const Value.absent(),
     required String gender,
     required String bio,
     required bool onboardingCompleted,
@@ -769,6 +816,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     Expression<String>? avatarStoragePath,
     Expression<Uint8List>? avatarBytes,
     Expression<DateTime>? avatarUpdatedAt,
+    Expression<bool>? yandexAvatarDisabled,
     Expression<String>? gender,
     Expression<String>? bio,
     Expression<bool>? onboardingCompleted,
@@ -787,6 +835,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
       if (avatarStoragePath != null) 'avatar_storage_path': avatarStoragePath,
       if (avatarBytes != null) 'avatar_bytes': avatarBytes,
       if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
+      if (yandexAvatarDisabled != null)
+        'yandex_avatar_disabled': yandexAvatarDisabled,
       if (gender != null) 'gender': gender,
       if (bio != null) 'bio': bio,
       if (onboardingCompleted != null)
@@ -808,6 +858,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     Value<String?>? avatarStoragePath,
     Value<Uint8List?>? avatarBytes,
     Value<DateTime?>? avatarUpdatedAt,
+    Value<bool>? yandexAvatarDisabled,
     Value<String>? gender,
     Value<String>? bio,
     Value<bool>? onboardingCompleted,
@@ -826,6 +877,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
       avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
       avatarBytes: avatarBytes ?? this.avatarBytes,
       avatarUpdatedAt: avatarUpdatedAt ?? this.avatarUpdatedAt,
+      yandexAvatarDisabled: yandexAvatarDisabled ?? this.yandexAvatarDisabled,
       gender: gender ?? this.gender,
       bio: bio ?? this.bio,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
@@ -863,6 +915,11 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     }
     if (avatarUpdatedAt.present) {
       map['avatar_updated_at'] = Variable<DateTime>(avatarUpdatedAt.value);
+    }
+    if (yandexAvatarDisabled.present) {
+      map['yandex_avatar_disabled'] = Variable<bool>(
+        yandexAvatarDisabled.value,
+      );
     }
     if (gender.present) {
       map['gender'] = Variable<String>(gender.value);
@@ -902,6 +959,7 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
           ..write('avatarStoragePath: $avatarStoragePath, ')
           ..write('avatarBytes: $avatarBytes, ')
           ..write('avatarUpdatedAt: $avatarUpdatedAt, ')
+          ..write('yandexAvatarDisabled: $yandexAvatarDisabled, ')
           ..write('gender: $gender, ')
           ..write('bio: $bio, ')
           ..write('onboardingCompleted: $onboardingCompleted, ')
@@ -10071,6 +10129,7 @@ typedef $$CachedProfilesTableCreateCompanionBuilder =
       Value<String?> avatarStoragePath,
       Value<Uint8List?> avatarBytes,
       Value<DateTime?> avatarUpdatedAt,
+      Value<bool> yandexAvatarDisabled,
       required String gender,
       required String bio,
       required bool onboardingCompleted,
@@ -10090,6 +10149,7 @@ typedef $$CachedProfilesTableUpdateCompanionBuilder =
       Value<String?> avatarStoragePath,
       Value<Uint8List?> avatarBytes,
       Value<DateTime?> avatarUpdatedAt,
+      Value<bool> yandexAvatarDisabled,
       Value<String> gender,
       Value<String> bio,
       Value<bool> onboardingCompleted,
@@ -10146,6 +10206,11 @@ class $$CachedProfilesTableFilterComposer
 
   ColumnFilters<DateTime> get avatarUpdatedAt => $composableBuilder(
     column: $table.avatarUpdatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get yandexAvatarDisabled => $composableBuilder(
+    column: $table.yandexAvatarDisabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10234,6 +10299,11 @@ class $$CachedProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get yandexAvatarDisabled => $composableBuilder(
+    column: $table.yandexAvatarDisabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get gender => $composableBuilder(
     column: $table.gender,
     builder: (column) => ColumnOrderings(column),
@@ -10311,6 +10381,11 @@ class $$CachedProfilesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get yandexAvatarDisabled => $composableBuilder(
+    column: $table.yandexAvatarDisabled,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get gender =>
       $composableBuilder(column: $table.gender, builder: (column) => column);
 
@@ -10380,6 +10455,7 @@ class $$CachedProfilesTableTableManager
                 Value<String?> avatarStoragePath = const Value.absent(),
                 Value<Uint8List?> avatarBytes = const Value.absent(),
                 Value<DateTime?> avatarUpdatedAt = const Value.absent(),
+                Value<bool> yandexAvatarDisabled = const Value.absent(),
                 Value<String> gender = const Value.absent(),
                 Value<String> bio = const Value.absent(),
                 Value<bool> onboardingCompleted = const Value.absent(),
@@ -10397,6 +10473,7 @@ class $$CachedProfilesTableTableManager
                 avatarStoragePath: avatarStoragePath,
                 avatarBytes: avatarBytes,
                 avatarUpdatedAt: avatarUpdatedAt,
+                yandexAvatarDisabled: yandexAvatarDisabled,
                 gender: gender,
                 bio: bio,
                 onboardingCompleted: onboardingCompleted,
@@ -10416,6 +10493,7 @@ class $$CachedProfilesTableTableManager
                 Value<String?> avatarStoragePath = const Value.absent(),
                 Value<Uint8List?> avatarBytes = const Value.absent(),
                 Value<DateTime?> avatarUpdatedAt = const Value.absent(),
+                Value<bool> yandexAvatarDisabled = const Value.absent(),
                 required String gender,
                 required String bio,
                 required bool onboardingCompleted,
@@ -10433,6 +10511,7 @@ class $$CachedProfilesTableTableManager
                 avatarStoragePath: avatarStoragePath,
                 avatarBytes: avatarBytes,
                 avatarUpdatedAt: avatarUpdatedAt,
+                yandexAvatarDisabled: yandexAvatarDisabled,
                 gender: gender,
                 bio: bio,
                 onboardingCompleted: onboardingCompleted,

@@ -151,6 +151,8 @@ class MockProfileRepository
       avatarStoragePath: primary?.storagePath,
       avatarBytes: primary?.bytes,
       avatarUpdatedAt: primary?.updatedAt,
+      yandexAvatarDisabled:
+          normalizedPhotos.isEmpty || currentProfile.yandexAvatarDisabled,
       clearAvatarUrl: primary?.avatarUrl == null,
       clearAvatarStoragePath: primary?.storagePath == null,
       clearAvatarBytes: primary?.bytes == null,
@@ -183,6 +185,7 @@ class MockProfileRepository
       avatarStoragePath: profile.avatarStoragePath,
       avatarBytes: profile.avatarBytes,
       avatarUpdatedAt: profile.avatarUpdatedAt,
+      yandexAvatarDisabled: profile.yandexAvatarDisabled,
       photos: profile.photos,
       gender: profile.gender,
       bio: profile.bio,
@@ -212,6 +215,7 @@ class MockProfileRepository
           ? null
           : base64Encode(profile.avatarBytes!),
       'avatar_updated_at': profile.avatarUpdatedAt?.toIso8601String(),
+      'yandex_avatar_disabled': profile.yandexAvatarDisabled,
       'gender': profile.gender.databaseValue,
       'bio': profile.bio,
       'onboarding_completed': profile.onboardingCompleted,

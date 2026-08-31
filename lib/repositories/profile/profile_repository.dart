@@ -450,7 +450,8 @@ class ProfileRepository
           .split('T')
           .first;
     }
-    if (profile.avatarUrl == null &&
+    if (!profile.yandexAvatarDisabled &&
+        profile.avatarUrl == null &&
         profile.avatarStoragePath == null &&
         session.avatarUrl != null) {
       update['avatar_url'] = session.avatarUrl;
@@ -675,12 +676,33 @@ class ProfileRepository
     }
 
     if (hydrated.isEmpty &&
+        !profile.yandexAvatarDisabled &&
         profile.avatarUrl == null &&
         profile.avatarStoragePath == null &&
         session.avatarUrl != null) {
       hydrated.add(ProfilePhoto(position: 0, avatarUrl: session.avatarUrl));
     }
-    return _withPhotos(profile, hydrated);
+    final cachedExternalPhotos = <ProfilePhoto>[];
+    for (final photo in hydrated) {
+      if (photo.bytes != null || photo.avatarUrl == null) {
+        cachedExternalPhotos.add(photo);
+        continue;
+      }
+      try {
+        final localPath = await _mediaCache.cacheNetworkFile(
+          ownerUserId: scope.userId,
+          url: photo.avatarUrl!,
+        );
+        cachedExternalPhotos.add(
+          photo.copyWith(bytes: await File(localPath).readAsBytes()),
+        );
+      } catch (_) {
+        // An external avatar can still be shown online; a failed cache write
+        // must not prevent profile loading.
+        cachedExternalPhotos.add(photo);
+      }
+    }
+    return _withPhotos(profile, cachedExternalPhotos);
   }
 
   UserProfile _withPhotos(UserProfile profile, List<ProfilePhoto> photos) {

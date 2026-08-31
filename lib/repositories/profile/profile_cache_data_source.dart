@@ -44,6 +44,7 @@ class ProfileCacheDataSource {
       avatarStoragePath: row.avatarStoragePath,
       avatarBytes: photos.firstOrNull?.bytes ?? row.avatarBytes,
       avatarUpdatedAt: row.avatarUpdatedAt,
+      yandexAvatarDisabled: row.yandexAvatarDisabled,
       photos: photos,
       gender: ProfileGender.fromDatabaseValue(row.gender),
       bio: row.bio,
@@ -70,6 +71,7 @@ class ProfileCacheDataSource {
               // Keep the legacy column empty while retaining read compatibility.
               avatarBytes: const Value(null),
               avatarUpdatedAt: Value(profile.avatarUpdatedAt),
+              yandexAvatarDisabled: Value(profile.yandexAvatarDisabled),
               gender: profile.gender.databaseValue,
               bio: profile.bio,
               onboardingCompleted: profile.onboardingCompleted,

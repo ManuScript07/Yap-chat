@@ -29,6 +29,7 @@ class UserProfile extends Equatable {
     this.avatarStoragePath,
     this.avatarBytes,
     this.avatarUpdatedAt,
+    this.yandexAvatarDisabled = false,
     this.photos = const [],
     this.gender = ProfileGender.unspecified,
     this.bio = '',
@@ -48,6 +49,7 @@ class UserProfile extends Equatable {
       avatarUpdatedAt: DateTime.tryParse(
         map['avatar_updated_at'] as String? ?? '',
       ),
+      yandexAvatarDisabled: map['yandex_avatar_disabled'] as bool? ?? false,
       gender: ProfileGender.fromDatabaseValue(map['gender'] as String?),
       bio: map['bio'] as String? ?? '',
       onboardingCompleted: map['onboarding_completed'] as bool? ?? false,
@@ -69,6 +71,10 @@ class UserProfile extends Equatable {
   final String? avatarStoragePath;
   final Uint8List? avatarBytes;
   final DateTime? avatarUpdatedAt;
+
+  /// Set after the owner deliberately saves an empty photo list. It prevents
+  /// later session refreshes from restoring the Yandex default avatar.
+  final bool yandexAvatarDisabled;
   final List<ProfilePhoto> photos;
   final ProfileGender gender;
   final String bio;
@@ -109,6 +115,7 @@ class UserProfile extends Equatable {
     String? avatarStoragePath,
     Uint8List? avatarBytes,
     DateTime? avatarUpdatedAt,
+    bool? yandexAvatarDisabled,
     List<ProfilePhoto>? photos,
     ProfileGender? gender,
     String? bio,
@@ -134,6 +141,7 @@ class UserProfile extends Equatable {
       avatarUpdatedAt: clearAvatarUpdatedAt
           ? null
           : avatarUpdatedAt ?? this.avatarUpdatedAt,
+      yandexAvatarDisabled: yandexAvatarDisabled ?? this.yandexAvatarDisabled,
       photos: photos ?? this.photos,
       gender: gender ?? this.gender,
       bio: bio ?? this.bio,
@@ -154,6 +162,7 @@ class UserProfile extends Equatable {
     avatarStoragePath,
     avatarBytes,
     avatarUpdatedAt,
+    yandexAvatarDisabled,
     photos,
     gender,
     bio,

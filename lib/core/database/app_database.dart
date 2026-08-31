@@ -12,6 +12,8 @@ class CachedProfiles extends Table {
   TextColumn get avatarStoragePath => text().nullable()();
   BlobColumn get avatarBytes => blob().nullable()();
   DateTimeColumn get avatarUpdatedAt => dateTime().nullable()();
+  BoolColumn get yandexAvatarDisabled =>
+      boolean().withDefault(const Constant(false))();
   TextColumn get gender => text()();
   TextColumn get bio => text()();
   BoolColumn get onboardingCompleted => boolean()();
@@ -297,7 +299,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -374,6 +376,19 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'UPDATE cached_viewed_profile_metadata SET view_count = 0',
         );
+      }
+      if (from < 18) {
+        final columns = await customSelect(
+          'PRAGMA table_info(cached_profiles)',
+        ).get();
+        if (!columns.any(
+          (column) => column.read<String>('name') == 'yandex_avatar_disabled',
+        )) {
+          await migrator.addColumn(
+            cachedProfiles,
+            cachedProfiles.yandexAvatarDisabled,
+          );
+        }
       }
     },
     beforeOpen: (details) async {
