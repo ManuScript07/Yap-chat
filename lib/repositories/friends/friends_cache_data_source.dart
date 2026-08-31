@@ -195,29 +195,36 @@ class FriendsCacheDataSource {
           .into(_database.cachedFriendRequests)
           .insert(_requestRow(request, owner));
     }
-    final friendIds = friends.map((friend) => friend.id).toSet();
     final cachedLocations = await (_database.select(
       _database.cachedFriendLocations,
     )..where((table) => table.ownerUserId.equals(owner))).get();
-    final obsoleteLocationIds = cachedLocations
+    final cutoff = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 24));
+    final expiredLocationIds = cachedLocations
+        .where(
+          (row) => DateTime.fromMillisecondsSinceEpoch(
+            row.locationUpdatedAtMs,
+            isUtc: true,
+          ).isBefore(cutoff),
+        )
         .map((row) => row.friendUserId)
-        .where((friendId) => !friendIds.contains(friendId))
         .toList(growable: false);
     const deleteBatchSize = 500;
     for (
       var offset = 0;
-      offset < obsoleteLocationIds.length;
+      offset < expiredLocationIds.length;
       offset += deleteBatchSize
     ) {
       final end = (offset + deleteBatchSize).clamp(
         0,
-        obsoleteLocationIds.length,
+        expiredLocationIds.length,
       );
       await (_database.delete(_database.cachedFriendLocations)..where(
             (table) =>
                 table.ownerUserId.equals(owner) &
                 table.friendUserId.isIn(
-                  obsoleteLocationIds.sublist(offset, end),
+                  expiredLocationIds.sublist(offset, end),
                 ),
           ))
           .go();

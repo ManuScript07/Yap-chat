@@ -186,7 +186,7 @@ class _ProfileScaffold extends StatelessWidget {
                   onPhotoTap: (index) =>
                       _openGallery(context, viewedProfile.profile, index),
                   onChat: () => _openChat(context),
-                  onLocation: state.location == null
+                  onLocation: !viewedProfile.isFriend || state.location == null
                       ? null
                       : () => _openLocation(context, state.location!),
                   onFriends: () => _openFriends(context),
@@ -276,40 +276,48 @@ class _ProfileScaffold extends StatelessWidget {
     );
   }
 
-  Future<void> _showActions(BuildContext context) async {
+  Future<void> _showActions(BuildContext pageContext) async {
+    final cubit = pageContext.read<ViewedProfileCubit>();
     await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.scaffoldBackgroundColor,
+      context: pageContext,
+      backgroundColor: pageContext.scaffoldBackgroundColor,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (sheetContext) => _ProfileActionsSheet(
-        viewedProfile: viewedProfile,
-        chatIsMuted: state.chat?.isMuted ?? false,
-        canMute: viewedProfile.isFriend,
-        onMute: () async {
-          Navigator.of(sheetContext).pop();
-          await context.read<ViewedProfileCubit>().toggleMute();
-        },
-        onRemove: viewedProfile.isFriend
-            ? () async {
+      builder: (sheetContext) => BlocProvider.value(
+        value: cubit,
+        child: BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
+          builder: (_, currentState) {
+            final currentProfile = currentState.viewedProfile ?? viewedProfile;
+            return _ProfileActionsSheet(
+              viewedProfile: currentProfile,
+              chatIsMuted: currentState.chat?.isMuted ?? false,
+              canMute: currentProfile.isFriend,
+              onMute: () async {
                 Navigator.of(sheetContext).pop();
-                final confirmed = await _confirm(
-                  context,
-                  title: context.l10n.viewedProfileRemoveFriendTitle,
-                  content: context.l10n.viewedProfileRemoveFriendContent(
-                    viewedProfile.profile.displayName,
-                  ),
-                  confirmLabel: context.l10n.viewedProfileRemoveFriend,
-                );
-                if (confirmed && context.mounted) {
-                  await context.read<ViewedProfileCubit>().removeFriend();
-                }
-              }
-            : null,
-        onStub: (message) {
-          Navigator.of(sheetContext).pop();
-          showAppSnackBar(context, message: message);
-        },
+                await cubit.toggleMute();
+              },
+              onRemove: currentProfile.isFriend
+                  ? () async {
+                      final confirmed = await _confirm(
+                        pageContext,
+                        title: pageContext.l10n.viewedProfileRemoveFriendTitle,
+                        content: pageContext.l10n.viewedProfileRemoveFriendContent(
+                          currentProfile.profile.displayName,
+                        ),
+                        confirmLabel: pageContext.l10n.viewedProfileRemoveFriend,
+                      );
+                      if (!confirmed || !pageContext.mounted) return;
+                      Navigator.of(sheetContext).pop();
+                      await cubit.removeFriend();
+                    }
+                  : null,
+              onStub: (message) {
+                Navigator.of(sheetContext).pop();
+                showAppSnackBar(pageContext, message: message);
+              },
+            );
+          },
+        ),
       ),
     );
   }

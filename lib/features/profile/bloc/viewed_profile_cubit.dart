@@ -83,6 +83,10 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   final ILocationRepository _locationRepository;
   StreamSubscription<List<Chat>>? _chatsSubscription;
   StreamSubscription<String>? _friendsSubscription;
+  StreamSubscription<List<Friend>>? _friendsCacheSubscription;
+  StreamSubscription<List<FriendRequest>>? _requestsCacheSubscription;
+  List<Friend>? _friendsSnapshot;
+  List<FriendRequest>? _requestsSnapshot;
   bool _isRealtimeProfileRefreshPending = false;
 
   Future<void> load() async {
@@ -94,6 +98,18 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       _syncProfileFromFriendChange,
       onError: (_, _) {},
     );
+    _friendsCacheSubscription ??= _friendsRepository.watchFriends().listen((
+      friends,
+    ) {
+      _friendsSnapshot = friends;
+      _syncRelationshipFromCache();
+    }, onError: (_, _) {});
+    _requestsCacheSubscription ??= _friendsRepository.watchRequests().listen((
+      requests,
+    ) {
+      _requestsSnapshot = requests;
+      _syncRelationshipFromCache();
+    }, onError: (_, _) {});
     emit(state.copyWith(status: ViewedProfileStatus.loading));
     final cached = await _profileRepository.getCachedViewedProfile(_userId);
     if (cached != null && !isClosed) {
@@ -103,6 +119,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
           viewedProfile: cached,
         ),
       );
+      _syncRelationshipFromCache();
       await _loadSupportingData(cached);
     }
     try {
@@ -115,6 +132,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
           clearActionError: true,
         ),
       );
+      _syncRelationshipFromCache();
       await _loadSupportingData(remote);
     } catch (error) {
       if (!isClosed && cached == null) {
@@ -258,14 +276,12 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
         relationship: FriendRelationship.none,
       ),
     );
-    await _reloadWithoutView();
   });
 
   Future<void> cancelRequest() => _performAction(() async {
     final requestId = state.viewedProfile?.requestId;
     if (requestId == null) return;
     await _friendsRepository.cancelRequest(requestId);
-    await _reloadWithoutView();
   });
 
   Future<void> respondToRequest({required bool accept}) =>
@@ -273,12 +289,10 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
         final requestId = state.viewedProfile?.requestId;
         if (requestId == null) return;
         await _friendsRepository.respondToRequest(requestId, accept: accept);
-        await _reloadWithoutView();
       });
 
   Future<void> removeFriend() => _performAction(() async {
     await _friendsRepository.removeFriend(_userId);
-    await _reloadWithoutView();
   });
 
   Future<void> toggleMute() => _performAction(() async {
@@ -289,17 +303,6 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     await _chatsRepository.toggleMute({chat.id});
     emit(state.copyWith(chat: chat.copyWith(isMuted: !chat.isMuted)));
   });
-
-  Future<void> _reloadWithoutView() async {
-    final refreshed = await _profileRepository.getViewedProfile(
-      _userId,
-      registerView: false,
-    );
-    if (!isClosed) {
-      emit(state.copyWith(viewedProfile: refreshed));
-      await _loadSupportingData(refreshed);
-    }
-  }
 
   Future<void> _performAction(Future<void> Function() action) async {
     if (state.isActionPending) return;
@@ -363,6 +366,61 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     if (profileId == _userId) unawaited(_refreshProfileFromRealtime());
   }
 
+  void _syncRelationshipFromCache() {
+    final profile = state.viewedProfile;
+    final friends = _friendsSnapshot;
+    final requests = _requestsSnapshot;
+    if (isClosed || profile == null || friends == null || requests == null) {
+      return;
+    }
+
+    final isFriend = friends.any((friend) => friend.id == _userId);
+    final request = requests
+        .where((candidate) => candidate.peerId == _userId)
+        .firstOrNull;
+    final relationship = isFriend
+        ? ProfileRelationship.friend
+        : switch (request?.direction) {
+            FriendRequestDirection.incoming => ProfileRelationship.incoming,
+            FriendRequestDirection.outgoing => ProfileRelationship.outgoing,
+            null => ProfileRelationship.none,
+          };
+    final requestId = isFriend ? null : request?.id;
+    if (profile.relationship == relationship &&
+        profile.requestId == requestId) {
+      return;
+    }
+
+    final becameFriend =
+        isFriend && profile.relationship != ProfileRelationship.friend;
+    emit(
+      state.copyWith(
+        viewedProfile: profile.copyWith(
+          relationship: relationship,
+          requestId: requestId,
+          clearRequestId: requestId == null,
+        ),
+        clearLocation: !isFriend,
+      ),
+    );
+    if (becameFriend) unawaited(_restoreFriendLocation());
+  }
+
+  Future<void> _restoreFriendLocation() async {
+    final location = await _friendsRepository.getCachedFriendLocation(_userId);
+    final profile = state.viewedProfile;
+    if (isClosed || profile == null || !profile.isFriend) {
+      return;
+    }
+    if (location != null) {
+      emit(state.copyWith(location: location));
+    }
+
+    // A cached point makes the map and its timestamp available immediately.
+    // _loadLocation also fetches a point when no cache survived the 24-hour TTL.
+    await _loadLocation(profile);
+  }
+
   Future<void> _refreshProfileFromRealtime() async {
     if (_isRealtimeProfileRefreshPending) return;
     _isRealtimeProfileRefreshPending = true;
@@ -373,6 +431,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       );
       if (!isClosed) {
         emit(state.copyWith(viewedProfile: refreshed));
+        _syncRelationshipFromCache();
         await _loadSupportingData(refreshed);
       }
     } catch (_) {
@@ -386,6 +445,8 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   Future<void> close() async {
     await _chatsSubscription?.cancel();
     await _friendsSubscription?.cancel();
+    await _friendsCacheSubscription?.cancel();
+    await _requestsCacheSubscription?.cancel();
     return super.close();
   }
 }
