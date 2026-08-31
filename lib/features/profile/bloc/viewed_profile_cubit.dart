@@ -199,10 +199,13 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
 
   Future<void> _setLocalDistance(FriendLocation location) async {
     try {
-      final own = await _locationRepository.getCurrentPosition();
+      final cachedOwn = await _locationRepository.getCachedCurrentLocation();
+      final own = cachedOwn == null
+          ? await _locationRepository.getCurrentPosition()
+          : null;
       final meters = Geolocator.distanceBetween(
-        own.latitude,
-        own.longitude,
+        cachedOwn?.latitude ?? own!.latitude,
+        cachedOwn?.longitude ?? own!.longitude,
         location.latitude,
         location.longitude,
       );

@@ -19,6 +19,7 @@ class LocationRepository implements ILocationRepository {
     Future<LocationPermission> Function()? requestPermission,
     LocationPositionGetter? getPosition,
     LocationPublisher? publishLocation,
+    String? Function()? currentUserId,
     double Function(double, double, double, double)? distanceBetween,
   }) : _preferences = preferences,
        _client = client,
@@ -31,6 +32,7 @@ class LocationRepository implements ILocationRepository {
            ((settings) =>
                Geolocator.getCurrentPosition(locationSettings: settings)),
        _publishLocation = publishLocation,
+       _currentUserId = currentUserId ?? (() => client?.auth.currentUser?.id),
        _distanceBetween = distanceBetween ?? Geolocator.distanceBetween;
 
   static const minimumMovementMeters = 100.0;
@@ -44,6 +46,7 @@ class LocationRepository implements ILocationRepository {
   final Future<LocationPermission> Function() _requestPermission;
   final LocationPositionGetter _getPosition;
   final LocationPublisher? _publishLocation;
+  final String? Function() _currentUserId;
   final double Function(double, double, double, double) _distanceBetween;
 
   @override
@@ -70,6 +73,27 @@ class LocationRepository implements ILocationRepository {
 
     return _getPosition(
       const LocationSettings(accuracy: LocationAccuracy.high),
+    );
+  }
+
+  @override
+  Future<CachedTrackedLocation?> getCachedCurrentLocation() async {
+    final userId = _currentUserId();
+    if (userId == null || userId.isEmpty) return null;
+
+    final latitude = _preferences.getDouble(_latitudeKey(userId));
+    final longitude = _preferences.getDouble(_longitudeKey(userId));
+    final updatedAt = DateTime.tryParse(
+      _preferences.getString(_publishedAtKey(userId)) ?? '',
+    );
+    if (latitude == null || longitude == null || updatedAt == null) return null;
+
+    final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
+    if (age.isNegative || age >= const Duration(hours: 24)) return null;
+    return CachedTrackedLocation(
+      latitude: latitude,
+      longitude: longitude,
+      updatedAt: updatedAt,
     );
   }
 

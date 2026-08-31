@@ -3,6 +3,21 @@ import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
 
 abstract class TimeFormatter {
+  /// Relative time for a cached location point. Unlike chat timestamps this
+  /// deliberately has no calendar-day wording: a point from before midnight
+  /// is still shown as hours ago until its short display window expires.
+  static String? formatLocationAge(BuildContext context, DateTime date) {
+    final difference = DateTime.now().difference(date);
+    if (difference.isNegative || difference >= const Duration(hours: 12)) {
+      return null;
+    }
+    if (difference.inMinutes < 1) return context.l10n.timeJustNow;
+    if (difference.inMinutes < 60) {
+      return context.l10n.timeMinutesAgo(difference.inMinutes);
+    }
+    return context.l10n.timeHoursAgo(difference.inHours);
+  }
+
   /// Форматирование времени для списка чатов (относительное время)
   static String format(BuildContext context, DateTime date) {
     final now = DateTime.now();

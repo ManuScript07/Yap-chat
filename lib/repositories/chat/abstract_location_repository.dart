@@ -15,8 +15,28 @@ enum LocationAccessStatus {
   serviceDisabled,
 }
 
+/// The last position successfully published for the signed-in account.
+///
+/// It is deliberately separate from a live [Position]: using it must never
+/// wake the device GPS just to render a cached distance.
+class CachedTrackedLocation {
+  const CachedTrackedLocation({
+    required this.latitude,
+    required this.longitude,
+    required this.updatedAt,
+  });
+
+  final double latitude;
+  final double longitude;
+  final DateTime updatedAt;
+}
+
 abstract interface class ILocationRepository {
   Future<Position> getCurrentPosition();
+
+  /// Returns the current account's last published location from local storage.
+  /// A stale record is represented by `null`.
+  Future<CachedTrackedLocation?> getCachedCurrentLocation();
 
   /// Reads the current service and permission state without showing OS UI.
   Future<LocationAccessStatus> getLocationAccessStatus();

@@ -58,18 +58,44 @@ class _ViewedProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<ViewedProfileCubit, ViewedProfileState>(
-      listenWhen: (previous, current) =>
-          previous.actionError != current.actionError &&
-          current.actionError != null,
-      listener: (context, state) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.friendsActionFailed,
-          type: SnackBarType.error,
-        );
-        context.read<ViewedProfileCubit>().clearActionError();
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ViewedProfileCubit, ViewedProfileState>(
+          listenWhen: (previous, current) =>
+              previous.actionError != current.actionError &&
+              current.actionError != null,
+          listener: (context, state) {
+            showAppSnackBar(
+              context,
+              message: context.l10n.friendsActionFailed,
+              type: SnackBarType.error,
+            );
+            context.read<ViewedProfileCubit>().clearActionError();
+          },
+        ),
+        BlocListener<LocationVisibilityCubit, LocationVisibilityState>(
+          listenWhen: (previous, current) =>
+              previous.feedbackId != current.feedbackId &&
+              current.feedback != null,
+          listener: (context, state) {
+            final message = switch (state.feedback) {
+              LocationVisibilityFeedback.success =>
+                context.l10n.settingsPrivacySaved,
+              LocationVisibilityFeedback.failure =>
+                context.l10n.settingsPrivacySaveFailed,
+              null => null,
+            };
+            if (message == null) return;
+            showAppSnackBar(
+              context,
+              message: message,
+              type: state.feedback == LocationVisibilityFeedback.success
+                  ? SnackBarType.success
+                  : SnackBarType.error,
+            );
+          },
+        ),
+      ],
       child: BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
         builder: (context, state) {
           final viewedProfile = state.viewedProfile;
@@ -600,7 +626,7 @@ class _ProfileActions extends StatelessWidget {
     final cubit = context.read<ViewedProfileCubit>();
     final location = _distanceLabel(context, state.distance);
     final locationAge = viewedProfile.isFriend
-        ? _locationAge(context, state.distance?.updatedAt)
+        ? _locationAge(context, state.location?.updatedAt)
         : null;
     final buttons = <Widget>[
       _ActionButton(
@@ -1015,9 +1041,7 @@ String _distanceLabel(BuildContext context, UserDistance? distance) {
 
 String? _locationAge(BuildContext context, DateTime? updatedAt) {
   if (updatedAt == null) return null;
-  final age = DateTime.now().difference(updatedAt);
-  if (age.isNegative || age >= const Duration(hours: 24)) return null;
-  return TimeFormatter.format(context, updatedAt);
+  return TimeFormatter.formatLocationAge(context, updatedAt);
 }
 
 Future<void> _copyUsername(BuildContext context, String username) async {

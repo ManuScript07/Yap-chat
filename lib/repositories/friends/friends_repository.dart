@@ -556,7 +556,7 @@ class FriendsRepository
       ownerUserId: scope.userId,
     );
     _accountSessionController.ensureCurrent(scope);
-    if (cached != null) {
+    if (cached != null && _isLocationTimestampCurrent(cached.updatedAt)) {
       final isFresh = await _cache.hasFreshLocation(
         friendId,
         maxAge: _locationCacheTtl,
@@ -567,24 +567,53 @@ class FriendsRepository
       }
       return FriendLocationLookup.current(cached);
     }
+    if (cached != null) {
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.removeLocation(friendId, ownerUserId: scope.userId),
+      );
+    }
     return _refreshFriendLocation(friendId, scope);
   }
 
   @override
-  Future<FriendLocation?> getCachedFriendLocation(String friendId) {
+  Future<FriendLocation?> getCachedFriendLocation(String friendId) async {
     final scope = _accountSessionController.capture();
-    return _cache.readLocation(friendId, ownerUserId: scope.userId);
+    final cached = await _cache.readLocation(
+      friendId,
+      ownerUserId: scope.userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    if (cached == null || _isLocationTimestampCurrent(cached.updatedAt)) {
+      return cached;
+    }
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.removeLocation(friendId, ownerUserId: scope.userId),
+    );
+    return null;
   }
 
   @override
-  Future<UserDistance?> getCachedUserDistance(String userId) {
+  Future<UserDistance?> getCachedUserDistance(String userId) async {
     final scope = _accountSessionController.capture();
-    return _cache.readDistance(userId, ownerUserId: scope.userId);
+    final cached = await _cache.readDistance(userId, ownerUserId: scope.userId);
+    _accountSessionController.ensureCurrent(scope);
+    if (cached == null || _isLocationTimestampCurrent(cached.updatedAt)) {
+      return cached;
+    }
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.removeDistance(userId, ownerUserId: scope.userId),
+    );
+    return null;
   }
 
   @override
-  Future<bool> isCachedUserDistanceFresh(String userId) {
+  Future<bool> isCachedUserDistanceFresh(String userId) async {
     final scope = _accountSessionController.capture();
+    final cached = await getCachedUserDistance(userId);
+    if (cached == null) return false;
     return _cache.hasFreshDistance(
       userId,
       maxAge: _locationCacheTtl,
@@ -607,6 +636,7 @@ class FriendsRepository
     final cached = await _cache.readDistance(userId, ownerUserId: scope.userId);
     _accountSessionController.ensureCurrent(scope);
     if (cached != null &&
+        _isLocationTimestampCurrent(cached.updatedAt) &&
         await _cache.hasFreshDistance(
           userId,
           maxAge: _locationCacheTtl,
@@ -634,7 +664,9 @@ class FriendsRepository
         userId,
         ownerUserId: scope.userId,
       );
-      if (fallback != null) return fallback;
+      if (fallback != null && _isLocationTimestampCurrent(fallback.updatedAt)) {
+        return fallback;
+      }
       rethrow;
     }
   }
@@ -712,6 +744,11 @@ class FriendsRepository
         'Friend location refresh failed',
       );
     }
+  }
+
+  bool _isLocationTimestampCurrent(DateTime updatedAt) {
+    final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
+    return !age.isNegative && age < const Duration(hours: 24);
   }
 
   @override
