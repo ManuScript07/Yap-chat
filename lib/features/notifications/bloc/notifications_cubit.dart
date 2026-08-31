@@ -13,10 +13,14 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     ) {
       emit(state.copyWith(pendingConversationId: conversationId));
     });
+    _openedProfileSubscription = _repository.openedProfileIds.listen((userId) {
+      emit(state.copyWith(pendingProfileId: userId));
+    });
   }
 
   final IPushNotificationsRepository _repository;
   late final StreamSubscription<String> _openedSubscription;
+  late final StreamSubscription<String> _openedProfileSubscription;
 
   Future<void> setAuthenticatedUser(String? userId) {
     if (userId == null) {
@@ -51,9 +55,15 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     emit(state.copyWith(clearPendingConversation: true));
   }
 
+  void profileNavigationHandled(String userId) {
+    if (state.pendingProfileId != userId) return;
+    emit(state.copyWith(clearPendingProfile: true));
+  }
+
   @override
   Future<void> close() async {
     await _openedSubscription.cancel();
+    await _openedProfileSubscription.cancel();
     return super.close();
   }
 }

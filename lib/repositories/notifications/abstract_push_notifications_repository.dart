@@ -3,6 +3,9 @@ enum PushPermissionStatus { authorized, provisional, denied, notDetermined }
 abstract interface class IPushNotificationsRepository {
   Stream<String> get openedConversationIds;
 
+  /// Sender ids from accepted friend-request notification taps.
+  Stream<String> get openedProfileIds;
+
   Future<void> setAuthenticatedUser(String? userId);
 
   Future<void> setActiveConversation(String? conversationId);

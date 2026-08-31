@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:yap_chat/app/chat_navigation_coordinator.dart';
+import 'package:yap_chat/app/profile_navigation_coordinator.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/app_initializer.dart';
@@ -63,9 +64,11 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _permissionReminderScheduled = false;
   bool _isForeground = true;
   late final ChatNavigationCoordinator _chatNavigator;
+  late final ProfileNavigationCoordinator _profileNavigator;
   bool _dependenciesInitialized = false;
   String? _activeUserId;
   final Set<String> _openingNotificationChatIds = <String>{};
+  final Set<String> _openingNotificationProfileIds = <String>{};
 
   @override
   void initState() {
@@ -101,6 +104,28 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       },
       isConversationVisible: _isConversationVisible,
       isPeerVisible: _isPeerVisible,
+      isActive: () => mounted,
+      onError: talker.handle,
+    );
+    _profileNavigator = ProfileNavigationCoordinator(
+      navigateToProfile: (userId) async {
+        if (!mounted) return;
+        final authRouter = await _authenticatedRouter;
+        if (!mounted || authRouter == null) return;
+
+        final originChatId = _visibleChatIdForPeer(userId);
+        unawaited(
+          authRouter.push<Object?>(
+            ViewedProfileRoute(
+              key: ValueKey('profile:$userId'),
+              userId: userId,
+              originChatId: originChatId,
+            ),
+          ),
+        );
+        await WidgetsBinding.instance.endOfFrame;
+      },
+      isProfileVisible: _isProfileVisible,
       isActive: () => mounted,
       onError: talker.handle,
     );
@@ -188,6 +213,39 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _openNotificationProfile(String userId) async {
+    final notifications = context.read<NotificationsCubit>();
+    if (notifications.state.pendingProfileId != userId) return;
+    if (!_openingNotificationProfileIds.add(userId)) return;
+
+    try {
+      // The tap can arrive while AuthGate is still building after a cold start.
+      // Keep it pending until the authenticated stack is actually available.
+      for (var attempt = 0; attempt < 20; attempt++) {
+        if (!mounted || notifications.state.pendingProfileId != userId) return;
+
+        final authRouter = await _authenticatedRouter;
+        if (authRouter == null) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          continue;
+        }
+        if (_isProfileVisible(userId)) {
+          notifications.profileNavigationHandled(userId);
+          return;
+        }
+
+        await _profileNavigator.open(userId);
+        if (_isProfileVisible(userId)) {
+          notifications.profileNavigationHandled(userId);
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    } finally {
+      _openingNotificationProfileIds.remove(userId);
+    }
+  }
+
   bool _isConversationVisible(String conversationId) {
     final authRouter = _authRouter;
     if (authRouter == null) return false;
@@ -212,6 +270,31 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     if (route.name != ChatRoute.name) return false;
 
     return route.argsAs<ChatRouteArgs>().chat.peerId == normalizedPeerId;
+  }
+
+  bool _isProfileVisible(String userId) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return false;
+
+    final authRouter = _authRouter;
+    if (authRouter == null || authRouter.stackData.isEmpty) return false;
+
+    final route = authRouter.stackData.last;
+    return route.name == ViewedProfileRoute.name &&
+        route.argsAs<ViewedProfileRouteArgs>().userId == normalizedUserId;
+  }
+
+  String? _visibleChatIdForPeer(String peerId) {
+    final normalizedPeerId = peerId.trim();
+    if (normalizedPeerId.isEmpty) return null;
+
+    final authRouter = _authRouter;
+    if (authRouter == null || authRouter.stackData.isEmpty) return null;
+
+    final route = authRouter.stackData.last;
+    if (route.name != ChatRoute.name) return null;
+    final chat = route.argsAs<ChatRouteArgs>().chat;
+    return chat.peerId == normalizedPeerId ? chat.id : null;
   }
 
   StackRouter? get _authRouter =>
@@ -379,6 +462,17 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
             final conversationId = state.pendingConversationId;
             if (conversationId != null) {
               unawaited(_openNotificationChat(conversationId));
+            }
+          },
+        ),
+        BlocListener<NotificationsCubit, NotificationsState>(
+          listenWhen: (previous, current) =>
+              previous.pendingProfileId != current.pendingProfileId &&
+              current.pendingProfileId != null,
+          listener: (context, state) {
+            final userId = state.pendingProfileId;
+            if (userId != null) {
+              unawaited(_openNotificationProfile(userId));
             }
           },
         ),

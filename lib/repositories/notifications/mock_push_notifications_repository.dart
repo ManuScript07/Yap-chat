@@ -9,6 +9,9 @@ class MockPushNotificationsRepository implements IPushNotificationsRepository {
   Stream<String> get openedConversationIds => const Stream.empty();
 
   @override
+  Stream<String> get openedProfileIds => const Stream.empty();
+
+  @override
   Future<void> setAuthenticatedUser(String? userId) async {}
 
   @override

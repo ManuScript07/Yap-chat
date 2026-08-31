@@ -39,6 +39,8 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
   final AndroidNotificationService _notificationService;
   final StreamController<String> _openedConversationController =
       StreamController.broadcast(sync: true);
+  final StreamController<String> _openedProfileController =
+      StreamController.broadcast(sync: true);
 
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<RemoteMessage>? _foregroundMessageSubscription;
@@ -54,6 +56,9 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
   @override
   Stream<String> get openedConversationIds =>
       _openedConversationController.stream;
+
+  @override
+  Stream<String> get openedProfileIds => _openedProfileController.stream;
 
   @override
   Future<void> setAuthenticatedUser(String? userId) => _enqueue(() async {
@@ -293,8 +298,11 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     if (_disposed || !_belongsToCurrentUser(payload) || !payload.isValid) {
       return;
     }
-    if (!payload.isChatMessage) return;
-    _openedConversationController.add(payload.conversationId);
+    if (payload.isChatMessage) {
+      _openedConversationController.add(payload.conversationId);
+    } else {
+      _openedProfileController.add(payload.senderId);
+    }
   }
 
   void _handleRemoteOpenedMessage(RemoteMessage message) {
@@ -351,5 +359,6 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     ]);
     await _notificationService.dispose();
     await _openedConversationController.close();
+    await _openedProfileController.close();
   }
 }
