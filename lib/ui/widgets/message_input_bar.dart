@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 
 class MessageInputBar extends StatefulWidget {
   const MessageInputBar({
@@ -202,6 +203,7 @@ class _MessageTextField extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 focusNode: focusNode,
+                contextMenuBuilder: buildAppTextSelectionToolbar,
                 minLines: 1,
                 maxLines: 5,
                 keyboardType: TextInputType.multiline,

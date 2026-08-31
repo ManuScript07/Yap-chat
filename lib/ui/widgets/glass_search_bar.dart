@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 
 class GlassSearchBar extends StatefulWidget {
   const GlassSearchBar({
@@ -140,6 +141,7 @@ class _GlassSearchBarState extends State<GlassSearchBar>
                   enabled: widget.enabled,
                   controller: _controller,
                   focusNode: _focusNode,
+                  contextMenuBuilder: buildAppTextSelectionToolbar,
                   onChanged: widget.onChanged,
                   onTapOutside: (_) => _focusNode.unfocus(),
                   cursorColor: mainColor,

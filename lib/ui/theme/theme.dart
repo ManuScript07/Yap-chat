@@ -26,6 +26,34 @@ abstract class AppColors {
   ); // Время входящего сообщения
 }
 
+/// Builds the platform text-selection toolbar with colors that contrast with
+/// the app's dark background.
+///
+/// The app intentionally uses a white `ColorScheme.surface` for some custom
+/// controls while keeping `onSurface` white for the main dark UI. Flutter's
+/// default Android selection toolbar uses those two color-scheme values for
+/// its background and labels, respectively, which makes the toolbar unreadable
+/// unless its local theme is adjusted.
+Widget buildAppTextSelectionToolbar(
+  BuildContext context,
+  EditableTextState editableTextState,
+) {
+  final appTheme = Theme.of(context);
+  final colorScheme = appTheme.colorScheme;
+
+  return Theme(
+    data: appTheme.copyWith(
+      colorScheme: colorScheme.copyWith(
+        surface: appTheme.scaffoldBackgroundColor,
+        onSurface: colorScheme.onSurface,
+      ),
+    ),
+    child: AdaptiveTextSelectionToolbar.editableText(
+      editableTextState: editableTextState,
+    ),
+  );
+}
+
 /// 2. ThemeData с конфигурацией под чат
 final ThemeData theme = ThemeData(
   useMaterial3: true,
@@ -63,9 +91,8 @@ final ThemeData theme = ThemeData(
   // Настройка AppBar
   appBarTheme: const AppBarTheme(
     systemOverlayStyle: SystemUiOverlayStyle(
-      statusBarIconBrightness: Brightness.light, // Темные иконки сверху
-      systemNavigationBarIconBrightness:
-          Brightness.light, // Темные кнопки снизу
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: Brightness.light,
       systemNavigationBarColor: Colors.transparent,
       systemNavigationBarContrastEnforced: false,
     ),

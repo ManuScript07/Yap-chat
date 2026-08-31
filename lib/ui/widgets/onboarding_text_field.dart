@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 
 class OnboardingTextField extends StatefulWidget {
   const OnboardingTextField({
@@ -109,6 +110,7 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
                       child: TextField(
                         controller: widget.controller,
                         focusNode: _focusNode,
+                        contextMenuBuilder: buildAppTextSelectionToolbar,
                         maxLength: widget.maxLength,
                         maxLengthEnforcement: MaxLengthEnforcement.none,
                         minLines: 1,
@@ -289,6 +291,7 @@ class _OnboardingDateFieldState extends State<_OnboardingDateField> {
             child: TextField(
               controller: widget.controller,
               focusNode: widget.focusNode,
+              contextMenuBuilder: buildAppTextSelectionToolbar,
               maxLength: widget.maxLength,
               minLines: 1,
               maxLines: 1,
