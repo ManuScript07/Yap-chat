@@ -5,6 +5,7 @@ import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/presence/presence.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 
 class ChatListItem extends StatelessWidget {
   const ChatListItem({
@@ -46,14 +47,18 @@ class ChatListItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              UserAvatar(
+              ProfileAvatarHero(
                 avatarUrl: chat.avatarUrl,
-                avatarLoader: avatarLoader,
-                avatarRevision: chat.avatarStoragePath ?? chat.avatarUrl,
-                size: 56,
-                borderRadius: 10,
-                isOnline: isOnline,
-                showOnlineBadge: true,
+                avatarStoragePath: chat.avatarStoragePath,
+                child: UserAvatar(
+                  avatarUrl: chat.avatarUrl,
+                  avatarLoader: avatarLoader,
+                  avatarRevision: chat.avatarStoragePath ?? chat.avatarUrl,
+                  size: 56,
+                  borderRadius: 10,
+                  isOnline: isOnline,
+                  showOnlineBadge: true,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(child: _buildChatInfo(context)),

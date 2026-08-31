@@ -16,6 +16,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.avatarUrl,
     this.avatarLoader,
     this.avatarRevision,
+    this.avatarStoragePath,
     this.onBack,
     this.onProfileTap,
   });
@@ -27,6 +28,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? avatarUrl;
   final Future<String?> Function()? avatarLoader;
   final Object? avatarRevision;
+  final String? avatarStoragePath;
   final VoidCallback? onBack;
   final VoidCallback? onProfileTap;
 
@@ -55,9 +57,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             onTap: onProfileTap,
             child: ProfileAvatarHero(
               avatarUrl: avatarUrl,
-              avatarStoragePath: avatarRevision is String
-                  ? avatarRevision as String
-                  : null,
+              avatarStoragePath: avatarStoragePath,
               child: UserAvatar(
                 avatarUrl: avatarUrl,
                 avatarLoader: avatarLoader,

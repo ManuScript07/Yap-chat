@@ -1067,8 +1067,14 @@ Future<void> _openGallery(
         displayName: profile.displayName,
         imageAspectRatios: ratios,
       ),
-      transitionsBuilder: (_, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
+      transitionsBuilder: (_, animation, _, child) => FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+        child: child,
+      ),
     ),
   );
 }

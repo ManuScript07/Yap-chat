@@ -323,6 +323,7 @@ class _ChatViewState extends State<_ChatView>
                         avatarRevision:
                             widget.chat.avatarStoragePath ??
                             widget.chat.avatarUrl,
+                        avatarStoragePath: widget.chat.avatarStoragePath,
                         onBack: () {
                           Navigator.of(context).maybePop();
                         },

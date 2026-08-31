@@ -49,7 +49,10 @@ class ProfilePhotoHero extends StatelessWidget {
                   : fromRadius,
             ).animate(animation);
 
-            final targetChild = _buildFlightChild(toChild);
+            final targetChild = _buildFlightChild(
+              toChild,
+              flightPhoto: _flightPhoto(fromChild),
+            );
             return AnimatedBuilder(
               animation: radius,
               builder: (context, child) => ClipRRect(
@@ -78,7 +81,14 @@ double _heroBorderRadius(Widget child, {required double fallback}) {
   return fallback;
 }
 
-Widget _buildFlightChild(Widget child) {
+ProfilePhoto? _flightPhoto(Widget child) {
+  if (child is ClipRRect && child.child is ProfilePhotoImage) {
+    return (child.child! as ProfilePhotoImage).photo;
+  }
+  return child is ProfilePhotoImage ? child.photo : null;
+}
+
+Widget _buildFlightChild(Widget child, {ProfilePhoto? flightPhoto}) {
   if (child is UserAvatar) {
     return FittedBox(fit: BoxFit.fill, child: child);
   }
@@ -87,7 +97,7 @@ Widget _buildFlightChild(Widget child) {
     return ClipRRect(
       borderRadius: child.borderRadius,
       child: ProfilePhotoImage(
-        photo: image.photo,
+        photo: flightPhoto ?? image.photo,
         fit: image.fit,
         placeholderIconSize: image.placeholderIconSize,
         cacheWidth: image.cacheWidth,
@@ -97,7 +107,7 @@ Widget _buildFlightChild(Widget child) {
   }
   if (child is ProfilePhotoImage) {
     return ProfilePhotoImage(
-      photo: child.photo,
+      photo: flightPhoto ?? child.photo,
       fit: child.fit,
       placeholderIconSize: child.placeholderIconSize,
       cacheWidth: child.cacheWidth,

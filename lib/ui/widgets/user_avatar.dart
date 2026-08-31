@@ -31,8 +31,12 @@ class UserAvatar extends StatefulWidget {
 }
 
 class _UserAvatarState extends State<UserAvatar> {
+  static const _resolvedAvatarCacheLimit = 200;
+  static final _resolvedAvatarPaths = <Object, String>{};
+
   String? _resolvedAvatarPath;
   int _loadGeneration = 0;
+  bool _isAvatarLoading = false;
 
   @override
   void initState() {
@@ -52,20 +56,46 @@ class _UserAvatarState extends State<UserAvatar> {
   void _loadAvatar() {
     final loader = widget.avatarLoader;
     final generation = ++_loadGeneration;
+    final cacheKey = widget.avatarRevision ?? widget.avatarUrl;
     if (loader == null) {
       _resolvedAvatarPath = null;
+      _isAvatarLoading = false;
       return;
     }
 
+    final cachedPath = cacheKey == null ? null : _resolvedAvatarPaths[cacheKey];
+    if (cachedPath != null) {
+      _resolvedAvatarPath = cachedPath;
+      _isAvatarLoading = false;
+      return;
+    }
+
+    _isAvatarLoading = true;
     Future<String?>.sync(loader).then(
       (value) {
         if (!mounted || generation != _loadGeneration) return;
-        setState(() => _resolvedAvatarPath = value);
+        setState(() {
+          _resolvedAvatarPath = value;
+          _isAvatarLoading = false;
+          if (cacheKey != null && value != null && value.isNotEmpty) {
+            _rememberResolvedPath(cacheKey, value);
+          }
+        });
       },
       onError: (_, _) {
+        if (!mounted || generation != _loadGeneration) return;
         // Keep the last successfully rendered avatar on transient failures.
+        setState(() => _isAvatarLoading = false);
       },
     );
+  }
+
+  void _rememberResolvedPath(Object key, String path) {
+    _resolvedAvatarPaths.remove(key);
+    _resolvedAvatarPaths[key] = path;
+    if (_resolvedAvatarPaths.length > _resolvedAvatarCacheLimit) {
+      _resolvedAvatarPaths.remove(_resolvedAvatarPaths.keys.first);
+    }
   }
 
   @override
@@ -120,6 +150,7 @@ class _UserAvatarState extends State<UserAvatar> {
   Widget _avatar({required int targetWidth, required Color iconColor}) {
     final value = _resolvedAvatarPath ?? widget.avatarUrl;
     if (value == null || value.isEmpty) {
+      if (_isAvatarLoading) return const SizedBox.expand();
       return Icon(Icons.person, color: iconColor, size: widget.size * 0.65);
     }
     return _image(
@@ -133,18 +164,14 @@ class _UserAvatarState extends State<UserAvatar> {
     ImageProvider provider, {
     required int targetWidth,
     required Color iconColor,
-  }) => Stack(
-    fit: StackFit.expand,
-    children: [
-      Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
-      Image(
-        image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        frameBuilder: _revealImageFrame,
-        errorBuilder: (_, _, _) => const SizedBox.expand(),
-      ),
-    ],
+  }) => Image(
+    image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
+    fit: BoxFit.cover,
+    gaplessPlayback: true,
+    frameBuilder: _revealImageFrame,
+    errorBuilder: (_, _, _) => Center(
+      child: Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
+    ),
   );
 
   ImageProvider _provider(String value) {
