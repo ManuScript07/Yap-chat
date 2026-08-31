@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -55,7 +54,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 left: 0,
                 right: 0,
                 height: glowHeight,
-                child: _ProfileAmbientGlow(height: glowHeight),
+                child: ProfileAmbientGlow(height: glowHeight),
               ),
               Positioned.fill(
                 child: _ProfileScrollContent(
@@ -155,65 +154,6 @@ class _ProfilePageState extends State<ProfilePage> {
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
-  }
-}
-
-class _ProfileAmbientGlow extends StatelessWidget {
-  const _ProfileAmbientGlow({required this.height});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = context.colorScheme.primary;
-    final transparent = color.withValues(alpha: 0);
-    return IgnorePointer(
-      child: SizedBox(
-        width: double.infinity,
-        height: height,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(
-                sigmaX: 42,
-                sigmaY: 18,
-                tileMode: ui.TileMode.decal,
-              ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      color.withValues(alpha: .98),
-                      color.withValues(alpha: .86),
-                      color.withValues(alpha: .52),
-                      color.withValues(alpha: .1),
-                    ],
-                    stops: const [0, .22, .65, 1],
-                  ),
-                ),
-              ),
-            ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    color.withValues(alpha: .34),
-                    color.withValues(alpha: .22),
-                    transparent,
-                  ],
-                  stops: const [0, .42, 1],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -324,23 +264,7 @@ class _ProfileScrollContent extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.favorite_border_rounded,
-                    color: inactiveColor,
-                    size: 42,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    context.l10n.profileDaysWithUs(days),
-                    style: TextStyle(
-                      color: inactiveColor,
-                      fontSize: 20,
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.w500,
-                      height: 1.20,
-                      letterSpacing: .50,
-                    ),
-                  ),
+                  ProfileDaysLabel(days: days),
                   const SizedBox(width: 24),
                   Icon(
                     Icons.visibility_outlined,

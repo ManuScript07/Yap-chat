@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
+import 'package:yap_chat/ui/ui.dart';
 
 class ProfilePhotoHero extends StatelessWidget {
   const ProfilePhotoHero({
@@ -11,8 +12,6 @@ class ProfilePhotoHero extends StatelessWidget {
     this.cacheWidth,
     this.revealOnLoad = true,
   });
-
-  static const _thumbnailRadius = 32.0;
 
   final ProfilePhoto photo;
   final double borderRadius;
@@ -32,28 +31,34 @@ class ProfilePhotoHero extends StatelessWidget {
       tag: profilePhotoHeroTag(photo),
       transitionOnUserGestures: true,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
-      flightShuttleBuilder: (_, animation, _, _, _) {
-        final radius = Tween<double>(
-          begin: _thumbnailRadius,
-          end: 0,
-        ).animate(animation);
-        return AnimatedBuilder(
-          animation: radius,
-          builder: (context, child) => ClipRRect(
-            borderRadius: BorderRadius.circular(radius.value),
-            child: child,
-          ),
-          child: ColoredBox(
-            color: context.scaffoldBackgroundColor,
-            child: ProfilePhotoImage(
-              photo: photo,
-              fit: BoxFit.cover,
-              cacheWidth: cacheWidth,
-              revealOnLoad: false,
-            ),
-          ),
-        );
-      },
+      flightShuttleBuilder:
+          (_, animation, flightDirection, fromHeroContext, toHeroContext) {
+            final fromChild = (fromHeroContext.widget as Hero).child;
+            final toChild = (toHeroContext.widget as Hero).child;
+            final fromRadius = _heroBorderRadius(
+              fromChild,
+              fallback: borderRadius,
+            );
+            final toRadius = _heroBorderRadius(toChild, fallback: borderRadius);
+            final radius = Tween<double>(
+              begin: flightDirection == HeroFlightDirection.push
+                  ? fromRadius
+                  : toRadius,
+              end: flightDirection == HeroFlightDirection.push
+                  ? toRadius
+                  : fromRadius,
+            ).animate(animation);
+
+            final targetChild = _buildFlightChild(toChild);
+            return AnimatedBuilder(
+              animation: radius,
+              builder: (context, child) => ClipRRect(
+                borderRadius: BorderRadius.circular(radius.value),
+                child: child,
+              ),
+              child: targetChild,
+            );
+          },
       child: borderRadius == 0
           ? image
           : ClipRRect(
@@ -62,6 +67,44 @@ class ProfilePhotoHero extends StatelessWidget {
             ),
     );
   }
+}
+
+double _heroBorderRadius(Widget child, {required double fallback}) {
+  if (child is UserAvatar) return child.borderRadius;
+  if (child is ClipRRect) {
+    return child.borderRadius.resolve(TextDirection.ltr).topLeft.x;
+  }
+  if (child is ProfilePhotoImage) return 0;
+  return fallback;
+}
+
+Widget _buildFlightChild(Widget child) {
+  if (child is UserAvatar) {
+    return FittedBox(fit: BoxFit.fill, child: child);
+  }
+  if (child is ClipRRect && child.child is ProfilePhotoImage) {
+    final image = child.child as ProfilePhotoImage;
+    return ClipRRect(
+      borderRadius: child.borderRadius,
+      child: ProfilePhotoImage(
+        photo: image.photo,
+        fit: image.fit,
+        placeholderIconSize: image.placeholderIconSize,
+        cacheWidth: image.cacheWidth,
+        revealOnLoad: false,
+      ),
+    );
+  }
+  if (child is ProfilePhotoImage) {
+    return ProfilePhotoImage(
+      photo: child.photo,
+      fit: child.fit,
+      placeholderIconSize: child.placeholderIconSize,
+      cacheWidth: child.cacheWidth,
+      revealOnLoad: false,
+    );
+  }
+  return child;
 }
 
 String profilePhotoHeroTag(ProfilePhoto photo) =>

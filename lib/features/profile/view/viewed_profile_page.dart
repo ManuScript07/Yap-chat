@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -176,13 +175,13 @@ class _ProfileScaffold extends StatelessWidget {
                 left: 0,
                 right: 0,
                 height: glowHeight,
-                child: _AmbientGlow(height: glowHeight),
+                child: ProfileAmbientGlow(height: glowHeight),
               ),
               Positioned.fill(
                 child: _ProfileContent(
                   viewedProfile: viewedProfile,
                   state: state,
-                  topPadding: mediaQuery.padding.top + (isLandscape ? 82 : 94),
+                  topPadding: mediaQuery.padding.top + (isLandscape ? 88 : 98),
                   onPhotoTap: (index) =>
                       _openGallery(context, viewedProfile.profile, index),
                   onChat: () => _openChat(context),
@@ -280,85 +279,69 @@ class _ProfileScaffold extends StatelessWidget {
     final cubit = pageContext.read<ViewedProfileCubit>();
     await showModalBottomSheet<void>(
       context: pageContext,
+      isScrollControlled: true,
+      useSafeArea: false,
       backgroundColor: pageContext.scaffoldBackgroundColor,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (sheetContext) => BlocProvider.value(
-        value: cubit,
-        child: BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
-          builder: (_, currentState) {
-            final currentProfile = currentState.viewedProfile ?? viewedProfile;
-            return _ProfileActionsSheet(
-              viewedProfile: currentProfile,
-              chatIsMuted: currentState.chat?.isMuted ?? false,
-              canMute: currentProfile.isFriend,
-              onMute: () async {
-                Navigator.of(sheetContext).pop();
-                await cubit.toggleMute();
-              },
-              onRemove: currentProfile.isFriend
-                  ? () async {
-                      final confirmed = await _confirm(
-                        pageContext,
-                        title: pageContext.l10n.viewedProfileRemoveFriendTitle,
-                        content: pageContext.l10n
-                            .viewedProfileRemoveFriendContent(
-                              currentProfile.profile.displayName,
-                            ),
-                        confirmLabel:
-                            pageContext.l10n.viewedProfileRemoveFriend,
-                      );
-                      if (!confirmed || !pageContext.mounted) return;
-                      Navigator.of(sheetContext).pop();
-                      await cubit.removeFriend();
-                    }
-                  : null,
-              onStub: (message) {
-                Navigator.of(sheetContext).pop();
-                showAppSnackBar(pageContext, message: message);
-              },
-            );
-          },
-        ),
+      barrierColor: pageContext.colorScheme.primary.withValues(alpha: .22),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
-    );
-  }
-}
-
-class _AmbientGlow extends StatelessWidget {
-  const _AmbientGlow({required this.height});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = context.colorScheme.primary;
-    return IgnorePointer(
-      child: SizedBox(
-        height: height,
-        child: ImageFiltered(
-          imageFilter: ui.ImageFilter.blur(
-            sigmaX: 42,
-            sigmaY: 18,
-            tileMode: ui.TileMode.decal,
+      clipBehavior: Clip.antiAlias,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final size = MediaQuery.sizeOf(sheetContext);
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(size.width, 720),
+            maxHeight: size.height * .72,
           ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  color.withValues(alpha: .98),
-                  color.withValues(alpha: .76),
-                  color.withValues(alpha: .28),
-                  color.withValues(alpha: 0),
-                ],
-                stops: const [0, .24, .7, 1],
+          child: SingleChildScrollView(
+            child: BlocProvider.value(
+              value: cubit,
+              child: BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
+                builder: (_, currentState) {
+                  final currentProfile =
+                      currentState.viewedProfile ?? viewedProfile;
+                  return _ProfileActionsSheet(
+                    viewedProfile: currentProfile,
+                    chatIsMuted: currentState.chat?.isMuted ?? false,
+                    canMute: currentProfile.isFriend,
+                    onMute: () async {
+                      Navigator.of(sheetContext).pop();
+                      await cubit.toggleMute();
+                    },
+                    onRemove: currentProfile.isFriend
+                        ? () async {
+                            final confirmed = await showConfirmationDialog(
+                              pageContext,
+                              title: pageContext
+                                  .l10n
+                                  .viewedProfileRemoveFriendTitle,
+                              content: pageContext.l10n
+                                  .viewedProfileRemoveFriendContent(
+                                    currentProfile.profile.displayName,
+                                  ),
+                              confirmLabel:
+                                  pageContext.l10n.viewedProfileRemoveFriend,
+                            );
+                            if (confirmed != true || !pageContext.mounted) {
+                              return;
+                            }
+                            Navigator.of(sheetContext).pop();
+                            await cubit.removeFriend();
+                          }
+                        : null,
+                    onStub: (message) {
+                      Navigator.of(sheetContext).pop();
+                      showAppSnackBar(pageContext, message: message);
+                    },
+                  );
+                },
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -405,7 +388,7 @@ class _ProfileContent extends StatelessWidget {
       ),
       slivers: [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 20),
+          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 16),
           sliver: SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
@@ -438,6 +421,7 @@ class _ProfileContent extends StatelessWidget {
                             style: TextStyle(
                               color: context.colorScheme.onSurface,
                               fontSize: 32,
+                              fontFamily: 'Roboto',
                               fontWeight: FontWeight.w600,
                               height: 1,
                               letterSpacing: 1,
@@ -449,7 +433,10 @@ class _ProfileContent extends StatelessWidget {
                               style: TextStyle(
                                 color: context.colorScheme.onSurface,
                                 fontSize: 24,
+                                fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w400,
+                                height: .67,
+                                letterSpacing: .5,
                               ),
                             ),
                         ],
@@ -457,14 +444,16 @@ class _ProfileContent extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                     if (profile.bio.trim().isNotEmpty) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       Text(
                         profile.bio.trim(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: context.colorScheme.onSurface,
                           fontSize: 18,
-                          height: 1.2,
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w400,
+                          height: 1,
                           letterSpacing: .5,
                         ),
                       ),
@@ -492,31 +481,17 @@ class _ProfileContent extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               16,
-              32,
+              MediaQuery.orientationOf(context) == Orientation.landscape
+                  ? 56
+                  : 32,
               16,
+              // Unlike ProfilePage, this route is not covered by MainPage's
+              // floating bottom navigation. Reserve only its visual inset.
               MediaQuery.paddingOf(context).bottom + 28,
             ),
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.favorite_border_rounded,
-                    color: context.colorScheme.outline,
-                    size: 36,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    context.l10n.profileDaysWithUs(days),
-                    style: TextStyle(
-                      color: context.colorScheme.outline,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+              child: ProfileDaysLabel(days: days),
             ),
           ),
         ),
@@ -542,39 +517,42 @@ class _ProfilePhotoCard extends StatelessWidget {
         children: [
           Positioned(
             top: 0,
-            child: SizedBox.square(
-              dimension: 176,
-              child: primary == null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
-                      child: ColoredBox(
-                        color: context.colorScheme.primary,
-                        child: Icon(
-                          Icons.person_rounded,
-                          size: 96,
-                          color: context.colorScheme.onPrimary,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 176,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (primary == null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(32),
+                        child: ColoredBox(
+                          color: context.colorScheme.primary,
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 96,
+                            color: context.colorScheme.onSurface,
+                          ),
                         ),
+                      )
+                    else
+                      ProfilePhotoHero(
+                        photo: primary,
+                        borderRadius: 32,
+                        cacheWidth: 352,
                       ),
-                    )
-                  : Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ProfilePhotoHero(
-                          photo: primary,
-                          borderRadius: 32,
-                          cacheWidth: 352,
-                        ),
-                        Material(
-                          color: context.colorScheme.surface.withValues(
-                            alpha: 0,
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(32),
-                            onTap: onTap,
-                          ),
-                        ),
-                      ],
+                    Material(
+                      color: context.colorScheme.surface.withValues(alpha: 0),
+                      child: InkWell(
+                        onTap: primary == null ? null : onTap,
+                        borderRadius: BorderRadius.circular(32),
+                      ),
                     ),
+                  ],
+                ),
+              ),
             ),
           ),
           Positioned(
@@ -587,23 +565,36 @@ class _ProfilePhotoCard extends StatelessWidget {
                 onLongPress: () => _copyUsername(context, profile.username),
                 child: Transform.rotate(
                   angle: -.09,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width - 32,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(5),
-                      child: Text(
-                        '@${profile.username}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colorScheme.onPrimary,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w500,
-                          height: 1,
-                          letterSpacing: .5,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 5,
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: Text(
+                            '@${profile.username}',
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              color: context.colorScheme.onPrimary,
+                              fontSize: 24,
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.w500,
+                              height: 1,
+                              letterSpacing: .50,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -639,13 +630,7 @@ class _ProfileActions extends StatelessWidget {
         ? _locationAge(context, state.location?.updatedAt)
         : null;
     final buttons = <Widget>[
-      _ActionButton(
-        icon: Icons.chat_bubble_rounded,
-        label: viewedProfile.isFriend
-            ? context.l10n.viewedProfileOpenChat
-            : context.l10n.viewedProfileWrite,
-        onTap: onChat,
-      ),
+      _ActionButton(icon: Icons.chat_bubble_rounded, label: '', onTap: onChat),
       if (viewedProfile.relationship == ProfileRelationship.none)
         _ActionButton(
           icon: Icons.person_add_alt_1_rounded,
@@ -655,33 +640,20 @@ class _ProfileActions extends StatelessWidget {
         ),
       if (viewedProfile.relationship == ProfileRelationship.outgoing)
         _ActionButton(
-          icon: Icons.schedule_send_rounded,
+          icon: Icons.schedule_rounded,
           label: context.l10n.viewedProfileRequestSent,
           onTap: state.isActionPending ? null : () => _cancelRequest(context),
           wide: true,
+          transparent: true,
         ),
       if (viewedProfile.relationship == ProfileRelationship.incoming) ...[
-        _ActionButton(
-          icon: Icons.check_rounded,
-          label: '',
-          onTap: state.isActionPending
-              ? null
-              : () => cubit.respondToRequest(accept: true),
-        ),
-        _ActionButton(
-          icon: Icons.close_rounded,
-          label: '',
-          onTap: state.isActionPending
-              ? null
-              : () => cubit.respondToRequest(accept: false),
+        _IncomingRequestActions(
+          isPending: state.isActionPending,
+          onAccept: () => cubit.respondToRequest(accept: true),
+          onDecline: () => cubit.respondToRequest(accept: false),
         ),
       ],
-      _ActionButton(
-        icon: Icons.near_me_rounded,
-        label: location,
-        subtitle: locationAge,
-        onTap: onLocation,
-      ),
+      _LocationAction(distance: location, age: locationAge, onTap: onLocation),
     ];
     return LayoutBuilder(
       builder: (context, constraints) => Wrap(
@@ -706,13 +678,13 @@ class _ProfileActions extends StatelessWidget {
   }
 
   Future<void> _cancelRequest(BuildContext context) async {
-    final confirmed = await _confirm(
+    final confirmed = await showConfirmationDialog(
       context,
       title: context.l10n.viewedProfileCancelRequestTitle,
       content: context.l10n.viewedProfileCancelRequestContent,
       confirmLabel: context.l10n.friendsCancelRequest,
     );
-    if (confirmed && context.mounted) {
+    if (confirmed == true && context.mounted) {
       await context.read<ViewedProfileCubit>().cancelRequest();
     }
   }
@@ -725,6 +697,8 @@ class _ActionButton extends StatelessWidget {
     required this.onTap,
     this.subtitle,
     this.wide = false,
+    this.transparent = false,
+    this.minWidth = 68,
   });
 
   final IconData icon;
@@ -732,61 +706,141 @@ class _ActionButton extends StatelessWidget {
   final String? subtitle;
   final VoidCallback? onTap;
   final bool wide;
+  final bool transparent;
+  final double minWidth;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: context.colorScheme.surface,
-    borderRadius: BorderRadius.circular(16),
-    child: InkWell(
-      onTap: onTap,
+  Widget build(BuildContext context) {
+    final foreground = transparent
+        ? context.colorScheme.onSurface.withValues(alpha: .70)
+        : context.colorScheme.onPrimary;
+    return Material(
+      color: transparent
+          ? context.colorScheme.onSurface.withValues(alpha: .20)
+          : context.colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: wide ? 138 : 68, minHeight: 46),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 28, color: context.colorScheme.onPrimary),
-              if (label.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: context.colorScheme.onPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (subtitle != null)
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: wide ? 138 : minWidth,
+            minHeight: 46,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 28, color: foreground),
+                if (label.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Text(
-                          subtitle!,
+                          label,
                           maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: context.colorScheme.onPrimary.withValues(
-                              alpha: .68,
-                            ),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                            color: foreground,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                    ],
+                        if (subtitle != null)
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: foreground.withValues(alpha: .68),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _IncomingRequestActions extends StatelessWidget {
+  const _IncomingRequestActions({
+    required this.isPending,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final bool isPending;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 138,
+    child: Row(
+      children: [
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.check_rounded,
+            label: '',
+            minWidth: 0,
+            onTap: isPending ? null : onAccept,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.close_rounded,
+            label: '',
+            minWidth: 0,
+            transparent: true,
+            onTap: isPending ? null : onDecline,
+          ),
+        ),
+      ],
     ),
+  );
+}
+
+class _LocationAction extends StatelessWidget {
+  const _LocationAction({
+    required this.distance,
+    required this.age,
+    required this.onTap,
+  });
+
+  final String distance;
+  final String? age;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _ActionButton(icon: Icons.near_me_rounded, label: distance, onTap: onTap),
+      if (age != null) ...[
+        const SizedBox(height: 5),
+        Text(
+          age!,
+          style: TextStyle(
+            color: context.colorScheme.onSurfaceVariant,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    ],
   );
 }
 
@@ -916,84 +970,77 @@ class _ProfileActionsSheet extends StatelessWidget {
   final VoidCallback? onRemove;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      12,
-      0,
-      12,
-      MediaQuery.paddingOf(context).bottom + 12,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (viewedProfile.isFriend)
-          ListTile(
-            enabled: canMute,
-            leading: Icon(
-              chatIsMuted
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_off_outlined,
-            ),
-            title: Text(
-              chatIsMuted
-                  ? context.l10n.viewedProfileUnmute
-                  : context.l10n.viewedProfileMute,
-            ),
-            onTap: onMute,
-          ),
-        if (onRemove != null)
-          ListTile(
-            leading: const Icon(Icons.person_remove_outlined),
-            title: Text(context.l10n.viewedProfileRemoveFriend),
-            onTap: onRemove,
-          ),
-        ListTile(
-          leading: const Icon(Icons.block_outlined),
-          title: Text(context.l10n.viewedProfileBlock),
-          onTap: () => onStub(context.l10n.viewedProfileStub),
-        ),
-        ListTile(
-          leading: const Icon(Icons.flag_outlined),
-          title: Text(context.l10n.viewedProfileReport),
-          onTap: () => onStub(context.l10n.viewedProfileStub),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<bool> _confirm(
-  BuildContext context, {
-  required String title,
-  required String content,
-  required String confirmLabel,
-}) async =>
-    await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: context.scaffoldBackgroundColor,
-        surfaceTintColor: context.colorScheme.surface.withValues(alpha: 0),
-        title: Text(
-          title,
-          style: TextStyle(color: context.colorScheme.onSurface),
-        ),
-        content: Text(
-          content,
-          style: TextStyle(color: context.colorScheme.onSurfaceVariant),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final itemStyle = TextStyle(
+      color: context.colorScheme.onSurface,
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+      letterSpacing: .5,
+    );
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
       ),
-    ) ??
-    false;
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          12,
+          0,
+          12,
+          MediaQuery.paddingOf(context).bottom + 12,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (viewedProfile.isFriend)
+              ListTile(
+                enabled: canMute,
+                leading: Icon(
+                  chatIsMuted
+                      ? Icons.notifications_rounded
+                      : Icons.notifications_off_rounded,
+                ),
+                title: Text(
+                  chatIsMuted
+                      ? context.l10n.viewedProfileUnmute.toLowerCase()
+                      : context.l10n.viewedProfileMute.toLowerCase(),
+                  style: itemStyle,
+                ),
+                onTap: onMute,
+              ),
+            if (onRemove != null)
+              ListTile(
+                leading: const Icon(Icons.person_remove_rounded),
+                title: Text(
+                  context.l10n.viewedProfileRemoveFriend.toLowerCase(),
+                  style: itemStyle,
+                ),
+                onTap: onRemove,
+              ),
+            ListTile(
+              leading: const Icon(Icons.block_rounded),
+              title: Text(
+                context.l10n.viewedProfileBlock.toLowerCase(),
+                style: itemStyle,
+              ),
+              onTap: () => onStub(context.l10n.viewedProfileStub),
+            ),
+            ListTile(
+              leading: const Icon(Icons.flag_rounded),
+              title: Text(
+                context.l10n.viewedProfileReport.toLowerCase(),
+                style: itemStyle,
+              ),
+              onTap: () => onStub(context.l10n.viewedProfileStub),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 Future<void> _openGallery(
   BuildContext context,
