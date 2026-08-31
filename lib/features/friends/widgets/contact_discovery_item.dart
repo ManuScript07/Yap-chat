@@ -66,6 +66,7 @@ class ContactDiscoveryItem extends StatelessWidget {
               )
             else
               ProfileAvatarHero(
+                profileId: candidate.id,
                 avatarUrl: candidate.avatarUrl,
                 avatarStoragePath: candidate.avatarStoragePath,
                 child: UserAvatar(

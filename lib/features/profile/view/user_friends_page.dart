@@ -164,6 +164,7 @@ class _FriendRow extends StatelessWidget {
       child: Row(
         children: [
           ProfileAvatarHero(
+            profileId: friend.id,
             avatarUrl: friend.avatarUrl,
             avatarStoragePath: friend.avatarStoragePath,
             child: UserAvatar(

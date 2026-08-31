@@ -57,15 +57,14 @@ class _UserAvatarState extends State<UserAvatar> {
     final loader = widget.avatarLoader;
     final generation = ++_loadGeneration;
     final cacheKey = widget.avatarRevision ?? widget.avatarUrl;
-    if (loader == null) {
-      _resolvedAvatarPath = null;
-      _isAvatarLoading = false;
-      return;
-    }
-
     final cachedPath = cacheKey == null ? null : _resolvedAvatarPaths[cacheKey];
     if (cachedPath != null) {
       _resolvedAvatarPath = cachedPath;
+      _isAvatarLoading = false;
+      return;
+    }
+    if (loader == null) {
+      _resolvedAvatarPath = null;
       _isAvatarLoading = false;
       return;
     }

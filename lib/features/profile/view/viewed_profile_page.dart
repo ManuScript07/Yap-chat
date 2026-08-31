@@ -46,13 +46,14 @@ class ViewedProfilePage extends StatelessWidget {
         )..load(),
       ),
     ],
-    child: _ViewedProfileView(originChatId: originChatId),
+    child: _ViewedProfileView(userId: userId, originChatId: originChatId),
   );
 }
 
 class _ViewedProfileView extends StatelessWidget {
-  const _ViewedProfileView({this.originChatId});
+  const _ViewedProfileView({required this.userId, this.originChatId});
 
+  final String userId;
   final String? originChatId;
 
   @override
@@ -99,10 +100,13 @@ class _ViewedProfileView extends StatelessWidget {
         builder: (context, state) {
           final viewedProfile = state.viewedProfile;
           if (viewedProfile == null) {
+            final avatarSnapshot = ProfileAvatarHero.snapshotFor(userId);
             return Scaffold(
               backgroundColor: context.scaffoldBackgroundColor,
               body: Stack(
                 children: [
+                  if (avatarSnapshot != null)
+                    _LoadingProfileAvatar(snapshot: avatarSnapshot),
                   Positioned(
                     top: MediaQuery.paddingOf(context).top + 16,
                     left: MediaQuery.paddingOf(context).left + 16,
@@ -143,6 +147,46 @@ class _ViewedProfileView extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _LoadingProfileAvatar extends StatelessWidget {
+  const _LoadingProfileAvatar({required this.snapshot});
+
+  final ProfileAvatarHeroSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + (isLandscape ? 88 : 98),
+      left: 0,
+      right: 0,
+      child: Center(
+        child: SizedBox(
+          width: 270,
+          height: 204,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox.square(
+              dimension: 176,
+              child: ProfileAvatarHero(
+                avatarUrl: snapshot.avatarUrl,
+                avatarStoragePath: snapshot.avatarStoragePath,
+                child: UserAvatar(
+                  avatarUrl: snapshot.avatarUrl,
+                  avatarRevision:
+                      snapshot.avatarStoragePath ?? snapshot.avatarUrl,
+                  size: 176,
+                  borderRadius: 32,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

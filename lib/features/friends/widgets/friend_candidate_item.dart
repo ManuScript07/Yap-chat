@@ -47,6 +47,7 @@ class FriendCandidateItem extends StatelessWidget {
         child: Row(
           children: [
             ProfileAvatarHero(
+              profileId: candidate.id,
               avatarUrl: candidate.avatarUrl,
               avatarStoragePath: candidate.avatarStoragePath,
               child: UserAvatar(

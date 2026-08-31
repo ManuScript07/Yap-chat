@@ -42,6 +42,7 @@ class FriendRequestItem extends StatelessWidget {
         child: Row(
           children: [
             ProfileAvatarHero(
+              profileId: request.peerId,
               avatarUrl: request.peerAvatarUrl,
               avatarStoragePath: request.peerAvatarStoragePath,
               child: UserAvatar(

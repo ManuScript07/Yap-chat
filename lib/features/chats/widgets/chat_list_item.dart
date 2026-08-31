@@ -48,6 +48,7 @@ class ChatListItem extends StatelessWidget {
           child: Row(
             children: [
               ProfileAvatarHero(
+                profileId: chat.peerId,
                 avatarUrl: chat.avatarUrl,
                 avatarStoragePath: chat.avatarStoragePath,
                 child: UserAvatar(
