@@ -18,13 +18,17 @@
   "chatsDeleteTitle": "{count, plural, =1{Delete chat?} other{Delete chats?}}",
   "@chatsDeleteTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "chatsDeleteConfirmation": "{count, plural, =1{The history will be deleted only for you.} other{The selected histories will be deleted only for you.}}",
   "@chatsDeleteConfirmation": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "chatInputHint": "Type a message",
@@ -238,7 +242,13 @@
   "friendsActionFailed": "Unable to complete the action",
   "friendsCancelRequest": "cancel",
   "friendsCount": "{count, plural, one{{count} friend} other{{count} friends}}",
-  "@friendsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@friendsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "friendsAddTitle": "add friends",
   "friendsAddContacts": "from contacts",
   "friendsAddByUsername": "search by username",
@@ -269,7 +279,13 @@
   "friendsContactsPermissionTitle": "Contacts access denied",
   "friendsContactsPermissionDescription": "Allow contacts access in the app settings.",
   "friendsContactsInviteText": "I'm on Yapchat as @{username}. Join me!",
-  "@friendsContactsInviteText": {"placeholders": {"username": {"type": "String"}}},
+  "@friendsContactsInviteText": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
   "friendsContactsInviteTextWithoutUsername": "Join me on Yapchat!",
   "friendsSocialTelegram": "Telegram",
   "friendsSocialVk": "VK",
@@ -308,9 +324,24 @@
   "profileStay": "Stay",
   "profileDiscard": "Exit",
   "profilePhotoCounter": "{current} of {total}",
-  "@profilePhotoCounter": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "@profilePhotoCounter": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "profileDaysWithUs": "{count, plural, one{{count} day with us} other{{count} days with us}}",
-  "@profileDaysWithUs": {"placeholders": {"count": {"type": "int"}}},
+  "@profileDaysWithUs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "viewedProfileLoadFailed": "Unable to load profile",
   "viewedProfileOpenChat": "open chat",
   "viewedProfileWrite": "message",
@@ -321,17 +352,43 @@
   "viewedProfileRemoveFriend": "Remove friend",
   "viewedProfileRemoveFriendTitle": "Remove friend?",
   "viewedProfileRemoveFriendContent": "Remove {name} from your friends?",
-  "@viewedProfileRemoveFriendContent": {"placeholders": {"name": {"type": "String"}}},
+  "@viewedProfileRemoveFriendContent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "viewedProfileMute": "Mute",
   "viewedProfileUnmute": "Unmute",
   "viewedProfileBlock": "Block",
   "viewedProfileReport": "Report",
   "viewedProfileStub": "This feature is coming later",
   "viewedProfileDistanceMeters": "{value} m",
-  "@viewedProfileDistanceMeters": {"placeholders": {"value": {"type": "int"}}},
+  "@viewedProfileDistanceMeters": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
   "viewedProfileDistanceKilometers": "{value} km",
-  "@viewedProfileDistanceKilometers": {"placeholders": {"value": {"type": "int"}}},
+  "@viewedProfileDistanceKilometers": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
   "viewedProfileUsernameCopied": "Username copied",
   "viewedProfileUserFriends": "{name}'s friends",
-  "@viewedProfileUserFriends": {"placeholders": {"name": {"type": "String"}}}
+  "@viewedProfileUserFriends": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "viewedProfileNoFriends": "no friends",
+  "viewedProfileFriendIsYou": "that's you"
 }

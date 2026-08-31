@@ -219,6 +219,15 @@ class CachedViewedProfileFriends extends Table {
   Set<Column> get primaryKey => {ownerUserId, targetUserId, friendUserId};
 }
 
+class CachedViewedProfileFriendLists extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get targetUserId => text()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, targetUserId};
+}
+
 class CachedUserDistances extends Table {
   TextColumn get ownerUserId => text()();
   TextColumn get targetUserId => text()();
@@ -266,6 +275,7 @@ class CachedAppLanguages extends Table {
     CachedPreciseLocationExclusions,
     CachedViewedProfileMetadata,
     CachedViewedProfileFriends,
+    CachedViewedProfileFriendLists,
     CachedUserDistances,
     CachedProfileViewCounts,
     CachedAppLanguages,
@@ -287,7 +297,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -355,6 +365,15 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(cachedViewedProfileFriends);
         await migrator.createTable(cachedUserDistances);
         await migrator.createTable(cachedProfileViewCounts);
+      }
+      if (from < 16) {
+        await migrator.createTable(cachedViewedProfileFriendLists);
+      }
+      if (from < 17) {
+        await customStatement('DELETE FROM cached_profile_view_counts');
+        await customStatement(
+          'UPDATE cached_viewed_profile_metadata SET view_count = 0',
+        );
       }
     },
     beforeOpen: (details) async {

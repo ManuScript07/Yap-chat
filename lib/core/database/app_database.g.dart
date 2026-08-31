@@ -8647,6 +8647,297 @@ class CachedViewedProfileFriendsCompanion
   }
 }
 
+class $CachedViewedProfileFriendListsTable
+    extends CachedViewedProfileFriendLists
+    with
+        TableInfo<
+          $CachedViewedProfileFriendListsTable,
+          CachedViewedProfileFriendList
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedViewedProfileFriendListsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetUserIdMeta = const VerificationMeta(
+    'targetUserId',
+  );
+  @override
+  late final GeneratedColumn<String> targetUserId = GeneratedColumn<String>(
+    'target_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [ownerUserId, targetUserId, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_viewed_profile_friend_lists';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedViewedProfileFriendList> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('target_user_id')) {
+      context.handle(
+        _targetUserIdMeta,
+        targetUserId.isAcceptableOrUnknown(
+          data['target_user_id']!,
+          _targetUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetUserIdMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, targetUserId};
+  @override
+  CachedViewedProfileFriendList map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedViewedProfileFriendList(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      targetUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_user_id'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedViewedProfileFriendListsTable createAlias(String alias) {
+    return $CachedViewedProfileFriendListsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedViewedProfileFriendList extends DataClass
+    implements Insertable<CachedViewedProfileFriendList> {
+  final String ownerUserId;
+  final String targetUserId;
+  final DateTime cachedAt;
+  const CachedViewedProfileFriendList({
+    required this.ownerUserId,
+    required this.targetUserId,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['target_user_id'] = Variable<String>(targetUserId);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedViewedProfileFriendListsCompanion toCompanion(bool nullToAbsent) {
+    return CachedViewedProfileFriendListsCompanion(
+      ownerUserId: Value(ownerUserId),
+      targetUserId: Value(targetUserId),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedViewedProfileFriendList.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedViewedProfileFriendList(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      targetUserId: serializer.fromJson<String>(json['targetUserId']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'targetUserId': serializer.toJson<String>(targetUserId),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedViewedProfileFriendList copyWith({
+    String? ownerUserId,
+    String? targetUserId,
+    DateTime? cachedAt,
+  }) => CachedViewedProfileFriendList(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    targetUserId: targetUserId ?? this.targetUserId,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedViewedProfileFriendList copyWithCompanion(
+    CachedViewedProfileFriendListsCompanion data,
+  ) {
+    return CachedViewedProfileFriendList(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      targetUserId: data.targetUserId.present
+          ? data.targetUserId.value
+          : this.targetUserId,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedViewedProfileFriendList(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('targetUserId: $targetUserId, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(ownerUserId, targetUserId, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedViewedProfileFriendList &&
+          other.ownerUserId == this.ownerUserId &&
+          other.targetUserId == this.targetUserId &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedViewedProfileFriendListsCompanion
+    extends UpdateCompanion<CachedViewedProfileFriendList> {
+  final Value<String> ownerUserId;
+  final Value<String> targetUserId;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedViewedProfileFriendListsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.targetUserId = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedViewedProfileFriendListsCompanion.insert({
+    required String ownerUserId,
+    required String targetUserId,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       targetUserId = Value(targetUserId),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedViewedProfileFriendList> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? targetUserId,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (targetUserId != null) 'target_user_id': targetUserId,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedViewedProfileFriendListsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? targetUserId,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedViewedProfileFriendListsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      targetUserId: targetUserId ?? this.targetUserId,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (targetUserId.present) {
+      map['target_user_id'] = Variable<String>(targetUserId.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedViewedProfileFriendListsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('targetUserId: $targetUserId, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedUserDistancesTable extends CachedUserDistances
     with TableInfo<$CachedUserDistancesTable, CachedUserDistance> {
   @override
@@ -9737,6 +10028,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedViewedProfileMetadataTable(this);
   late final $CachedViewedProfileFriendsTable cachedViewedProfileFriends =
       $CachedViewedProfileFriendsTable(this);
+  late final $CachedViewedProfileFriendListsTable
+  cachedViewedProfileFriendLists = $CachedViewedProfileFriendListsTable(this);
   late final $CachedUserDistancesTable cachedUserDistances =
       $CachedUserDistancesTable(this);
   late final $CachedProfileViewCountsTable cachedProfileViewCounts =
@@ -9761,6 +10054,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedPreciseLocationExclusions,
     cachedViewedProfileMetadata,
     cachedViewedProfileFriends,
+    cachedViewedProfileFriendLists,
     cachedUserDistances,
     cachedProfileViewCounts,
     cachedAppLanguages,
@@ -13971,6 +14265,191 @@ typedef $$CachedViewedProfileFriendsTableProcessedTableManager =
       CachedViewedProfileFriend,
       PrefetchHooks Function()
     >;
+typedef $$CachedViewedProfileFriendListsTableCreateCompanionBuilder =
+    CachedViewedProfileFriendListsCompanion Function({
+      required String ownerUserId,
+      required String targetUserId,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedViewedProfileFriendListsTableUpdateCompanionBuilder =
+    CachedViewedProfileFriendListsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> targetUserId,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedViewedProfileFriendListsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedViewedProfileFriendListsTable> {
+  $$CachedViewedProfileFriendListsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetUserId => $composableBuilder(
+    column: $table.targetUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedViewedProfileFriendListsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedViewedProfileFriendListsTable> {
+  $$CachedViewedProfileFriendListsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetUserId => $composableBuilder(
+    column: $table.targetUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedViewedProfileFriendListsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedViewedProfileFriendListsTable> {
+  $$CachedViewedProfileFriendListsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetUserId => $composableBuilder(
+    column: $table.targetUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedViewedProfileFriendListsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedViewedProfileFriendListsTable,
+          CachedViewedProfileFriendList,
+          $$CachedViewedProfileFriendListsTableFilterComposer,
+          $$CachedViewedProfileFriendListsTableOrderingComposer,
+          $$CachedViewedProfileFriendListsTableAnnotationComposer,
+          $$CachedViewedProfileFriendListsTableCreateCompanionBuilder,
+          $$CachedViewedProfileFriendListsTableUpdateCompanionBuilder,
+          (
+            CachedViewedProfileFriendList,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedViewedProfileFriendListsTable,
+              CachedViewedProfileFriendList
+            >,
+          ),
+          CachedViewedProfileFriendList,
+          PrefetchHooks Function()
+        > {
+  $$CachedViewedProfileFriendListsTableTableManager(
+    _$AppDatabase db,
+    $CachedViewedProfileFriendListsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedViewedProfileFriendListsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedViewedProfileFriendListsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedViewedProfileFriendListsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> targetUserId = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedViewedProfileFriendListsCompanion(
+                ownerUserId: ownerUserId,
+                targetUserId: targetUserId,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String targetUserId,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedViewedProfileFriendListsCompanion.insert(
+                ownerUserId: ownerUserId,
+                targetUserId: targetUserId,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedViewedProfileFriendListsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedViewedProfileFriendListsTable,
+      CachedViewedProfileFriendList,
+      $$CachedViewedProfileFriendListsTableFilterComposer,
+      $$CachedViewedProfileFriendListsTableOrderingComposer,
+      $$CachedViewedProfileFriendListsTableAnnotationComposer,
+      $$CachedViewedProfileFriendListsTableCreateCompanionBuilder,
+      $$CachedViewedProfileFriendListsTableUpdateCompanionBuilder,
+      (
+        CachedViewedProfileFriendList,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedViewedProfileFriendListsTable,
+          CachedViewedProfileFriendList
+        >,
+      ),
+      CachedViewedProfileFriendList,
+      PrefetchHooks Function()
+    >;
 typedef $$CachedUserDistancesTableCreateCompanionBuilder =
     CachedUserDistancesCompanion Function({
       required String ownerUserId,
@@ -14644,6 +15123,12 @@ class $AppDatabaseManager {
       $$CachedViewedProfileFriendsTableTableManager(
         _db,
         _db.cachedViewedProfileFriends,
+      );
+  $$CachedViewedProfileFriendListsTableTableManager
+  get cachedViewedProfileFriendLists =>
+      $$CachedViewedProfileFriendListsTableTableManager(
+        _db,
+        _db.cachedViewedProfileFriendLists,
       );
   $$CachedUserDistancesTableTableManager get cachedUserDistances =>
       $$CachedUserDistancesTableTableManager(_db, _db.cachedUserDistances);

@@ -26,6 +26,7 @@ abstract interface class IViewedProfileRepository {
   Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
     String userId,
   );
+  Future<DateTime?> getCachedViewedProfileFriendsUpdatedAt(String userId);
   Future<List<ViewedProfileFriend>> getViewedProfileFriends(String userId);
   Future<String?> resolveViewedProfileFriendAvatar(ViewedProfileFriend friend);
   Future<int?> getCachedProfileViewCount(String userId);
@@ -45,6 +46,8 @@ extension ViewedProfileRepositoryAccess on IProfileRepository {
   Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
     String userId,
   ) => _viewedProfiles.getCachedViewedProfileFriends(userId);
+  Future<DateTime?> getCachedViewedProfileFriendsUpdatedAt(String userId) =>
+      _viewedProfiles.getCachedViewedProfileFriendsUpdatedAt(userId);
   Future<List<ViewedProfileFriend>> getViewedProfileFriends(String userId) =>
       _viewedProfiles.getViewedProfileFriends(userId);
   Future<String?> resolveViewedProfileFriendAvatar(

@@ -955,4 +955,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String viewedProfileUserFriends(String name) {
     return '$name\'s friends';
   }
+
+  @override
+  String get viewedProfileNoFriends => 'no friends';
+
+  @override
+  String get viewedProfileFriendIsYou => 'that\'s you';
 }

@@ -66,8 +66,25 @@ void main() {
     );
 
     await cache.replaceFriends('owner', 'target', const [first]);
+    final firstCachedAt = await cache.readFriendsCachedAt('owner', 'target');
     await cache.replaceFriends('owner', 'target', const [second]);
 
     expect(await cache.readFriends('owner', 'target'), const [second]);
+    expect(firstCachedAt, isNotNull);
+    expect(await cache.readFriendsCachedAt('owner', 'target'), isNotNull);
+  });
+
+  test('records a successful empty friend-list response', () async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    final cache = ViewedProfileCacheDataSource(
+      database: database,
+      profileCache: ProfileCacheDataSource(database: database),
+    );
+
+    await cache.replaceFriends('owner', 'target', const []);
+
+    expect(await cache.readFriends('owner', 'target'), isEmpty);
+    expect(await cache.readFriendsCachedAt('owner', 'target'), isNotNull);
   });
 }

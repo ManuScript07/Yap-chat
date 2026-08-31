@@ -27,6 +27,8 @@ class UserFriendsPage extends StatefulWidget {
 }
 
 class _UserFriendsPageState extends State<UserFriendsPage> {
+  static const _cacheTtl = Duration(minutes: 10);
+
   List<ViewedProfileFriend> _friends = const [];
   bool _isLoading = true;
   bool _failed = false;
@@ -39,15 +41,27 @@ class _UserFriendsPageState extends State<UserFriendsPage> {
 
   Future<void> _load() async {
     final repository = context.read<IProfileRepository>();
-    final cached = await repository.getCachedViewedProfileFriends(
+    final cachedFuture = repository.getCachedViewedProfileFriends(
       widget.userId,
     );
-    if (mounted && cached.isNotEmpty) {
+    final cachedAtFuture = repository.getCachedViewedProfileFriendsUpdatedAt(
+      widget.userId,
+    );
+    final cached = await cachedFuture;
+    final cachedAt = await cachedAtFuture;
+    final hasCachedSnapshot = cachedAt != null;
+    if (mounted && hasCachedSnapshot) {
       setState(() {
         _friends = cached;
         _isLoading = false;
       });
     }
+
+    final isFresh =
+        cachedAt != null &&
+        DateTime.now().toUtc().difference(cachedAt) < _cacheTtl;
+    if (isFresh) return;
+
     try {
       final remote = await repository.getViewedProfileFriends(widget.userId);
       if (mounted) {
@@ -61,7 +75,7 @@ class _UserFriendsPageState extends State<UserFriendsPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _failed = cached.isEmpty;
+          _failed = !hasCachedSnapshot;
         });
       }
     }

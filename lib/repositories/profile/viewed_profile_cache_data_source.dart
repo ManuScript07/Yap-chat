@@ -84,11 +84,25 @@ class ViewedProfileCacheDataSource {
         .toList(growable: false);
   }
 
+  Future<DateTime?> readFriendsCachedAt(
+    String ownerUserId,
+    String targetUserId,
+  ) async {
+    final query = _database.select(_database.cachedViewedProfileFriendLists)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(ownerUserId) &
+            table.targetUserId.equals(targetUserId),
+      );
+    return (await query.getSingleOrNull())?.cachedAt;
+  }
+
   Future<void> replaceFriends(
     String ownerUserId,
     String targetUserId,
     List<ViewedProfileFriend> friends,
   ) => _database.transaction(() async {
+    final cachedAt = DateTime.now().toUtc();
     await (_database.delete(_database.cachedViewedProfileFriends)..where(
           (table) =>
               table.ownerUserId.equals(ownerUserId) &
@@ -107,10 +121,19 @@ class ViewedProfileCacheDataSource {
               displayName: friend.displayName,
               avatarUrl: Value(friend.avatarUrl),
               avatarStoragePath: Value(friend.avatarStoragePath),
-              cachedAt: DateTime.now().toUtc(),
+              cachedAt: cachedAt,
             ),
           );
     }
+    await _database
+        .into(_database.cachedViewedProfileFriendLists)
+        .insertOnConflictUpdate(
+          CachedViewedProfileFriendListsCompanion.insert(
+            ownerUserId: ownerUserId,
+            targetUserId: targetUserId,
+            cachedAt: cachedAt,
+          ),
+        );
   });
 
   Future<int?> readViewCount(String ownerUserId, String targetUserId) async {

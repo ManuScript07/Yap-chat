@@ -41,6 +41,8 @@ class ProfileRepository
   final AccountSessionController _accountSessionController;
   final ViewedProfileCacheDataSource _viewedProfileCache;
   final MediaCacheService _mediaCache;
+  final Map<String, Future<List<ViewedProfileFriend>>>
+  _activeViewedProfileFriendsRequests = {};
 
   @override
   Future<UserProfile?> getCachedProfile(String userId) => _cache.read(userId);
@@ -105,9 +107,26 @@ class ProfileRepository
   @override
   Future<List<ViewedProfileFriend>> getCachedViewedProfileFriends(
     String userId,
-  ) {
+  ) async {
     final scope = _accountSessionController.capture();
-    return _viewedProfileCache.readFriends(scope.userId, userId);
+    final friends = await _viewedProfileCache.readFriends(scope.userId, userId);
+    _accountSessionController.ensureCurrent(scope);
+    return friends
+        .where((friend) => friend.id != scope.userId)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<DateTime?> getCachedViewedProfileFriendsUpdatedAt(
+    String userId,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final cachedAt = await _viewedProfileCache.readFriendsCachedAt(
+      scope.userId,
+      userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return cachedAt;
   }
 
   @override
@@ -115,6 +134,27 @@ class ProfileRepository
     String userId,
   ) async {
     final scope = _accountSessionController.capture();
+    final operationKey = '${scope.userId}:$userId';
+    final active = _activeViewedProfileFriendsRequests[operationKey];
+    if (active != null) return active;
+    final request = _fetchViewedProfileFriends(userId, scope);
+    _activeViewedProfileFriendsRequests[operationKey] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(
+        _activeViewedProfileFriendsRequests[operationKey],
+        request,
+      )) {
+        _activeViewedProfileFriendsRequests.remove(operationKey);
+      }
+    }
+  }
+
+  Future<List<ViewedProfileFriend>> _fetchViewedProfileFriends(
+    String userId,
+    AccountSessionSnapshot scope,
+  ) async {
     final response = await _client.rpc<List<dynamic>>(
       'get_user_profile_friends',
       params: {'target_user_id': userId},
@@ -122,6 +162,7 @@ class ProfileRepository
     _accountSessionController.ensureCurrent(scope);
     final friends = response
         .map((item) => _viewedFriend(Map<String, dynamic>.from(item as Map)))
+        .where((friend) => friend.id != scope.userId)
         .toList(growable: false);
     await _accountSessionController.commit(
       scope,

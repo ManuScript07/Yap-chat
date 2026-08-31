@@ -301,10 +301,12 @@ class _ProfileScaffold extends StatelessWidget {
                       final confirmed = await _confirm(
                         pageContext,
                         title: pageContext.l10n.viewedProfileRemoveFriendTitle,
-                        content: pageContext.l10n.viewedProfileRemoveFriendContent(
-                          currentProfile.profile.displayName,
-                        ),
-                        confirmLabel: pageContext.l10n.viewedProfileRemoveFriend,
+                        content: pageContext.l10n
+                            .viewedProfileRemoveFriendContent(
+                              currentProfile.profile.displayName,
+                            ),
+                        confirmLabel:
+                            pageContext.l10n.viewedProfileRemoveFriend,
                       );
                       if (!confirmed || !pageContext.mounted) return;
                       Navigator.of(sheetContext).pop();
@@ -795,71 +797,82 @@ class _ProfileStats extends StatelessWidget {
   final VoidCallback onFriends;
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Flexible(
-        child: InkWell(
-          onTap: onFriends,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: viewedProfile.friendsPreview.isEmpty
-                      ? 0
-                      : 32 + (viewedProfile.friendsPreview.length - 1) * 20,
-                  height: 32,
-                  child: Stack(
-                    children: [
-                      for (
-                        var index = 0;
-                        index < viewedProfile.friendsPreview.length;
-                        index++
-                      )
-                        Positioned(
-                          left: index * 20,
-                          child: _MiniFriendAvatar(
-                            friend: viewedProfile.friendsPreview[index],
+  Widget build(BuildContext context) {
+    final hasNoFriends = viewedProfile.friendCount == 0;
+    final onlyFriendIsViewer =
+        viewedProfile.isFriend && viewedProfile.friendCount == 1;
+    final canOpenFriends = !hasNoFriends && !onlyFriendIsViewer;
+    final friendsLabel = hasNoFriends
+        ? context.l10n.viewedProfileNoFriends
+        : onlyFriendIsViewer
+        ? context.l10n.viewedProfileFriendIsYou
+        : context.l10n.friendsCount(viewedProfile.friendCount);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: InkWell(
+            onTap: canOpenFriends ? onFriends : null,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: viewedProfile.friendsPreview.isEmpty
+                        ? 0
+                        : 32 + (viewedProfile.friendsPreview.length - 1) * 20,
+                    height: 32,
+                    child: Stack(
+                      children: [
+                        for (
+                          var index = 0;
+                          index < viewedProfile.friendsPreview.length;
+                          index++
+                        )
+                          Positioned(
+                            left: index * 20,
+                            child: _MiniFriendAvatar(
+                              friend: viewedProfile.friendsPreview[index],
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (viewedProfile.friendsPreview.isNotEmpty)
-                  const SizedBox(width: 8),
-                Text(
-                  context.l10n.friendsCount(viewedProfile.friendCount),
-                  style: TextStyle(
-                    color: context.colorScheme.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                  if (viewedProfile.friendsPreview.isNotEmpty)
+                    const SizedBox(width: 8),
+                  Text(
+                    friendsLabel,
+                    style: TextStyle(
+                      color: context.colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      const SizedBox(width: 18),
-      Icon(
-        Icons.visibility_outlined,
-        size: 20,
-        color: context.colorScheme.onSurfaceVariant,
-      ),
-      const SizedBox(width: 5),
-      Text(
-        '${viewedProfile.viewCount}',
-        style: TextStyle(
-          color: context.colorScheme.onSurface,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
+        const SizedBox(width: 18),
+        Icon(
+          Icons.visibility_outlined,
+          size: 20,
+          color: context.colorScheme.onSurfaceVariant,
         ),
-      ),
-    ],
-  );
+        const SizedBox(width: 5),
+        Text(
+          '${viewedProfile.viewCount}',
+          style: TextStyle(
+            color: context.colorScheme.onSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _MiniFriendAvatar extends StatelessWidget {

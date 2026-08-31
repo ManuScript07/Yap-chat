@@ -242,7 +242,13 @@
   "friendsActionFailed": "Не удалось выполнить действие",
   "friendsCancelRequest": "отменить",
   "friendsCount": "{count, plural, one{{count} друг} few{{count} друга} many{{count} друзей} other{{count} друзей}}",
-  "@friendsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@friendsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "friendsAddTitle": "добавить",
   "friendsAddContacts": "из контактов",
   "friendsAddByUsername": "поиск по никнейму",
@@ -273,7 +279,13 @@
   "friendsContactsPermissionTitle": "Нет доступа к контактам",
   "friendsContactsPermissionDescription": "Разрешите доступ к контактам в настройках приложения.",
   "friendsContactsInviteText": "Я в Пуньк как @{username}. Присоединяйся!",
-  "@friendsContactsInviteText": {"placeholders": {"username": {"type": "String"}}},
+  "@friendsContactsInviteText": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
   "friendsContactsInviteTextWithoutUsername": "Присоединяйся ко мне в Пуньк!",
   "friendsSocialTelegram": "Telegram",
   "friendsSocialVk": "VK",
@@ -312,9 +324,24 @@
   "profileStay": "Остаться",
   "profileDiscard": "Выйти",
   "profilePhotoCounter": "{current} из {total}",
-  "@profilePhotoCounter": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "@profilePhotoCounter": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "profileDaysWithUs": "{count, plural, one{{count} день с нами} few{{count} дня с нами} many{{count} дней с нами} other{{count} дня с нами}}",
-  "@profileDaysWithUs": {"placeholders": {"count": {"type": "int"}}},
+  "@profileDaysWithUs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "viewedProfileLoadFailed": "Не удалось загрузить профиль",
   "viewedProfileOpenChat": "открыть чат",
   "viewedProfileWrite": "написать",
@@ -325,17 +352,43 @@
   "viewedProfileRemoveFriend": "Удалить из друнов",
   "viewedProfileRemoveFriendTitle": "Удалить из друнов?",
   "viewedProfileRemoveFriendContent": "Удалить {name} из друнов?",
-  "@viewedProfileRemoveFriendContent": {"placeholders": {"name": {"type": "String"}}},
+  "@viewedProfileRemoveFriendContent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "viewedProfileMute": "Убрать звук",
   "viewedProfileUnmute": "Включить звук",
   "viewedProfileBlock": "Заблокировать",
   "viewedProfileReport": "Пожаловаться",
   "viewedProfileStub": "Функция появится позже",
   "viewedProfileDistanceMeters": "{value} м",
-  "@viewedProfileDistanceMeters": {"placeholders": {"value": {"type": "int"}}},
+  "@viewedProfileDistanceMeters": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
   "viewedProfileDistanceKilometers": "{value} км",
-  "@viewedProfileDistanceKilometers": {"placeholders": {"value": {"type": "int"}}},
+  "@viewedProfileDistanceKilometers": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
   "viewedProfileUsernameCopied": "Никнейм скопирован",
   "viewedProfileUserFriends": "Друны {name}",
-  "@viewedProfileUserFriends": {"placeholders": {"name": {"type": "String"}}}
+  "@viewedProfileUserFriends": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "viewedProfileNoFriends": "нет друзей",
+  "viewedProfileFriendIsYou": "друг это я"
 }

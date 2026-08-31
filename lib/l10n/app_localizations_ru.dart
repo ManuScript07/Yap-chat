@@ -966,4 +966,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String viewedProfileUserFriends(String name) {
     return 'Друны $name';
   }
+
+  @override
+  String get viewedProfileNoFriends => 'нет друзей';
+
+  @override
+  String get viewedProfileFriendIsYou => 'друг это я';
 }

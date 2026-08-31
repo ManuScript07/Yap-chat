@@ -63,6 +63,11 @@ class MockProfileRepository
   ) async => const [];
 
   @override
+  Future<DateTime?> getCachedViewedProfileFriendsUpdatedAt(
+    String userId,
+  ) async => null;
+
+  @override
   Future<List<ViewedProfileFriend>> getViewedProfileFriends(
     String userId,
   ) async => const [];
