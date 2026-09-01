@@ -7,16 +7,19 @@ import 'package:yap_chat/repositories/blocks/blocks.dart';
 class BlocklistState extends Equatable {
   const BlocklistState({
     this.blockedUserIds = const {},
+    this.pendingUserIds = const {},
     this.isLoaded = false,
   });
 
   final Set<String> blockedUserIds;
+  final Set<String> pendingUserIds;
   final bool isLoaded;
 
   bool blocks(String userId) => blockedUserIds.contains(userId);
+  bool isPending(String userId) => pendingUserIds.contains(userId);
 
   @override
-  List<Object?> get props => [blockedUserIds, isLoaded];
+  List<Object?> get props => [blockedUserIds, pendingUserIds, isLoaded];
 }
 
 class BlocklistCubit extends Cubit<BlocklistState> {
@@ -27,9 +30,19 @@ class BlocklistCubit extends Cubit<BlocklistState> {
       (ids) => emit(
         BlocklistState(
           blockedUserIds: ids,
+          pendingUserIds: state.pendingUserIds,
           // A locally added entry is authoritative for the current session,
           // even if the first background refresh has not finished yet.
           isLoaded: state.isLoaded || ids.isNotEmpty,
+        ),
+      ),
+    );
+    _pendingSubscription = repository.watchPendingUserIds().listen(
+      (ids) => emit(
+        BlocklistState(
+          blockedUserIds: state.blockedUserIds,
+          pendingUserIds: ids,
+          isLoaded: state.isLoaded,
         ),
       ),
     );
@@ -37,6 +50,7 @@ class BlocklistCubit extends Cubit<BlocklistState> {
 
   final IBlocklistRepository _repository;
   late final StreamSubscription<Set<String>> _subscription;
+  late final StreamSubscription<Set<String>> _pendingSubscription;
 
   Future<void> refresh() async {
     try {
@@ -45,6 +59,7 @@ class BlocklistCubit extends Cubit<BlocklistState> {
         emit(
           BlocklistState(
             blockedUserIds: state.blockedUserIds,
+            pendingUserIds: state.pendingUserIds,
             isLoaded: true,
           ),
         );
@@ -57,6 +72,7 @@ class BlocklistCubit extends Cubit<BlocklistState> {
   @override
   Future<void> close() async {
     await _subscription.cancel();
+    await _pendingSubscription.cancel();
     return super.close();
   }
 }

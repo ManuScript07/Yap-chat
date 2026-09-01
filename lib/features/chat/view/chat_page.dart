@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -353,6 +354,9 @@ class _ChatViewState extends State<_ChatView>
                       peerName: widget.chat.userName,
                       peerId: widget.chat.peerId,
                       blockedByMe: blockedByMe,
+                      isBlockActionPending: blocklistState.isPending(
+                        widget.chat.peerId,
+                      ),
                       onMessageSent: _scrollToBottom,
                       onHeightChanged: _onComposerHeightChanged,
                     ),
@@ -373,6 +377,7 @@ class _KeyboardAwareInput extends StatelessWidget {
     required this.peerName,
     required this.peerId,
     required this.blockedByMe,
+    required this.isBlockActionPending,
     required this.onMessageSent,
     required this.onHeightChanged,
   });
@@ -381,6 +386,7 @@ class _KeyboardAwareInput extends StatelessWidget {
   final String peerName;
   final String peerId;
   final bool blockedByMe;
+  final bool isBlockActionPending;
   final VoidCallback onMessageSent;
   final ValueChanged<double> onHeightChanged;
 
@@ -432,7 +438,11 @@ class _KeyboardAwareInput extends StatelessWidget {
             if (blockedByMe) {
               return SizeReporter(
                 onSizeChanged: (size) => onHeightChanged(size.height),
-                child: _UnblockComposer(peerName: peerName, peerId: peerId),
+                child: _UnblockComposer(
+                  peerName: peerName,
+                  peerId: peerId,
+                  isPending: isBlockActionPending,
+                ),
               );
             }
             return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
@@ -549,10 +559,15 @@ class _KeyboardAwareInput extends StatelessWidget {
 }
 
 class _UnblockComposer extends StatelessWidget {
-  const _UnblockComposer({required this.peerName, required this.peerId});
+  const _UnblockComposer({
+    required this.peerName,
+    required this.peerId,
+    required this.isPending,
+  });
 
   final String peerName;
   final String peerId;
+  final bool isPending;
 
   @override
   Widget build(BuildContext context) {
@@ -564,21 +579,46 @@ class _UnblockComposer extends StatelessWidget {
         padding.right + 16,
         padding.bottom + 8,
       ),
-      child: Material(
-        color: context.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => _confirm(context),
-          child: SizedBox(
-            height: 58,
-            child: Center(
-              child: Text(
-                context.l10n.unblockUser,
-                style: TextStyle(
-                  color: context.colorScheme.onPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+      child: SizedBox(
+        height: 50,
+        child: Container(
+          decoration: BoxDecoration(
+            color: context.colorScheme.primary.withValues(alpha: .15),
+            border: Border.all(
+              color: context.colorScheme.onSurface.withValues(alpha: .4),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(32),
+                  onTap: isPending ? null : () => _confirm(context),
+                  child: Center(
+                    child: isPending
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: context.colorScheme.onSurface,
+                            ),
+                          )
+                        : Text(
+                            context.l10n.unblockUser.toLowerCase(),
+                            style: TextStyle(
+                              color: context.colorScheme.onSurface,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: .15,
+                            ),
+                          ),
+                  ),
                 ),
               ),
             ),

@@ -198,6 +198,7 @@ class SettingsFriendRow extends StatelessWidget {
     required this.onToggle,
     this.trailingIcon = Icons.visibility_rounded,
     this.horizontalPadding = 16,
+    this.isBusy = false,
   });
 
   final Widget avatar;
@@ -207,6 +208,7 @@ class SettingsFriendRow extends StatelessWidget {
   final VoidCallback onToggle;
   final IconData trailingIcon;
   final double horizontalPadding;
+  final bool isBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -246,16 +248,25 @@ class SettingsFriendRow extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: onToggle,
+            onPressed: isBusy ? null : onToggle,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            icon: Icon(
-              trailingIcon == Icons.visibility_rounded && !isVisible
-                  ? Icons.visibility_off_rounded
-                  : trailingIcon,
-              color: colorScheme.onSurface,
-              size: 28,
-            ),
+            icon: isBusy
+                ? SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: colorScheme.onSurface,
+                    ),
+                  )
+                : Icon(
+                    trailingIcon == Icons.visibility_rounded && !isVisible
+                        ? Icons.visibility_off_rounded
+                        : trailingIcon,
+                    color: colorScheme.onSurface,
+                    size: 28,
+                  ),
           ),
         ],
       ),

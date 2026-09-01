@@ -3,6 +3,7 @@ import 'package:yap_chat/repositories/blocks/blocked_user.dart';
 abstract interface class IBlocklistRepository {
   Stream<List<BlockedUser>> watchBlockedUsers();
   Stream<Set<String>> watchBlockedUserIds();
+  Stream<Set<String>> watchPendingUserIds();
 
   Future<List<BlockedUser>> readCachedBlockedUsers();
   Future<List<BlockedUser>> refreshBlockedUsers();

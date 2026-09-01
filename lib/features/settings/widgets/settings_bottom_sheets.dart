@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/repositories/repositories.dart';
@@ -473,19 +474,22 @@ class _BlacklistBody extends StatelessWidget {
       itemCount: users.length,
       itemBuilder: (context, index) {
         final user = users[index];
-        return SettingsFriendRow(
-          avatar: UserAvatar(
-            avatarUrl: user.avatarUrl,
-            avatarRevision: user.avatarStoragePath ?? user.avatarUrl,
-            size: 54,
-            borderRadius: 12,
+        return BlocBuilder<BlocklistCubit, BlocklistState>(
+          builder: (context, state) => SettingsFriendRow(
+            avatar: UserAvatar(
+              avatarUrl: user.avatarUrl,
+              avatarRevision: user.avatarStoragePath ?? user.avatarUrl,
+              size: 54,
+              borderRadius: 12,
+            ),
+            name: user.displayName,
+            username: user.username,
+            isVisible: true,
+            isBusy: state.isPending(user.id),
+            onToggle: () => _confirmUnblock(context, user),
+            trailingIcon: Icons.lock_open_rounded,
+            horizontalPadding: 16,
           ),
-          name: user.displayName,
-          username: user.username,
-          isVisible: true,
-          onToggle: () => _confirmUnblock(context, user),
-          trailingIcon: Icons.lock_open_rounded,
-          horizontalPadding: 16,
         );
       },
     );

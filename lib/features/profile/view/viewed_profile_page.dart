@@ -239,6 +239,9 @@ class _ProfileScaffold extends StatelessWidget {
                   onPhotoTap: (index) =>
                       _openGallery(context, viewedProfile.profile, index),
                   onChat: () => _openChat(context),
+                  onUnblock: isBlockedByMe
+                      ? () => _confirmUnblock(context)
+                      : null,
                   onLocation: !viewedProfile.isFriend || state.location == null
                       || isBlockedByMe
                       ? null
@@ -393,6 +396,9 @@ class _ProfileScaffold extends StatelessWidget {
                           }
                         : null,
                       isBlockedByMe: isBlockedByMe,
+                      isBlockActionPending:
+                          blocklistState.isPending(currentProfile.profile.id) ||
+                          currentState.isActionPending,
                       onBlock: () async {
                         final confirmed = await showConfirmationDialog(
                           pageContext,
@@ -445,6 +451,32 @@ class _ProfileScaffold extends StatelessWidget {
       },
     );
   }
+
+  Future<void> _confirmUnblock(BuildContext context) async {
+    if (viewedProfile.profile.id.isEmpty) return;
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.unblockUserTitle,
+      content: context.l10n.unblockUserContent(
+        viewedProfile.profile.displayName,
+      ),
+      confirmLabel: context.l10n.unblockUser,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await context
+          .read<IBlocklistRepository>()
+          .unblockUser(viewedProfile.profile.id);
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.friendsActionFailed,
+          type: SnackBarType.error,
+        );
+      }
+    }
+  }
 }
 
 class _ProfileContent extends StatelessWidget {
@@ -456,6 +488,7 @@ class _ProfileContent extends StatelessWidget {
     required this.onPhotoTap,
     required this.onChat,
     required this.onFriends,
+    this.onUnblock,
     this.onLocation,
   });
 
@@ -466,6 +499,7 @@ class _ProfileContent extends StatelessWidget {
   final ValueChanged<int> onPhotoTap;
   final VoidCallback onChat;
   final VoidCallback onFriends;
+  final VoidCallback? onUnblock;
   final VoidCallback? onLocation;
 
   @override
@@ -570,6 +604,7 @@ class _ProfileContent extends StatelessWidget {
                       state: state,
                       isBlockedByMe: isBlockedByMe,
                       onChat: onChat,
+                      onUnblock: onUnblock,
                       onLocation: onLocation,
                     ),
                     const SizedBox(height: 24),
@@ -778,6 +813,7 @@ class _ProfileActions extends StatelessWidget {
     required this.state,
     required this.isBlockedByMe,
     required this.onChat,
+    this.onUnblock,
     this.onLocation,
   });
 
@@ -785,17 +821,28 @@ class _ProfileActions extends StatelessWidget {
   final ViewedProfileState state;
   final bool isBlockedByMe;
   final VoidCallback onChat;
+  final VoidCallback? onUnblock;
   final VoidCallback? onLocation;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<ViewedProfileCubit>();
+    final isBlockActionPending = context.select<BlocklistCubit, bool>(
+      (cubit) => cubit.state.isPending(viewedProfile.profile.id),
+    );
     final location = _distanceLabel(context, state.distance);
     final locationAge = viewedProfile.isFriend
         ? _locationAge(context, state.location?.updatedAt)
         : null;
     final buttons = <Widget>[
       _ActionButton(icon: Icons.chat_bubble_rounded, label: '', onTap: onChat),
+      if (isBlockedByMe)
+        _ActionButton(
+          icon: Icons.lock_open_rounded,
+          label: context.l10n.unblockUser,
+          onTap: isBlockActionPending ? null : onUnblock,
+          wide: true,
+        ),
       if (!isBlockedByMe &&
           viewedProfile.relationship == ProfileRelationship.none)
         _ActionButton(
@@ -1133,6 +1180,7 @@ class _ProfileActionsSheet extends StatelessWidget {
     required this.onMute,
     required this.onStub,
     required this.isBlockedByMe,
+    required this.isBlockActionPending,
     required this.onBlock,
     required this.onUnblock,
     this.onRemove,
@@ -1144,6 +1192,7 @@ class _ProfileActionsSheet extends StatelessWidget {
   final VoidCallback onMute;
   final ValueChanged<String> onStub;
   final bool isBlockedByMe;
+  final bool isBlockActionPending;
   final VoidCallback onBlock;
   final VoidCallback onUnblock;
   final VoidCallback? onRemove;
@@ -1199,18 +1248,30 @@ class _ProfileActionsSheet extends StatelessWidget {
                 onTap: onRemove,
               ),
             ListTile(
-              leading: Icon(
-                isBlockedByMe
-                    ? Icons.lock_open_rounded
-                    : Icons.block_rounded,
-              ),
+              enabled: !isBlockActionPending,
+              leading: isBlockActionPending
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: context.colorScheme.onSurface,
+                      ),
+                    )
+                  : Icon(
+                      isBlockedByMe
+                          ? Icons.lock_open_rounded
+                          : Icons.block_rounded,
+                    ),
               title: Text(
                 isBlockedByMe
                     ? context.l10n.unblockUser.toLowerCase()
                     : context.l10n.viewedProfileBlock.toLowerCase(),
                 style: itemStyle,
               ),
-              onTap: isBlockedByMe ? onUnblock : onBlock,
+              onTap: isBlockActionPending
+                  ? null
+                  : (isBlockedByMe ? onUnblock : onBlock),
             ),
             ListTile(
               leading: const Icon(Icons.flag_rounded),
