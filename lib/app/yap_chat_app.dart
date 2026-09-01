@@ -68,6 +68,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   late final ProfileNavigationCoordinator _profileNavigator;
   bool _dependenciesInitialized = false;
   String? _activeUserId;
+  String? _blocklistHydratedUserId;
   final Set<String> _openingNotificationChatIds = <String>{};
   final Set<String> _openingNotificationProfileIds = <String>{};
 
@@ -130,6 +131,25 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       isActive: () => mounted,
       onError: talker.handle,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _hydrateBlocklistForCurrentAuthState();
+    });
+  }
+
+  void _hydrateBlocklistForCurrentAuthState() {
+    final authState = context.read<AuthBloc>().state;
+    final userId = authState.session?.userId;
+    if (authState.status != AuthStatus.authenticated || userId == null) {
+      return;
+    }
+    context.read<AccountSessionController>().setAuthenticatedUser(userId);
+    _hydrateBlocklistForUser(userId);
+  }
+
+  void _hydrateBlocklistForUser(String userId) {
+    if (_blocklistHydratedUserId == userId) return;
+    _blocklistHydratedUserId = userId;
+    unawaited(context.read<BlocklistCubit>().hydrateAndRefresh());
   }
 
   @override
@@ -408,7 +428,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               context.read<AppLanguageCubit>().setAuthenticatedUser(userId),
             );
             if (state.status == AuthStatus.authenticated && userId != null) {
-              unawaited(context.read<BlocklistCubit>().refresh());
+              _hydrateBlocklistForUser(userId);
               unawaited(
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
                   userId,
@@ -423,6 +443,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
             } else if (state.status == AuthStatus.unauthenticated ||
                 state.status == AuthStatus.profileIncomplete ||
                 state.status == AuthStatus.failure) {
+              _blocklistHydratedUserId = null;
               unawaited(
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
                   null,

@@ -208,6 +208,7 @@ class _AppInitializerState extends State<AppInitializer> {
                 PresenceCubit(repository: context.read<IPresenceRepository>()),
           ),
           BlocProvider<BlocklistCubit>(
+            lazy: false,
             create: (context) => BlocklistCubit(
               repository: context.read<IBlocklistRepository>(),
             ),

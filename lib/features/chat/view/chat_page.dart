@@ -572,6 +572,7 @@ class _UnblockComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.paddingOf(context);
+    final mainColor = context.colorScheme.onSurface;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         padding.left + 16,
@@ -583,9 +584,8 @@ class _UnblockComposer extends StatelessWidget {
         height: 50,
         child: Container(
           decoration: BoxDecoration(
-            color: context.colorScheme.primary.withValues(alpha: .15),
             border: Border.all(
-              color: context.colorScheme.onSurface.withValues(alpha: .4),
+              color: mainColor.withValues(alpha: .4),
               width: 1.5,
             ),
             borderRadius: BorderRadius.circular(32),
@@ -594,30 +594,33 @@ class _UnblockComposer extends StatelessWidget {
             borderRadius: BorderRadius.circular(32),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(32),
-                  onTap: isPending ? null : () => _confirm(context),
-                  child: Center(
-                    child: isPending
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: context.colorScheme.onSurface,
+              child: Container(
+                color: mainColor.withValues(alpha: .15),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(32),
+                    onTap: isPending ? null : () => _confirm(context),
+                    child: Center(
+                      child: isPending
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: mainColor,
+                              ),
+                            )
+                          : Text(
+                              context.l10n.unblockUser.toLowerCase(),
+                              style: TextStyle(
+                                color: mainColor.withValues(alpha: .6),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: .15,
+                              ),
                             ),
-                          )
-                        : Text(
-                            context.l10n.unblockUser.toLowerCase(),
-                            style: TextStyle(
-                              color: context.colorScheme.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: .15,
-                            ),
-                          ),
+                    ),
                   ),
                 ),
               ),

@@ -299,11 +299,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (migrator) => migrator.createAll(),
+    onCreate: (migrator) async {
+      await migrator.createAll();
+      await _createBlocklistCacheTables();
+    },
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
         await migrator.createTable(cachedChats);
@@ -390,12 +393,44 @@ class AppDatabase extends _$AppDatabase {
           );
         }
       }
+      if (from < 19) {
+        await _createBlocklistCacheTables();
+      }
     },
     beforeOpen: (details) async {
+      // Version 19 was briefly shipped while the blacklist cache schema was
+      // being introduced. Keep this idempotent repair here so an existing
+      // database carrying that version cannot silently miss the raw tables.
+      await _createBlocklistCacheTables();
       if (details.hadUpgrade && details.versionBefore! < 10) {
         // Reclaim pages that previously contained duplicated avatar BLOBs.
         await customStatement('VACUUM');
       }
     },
   );
+
+  Future<void> _createBlocklistCacheTables() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS cached_blocked_users (
+        owner_user_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        avatar_url TEXT,
+        avatar_storage_path TEXT,
+        blocked_at_ms INTEGER NOT NULL,
+        PRIMARY KEY (owner_user_id, user_id)
+      )
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS cached_blocklist_snapshots (
+        owner_user_id TEXT NOT NULL PRIMARY KEY,
+        cached_at_ms INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  /// Repairs the raw blacklist cache tables for databases created by an
+  /// intermediate version of the application schema.
+  Future<void> ensureBlocklistCacheTables() => _createBlocklistCacheTables();
 }

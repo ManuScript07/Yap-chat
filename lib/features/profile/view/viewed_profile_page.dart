@@ -296,14 +296,13 @@ class _ProfileScaffold extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                     ],
-                    if (!viewedProfile.isBlocked)
-                      GlassButton(
-                        icon: Icons.settings_rounded,
-                        size: 50,
-                        iconSize: 29,
-                        borderRadius: 20,
-                        onPressed: () => _showActions(context),
-                      ),
+                    GlassButton(
+                      icon: Icons.settings_rounded,
+                      size: 50,
+                      iconSize: 29,
+                      borderRadius: 20,
+                      onPressed: () => _showActions(context),
+                    ),
                   ],
                 ),
               ),
@@ -839,7 +838,7 @@ class _ProfileActions extends StatelessWidget {
       if (isBlockedByMe)
         _ActionButton(
           icon: Icons.lock_open_rounded,
-          label: context.l10n.unblockUser,
+          label: context.l10n.unblockUser.toLowerCase(),
           onTap: isBlockActionPending ? null : onUnblock,
           wide: true,
         ),

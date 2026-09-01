@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/repositories/repositories.dart';
@@ -316,9 +317,9 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
 
   Future<void> _load() async {
     try {
-      await context.read<IBlocklistRepository>().refreshBlockedUsers();
+      await context.read<BlocklistCubit>().refreshIfStale();
     } catch (_) {
-      if (mounted) {
+      if (mounted && !context.read<BlocklistCubit>().state.isLoaded) {
         showAppSnackBar(
           context,
           message: context.l10n.settingsBlacklistLoadFailed,
@@ -344,12 +345,14 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
     final searchBottom = keyboardInset > 0
         ? keyboardInset + 12
         : mediaQuery.viewPadding.bottom + 12;
-    const headerHeight = 106.0;
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final heightFactor = isLandscape ? .88 : .84;
+    final referenceHeightFactor = isLandscape ? .86 : .80;
+    final heightScale = heightFactor / referenceHeightFactor;
+    final sheetHeight = mediaQuery.size.height * heightFactor;
+    final headerHeight = 106.0 * heightScale;
+    final emptyStateTopPadding = headerHeight + 64 * heightScale;
     final contentBottomPadding = searchBottom + 62;
-    final heightFactor = mediaQuery.orientation == Orientation.landscape
-        ? .86
-        : .80;
-    final double sheetHeight = mediaQuery.size.height * heightFactor;
     final filteredUsers = _blockedUsers
         .where((user) {
           final query = _query.trim().toLowerCase();
@@ -365,11 +368,19 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: _BlacklistBody(
-              users: filteredUsers,
-              isLoading: _isLoading,
-              topPadding: headerHeight,
-              bottomPadding: contentBottomPadding,
+            child: MediaQuery.removePadding(
+              context: context,
+              removeLeft: true,
+              removeRight: true,
+              child: BlocBuilder<BlocklistCubit, BlocklistState>(
+                builder: (context, blocklistState) => _BlacklistBody(
+                  users: filteredUsers,
+                  isLoading: _isLoading && !blocklistState.isLoaded,
+                  topPadding: headerHeight,
+                  emptyStateTopPadding: emptyStateTopPadding,
+                  bottomPadding: contentBottomPadding,
+                ),
+              ),
             ),
           ),
           GradientOverlay(
@@ -416,10 +427,15 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
             left: 0,
             right: 0,
             bottom: searchBottom,
-            child: GlassSearchBar(
-              controller: _searchController,
-              hintText: context.l10n.settingsSearchBlacklist,
-              onChanged: (value) => setState(() => _query = value),
+            child: MediaQuery.removePadding(
+              context: context,
+              removeLeft: true,
+              removeRight: true,
+              child: GlassSearchBar(
+                controller: _searchController,
+                hintText: context.l10n.settingsSearchBlacklist,
+                onChanged: (value) => setState(() => _query = value),
+              ),
             ),
           ),
         ],
@@ -433,12 +449,14 @@ class _BlacklistBody extends StatelessWidget {
     required this.users,
     required this.isLoading,
     required this.topPadding,
+    required this.emptyStateTopPadding,
     required this.bottomPadding,
   });
 
   final List<BlockedUser> users;
   final bool isLoading;
   final double topPadding;
+  final double emptyStateTopPadding;
   final double bottomPadding;
 
   @override
@@ -455,7 +473,11 @@ class _BlacklistBody extends StatelessWidget {
       return Align(
         alignment: Alignment.topCenter,
         child: Padding(
-          padding: EdgeInsets.only(top: topPadding + 64, left: 24, right: 24),
+          padding: EdgeInsets.only(
+            top: emptyStateTopPadding,
+            left: 24,
+            right: 24,
+          ),
           child: Text(
             context.l10n.settingsNobodyHere,
             textAlign: TextAlign.center,
@@ -474,21 +496,24 @@ class _BlacklistBody extends StatelessWidget {
       itemCount: users.length,
       itemBuilder: (context, index) {
         final user = users[index];
-        return BlocBuilder<BlocklistCubit, BlocklistState>(
-          builder: (context, state) => SettingsFriendRow(
-            avatar: UserAvatar(
-              avatarUrl: user.avatarUrl,
-              avatarRevision: user.avatarStoragePath ?? user.avatarUrl,
-              size: 54,
-              borderRadius: 12,
+        return InkWell(
+          onTap: () => openViewedProfile(context, userId: user.id),
+          child: BlocBuilder<BlocklistCubit, BlocklistState>(
+            builder: (context, state) => SettingsFriendRow(
+              avatar: UserAvatar(
+                avatarUrl: user.avatarUrl,
+                avatarRevision: user.avatarStoragePath ?? user.avatarUrl,
+                size: 54,
+                borderRadius: 12,
+              ),
+              name: user.displayName,
+              username: user.username,
+              isVisible: true,
+              isBusy: state.isPending(user.id),
+              onToggle: () => _confirmUnblock(context, user),
+              trailingIcon: Icons.lock_open_rounded,
+              horizontalPadding: 16,
             ),
-            name: user.displayName,
-            username: user.username,
-            isVisible: true,
-            isBusy: state.isPending(user.id),
-            onToggle: () => _confirmUnblock(context, user),
-            trailingIcon: Icons.lock_open_rounded,
-            horizontalPadding: 16,
           ),
         );
       },

@@ -46,15 +46,78 @@ class BlocklistCubit extends Cubit<BlocklistState> {
         ),
       ),
     );
+    // The account controller is restored before providers are built. Starting
+    // here makes a persisted Supabase session hydrate its blacklist even if a
+    // UI AuthBloc listener attaches after the initial authenticated state.
+    unawaited(hydrateAndRefresh());
   }
 
   final IBlocklistRepository _repository;
   late final StreamSubscription<Set<String>> _subscription;
   late final StreamSubscription<Set<String>> _pendingSubscription;
+  Future<void>? _refreshOperation;
+  Future<void>? _hydrateOperation;
+  DateTime? _lastSuccessfulRefreshAt;
 
-  Future<void> refresh() async {
+  Future<void> hydrateAndRefresh() async {
+    await hydrate();
+    await refreshIfStale();
+  }
+
+  Future<void> hydrate() =>
+      _hydrateOperation ??= _hydrateInternal().whenComplete(
+        () => _hydrateOperation = null,
+      );
+
+  Future<void> _hydrateInternal() async {
+    try {
+      final snapshot = await _repository.readCachedBlockedUsers();
+      _lastSuccessfulRefreshAt = snapshot?.cachedAt;
+      if (!isClosed) {
+        emit(
+          BlocklistState(
+            blockedUserIds: snapshot == null
+                ? state.blockedUserIds
+                : snapshot.users.map((user) => user.id).toSet(),
+            pendingUserIds: state.pendingUserIds,
+            isLoaded: state.isLoaded || snapshot != null,
+          ),
+        );
+      }
+    } catch (_) {
+      // A missing or unreadable SQLite cache must not block authentication.
+      if (!isClosed) {
+        emit(
+          BlocklistState(
+            blockedUserIds: state.blockedUserIds,
+            pendingUserIds: state.pendingUserIds,
+            isLoaded: false,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> refreshIfStale({
+    Duration maxAge = const Duration(minutes: 5),
+  }) {
+    final lastRefresh = _lastSuccessfulRefreshAt;
+    if (lastRefresh != null &&
+        DateTime.now().difference(lastRefresh) < maxAge) {
+      return Future<void>.value();
+    }
+    return refresh();
+  }
+
+  Future<void> refresh() =>
+      _refreshOperation ??= _refreshInternal().whenComplete(
+        () => _refreshOperation = null,
+      );
+
+  Future<void> _refreshInternal() async {
     try {
       await _repository.refreshBlockedUsers();
+      _lastSuccessfulRefreshAt = DateTime.now();
       if (!isClosed) {
         emit(
           BlocklistState(

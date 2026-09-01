@@ -168,6 +168,11 @@ class RepositoryContainer {
         accountSessionController: config.accountSessionController,
       ),
       blocklistRepository: BlocklistRepository(
+        cache: BlocklistCacheDataSource(
+          database: config.database,
+          preferences: config.preferences,
+          namespace: config.environment.name,
+        ),
         remote: BlocklistRemoteDataSource(client: client),
         accountSessionController: config.accountSessionController,
       ),

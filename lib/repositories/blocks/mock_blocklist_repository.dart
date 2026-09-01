@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:yap_chat/repositories/blocks/abstract_blocklist_repository.dart';
 import 'package:yap_chat/repositories/blocks/blocked_user.dart';
+import 'package:yap_chat/repositories/blocks/blocklist_cache_data_source.dart';
 
 class MockBlocklistRepository implements IBlocklistRepository {
   final _users = <BlockedUser>[];
@@ -26,11 +27,15 @@ class MockBlocklistRepository implements IBlocklistRepository {
   }
 
   @override
-  Future<List<BlockedUser>> readCachedBlockedUsers() async =>
-      List.unmodifiable(_users);
+  Future<BlocklistCacheSnapshot?> readCachedBlockedUsers() async =>
+      BlocklistCacheSnapshot(
+        users: List.unmodifiable(_users),
+        cachedAt: DateTime.now(),
+      );
 
   @override
-  Future<List<BlockedUser>> refreshBlockedUsers() => readCachedBlockedUsers();
+  Future<List<BlockedUser>> refreshBlockedUsers() async =>
+      List.unmodifiable(_users);
 
   @override
   Future<void> blockUser(BlockedUser user) => _runExclusive(user.id, () async {
