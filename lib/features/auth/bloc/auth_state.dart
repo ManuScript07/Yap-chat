@@ -8,6 +8,7 @@ enum AuthStatus {
   unauthenticated,
   profileIncomplete,
   authenticated,
+  banned,
   failure,
 }
 
@@ -28,6 +29,7 @@ class AuthState extends Equatable {
     this.session,
     this.profile,
     this.failure,
+    this.bannedUsername,
     this.isSubmitting = false,
     this.isCompletingSignIn = false,
   });
@@ -36,6 +38,7 @@ class AuthState extends Equatable {
   final AuthSession? session;
   final UserProfile? profile;
   final AuthFailure? failure;
+  final String? bannedUsername;
   final bool isSubmitting;
   final bool isCompletingSignIn;
 
@@ -44,17 +47,22 @@ class AuthState extends Equatable {
     AuthSession? session,
     UserProfile? profile,
     AuthFailure? failure,
+    String? bannedUsername,
     bool? isSubmitting,
     bool? isCompletingSignIn,
     bool clearSession = false,
     bool clearProfile = false,
     bool clearFailure = false,
+    bool clearBannedUsername = false,
   }) {
     return AuthState(
       status: status ?? this.status,
       session: clearSession ? null : session ?? this.session,
       profile: clearProfile ? null : profile ?? this.profile,
       failure: clearFailure ? null : failure ?? this.failure,
+      bannedUsername: clearBannedUsername
+          ? null
+          : bannedUsername ?? this.bannedUsername,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isCompletingSignIn: isCompletingSignIn ?? this.isCompletingSignIn,
     );
@@ -66,6 +74,7 @@ class AuthState extends Equatable {
     session,
     profile,
     failure,
+    bannedUsername,
     isSubmitting,
     isCompletingSignIn,
   ];

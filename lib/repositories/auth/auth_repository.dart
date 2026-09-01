@@ -85,6 +85,20 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<AuthAccountAccess> getAccountAccess() async {
+    final response = await _client.rpc<List<dynamic>>('get_my_account_access');
+    if (response.isEmpty) {
+      throw StateError('The account access response is empty.');
+    }
+    final row = Map<String, dynamic>.from(response.first as Map);
+    final username = (row['username'] as String?)?.trim();
+    return AuthAccountAccess(
+      isBanned: row['is_banned'] as bool? ?? false,
+      username: username == null || username.isEmpty ? null : username,
+    );
+  }
+
+  @override
   Future<void> signInWithYandex() async {
     if (_useAnonymousSignIn) {
       await _client.auth.signInAnonymously();

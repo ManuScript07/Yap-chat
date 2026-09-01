@@ -24,6 +24,7 @@ class RepositoryContainer {
     required this.pushNotificationsRepository,
     required this.friendsRepository,
     required this.blocklistRepository,
+    required this.userReportsRepository,
     required this.contactsRepository,
     required this.settingsRepository,
   });
@@ -176,6 +177,14 @@ class RepositoryContainer {
         remote: BlocklistRemoteDataSource(client: client),
         accountSessionController: config.accountSessionController,
       ),
+      userReportsRepository: UserReportsRepository(
+        remote: UserReportsRemoteDataSource(client: client),
+        cache: UserReportsCacheDataSource(
+          preferences: config.preferences,
+          environment: config.environment.name,
+        ),
+        accountSessionController: config.accountSessionController,
+      ),
       contactsRepository: ContactsRepository(),
       settingsRepository: settingsRepository,
     );
@@ -213,6 +222,7 @@ class RepositoryContainer {
       pushNotificationsRepository: const MockPushNotificationsRepository(),
       friendsRepository: MockFriendsRepository(),
       blocklistRepository: MockBlocklistRepository(),
+      userReportsRepository: const MockUserReportsRepository(),
       contactsRepository: const MockContactsRepository(),
       settingsRepository: MockSettingsRepository(),
     );
@@ -231,6 +241,7 @@ class RepositoryContainer {
   final IPushNotificationsRepository pushNotificationsRepository;
   final IFriendsRepository friendsRepository;
   final IBlocklistRepository blocklistRepository;
+  final IUserReportsRepository userReportsRepository;
   final IContactsRepository contactsRepository;
   final ISettingsRepository settingsRepository;
 

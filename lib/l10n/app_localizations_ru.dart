@@ -582,6 +582,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authSignOut => 'Выйти';
 
   @override
+  String get authBannedTitle => 'Пользователь забанен';
+
+  @override
+  String get authBannedDescription => 'Доступ к приложению ограничен.';
+
+  @override
+  String authBannedSupport(String email) {
+    return 'Если вы считаете это ошибкой, напишите в поддержку: $email';
+  }
+
+  @override
   String get authBack => 'Назад';
 
   @override
@@ -970,7 +981,34 @@ class AppLocalizationsRu extends AppLocalizations {
   String get viewedProfileReport => 'Пожаловаться';
 
   @override
-  String get viewedProfileStub => 'Функция появится позже';
+  String get viewedProfileReportSpam => 'Спам';
+
+  @override
+  String get viewedProfileReportScam => 'Мошенничество';
+
+  @override
+  String get viewedProfileReportPornography => 'Порнография';
+
+  @override
+  String get viewedProfileReportOther => 'Другое';
+
+  @override
+  String get viewedProfileReportAccepted => 'Жалоба принята';
+
+  @override
+  String get viewedProfileReportRateLimited =>
+      'Сейчас нельзя отправить ещё одну жалобу на этого пользователя';
+
+  @override
+  String get viewedProfileReportSending => 'Жалоба уже отправляется';
+
+  @override
+  String get viewedProfileReportBlockTitle => 'Заблокировать пользователя?';
+
+  @override
+  String viewedProfileReportBlockContent(Object name) {
+    return '$name не сможет просматривать ваш профиль, видеть статус и местоположение или писать вам.';
+  }
 
   @override
   String viewedProfileDistanceMeters(int value) {

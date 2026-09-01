@@ -12,6 +12,7 @@
 import 'package:auto_route/auto_route.dart' as _i17;
 import 'package:flutter/material.dart' as _i18;
 import 'package:yap_chat/features/auth/view/auth_failure_page.dart' as _i4;
+import 'package:yap_chat/features/auth/view/banned_account_page.dart' as _i20;
 import 'package:yap_chat/features/auth/view/auth_gate_page.dart' as _i5;
 import 'package:yap_chat/features/auth/view/profile_setup_page.dart' as _i12;
 import 'package:yap_chat/features/auth/view/splash_page.dart' as _i13;
@@ -92,6 +93,22 @@ class AuthFailureRoute extends _i17.PageRouteInfo<void> {
     name,
     builder: (data) {
       return const _i4.AuthFailurePage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i20.BannedAccountPage]
+class BannedAccountRoute extends _i17.PageRouteInfo<void> {
+  const BannedAccountRoute({List<_i17.PageRouteInfo>? children})
+    : super(BannedAccountRoute.name, initialChildren: children);
+
+  static const String name = 'BannedAccountRoute';
+
+  static _i17.PageInfo page = _i17.PageInfo(
+    name,
+    builder: (data) {
+      return const _i20.BannedAccountPage();
     },
   );
 }

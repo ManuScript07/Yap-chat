@@ -13,6 +13,7 @@ import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/bloc/bloc.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
+import 'package:yap_chat/features/reports/data/data.dart';
 import 'package:yap_chat/features/profile/view/profile_gallery_page.dart';
 import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
@@ -40,6 +41,7 @@ class ViewedProfilePage extends StatelessWidget {
           chatsRepository: context.read<IChatsRepository>(),
           locationRepository: context.read<ILocationRepository>(),
           blocklistRepository: context.read<IBlocklistRepository>(),
+          userReportsRepository: context.read<IUserReportsRepository>(),
         )..load(),
       ),
       BlocProvider(
@@ -67,9 +69,16 @@ class _ViewedProfileView extends StatelessWidget {
               previous.actionError != current.actionError &&
               current.actionError != null,
           listener: (context, state) {
+            final message = switch (state.actionError) {
+              UserReportRateLimitException() =>
+                context.l10n.viewedProfileReportRateLimited,
+              UserReportActionInProgressException() =>
+                context.l10n.viewedProfileReportSending,
+              _ => context.l10n.friendsActionFailed,
+            };
             showAppSnackBar(
               context,
-              message: context.l10n.friendsActionFailed,
+              message: message,
               type: SnackBarType.error,
             );
             context.read<ViewedProfileCubit>().clearActionError();
@@ -436,9 +445,11 @@ class _ProfileScaffold extends StatelessWidget {
                           }
                         }
                       },
-                      onStub: (message) {
+                      onReport: currentState.isActionPending
+                          ? null
+                          : () async {
                         Navigator.of(sheetContext).pop();
-                        showAppSnackBar(pageContext, message: message);
+                        await _reportUser(pageContext, cubit, currentProfile);
                       },
                     );
                   },
@@ -449,6 +460,42 @@ class _ProfileScaffold extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _reportUser(
+    BuildContext context,
+    ViewedProfileCubit cubit,
+    ViewedProfile profile,
+  ) async {
+    final reason = await showModalBottomSheet<UserReportReason>(
+      context: context,
+      backgroundColor: context.scaffoldBackgroundColor,
+      barrierColor: context.colorScheme.primary.withValues(alpha: .22),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      showDragHandle: true,
+      builder: (sheetContext) => _ReportReasonSheet(),
+    );
+    if (reason == null || !context.mounted) return;
+
+    final accepted = await cubit.reportUser(reason);
+    if (!context.mounted || !accepted) return;
+    showAppSnackBar(
+      context,
+      message: context.l10n.viewedProfileReportAccepted,
+      type: SnackBarType.success,
+    );
+    final shouldBlock = await showConfirmationDialog(
+      context,
+      title: context.l10n.viewedProfileReportBlockTitle,
+      content: context.l10n.viewedProfileReportBlockContent(
+        profile.profile.displayName,
+      ),
+      confirmLabel: context.l10n.viewedProfileBlock,
+    );
+    if (shouldBlock != true || !context.mounted) return;
+    await cubit.blockUser();
   }
 
   Future<void> _confirmUnblock(BuildContext context) async {
@@ -1177,7 +1224,7 @@ class _ProfileActionsSheet extends StatelessWidget {
     required this.chatIsMuted,
     required this.canMute,
     required this.onMute,
-    required this.onStub,
+    required this.onReport,
     required this.isBlockedByMe,
     required this.isBlockActionPending,
     required this.onBlock,
@@ -1189,7 +1236,7 @@ class _ProfileActionsSheet extends StatelessWidget {
   final bool chatIsMuted;
   final bool canMute;
   final VoidCallback onMute;
-  final ValueChanged<String> onStub;
+  final VoidCallback? onReport;
   final bool isBlockedByMe;
   final bool isBlockActionPending;
   final VoidCallback onBlock;
@@ -1273,12 +1320,68 @@ class _ProfileActionsSheet extends StatelessWidget {
                   : (isBlockedByMe ? onUnblock : onBlock),
             ),
             ListTile(
+              enabled: onReport != null,
               leading: const Icon(Icons.flag_rounded),
               title: Text(
                 context.l10n.viewedProfileReport.toLowerCase(),
                 style: itemStyle,
               ),
-              onTap: () => onStub(context.l10n.viewedProfileStub),
+              onTap: onReport,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportReasonSheet extends StatelessWidget {
+  const _ReportReasonSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      color: context.colorScheme.onSurface,
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+      letterSpacing: .5,
+    );
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          12,
+          0,
+          12,
+          MediaQuery.paddingOf(context).bottom + 12,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline_rounded),
+              title: Text(context.l10n.viewedProfileReportSpam, style: style),
+              onTap: () => Navigator.of(context).pop(UserReportReason.spam),
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: Text(context.l10n.viewedProfileReportScam, style: style),
+              onTap: () => Navigator.of(context).pop(UserReportReason.scam),
+            ),
+            ListTile(
+              leading: const Icon(Icons.visibility_off_rounded),
+              title: Text(
+                context.l10n.viewedProfileReportPornography,
+                style: style,
+              ),
+              onTap: () =>
+                  Navigator.of(context).pop(UserReportReason.pornography),
+            ),
+            ListTile(
+              leading: const Icon(Icons.more_horiz_rounded),
+              title: Text(context.l10n.viewedProfileReportOther, style: style),
+              onTap: () => Navigator.of(context).pop(UserReportReason.other),
             ),
           ],
         ),

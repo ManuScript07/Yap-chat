@@ -575,6 +575,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authSignOut => 'Sign out';
 
   @override
+  String get authBannedTitle => 'User is banned';
+
+  @override
+  String get authBannedDescription => 'Access to the app is restricted.';
+
+  @override
+  String authBannedSupport(String email) {
+    return 'If you believe this is a mistake, contact support: $email';
+  }
+
+  @override
   String get authBack => 'Back';
 
   @override
@@ -958,7 +969,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewedProfileReport => 'Report';
 
   @override
-  String get viewedProfileStub => 'This feature is coming later';
+  String get viewedProfileReportSpam => 'Spam';
+
+  @override
+  String get viewedProfileReportScam => 'Scam';
+
+  @override
+  String get viewedProfileReportPornography => 'Pornography';
+
+  @override
+  String get viewedProfileReportOther => 'Other';
+
+  @override
+  String get viewedProfileReportAccepted => 'Report received';
+
+  @override
+  String get viewedProfileReportRateLimited =>
+      'You cannot send another report about this user yet';
+
+  @override
+  String get viewedProfileReportSending => 'Your report is already being sent';
+
+  @override
+  String get viewedProfileReportBlockTitle => 'Block user?';
+
+  @override
+  String viewedProfileReportBlockContent(Object name) {
+    return '$name will no longer be able to view your profile, see your status or location, or message you.';
+  }
 
   @override
   String viewedProfileDistanceMeters(int value) {

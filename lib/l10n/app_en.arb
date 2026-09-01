@@ -214,6 +214,16 @@
   "authLoadFailedTitle": "Could not load your profile",
   "authLoadFailedDescription": "Check your connection and try again.",
   "authSignOut": "Sign out",
+  "authBannedTitle": "User is banned",
+  "authBannedDescription": "Access to the app is restricted.",
+  "authBannedSupport": "If you believe this is a mistake, contact support: {email}",
+  "@authBannedSupport": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "authBack": "Back",
   "notificationsChannelName": "Messages",
   "notificationsChannelDescription": "New chat messages",
@@ -379,7 +389,20 @@
     }
   },
   "viewedProfileReport": "Report",
-  "viewedProfileStub": "This feature is coming later",
+  "viewedProfileReportSpam": "Spam",
+  "viewedProfileReportScam": "Scam",
+  "viewedProfileReportPornography": "Pornography",
+  "viewedProfileReportOther": "Other",
+  "viewedProfileReportAccepted": "Report received",
+  "viewedProfileReportRateLimited": "You cannot send another report about this user yet",
+  "viewedProfileReportSending": "Your report is already being sent",
+  "viewedProfileReportBlockTitle": "Block user?",
+  "viewedProfileReportBlockContent": "{name} will no longer be able to view your profile, see your status or location, or message you.",
+  "@viewedProfileReportBlockContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
   "viewedProfileDistanceMeters": "{value} m",
   "@viewedProfileDistanceMeters": {
     "placeholders": {

@@ -80,6 +80,7 @@ class _AppInitializerState extends State<AppInitializer> {
       mediaCache: _repositories.mediaCache,
       settingsRepository: _repositories.settingsRepository,
       blocklistRepository: _repositories.blocklistRepository,
+      userReportsRepository: _repositories.userReportsRepository,
       talker: widget.config.talker,
     );
   }
@@ -146,6 +147,9 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
         RepositoryProvider<IBlocklistRepository>.value(
           value: _repositories.blocklistRepository,
+        ),
+        RepositoryProvider<IUserReportsRepository>.value(
+          value: _repositories.userReportsRepository,
         ),
         RepositoryProvider<IContactsRepository>.value(
           value: _repositories.contactsRepository,

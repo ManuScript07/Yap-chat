@@ -1070,6 +1070,24 @@ abstract class AppLocalizations {
   /// **'Выйти'**
   String get authSignOut;
 
+  /// No description provided for @authBannedTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пользователь забанен'**
+  String get authBannedTitle;
+
+  /// No description provided for @authBannedDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступ к приложению ограничен.'**
+  String get authBannedDescription;
+
+  /// No description provided for @authBannedSupport.
+  ///
+  /// In ru, this message translates to:
+  /// **'Если вы считаете это ошибкой, напишите в поддержку: {email}'**
+  String authBannedSupport(String email);
+
   /// No description provided for @authBack.
   ///
   /// In ru, this message translates to:
@@ -1772,11 +1790,59 @@ abstract class AppLocalizations {
   /// **'Пожаловаться'**
   String get viewedProfileReport;
 
-  /// No description provided for @viewedProfileStub.
+  /// No description provided for @viewedProfileReportSpam.
   ///
   /// In ru, this message translates to:
-  /// **'Функция появится позже'**
-  String get viewedProfileStub;
+  /// **'Спам'**
+  String get viewedProfileReportSpam;
+
+  /// No description provided for @viewedProfileReportScam.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мошенничество'**
+  String get viewedProfileReportScam;
+
+  /// No description provided for @viewedProfileReportPornography.
+  ///
+  /// In ru, this message translates to:
+  /// **'Порнография'**
+  String get viewedProfileReportPornography;
+
+  /// No description provided for @viewedProfileReportOther.
+  ///
+  /// In ru, this message translates to:
+  /// **'Другое'**
+  String get viewedProfileReportOther;
+
+  /// No description provided for @viewedProfileReportAccepted.
+  ///
+  /// In ru, this message translates to:
+  /// **'Жалоба принята'**
+  String get viewedProfileReportAccepted;
+
+  /// No description provided for @viewedProfileReportRateLimited.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сейчас нельзя отправить ещё одну жалобу на этого пользователя'**
+  String get viewedProfileReportRateLimited;
+
+  /// No description provided for @viewedProfileReportSending.
+  ///
+  /// In ru, this message translates to:
+  /// **'Жалоба уже отправляется'**
+  String get viewedProfileReportSending;
+
+  /// No description provided for @viewedProfileReportBlockTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Заблокировать пользователя?'**
+  String get viewedProfileReportBlockTitle;
+
+  /// No description provided for @viewedProfileReportBlockContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'{name} не сможет просматривать ваш профиль, видеть статус и местоположение или писать вам.'**
+  String viewedProfileReportBlockContent(Object name);
 
   /// No description provided for @viewedProfileDistanceMeters.
   ///

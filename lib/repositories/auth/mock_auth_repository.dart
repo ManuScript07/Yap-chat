@@ -35,6 +35,10 @@ class MockAuthRepository implements IAuthRepository {
   Stream<AuthSession?> observeSession() => _sessionController.stream.distinct();
 
   @override
+  Future<AuthAccountAccess> getAccountAccess() async =>
+      const AuthAccountAccess(isBanned: false, username: 'mock_user');
+
+  @override
   Future<void> signInWithYandex() async {
     await Future<void>.delayed(const Duration(milliseconds: 700));
     _currentSession = _mockSession;

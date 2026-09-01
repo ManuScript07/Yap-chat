@@ -62,6 +62,13 @@ class AppRouter extends RootStackRouter {
           reverseDuration: const Duration(milliseconds: 150),
         ),
         CustomRoute(
+          path: 'banned',
+          page: BannedAccountRoute.page,
+          transitionsBuilder: _fade,
+          duration: const Duration(milliseconds: 180),
+          reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
           path: 'app',
           page: MainRoute.page,
           transitionsBuilder: _fade,

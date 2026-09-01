@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
+import 'package:yap_chat/features/reports/data/data.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 enum ViewedProfileStatus { initial, loading, success, failure }
@@ -70,12 +71,14 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     required IChatsRepository chatsRepository,
     required ILocationRepository locationRepository,
     required IBlocklistRepository blocklistRepository,
+    required IUserReportsRepository userReportsRepository,
   }) : _userId = userId,
        _profileRepository = profileRepository,
        _friendsRepository = friendsRepository,
        _chatsRepository = chatsRepository,
        _locationRepository = locationRepository,
        _blocklistRepository = blocklistRepository,
+       _userReportsRepository = userReportsRepository,
        super(const ViewedProfileState());
 
   final String _userId;
@@ -84,6 +87,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   final IChatsRepository _chatsRepository;
   final ILocationRepository _locationRepository;
   final IBlocklistRepository _blocklistRepository;
+  final IUserReportsRepository _userReportsRepository;
   StreamSubscription<List<Chat>>? _chatsSubscription;
   StreamSubscription<String>? _friendsSubscription;
   StreamSubscription<List<Friend>>? _friendsCacheSubscription;
@@ -317,6 +321,23 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       ),
     );
   });
+
+  Future<bool> reportUser(UserReportReason reason) async {
+    if (state.isActionPending || state.viewedProfile == null) return false;
+    emit(state.copyWith(isActionPending: true, clearActionError: true));
+    try {
+      await _userReportsRepository.submitReport(
+        targetUserId: state.viewedProfile!.profile.id,
+        reason: reason,
+      );
+      return true;
+    } catch (error) {
+      if (!isClosed) emit(state.copyWith(actionError: error));
+      return false;
+    } finally {
+      if (!isClosed) emit(state.copyWith(isActionPending: false));
+    }
+  }
 
   Future<void> toggleMute() => _performAction(() async {
     var chat = await prepareChat();

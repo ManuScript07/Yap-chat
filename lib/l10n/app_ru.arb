@@ -214,6 +214,16 @@
   "authLoadFailedTitle": "Не удалось загрузить профиль",
   "authLoadFailedDescription": "Проверьте подключение и повторите попытку.",
   "authSignOut": "Выйти",
+  "authBannedTitle": "Пользователь забанен",
+  "authBannedDescription": "Доступ к приложению ограничен.",
+  "authBannedSupport": "Если вы считаете это ошибкой, напишите в поддержку: {email}",
+  "@authBannedSupport": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "authBack": "Назад",
   "notificationsChannelName": "Сообщения",
   "notificationsChannelDescription": "Новые сообщения в чатах",
@@ -379,7 +389,20 @@
     }
   },
   "viewedProfileReport": "Пожаловаться",
-  "viewedProfileStub": "Функция появится позже",
+  "viewedProfileReportSpam": "Спам",
+  "viewedProfileReportScam": "Мошенничество",
+  "viewedProfileReportPornography": "Порнография",
+  "viewedProfileReportOther": "Другое",
+  "viewedProfileReportAccepted": "Жалоба принята",
+  "viewedProfileReportRateLimited": "Сейчас нельзя отправить ещё одну жалобу на этого пользователя",
+  "viewedProfileReportSending": "Жалоба уже отправляется",
+  "viewedProfileReportBlockTitle": "Заблокировать пользователя?",
+  "viewedProfileReportBlockContent": "{name} не сможет просматривать ваш профиль, видеть статус и местоположение или писать вам.",
+  "@viewedProfileReportBlockContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
   "viewedProfileDistanceMeters": "{value} м",
   "@viewedProfileDistanceMeters": {
     "placeholders": {

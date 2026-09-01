@@ -415,7 +415,9 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               previous.status != current.status ||
               previous.session?.userId != current.session?.userId,
           listener: (context, state) {
-            final userId = state.session?.userId;
+            final userId = state.status == AuthStatus.banned
+                ? null
+                : state.session?.userId;
             if (_activeUserId != userId) {
               _activeUserId = userId;
               _pendingChatRestored = false;
@@ -442,6 +444,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               unawaited(_initializeNotificationsAndReminder(userId));
             } else if (state.status == AuthStatus.unauthenticated ||
                 state.status == AuthStatus.profileIncomplete ||
+                state.status == AuthStatus.banned ||
                 state.status == AuthStatus.failure) {
               _blocklistHydratedUserId = null;
               unawaited(

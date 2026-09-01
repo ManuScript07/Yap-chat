@@ -90,6 +90,7 @@ class _AuthGatePageState extends State<AuthGatePage> {
       AuthStatus.unauthenticated => const WelcomeRoute(),
       AuthStatus.profileIncomplete => const ProfileSetupRoute(),
       AuthStatus.authenticated => const MainRoute(),
+      AuthStatus.banned => const BannedAccountRoute(),
       AuthStatus.failure => const AuthFailureRoute(),
       AuthStatus.initial || AuthStatus.loading => const SplashRoute(),
     };
