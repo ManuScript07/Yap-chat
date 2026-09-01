@@ -12,6 +12,13 @@ abstract interface class IAuthRepository {
   /// offline-cache behavior for ordinary users.
   Future<AuthAccountAccess> getAccountAccess();
 
+  Future<AuthAccountAccess?> getCachedAccountAccess(String userId);
+
+  Future<void> cacheAccountAccess(
+    String userId,
+    AuthAccountAccess access,
+  );
+
   Future<void> signInWithYandex();
 
   Future<void> cancelPendingSignIn();

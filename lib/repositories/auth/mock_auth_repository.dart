@@ -39,6 +39,15 @@ class MockAuthRepository implements IAuthRepository {
       const AuthAccountAccess(isBanned: false, username: 'mock_user');
 
   @override
+  Future<AuthAccountAccess?> getCachedAccountAccess(String userId) async => null;
+
+  @override
+  Future<void> cacheAccountAccess(
+    String userId,
+    AuthAccountAccess access,
+  ) async {}
+
+  @override
   Future<void> signInWithYandex() async {
     await Future<void>.delayed(const Duration(milliseconds: 700));
     _currentSession = _mockSession;

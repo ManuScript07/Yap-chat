@@ -8,6 +8,7 @@ create table private.global_account_bans (
   email_lookup_hash bytea,
   phone_lookup_hash bytea,
   expires_at timestamptz,
+  revoked_at timestamptz,
   created_at timestamptz not null default now(),
   created_by text,
   note text,
@@ -18,7 +19,7 @@ create index global_account_bans_target_user_id_idx
   on private.global_account_bans (target_user_id, created_at desc);
 create index global_account_bans_active_expiry_idx
   on private.global_account_bans (expires_at)
-  where expires_at is not null;
+  where revoked_at is null and expires_at is not null;
 
 create table private.global_ban_account_links (
   ban_id uuid not null references private.global_account_bans(id)
@@ -245,7 +246,7 @@ on private.global_account_bans
 for each row execute function private.capture_global_ban_identity();
 
 create trigger global_account_bans_refresh_links
-after insert or update of target_user_id, expires_at
+after insert or update of target_user_id, expires_at, revoked_at
 on private.global_account_bans
 for each row execute function private.refresh_global_ban_links_after_change();
 
@@ -289,6 +290,7 @@ as $$
     from private.global_ban_account_links link
     join private.global_account_bans ban on ban.id = link.ban_id
     where link.user_id = target_user_id
+      and ban.revoked_at is null
       and (ban.expires_at is null or ban.expires_at > now())
   );
 $$;
@@ -313,7 +315,7 @@ $$;
 -- A narrow exception used only by AuthGate to render the access-restricted
 -- page. It intentionally exposes neither a moderation reason nor ban dates.
 create or replace function private.get_my_account_access_impl()
-returns table (is_banned boolean, username text)
+returns table (is_banned boolean, username text, support_email text)
 language plpgsql
 stable
 security definer
@@ -325,14 +327,18 @@ begin
   end if;
 
   return query
-  select private.is_account_globally_banned(account.user_id), profile.username
+  select
+    private.is_account_globally_banned(account.user_id),
+    profile.username,
+    content.support_email
   from (select auth.uid() as user_id) account
-  left join public.profiles profile on profile.id = account.user_id;
+  left join public.profiles profile on profile.id = account.user_id
+  left join private.app_public_content content on content.singleton;
 end;
 $$;
 
 create or replace function public.get_my_account_access()
-returns table (is_banned boolean, username text)
+returns table (is_banned boolean, username text, support_email text)
 language sql
 stable
 security invoker
@@ -649,6 +655,6 @@ join public.profiles target on target.id = report.target_user_id;
 revoke all on private.moderation_user_reports from public, anon, authenticated;
 
 comment on table private.global_account_bans is
-  'Insert a target_user_id from auth.users in Supabase Studio. Identity snapshots and matching account links are maintained automatically.';
+  'Insert a target_user_id from auth.users in Supabase Studio. Set revoked_at to unban while preserving moderation history.';
 comment on view private.moderation_user_reports is
   'Operator-only report queue with reporter/target identity and moderation aggregates.';

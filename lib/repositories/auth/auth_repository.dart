@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/auth/abstract_auth_repository.dart';
+import 'package:yap_chat/repositories/auth/auth_account_access_cache_data_source.dart';
 import 'package:yap_chat/repositories/auth/oauth_attempt_coordinator.dart';
 
 typedef OAuthSignInLauncher =
@@ -24,12 +25,14 @@ class AuthRepository implements IAuthRepository {
     OAuthSignInLauncher? oauthSignInLauncher,
     OAuthAttemptCoordinator? oauthAttemptCoordinator,
     AccountSessionController? accountSessionController,
+    AuthAccountAccessCacheDataSource? accountAccessCache,
   })
       : _client = client,
         _redirectUrl = redirectUrl,
         _useAnonymousSignIn = useAnonymousSignIn,
         _oauthAttemptCoordinator = oauthAttemptCoordinator,
         _accountSessionController = accountSessionController,
+        _accountAccessCache = accountAccessCache,
         _oauthSignInLauncher =
             oauthSignInLauncher ?? client.auth.signInWithOAuth;
 
@@ -39,6 +42,7 @@ class AuthRepository implements IAuthRepository {
   final OAuthSignInLauncher _oauthSignInLauncher;
   final OAuthAttemptCoordinator? _oauthAttemptCoordinator;
   final AccountSessionController? _accountSessionController;
+  final AuthAccountAccessCacheDataSource? _accountAccessCache;
 
   static const _yandexProvider = OAuthProvider('custom:yandex');
   static const _yandexQueryParams = <String, String>{'force_confirm': 'yes'};
@@ -92,10 +96,26 @@ class AuthRepository implements IAuthRepository {
     }
     final row = Map<String, dynamic>.from(response.first as Map);
     final username = (row['username'] as String?)?.trim();
+    final supportEmail = (row['support_email'] as String?)?.trim();
     return AuthAccountAccess(
       isBanned: row['is_banned'] as bool? ?? false,
       username: username == null || username.isEmpty ? null : username,
+      supportEmail: supportEmail == null || supportEmail.isEmpty
+          ? null
+          : supportEmail,
     );
+  }
+
+  @override
+  Future<AuthAccountAccess?> getCachedAccountAccess(String userId) async =>
+      _accountAccessCache?.read(userId);
+
+  @override
+  Future<void> cacheAccountAccess(
+    String userId,
+    AuthAccountAccess access,
+  ) async {
+    await _accountAccessCache?.write(userId, access);
   }
 
   @override
@@ -133,7 +153,14 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> signOut() => _client.auth.signOut();
+  Future<void> signOut() async {
+    final userId = currentSession?.userId;
+    try {
+      await _client.auth.signOut();
+    } finally {
+      if (userId != null) await _accountAccessCache?.clear(userId);
+    }
+  }
 
   AuthSession? _mapSession(Session? session) {
     final user = session?.user;

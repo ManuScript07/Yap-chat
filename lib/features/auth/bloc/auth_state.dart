@@ -30,6 +30,7 @@ class AuthState extends Equatable {
     this.profile,
     this.failure,
     this.bannedUsername,
+    this.bannedSupportEmail,
     this.isSubmitting = false,
     this.isCompletingSignIn = false,
   });
@@ -39,6 +40,7 @@ class AuthState extends Equatable {
   final UserProfile? profile;
   final AuthFailure? failure;
   final String? bannedUsername;
+  final String? bannedSupportEmail;
   final bool isSubmitting;
   final bool isCompletingSignIn;
 
@@ -48,12 +50,14 @@ class AuthState extends Equatable {
     UserProfile? profile,
     AuthFailure? failure,
     String? bannedUsername,
+    String? bannedSupportEmail,
     bool? isSubmitting,
     bool? isCompletingSignIn,
     bool clearSession = false,
     bool clearProfile = false,
     bool clearFailure = false,
     bool clearBannedUsername = false,
+    bool clearBannedSupportEmail = false,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -63,6 +67,9 @@ class AuthState extends Equatable {
       bannedUsername: clearBannedUsername
           ? null
           : bannedUsername ?? this.bannedUsername,
+      bannedSupportEmail: clearBannedSupportEmail
+          ? null
+          : bannedSupportEmail ?? this.bannedSupportEmail,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isCompletingSignIn: isCompletingSignIn ?? this.isCompletingSignIn,
     );
@@ -75,6 +82,7 @@ class AuthState extends Equatable {
     profile,
     failure,
     bannedUsername,
+    bannedSupportEmail,
     isSubmitting,
     isCompletingSignIn,
   ];

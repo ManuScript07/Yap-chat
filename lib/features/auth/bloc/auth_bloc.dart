@@ -168,6 +168,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         clearSession: true,
         clearProfile: true,
         clearBannedUsername: true,
+        clearBannedSupportEmail: true,
       ),
     );
   }
@@ -186,6 +187,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             clearSession: true,
             clearProfile: true,
             clearBannedUsername: true,
+            clearBannedSupportEmail: true,
             isSubmitting: true,
             isCompletingSignIn: false,
           ),
@@ -198,6 +200,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           clearSession: true,
           clearProfile: true,
           clearBannedUsername: true,
+          clearBannedSupportEmail: true,
           isSubmitting: false,
           isCompletingSignIn: false,
         ),
@@ -219,45 +222,91 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         isCompletingSignIn: false,
         clearFailure: true,
         clearBannedUsername: true,
+        clearBannedSupportEmail: true,
       ),
     );
-    try {
-      final access = await _authRepository.getAccountAccess();
-      if (access.isBanned) {
-        _accountSessionController?.setAuthenticatedUser(null);
-        emit(
-          state.copyWith(
-            status: AuthStatus.banned,
-            session: session,
-            bannedUsername: access.username,
-            clearProfile: true,
-            isSubmitting: false,
-            isCompletingSignIn: false,
-            clearFailure: true,
-          ),
-        );
-        return;
-      }
-    } catch (_) {
-      // Preserve the established offline path: cached data may still open for
-      // an ordinary account while there is no network. Once connected, the
-      // server-side guard rejects all banned-account data requests.
-    }
     UserProfile? cachedProfile;
     try {
       cachedProfile = await _profileRepository.getCachedProfile(session.userId);
-      if (cachedProfile != null) {
-        emit(
-          state.copyWith(
-            status: _statusForProfile(cachedProfile),
-            session: session,
-            profile: cachedProfile,
-            isSubmitting: false,
-          ),
-        );
-      }
     } catch (_) {
       // Повреждённый кеш не должен блокировать загрузку актуального профиля.
+    }
+
+    AuthAccountAccess? cachedAccess;
+    try {
+      cachedAccess = await _authRepository.getCachedAccountAccess(
+        session.userId,
+      );
+    } catch (_) {
+      // A corrupted access marker must never prevent an ordinary account from
+      // using its established offline profile cache.
+    }
+    var accessChecked = false;
+    if (cachedAccess?.isBanned ?? false) {
+      _emitBanned(
+        emit,
+        session: session,
+        username: cachedAccess!.username ?? cachedProfile?.username,
+        supportEmail: cachedAccess!.supportEmail,
+      );
+      try {
+        final access = await _authRepository
+            .getAccountAccess()
+            .timeout(const Duration(seconds: 3));
+        await _cacheAccountAccess(session.userId, access);
+        if (access.isBanned) {
+          _emitBanned(
+            emit,
+            session: session,
+            username: access.username ?? cachedProfile?.username,
+            supportEmail: access.supportEmail,
+          );
+          return;
+        }
+        accessChecked = true;
+        _accountSessionController?.setAuthenticatedUser(session.userId);
+      } catch (_) {
+        // A previously confirmed ban remains in force offline. The server
+        // refresh will clear it after an administrator removes the ban.
+        return;
+      }
+    }
+
+    // Preserve the original offline start behaviour: the local profile is
+    // available immediately and is never held behind an account-access RPC.
+    if (cachedProfile != null) {
+      emit(
+        state.copyWith(
+          status: _statusForProfile(cachedProfile),
+          session: session,
+          profile: cachedProfile,
+          isSubmitting: false,
+          clearBannedUsername: true,
+          clearBannedSupportEmail: true,
+        ),
+      );
+    }
+
+    if (!accessChecked) {
+      try {
+        final access = await _authRepository
+            .getAccountAccess()
+            .timeout(const Duration(seconds: 3));
+        await _cacheAccountAccess(session.userId, access);
+        if (access.isBanned) {
+          _emitBanned(
+            emit,
+            session: session,
+            username: access.username ?? cachedProfile?.username,
+            supportEmail: access.supportEmail,
+          );
+          return;
+        }
+      } catch (_) {
+        // Preserve the established offline path: cached data may still open for
+        // an ordinary account while there is no network. Once connected, the
+        // server-side guard rejects all banned-account data requests.
+      }
     }
 
     try {
@@ -272,17 +321,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
     } catch (error) {
       if (_isGlobalBanFailure(error)) {
-        _accountSessionController?.setAuthenticatedUser(null);
-        emit(
-          state.copyWith(
-            status: AuthStatus.banned,
-            session: session,
-            bannedUsername: cachedProfile?.username,
-            clearProfile: true,
-            isSubmitting: false,
-            isCompletingSignIn: false,
-            clearFailure: true,
+        await _cacheAccountAccess(
+          session.userId,
+          AuthAccountAccess(
+            isBanned: true,
+            username: cachedProfile?.username,
           ),
+        );
+        _emitBanned(
+          emit,
+          session: session,
+          username: cachedProfile?.username,
         );
         return;
       }
@@ -477,6 +526,39 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   bool _isGlobalBanFailure(Object error) =>
       error.toString().contains('account_globally_banned');
+
+  Future<void> _cacheAccountAccess(
+    String userId,
+    AuthAccountAccess access,
+  ) async {
+    try {
+      await _authRepository.cacheAccountAccess(userId, access);
+    } catch (_) {
+      // A server-confirmed ban still takes effect for this session if the
+      // device storage is temporarily unavailable.
+    }
+  }
+
+  void _emitBanned(
+    Emitter<AuthState> emit, {
+    required AuthSession session,
+    String? username,
+    String? supportEmail,
+  }) {
+    _accountSessionController?.setAuthenticatedUser(null);
+    emit(
+      state.copyWith(
+        status: AuthStatus.banned,
+        session: session,
+        bannedUsername: username,
+        bannedSupportEmail: supportEmail,
+        clearProfile: true,
+        isSubmitting: false,
+        isCompletingSignIn: false,
+        clearFailure: true,
+      ),
+    );
+  }
 
   @override
   Future<void> close() async {

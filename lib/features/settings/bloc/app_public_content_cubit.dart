@@ -36,6 +36,14 @@ class AppPublicContentCubit extends Cubit<AppPublicContentState> {
 
   Future<AppPublicContent?> ensureContent() async {
     await load();
+    // The initial startup refresh may have failed while the session and the
+    // Data API guard were being restored. A restriction screen needs support
+    // contacts, so allow one fresh attempt only when no cached/remote content
+    // was obtained at all.
+    if (state.content == null && !isClosed) {
+      _activeLoad = _load();
+      await _activeLoad;
+    }
     return state.content;
   }
 

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
@@ -8,17 +11,35 @@ import 'package:yap_chat/features/settings/bloc/bloc.dart';
 /// Deliberately neutral access-restriction page. No moderation reason, report
 /// information, or expiry date is exposed to the restricted account.
 @RoutePage()
-class BannedAccountPage extends StatelessWidget {
+class BannedAccountPage extends StatefulWidget {
   const BannedAccountPage({super.key});
 
   @override
+  State<BannedAccountPage> createState() => _BannedAccountPageState();
+}
+
+class _BannedAccountPageState extends State<BannedAccountPage> {
+  @override
+  void initState() {
+    super.initState();
+    // The cubit starts this load at app startup. Calling ensureContent here is
+    // harmless when it is already in progress and covers a direct route to
+    // this page before public content has reached the widget tree.
+    unawaited(context.read<AppPublicContentCubit>().ensureContent());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final username = context.select(
-      (AuthBloc bloc) => bloc.state.bannedUsername,
+    final userId = context.select(
+      (AuthBloc bloc) => bloc.state.session?.userId,
     );
-    final supportEmail = context.select(
+    final accessSupportEmail = context.select(
+      (AuthBloc bloc) => bloc.state.bannedSupportEmail,
+    );
+    final publicSupportEmail = context.select(
       (AppPublicContentCubit cubit) => cubit.state.content?.supportEmail,
     );
+    final supportEmail = accessSupportEmail ?? publicSupportEmail;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -50,22 +71,73 @@ class BannedAccountPage extends StatelessWidget {
                       color: context.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  if (username != null) ...[
+                  if (userId != null) ...[
                     const SizedBox(height: 18),
-                    Text(
-                      '@$username',
-                      style: context.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () async {
+                        await Clipboard.setData(ClipboardData(text: userId));
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                userId,
+                                textAlign: TextAlign.center,
+                                style: context.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.copy_rounded,
+                              size: 18,
+                              color: context.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                   if (supportEmail != null) ...[
                     const SizedBox(height: 10),
-                    Text(
-                      context.l10n.authBannedSupport(supportEmail),
-                      textAlign: TextAlign.center,
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => Clipboard.setData(
+                        ClipboardData(text: supportEmail),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                context.l10n.authBannedSupport(supportEmail),
+                                textAlign: TextAlign.center,
+                                style: context.textTheme.bodyMedium?.copyWith(
+                                  color: context.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.copy_rounded,
+                              size: 18,
+                              color: context.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

@@ -128,6 +128,10 @@ class RepositoryContainer {
         useAnonymousSignIn: config.isLocal,
         oauthAttemptCoordinator: config.oauthAttemptCoordinator,
         accountSessionController: config.accountSessionController,
+        accountAccessCache: AuthAccountAccessCacheDataSource(
+          preferences: config.preferences,
+          environment: config.environment.name,
+        ),
       ),
       profileRepository: ProfileRepository(
         client: client,
