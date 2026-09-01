@@ -103,6 +103,7 @@
   "settingsPublicContentUnavailable": "Информация пока недоступна",
   "settingsSearchBlacklist": "поиск",
   "settingsNobodyHere": "тут никого нет",
+  "settingsBlacklistLoadFailed": "Не удалось загрузить черный список",
   "settingsComingSoon": "скоро",
   "settingsTerms": "Условия обслуживания",
   "settingsPrivacyPolicy": "Политика конфиденциальности",
@@ -362,6 +363,21 @@
   "viewedProfileMute": "Убрать звук",
   "viewedProfileUnmute": "Включить звук",
   "viewedProfileBlock": "Заблокировать",
+  "viewedProfileBlockTitle": "Заблокировать пользователя?",
+  "viewedProfileBlockContent": "{name} не сможет просматривать ваш профиль, видеть статус и местоположение или писать вам.",
+  "@viewedProfileBlockContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "unblockUser": "Разблокировать",
+  "unblockUserTitle": "Разблокировать пользователя?",
+  "unblockUserContent": "{name} снова сможет найти ваш профиль и отправлять новые сообщения.",
+  "@unblockUserContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
   "viewedProfileReport": "Пожаловаться",
   "viewedProfileStub": "Функция появится позже",
   "viewedProfileDistanceMeters": "{value} м",

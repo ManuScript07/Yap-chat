@@ -10,6 +10,7 @@ import 'package:yap_chat/app/repository_container.dart';
 import 'package:yap_chat/app/user_data_cleanup_coordinator.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/profile.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
@@ -78,6 +79,7 @@ class _AppInitializerState extends State<AppInitializer> {
       localMediaRepository: _repositories.localMediaRepository,
       mediaCache: _repositories.mediaCache,
       settingsRepository: _repositories.settingsRepository,
+      blocklistRepository: _repositories.blocklistRepository,
       talker: widget.config.talker,
     );
   }
@@ -142,6 +144,9 @@ class _AppInitializerState extends State<AppInitializer> {
         RepositoryProvider<IFriendsRepository>.value(
           value: _repositories.friendsRepository,
         ),
+        RepositoryProvider<IBlocklistRepository>.value(
+          value: _repositories.blocklistRepository,
+        ),
         RepositoryProvider<IContactsRepository>.value(
           value: _repositories.contactsRepository,
         ),
@@ -201,6 +206,11 @@ class _AppInitializerState extends State<AppInitializer> {
           BlocProvider<PresenceCubit>(
             create: (context) =>
                 PresenceCubit(repository: context.read<IPresenceRepository>()),
+          ),
+          BlocProvider<BlocklistCubit>(
+            create: (context) => BlocklistCubit(
+              repository: context.read<IBlocklistRepository>(),
+            ),
           ),
           BlocProvider<NotificationsCubit>(
             create: (context) => NotificationsCubit(

@@ -21,6 +21,8 @@ class Chat extends Equatable {
   final bool showsLastSeen;
   final bool isLastMessageFromMe;
   final bool isMuted;
+  final bool blockedByMe;
+  final bool blockedByPeer;
 
   const Chat({
     required this.id,
@@ -39,6 +41,8 @@ class Chat extends Equatable {
     this.showsLastSeen = true,
     required this.isLastMessageFromMe,
     this.isMuted = false,
+    this.blockedByMe = false,
+    this.blockedByPeer = false,
   });
 
   factory Chat.directDraft({
@@ -80,6 +84,8 @@ class Chat extends Equatable {
     bool? showsLastSeen,
     bool? isLastMessageFromMe,
     bool? isMuted,
+    bool? blockedByMe,
+    bool? blockedByPeer,
   }) {
     return Chat(
       id: id ?? this.id,
@@ -98,6 +104,8 @@ class Chat extends Equatable {
       showsLastSeen: showsLastSeen ?? this.showsLastSeen,
       isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
       isMuted: isMuted ?? this.isMuted,
+      blockedByMe: blockedByMe ?? this.blockedByMe,
+      blockedByPeer: blockedByPeer ?? this.blockedByPeer,
     );
   }
 
@@ -119,6 +127,8 @@ class Chat extends Equatable {
     showsLastSeen,
     isLastMessageFromMe,
     isMuted,
+    blockedByMe,
+    blockedByPeer,
     isDraft,
   ];
 }

@@ -23,6 +23,7 @@ class RepositoryContainer {
     required this.presenceRepository,
     required this.pushNotificationsRepository,
     required this.friendsRepository,
+    required this.blocklistRepository,
     required this.contactsRepository,
     required this.settingsRepository,
   });
@@ -109,6 +110,7 @@ class RepositoryContainer {
         mediaProcessor: const ChatMediaProcessor(),
         mediaCache: mediaCache,
         syncService: conversationSync,
+        chatsCache: chatsCache,
         localMediaRepository: localMediaRepository,
         accountSessionController: config.accountSessionController,
       ),
@@ -165,6 +167,10 @@ class RepositoryContainer {
         mediaCache: mediaCache,
         accountSessionController: config.accountSessionController,
       ),
+      blocklistRepository: BlocklistRepository(
+        remote: BlocklistRemoteDataSource(client: client),
+        accountSessionController: config.accountSessionController,
+      ),
       contactsRepository: ContactsRepository(),
       settingsRepository: settingsRepository,
     );
@@ -201,6 +207,7 @@ class RepositoryContainer {
       presenceRepository: MockPresenceRepository(),
       pushNotificationsRepository: const MockPushNotificationsRepository(),
       friendsRepository: MockFriendsRepository(),
+      blocklistRepository: MockBlocklistRepository(),
       contactsRepository: const MockContactsRepository(),
       settingsRepository: MockSettingsRepository(),
     );
@@ -218,6 +225,7 @@ class RepositoryContainer {
   final IPresenceRepository presenceRepository;
   final IPushNotificationsRepository pushNotificationsRepository;
   final IFriendsRepository friendsRepository;
+  final IBlocklistRepository blocklistRepository;
   final IContactsRepository contactsRepository;
   final ISettingsRepository settingsRepository;
 

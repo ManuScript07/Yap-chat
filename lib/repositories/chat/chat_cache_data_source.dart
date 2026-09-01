@@ -168,7 +168,11 @@ class ChatCacheDataSource {
     return _database
         .into(_database.cachedMessages)
         .insertOnConflictUpdate(
-          _messageCompanion(message, owner, isPending: isPending),
+          _messageCompanion(
+            message,
+            owner,
+            isPending: isPending,
+          ),
         );
   }
 
@@ -431,7 +435,7 @@ class ChatCacheDataSource {
       replyType: Value(reply?.type.name),
       replyText: Value(reply?.text),
       readAt: Value(message.readAt),
-      isPending: isPending,
+      isPending: isPending || message.isLocalOnly,
       cachedAt: DateTime.now().toUtc(),
     );
   }
@@ -472,6 +476,7 @@ class ChatCacheDataSource {
           .toList(growable: false),
       replyTo: reply,
       readAt: row.readAt,
+      isLocalOnly: row.isPending && row.status == MessageStatus.sent.name,
     );
   }
 }

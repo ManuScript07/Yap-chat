@@ -8,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/bloc/bloc.dart';
@@ -38,6 +39,7 @@ class ViewedProfilePage extends StatelessWidget {
           friendsRepository: context.read<IFriendsRepository>(),
           chatsRepository: context.read<IChatsRepository>(),
           locationRepository: context.read<ILocationRepository>(),
+          blocklistRepository: context.read<IBlocklistRepository>(),
         )..load(),
       ),
       BlocProvider(
@@ -134,8 +136,12 @@ class _ViewedProfileView extends StatelessWidget {
               ),
             );
           }
+          final isBlockedByMe = context.select<BlocklistCubit, bool>(
+            (cubit) => cubit.state.blocks(viewedProfile.profile.id),
+          );
           return BlocListener<PresenceCubit, PresenceState>(
             listenWhen: (previous, current) =>
+                !viewedProfile.isBlocked &&
                 previous.isOnline(viewedProfile.profile.id) &&
                 !current.isOnline(viewedProfile.profile.id),
             listener: (context, _) =>
@@ -143,6 +149,7 @@ class _ViewedProfileView extends StatelessWidget {
             child: _ProfileScaffold(
               viewedProfile: viewedProfile,
               state: state,
+              isBlockedByMe: isBlockedByMe,
               originChatId: originChatId,
             ),
           );
@@ -196,11 +203,13 @@ class _ProfileScaffold extends StatelessWidget {
   const _ProfileScaffold({
     required this.viewedProfile,
     required this.state,
+    required this.isBlockedByMe,
     this.originChatId,
   });
 
   final ViewedProfile viewedProfile;
   final ViewedProfileState state;
+  final bool isBlockedByMe;
   final String? originChatId;
 
   @override
@@ -226,10 +235,12 @@ class _ProfileScaffold extends StatelessWidget {
                   viewedProfile: viewedProfile,
                   state: state,
                   topPadding: mediaQuery.padding.top + (isLandscape ? 88 : 98),
+                  isBlockedByMe: isBlockedByMe,
                   onPhotoTap: (index) =>
                       _openGallery(context, viewedProfile.profile, index),
                   onChat: () => _openChat(context),
                   onLocation: !viewedProfile.isFriend || state.location == null
+                      || isBlockedByMe
                       ? null
                       : () => _openLocation(context, state.location!),
                   onFriends: () => _openFriends(context),
@@ -249,7 +260,7 @@ class _ProfileScaffold extends StatelessWidget {
                       onPressed: () => context.router.maybePop(),
                     ),
                     const Spacer(),
-                    if (viewedProfile.isFriend) ...[
+                    if (viewedProfile.isFriend && !isBlockedByMe) ...[
                       BlocBuilder<
                         LocationVisibilityCubit,
                         LocationVisibilityState
@@ -282,13 +293,14 @@ class _ProfileScaffold extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                     ],
-                    GlassButton(
-                      icon: Icons.settings_rounded,
-                      size: 50,
-                      iconSize: 29,
-                      borderRadius: 20,
-                      onPressed: () => _showActions(context),
-                    ),
+                    if (!viewedProfile.isBlocked)
+                      GlassButton(
+                        icon: Icons.settings_rounded,
+                        size: 50,
+                        iconSize: 29,
+                        borderRadius: 20,
+                        onPressed: () => _showActions(context),
+                      ),
                   ],
                 ),
               ),
@@ -342,19 +354,24 @@ class _ProfileScaffold extends StatelessWidget {
           child: SingleChildScrollView(
             child: BlocProvider.value(
               value: cubit,
-              child: BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
-                builder: (_, currentState) {
-                  final currentProfile =
-                      currentState.viewedProfile ?? viewedProfile;
-                  return _ProfileActionsSheet(
-                    viewedProfile: currentProfile,
-                    chatIsMuted: currentState.chat?.isMuted ?? false,
-                    canMute: currentProfile.isFriend,
-                    onMute: () async {
-                      Navigator.of(sheetContext).pop();
-                      await cubit.toggleMute();
-                    },
-                    onRemove: currentProfile.isFriend
+              child: BlocBuilder<BlocklistCubit, BlocklistState>(
+                builder: (_, blocklistState) =>
+                    BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
+                  builder: (_, currentState) {
+                    final currentProfile =
+                        currentState.viewedProfile ?? viewedProfile;
+                    final isBlockedByMe = blocklistState.blocks(
+                      currentProfile.profile.id,
+                    );
+                    return _ProfileActionsSheet(
+                      viewedProfile: currentProfile,
+                      chatIsMuted: currentState.chat?.isMuted ?? false,
+                      canMute: currentProfile.isFriend && !isBlockedByMe,
+                      onMute: () async {
+                        Navigator.of(sheetContext).pop();
+                        await cubit.toggleMute();
+                      },
+                      onRemove: currentProfile.isFriend && !isBlockedByMe
                         ? () async {
                             final confirmed = await showConfirmationDialog(
                               pageContext,
@@ -375,12 +392,52 @@ class _ProfileScaffold extends StatelessWidget {
                             await cubit.removeFriend();
                           }
                         : null,
-                    onStub: (message) {
-                      Navigator.of(sheetContext).pop();
-                      showAppSnackBar(pageContext, message: message);
-                    },
-                  );
-                },
+                      isBlockedByMe: isBlockedByMe,
+                      onBlock: () async {
+                        final confirmed = await showConfirmationDialog(
+                          pageContext,
+                          title: pageContext.l10n.viewedProfileBlockTitle,
+                          content: pageContext.l10n.viewedProfileBlockContent(
+                            currentProfile.profile.displayName,
+                          ),
+                          confirmLabel: pageContext.l10n.viewedProfileBlock,
+                        );
+                        if (confirmed != true || !pageContext.mounted) return;
+                        Navigator.of(sheetContext).pop();
+                        await cubit.blockUser();
+                      },
+                      onUnblock: () async {
+                        final confirmed = await showConfirmationDialog(
+                          pageContext,
+                          title: pageContext.l10n.unblockUserTitle,
+                          content: pageContext.l10n.unblockUserContent(
+                            currentProfile.profile.displayName,
+                          ),
+                          confirmLabel: pageContext.l10n.unblockUser,
+                        );
+                        if (confirmed != true || !pageContext.mounted) return;
+                        Navigator.of(sheetContext).pop();
+                        try {
+                          await pageContext
+                              .read<IBlocklistRepository>()
+                              .unblockUser(currentProfile.profile.id);
+                        } catch (_) {
+                          if (pageContext.mounted) {
+                            showAppSnackBar(
+                              pageContext,
+                              message: pageContext.l10n.friendsActionFailed,
+                              type: SnackBarType.error,
+                            );
+                          }
+                        }
+                      },
+                      onStub: (message) {
+                        Navigator.of(sheetContext).pop();
+                        showAppSnackBar(pageContext, message: message);
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -395,6 +452,7 @@ class _ProfileContent extends StatelessWidget {
     required this.viewedProfile,
     required this.state,
     required this.topPadding,
+    required this.isBlockedByMe,
     required this.onPhotoTap,
     required this.onChat,
     required this.onFriends,
@@ -404,6 +462,7 @@ class _ProfileContent extends StatelessWidget {
   final ViewedProfile viewedProfile;
   final ViewedProfileState state;
   final double topPadding;
+  final bool isBlockedByMe;
   final ValueChanged<int> onPhotoTap;
   final VoidCallback onChat;
   final VoidCallback onFriends;
@@ -412,6 +471,9 @@ class _ProfileContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final profile = viewedProfile.profile;
+    if (viewedProfile.isBlocked) {
+      return _BlockedProfileContent(profile: profile, topPadding: topPadding);
+    }
     final isOnline = context.select<PresenceCubit, bool>(
       (cubit) => cubit.state.isOnline(profile.id),
     );
@@ -506,6 +568,7 @@ class _ProfileContent extends StatelessWidget {
                     _ProfileActions(
                       viewedProfile: viewedProfile,
                       state: state,
+                      isBlockedByMe: isBlockedByMe,
                       onChat: onChat,
                       onLocation: onLocation,
                     ),
@@ -542,6 +605,62 @@ class _ProfileContent extends StatelessWidget {
       ],
     );
   }
+}
+
+class _BlockedProfileContent extends StatelessWidget {
+  const _BlockedProfileContent({
+    required this.profile,
+    required this.topPadding,
+  });
+
+  final UserProfile profile;
+  final double topPadding;
+
+  @override
+  Widget build(BuildContext context) => CustomScrollView(
+    physics: const ClampingScrollPhysics(
+      parent: AlwaysScrollableScrollPhysics(),
+    ),
+    slivers: [
+      SliverFillRemaining(
+        hasScrollBody: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 32),
+          child: Column(
+            children: [
+              SizedBox.square(
+                dimension: 176,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(32),
+                  child: ColoredBox(
+                    color: context.colorScheme.primary,
+                    child: Icon(
+                      Icons.person_rounded,
+                      size: 96,
+                      color: context.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                profile.displayName,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.colorScheme.onSurface,
+                  fontSize: 32,
+                  fontFamily: 'Roboto',
+                  fontWeight: FontWeight.w600,
+                  height: 1,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 class _ProfilePhotoCard extends StatelessWidget {
@@ -657,12 +776,14 @@ class _ProfileActions extends StatelessWidget {
   const _ProfileActions({
     required this.viewedProfile,
     required this.state,
+    required this.isBlockedByMe,
     required this.onChat,
     this.onLocation,
   });
 
   final ViewedProfile viewedProfile;
   final ViewedProfileState state;
+  final bool isBlockedByMe;
   final VoidCallback onChat;
   final VoidCallback? onLocation;
 
@@ -675,14 +796,16 @@ class _ProfileActions extends StatelessWidget {
         : null;
     final buttons = <Widget>[
       _ActionButton(icon: Icons.chat_bubble_rounded, label: '', onTap: onChat),
-      if (viewedProfile.relationship == ProfileRelationship.none)
+      if (!isBlockedByMe &&
+          viewedProfile.relationship == ProfileRelationship.none)
         _ActionButton(
           icon: Icons.person_add_alt_1_rounded,
           label: context.l10n.viewedProfileAddFriend,
           onTap: state.isActionPending ? null : cubit.sendRequest,
           wide: true,
         ),
-      if (viewedProfile.relationship == ProfileRelationship.outgoing)
+      if (!isBlockedByMe &&
+          viewedProfile.relationship == ProfileRelationship.outgoing)
         _ActionButton(
           icon: Icons.schedule_rounded,
           label: context.l10n.viewedProfileRequestSent,
@@ -690,14 +813,20 @@ class _ProfileActions extends StatelessWidget {
           wide: true,
           transparent: true,
         ),
-      if (viewedProfile.relationship == ProfileRelationship.incoming) ...[
+      if (!isBlockedByMe &&
+          viewedProfile.relationship == ProfileRelationship.incoming) ...[
         _IncomingRequestActions(
           isPending: state.isActionPending,
           onAccept: () => cubit.respondToRequest(accept: true),
           onDecline: () => cubit.respondToRequest(accept: false),
         ),
       ],
-      _LocationAction(distance: location, age: locationAge, onTap: onLocation),
+      if (!isBlockedByMe)
+        _LocationAction(
+          distance: location,
+          age: locationAge,
+          onTap: onLocation,
+        ),
     ];
     return LayoutBuilder(
       builder: (context, constraints) => Wrap(
@@ -1003,6 +1132,9 @@ class _ProfileActionsSheet extends StatelessWidget {
     required this.canMute,
     required this.onMute,
     required this.onStub,
+    required this.isBlockedByMe,
+    required this.onBlock,
+    required this.onUnblock,
     this.onRemove,
   });
 
@@ -1011,6 +1143,9 @@ class _ProfileActionsSheet extends StatelessWidget {
   final bool canMute;
   final VoidCallback onMute;
   final ValueChanged<String> onStub;
+  final bool isBlockedByMe;
+  final VoidCallback onBlock;
+  final VoidCallback onUnblock;
   final VoidCallback? onRemove;
 
   @override
@@ -1038,7 +1173,7 @@ class _ProfileActionsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (viewedProfile.isFriend)
+            if (viewedProfile.isFriend && !isBlockedByMe)
               ListTile(
                 enabled: canMute,
                 leading: Icon(
@@ -1064,12 +1199,18 @@ class _ProfileActionsSheet extends StatelessWidget {
                 onTap: onRemove,
               ),
             ListTile(
-              leading: const Icon(Icons.block_rounded),
+              leading: Icon(
+                isBlockedByMe
+                    ? Icons.lock_open_rounded
+                    : Icons.block_rounded,
+              ),
               title: Text(
-                context.l10n.viewedProfileBlock.toLowerCase(),
+                isBlockedByMe
+                    ? context.l10n.unblockUser.toLowerCase()
+                    : context.l10n.viewedProfileBlock.toLowerCase(),
                 style: itemStyle,
               ),
-              onTap: () => onStub(context.l10n.viewedProfileStub),
+              onTap: isBlockedByMe ? onUnblock : onBlock,
             ),
             ListTile(
               leading: const Icon(Icons.flag_rounded),

@@ -284,6 +284,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsNobodyHere => 'тут никого нет';
 
   @override
+  String get settingsBlacklistLoadFailed =>
+      'Не удалось загрузить черный список';
+
+  @override
   String get settingsComingSoon => 'скоро';
 
   @override
@@ -942,6 +946,25 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get viewedProfileBlock => 'Заблокировать';
+
+  @override
+  String get viewedProfileBlockTitle => 'Заблокировать пользователя?';
+
+  @override
+  String viewedProfileBlockContent(Object name) {
+    return '$name не сможет просматривать ваш профиль, видеть статус и местоположение или писать вам.';
+  }
+
+  @override
+  String get unblockUser => 'Разблокировать';
+
+  @override
+  String get unblockUserTitle => 'Разблокировать пользователя?';
+
+  @override
+  String unblockUserContent(Object name) {
+    return '$name снова сможет найти ваш профиль и отправлять новые сообщения.';
+  }
 
   @override
   String get viewedProfileReport => 'Пожаловаться';

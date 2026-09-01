@@ -27,7 +27,9 @@ class ChatListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
     final systemPadding = MediaQuery.paddingOf(context);
-    final isOnline = chat.peerId.isEmpty
+    final isOnline = chat.blockedByPeer
+        ? false
+        : chat.peerId.isEmpty
         ? chat.isOnline
         : context.select<PresenceCubit, bool>(
             (cubit) => cubit.state.isOnline(chat.peerId),

@@ -8,6 +8,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
+import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/view/view.dart';
@@ -238,9 +239,15 @@ class _ChatViewState extends State<_ChatView>
 
     final backgroundColor = context.scaffoldBackgroundColor;
     final presence = context.watch<PresenceCubit>().state;
-    final isOnline = widget.chat.peerId.isEmpty
+    final isOnline = widget.chat.blockedByPeer
+        ? false
+        : widget.chat.peerId.isEmpty
         ? widget.chat.isOnline
         : presence.isOnline(widget.chat.peerId);
+    final blocklistState = context.watch<BlocklistCubit>().state;
+    final blockedByMe = widget.chat.peerId.isNotEmpty &&
+        (blocklistState.blocks(widget.chat.peerId) ||
+            (!blocklistState.isLoaded && widget.chat.blockedByMe));
 
     return BlocListener<PresenceCubit, PresenceState>(
       listenWhen: (previous, current) =>
@@ -315,11 +322,15 @@ class _ChatViewState extends State<_ChatView>
                         userName: widget.chat.userName,
                         isOnline: isOnline,
                         lastSeenAt: _lastSeenAt,
-                        showsLastSeen: widget.chat.showsLastSeen,
+                        showsLastSeen:
+                            !widget.chat.blockedByPeer &&
+                            widget.chat.showsLastSeen,
                         avatarUrl: widget.chat.avatarUrl,
-                        avatarLoader: () => context
-                            .read<IChatsRepository>()
-                            .resolveAvatar(widget.chat),
+                        avatarLoader: widget.chat.blockedByPeer
+                            ? null
+                            : () => context
+                                  .read<IChatsRepository>()
+                                  .resolveAvatar(widget.chat),
                         avatarRevision:
                             widget.chat.avatarStoragePath ??
                             widget.chat.avatarUrl,
@@ -340,6 +351,8 @@ class _ChatViewState extends State<_ChatView>
                     _KeyboardAwareInput(
                       chatId: widget.chat.id,
                       peerName: widget.chat.userName,
+                      peerId: widget.chat.peerId,
+                      blockedByMe: blockedByMe,
                       onMessageSent: _scrollToBottom,
                       onHeightChanged: _onComposerHeightChanged,
                     ),
@@ -358,12 +371,16 @@ class _KeyboardAwareInput extends StatelessWidget {
   const _KeyboardAwareInput({
     required this.chatId,
     required this.peerName,
+    required this.peerId,
+    required this.blockedByMe,
     required this.onMessageSent,
     required this.onHeightChanged,
   });
 
   final String chatId;
   final String peerName;
+  final String peerId;
+  final bool blockedByMe;
   final VoidCallback onMessageSent;
   final ValueChanged<double> onHeightChanged;
 
@@ -412,6 +429,12 @@ class _KeyboardAwareInput extends StatelessWidget {
           buildWhen: (previous, current) =>
               previous.replyToMessage != current.replyToMessage,
           builder: (context, chatState) {
+            if (blockedByMe) {
+              return SizeReporter(
+                onSizeChanged: (size) => onHeightChanged(size.height),
+                child: _UnblockComposer(peerName: peerName, peerId: peerId),
+              );
+            }
             return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
               builder: (context, state) {
                 return SizeReporter(
@@ -522,6 +545,69 @@ class _KeyboardAwareInput extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _UnblockComposer extends StatelessWidget {
+  const _UnblockComposer({required this.peerName, required this.peerId});
+
+  final String peerName;
+  final String peerId;
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        padding.left + 16,
+        8,
+        padding.right + 16,
+        padding.bottom + 8,
+      ),
+      child: Material(
+        color: context.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _confirm(context),
+          child: SizedBox(
+            height: 58,
+            child: Center(
+              child: Text(
+                context.l10n.unblockUser,
+                style: TextStyle(
+                  color: context.colorScheme.onPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirm(BuildContext context) async {
+    if (peerId.isEmpty) return;
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.unblockUserTitle,
+      content: context.l10n.unblockUserContent(peerName),
+      confirmLabel: context.l10n.unblockUser,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await context.read<IBlocklistRepository>().unblockUser(peerId);
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.friendsActionFailed,
+          type: SnackBarType.error,
+        );
+      }
+    }
   }
 }
 

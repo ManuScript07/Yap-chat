@@ -24,6 +24,7 @@ class ChatMessage extends Equatable {
   final List<double> audioWaveform;
   final MessageReply? replyTo;
   final DateTime? readAt;
+  final bool isLocalOnly;
 
   const ChatMessage({
     required this.id,
@@ -44,6 +45,7 @@ class ChatMessage extends Equatable {
     this.audioWaveform = const [],
     this.replyTo,
     this.readAt,
+    this.isLocalOnly = false,
   });
 
   ChatMessage copyWith({
@@ -65,6 +67,7 @@ class ChatMessage extends Equatable {
     List<double>? audioWaveform,
     MessageReply? replyTo,
     DateTime? readAt,
+    bool? isLocalOnly,
     bool clearReplyTo = false,
     bool clearReadAt = false,
   }) {
@@ -87,6 +90,7 @@ class ChatMessage extends Equatable {
       audioWaveform: audioWaveform ?? this.audioWaveform,
       replyTo: clearReplyTo ? null : replyTo ?? this.replyTo,
       readAt: clearReadAt ? null : readAt ?? this.readAt,
+      isLocalOnly: isLocalOnly ?? this.isLocalOnly,
     );
   }
 
@@ -110,5 +114,6 @@ class ChatMessage extends Equatable {
     audioWaveform,
     replyTo,
     readAt,
+    isLocalOnly,
   ];
 }

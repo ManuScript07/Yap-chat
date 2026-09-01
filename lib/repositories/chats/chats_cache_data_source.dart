@@ -41,6 +41,19 @@ class ChatsCacheDataSource {
     return row == null ? null : _mapRow(row);
   }
 
+  Future<bool> isDeliveryBlocked(
+    String chatId, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final row = await (_database.select(_database.cachedChats)..where(
+          (table) =>
+              table.ownerUserId.equals(owner) & table.id.equals(chatId),
+        ))
+        .getSingleOrNull();
+    return row != null && row.peerUsername.isEmpty;
+  }
+
   Future<bool> replaceAll(List<Chat> chats, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
     final cachedChats = await read(ownerUserId: owner);
@@ -172,6 +185,7 @@ class ChatsCacheDataSource {
       showsLastSeen: row.showsLastSeen,
       isLastMessageFromMe: row.isLastMessageFromMe,
       isMuted: row.isMuted,
+      blockedByPeer: row.peerUsername.isEmpty,
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/repositories/repositories.dart';
@@ -298,12 +298,40 @@ class _BlacklistSheet extends StatefulWidget {
 
 class _BlacklistSheetState extends State<_BlacklistSheet> {
   final _searchController = TextEditingController();
-  final List<Friend> _blockedFriends = const [];
+  List<BlockedUser> _blockedUsers = const [];
   String _query = '';
-  final bool _isLoading = false;
+  bool _isLoading = true;
+  StreamSubscription<List<BlockedUser>>? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    final repository = context.read<IBlocklistRepository>();
+    _subscription = repository.watchBlockedUsers().listen((users) {
+      if (mounted) setState(() => _blockedUsers = users);
+    });
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      await context.read<IBlocklistRepository>().refreshBlockedUsers();
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.settingsBlacklistLoadFailed,
+          type: SnackBarType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
+    _subscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -321,12 +349,12 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
         ? .86
         : .80;
     final double sheetHeight = mediaQuery.size.height * heightFactor;
-    final filteredFriends = _blockedFriends
-        .where((friend) {
+    final filteredUsers = _blockedUsers
+        .where((user) {
           final query = _query.trim().toLowerCase();
           return query.isEmpty ||
-              friend.displayName.toLowerCase().contains(query) ||
-              friend.username.toLowerCase().contains(query);
+              user.displayName.toLowerCase().contains(query) ||
+              user.username.toLowerCase().contains(query);
         })
         .toList(growable: false);
 
@@ -337,7 +365,7 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
         children: [
           Positioned.fill(
             child: _BlacklistBody(
-              friends: filteredFriends,
+              users: filteredUsers,
               isLoading: _isLoading,
               topPadding: headerHeight,
               bottomPadding: contentBottomPadding,
@@ -401,13 +429,13 @@ class _BlacklistSheetState extends State<_BlacklistSheet> {
 
 class _BlacklistBody extends StatelessWidget {
   const _BlacklistBody({
-    required this.friends,
+    required this.users,
     required this.isLoading,
     required this.topPadding,
     required this.bottomPadding,
   });
 
-  final List<Friend> friends;
+  final List<BlockedUser> users;
   final bool isLoading;
   final double topPadding;
   final double bottomPadding;
@@ -422,7 +450,7 @@ class _BlacklistBody extends StatelessWidget {
         ),
       );
     }
-    if (friends.isEmpty) {
+    if (users.isEmpty) {
       return Align(
         alignment: Alignment.topCenter,
         child: Padding(
@@ -442,27 +470,46 @@ class _BlacklistBody extends StatelessWidget {
     }
     return ListView.builder(
       padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
-      itemCount: friends.length,
+      itemCount: users.length,
       itemBuilder: (context, index) {
-        final friend = friends[index];
+        final user = users[index];
         return SettingsFriendRow(
           avatar: UserAvatar(
-            avatarUrl: friend.avatarUrl,
-            avatarLoader: () =>
-                context.read<IFriendsRepository>().resolveFriendAvatar(friend),
-            avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
+            avatarUrl: user.avatarUrl,
+            avatarRevision: user.avatarStoragePath ?? user.avatarUrl,
             size: 54,
             borderRadius: 12,
           ),
-          name: friend.displayName,
-          username: friend.username,
+          name: user.displayName,
+          username: user.username,
           isVisible: true,
-          onToggle: () {},
-          trailingIcon: Icons.settings_rounded,
+          onToggle: () => _confirmUnblock(context, user),
+          trailingIcon: Icons.lock_open_rounded,
           horizontalPadding: 16,
         );
       },
     );
+  }
+
+  Future<void> _confirmUnblock(BuildContext context, BlockedUser user) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.unblockUserTitle,
+      content: context.l10n.unblockUserContent(user.displayName),
+      confirmLabel: context.l10n.unblockUser,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await context.read<IBlocklistRepository>().unblockUser(user.id);
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.friendsActionFailed,
+          type: SnackBarType.error,
+        );
+      }
+    }
   }
 }
 

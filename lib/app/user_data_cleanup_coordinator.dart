@@ -6,6 +6,7 @@ import 'package:yap_chat/core/services/account_session_controller.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 import 'package:yap_chat/repositories/settings/abstract_settings_repository.dart';
+import 'package:yap_chat/repositories/blocks/abstract_blocklist_repository.dart';
 
 /// Durable, account-scoped cleanup used by logout and startup recovery.
 class UserDataCleanupCoordinator {
@@ -16,6 +17,7 @@ class UserDataCleanupCoordinator {
     required ILocalMediaRepository localMediaRepository,
     required MediaCacheService mediaCache,
     ISettingsRepository? settingsRepository,
+    IBlocklistRepository? blocklistRepository,
     required Talker talker,
   }) : _preferences = preferences,
        _pendingKey = 'auth.cleanup.pending.$environment',
@@ -23,6 +25,7 @@ class UserDataCleanupCoordinator {
        _localMediaRepository = localMediaRepository,
        _mediaCache = mediaCache,
        _settingsRepository = settingsRepository,
+       _blocklistRepository = blocklistRepository,
        _talker = talker;
 
   final SharedPreferences _preferences;
@@ -31,6 +34,7 @@ class UserDataCleanupCoordinator {
   final ILocalMediaRepository _localMediaRepository;
   final MediaCacheService _mediaCache;
   final ISettingsRepository? _settingsRepository;
+  final IBlocklistRepository? _blocklistRepository;
   final Talker _talker;
 
   Future<void> _operation = Future<void>.value();
@@ -65,6 +69,8 @@ class UserDataCleanupCoordinator {
         _localMediaRepository.clearUser(userId),
         _mediaCache.clearUser(userId),
         if (_settingsRepository case final repository?)
+          repository.clearUserCache(userId),
+        if (_blocklistRepository case final repository?)
           repository.clearUserCache(userId),
         _clearPreferences(userId),
       ]);

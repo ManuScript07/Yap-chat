@@ -75,6 +75,8 @@ class ChatsRemoteDataSource {
             showsLastSeen: showsLastSeen,
             isLastMessageFromMe: row['last_message_sender_id'] == currentUserId,
             isMuted: row['is_muted'] as bool? ?? false,
+            blockedByMe: row['blocked_by_me'] as bool? ?? false,
+            blockedByPeer: row['blocked_by_peer'] as bool? ?? false,
           );
         })
         .toList(growable: false);

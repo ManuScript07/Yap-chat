@@ -530,6 +530,12 @@ abstract class AppLocalizations {
   /// **'тут никого нет'**
   String get settingsNobodyHere;
 
+  /// No description provided for @settingsBlacklistLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить черный список'**
+  String get settingsBlacklistLoadFailed;
+
   /// No description provided for @settingsComingSoon.
   ///
   /// In ru, this message translates to:
@@ -1729,6 +1735,36 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Заблокировать'**
   String get viewedProfileBlock;
+
+  /// No description provided for @viewedProfileBlockTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Заблокировать пользователя?'**
+  String get viewedProfileBlockTitle;
+
+  /// No description provided for @viewedProfileBlockContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'{name} не сможет просматривать ваш профиль, видеть статус и местоположение или писать вам.'**
+  String viewedProfileBlockContent(Object name);
+
+  /// No description provided for @unblockUser.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разблокировать'**
+  String get unblockUser;
+
+  /// No description provided for @unblockUserTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разблокировать пользователя?'**
+  String get unblockUserTitle;
+
+  /// No description provided for @unblockUserContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'{name} снова сможет найти ваш профиль и отправлять новые сообщения.'**
+  String unblockUserContent(Object name);
 
   /// No description provided for @viewedProfileReport.
   ///

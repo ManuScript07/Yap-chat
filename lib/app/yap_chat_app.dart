@@ -16,6 +16,7 @@ import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/router/router.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/features/auth/auth.dart';
+import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/features/profile/profile.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
@@ -407,6 +408,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               context.read<AppLanguageCubit>().setAuthenticatedUser(userId),
             );
             if (state.status == AuthStatus.authenticated && userId != null) {
+              unawaited(context.read<BlocklistCubit>().refresh());
               unawaited(
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
                   userId,

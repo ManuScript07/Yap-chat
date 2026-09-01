@@ -10,6 +10,7 @@ import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
+import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 
 class ChatRepository implements IChatRepository {
@@ -20,6 +21,7 @@ class ChatRepository implements IChatRepository {
     required ChatMediaProcessor mediaProcessor,
     required MediaCacheService mediaCache,
     required ConversationSyncService syncService,
+    required ChatsCacheDataSource chatsCache,
     required ILocalMediaRepository localMediaRepository,
     required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
@@ -29,6 +31,7 @@ class ChatRepository implements IChatRepository {
        _mediaProcessor = mediaProcessor,
        _mediaCache = mediaCache,
        _syncService = syncService,
+       _chatsCache = chatsCache,
        _localMediaRepository = localMediaRepository,
        _accountSessionController = accountSessionController,
        _uuid = uuid;
@@ -41,6 +44,7 @@ class ChatRepository implements IChatRepository {
   final ChatMediaProcessor _mediaProcessor;
   final MediaCacheService _mediaCache;
   final ConversationSyncService _syncService;
+  final ChatsCacheDataSource _chatsCache;
   final ILocalMediaRepository _localMediaRepository;
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
@@ -235,6 +239,21 @@ class ChatRepository implements IChatRepository {
     required bool deleteForEveryone,
   }) async {
     final scope = _accountSessionController.capture();
+    final localMessage = await _cache.readMessage(
+      messageId,
+      currentUserId: scope.userId,
+    );
+    if (localMessage?.isLocalOnly ?? false) {
+      await _accountSessionController.commit(scope, () async {
+        await _cache.removeMessage(messageId, ownerUserId: scope.userId);
+        await _syncService.refreshLocalPreview(
+          chatId,
+          ownerUserId: scope.userId,
+        );
+      });
+      await _localMediaRepository.collectGarbage();
+      return;
+    }
     final pending = (await _cache.readPendingOperations(
       ownerUserId: scope.userId,
     )).where((operation) => operation.id == messageId).firstOrNull;
@@ -280,6 +299,10 @@ class ChatRepository implements IChatRepository {
   }) async {
     final scope = _accountSessionController.capture();
     final id = _uuid.v4();
+    final localOnly = await _chatsCache.isDeliveryBlocked(
+      chatId,
+      ownerUserId: scope.userId,
+    );
     final reply = await _createReply(replyToMessageId, scope);
     final message = ChatMessage(
       id: id,
@@ -288,7 +311,7 @@ class ChatRepository implements IChatRepository {
       text: text,
       timestamp: DateTime.now(),
       isMine: true,
-      status: MessageStatus.sending,
+      status: localOnly ? MessageStatus.sent : MessageStatus.sending,
       type: type,
       mediaUrls: imagePaths,
       audioUrl: audioPath,
@@ -297,6 +320,7 @@ class ChatRepository implements IChatRepository {
       latitude: latitude,
       longitude: longitude,
       replyTo: reply,
+      isLocalOnly: localOnly,
     );
     final operation = PendingMessageOperation(
       id: id,
@@ -318,16 +342,18 @@ class ChatRepository implements IChatRepository {
     await _accountSessionController.commit(scope, () async {
       await _cache.upsertMessage(
         message,
-        isPending: true,
+        isPending: !localOnly,
         ownerUserId: scope.userId,
       );
       await _syncService.reflectLocalMessage(
         message,
         ownerUserId: scope.userId,
       );
-      await _cache.putPendingOperation(operation, ownerUserId: scope.userId);
+      if (!localOnly) {
+        await _cache.putPendingOperation(operation, ownerUserId: scope.userId);
+      }
     });
-    await _deliver(operation, scope);
+    if (!localOnly) await _deliver(operation, scope);
   }
 
   Future<MessageReply?> _createReply(
@@ -366,6 +392,13 @@ class ChatRepository implements IChatRepository {
     PendingMessageOperation operation,
     AccountSessionSnapshot scope,
   ) async {
+    if (await _chatsCache.isDeliveryBlocked(
+      operation.chatId,
+      ownerUserId: scope.userId,
+    )) {
+      await _makeLocalOnly(operation, scope);
+      return;
+    }
     final deliveryKey = '${scope.generation}:${scope.userId}:${operation.id}';
     if (!_deliveringOperationIds.add(deliveryKey)) return;
     try {
@@ -412,6 +445,11 @@ class ChatRepository implements IChatRepository {
     } on StaleAccountSessionException {
       return;
     } catch (error, stackTrace) {
+      if (_isConversationBlockedError(error) &&
+          _accountSessionController.isCurrent(scope)) {
+        await _makeLocalOnly(operation, scope);
+        return;
+      }
       if (_accountSessionController.isCurrent(scope)) {
         await _accountSessionController.commit(scope, () async {
           if (operation.type == MessageType.image.name) {
@@ -435,6 +473,34 @@ class ChatRepository implements IChatRepository {
         unawaited(_localMediaRepository.collectGarbage());
       }
     }
+  }
+
+  bool _isConversationBlockedError(Object error) =>
+      error.toString().contains('conversation_blocked');
+
+  Future<void> _makeLocalOnly(
+    PendingMessageOperation operation,
+    AccountSessionSnapshot scope,
+  ) async {
+    final message = await _cache.readMessage(
+      operation.id,
+      currentUserId: scope.userId,
+    );
+    if (message == null) return;
+    await _accountSessionController.commit(scope, () async {
+      await _cache.upsertMessage(
+        message.copyWith(status: MessageStatus.sent, isLocalOnly: true),
+        ownerUserId: scope.userId,
+      );
+      await _cache.removePendingOperation(
+        operation.id,
+        ownerUserId: scope.userId,
+      );
+      await _syncService.refreshLocalPreview(
+        operation.chatId,
+        ownerUserId: scope.userId,
+      );
+    });
   }
 
   Future<List<Map<String, dynamic>>> _uploadImages(

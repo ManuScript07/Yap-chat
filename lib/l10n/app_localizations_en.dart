@@ -277,6 +277,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsNobodyHere => 'nobody here';
 
   @override
+  String get settingsBlacklistLoadFailed => 'Could not load blocked users';
+
+  @override
   String get settingsComingSoon => 'coming soon';
 
   @override
@@ -931,6 +934,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewedProfileBlock => 'Block';
+
+  @override
+  String get viewedProfileBlockTitle => 'Block user?';
+
+  @override
+  String viewedProfileBlockContent(Object name) {
+    return '$name will no longer be able to view your profile, see your status or location, or message you.';
+  }
+
+  @override
+  String get unblockUser => 'Unblock';
+
+  @override
+  String get unblockUserTitle => 'Unblock user?';
+
+  @override
+  String unblockUserContent(Object name) {
+    return '$name will be able to find your profile and send new messages again.';
+  }
 
   @override
   String get viewedProfileReport => 'Report';

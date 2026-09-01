@@ -103,6 +103,7 @@
   "settingsPublicContentUnavailable": "Information is not available yet",
   "settingsSearchBlacklist": "search",
   "settingsNobodyHere": "nobody here",
+  "settingsBlacklistLoadFailed": "Could not load blocked users",
   "settingsComingSoon": "coming soon",
   "settingsTerms": "Terms of service",
   "settingsPrivacyPolicy": "Privacy policy",
@@ -362,6 +363,21 @@
   "viewedProfileMute": "Mute",
   "viewedProfileUnmute": "Unmute",
   "viewedProfileBlock": "Block",
+  "viewedProfileBlockTitle": "Block user?",
+  "viewedProfileBlockContent": "{name} will no longer be able to view your profile, see your status or location, or message you.",
+  "@viewedProfileBlockContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "unblockUser": "Unblock",
+  "unblockUserTitle": "Unblock user?",
+  "unblockUserContent": "{name} will be able to find your profile and send new messages again.",
+  "@unblockUserContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
   "viewedProfileReport": "Report",
   "viewedProfileStub": "This feature is coming later",
   "viewedProfileDistanceMeters": "{value} m",

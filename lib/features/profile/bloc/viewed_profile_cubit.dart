@@ -69,11 +69,13 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     required IFriendsRepository friendsRepository,
     required IChatsRepository chatsRepository,
     required ILocationRepository locationRepository,
+    required IBlocklistRepository blocklistRepository,
   }) : _userId = userId,
        _profileRepository = profileRepository,
        _friendsRepository = friendsRepository,
        _chatsRepository = chatsRepository,
        _locationRepository = locationRepository,
+       _blocklistRepository = blocklistRepository,
        super(const ViewedProfileState());
 
   final String _userId;
@@ -81,6 +83,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   final IFriendsRepository _friendsRepository;
   final IChatsRepository _chatsRepository;
   final ILocationRepository _locationRepository;
+  final IBlocklistRepository _blocklistRepository;
   StreamSubscription<List<Chat>>? _chatsSubscription;
   StreamSubscription<String>? _friendsSubscription;
   StreamSubscription<List<Friend>>? _friendsCacheSubscription;
@@ -147,6 +150,12 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   }
 
   Future<void> _loadSupportingData(ViewedProfile profile) async {
+    if (profile.isBlocked) {
+      if (!isClosed) {
+        emit(state.copyWith(clearLocation: true, clearDistance: true));
+      }
+      return;
+    }
     await Future.wait([_loadChat(profile), _loadLocation(profile)]);
   }
 
@@ -295,6 +304,20 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     await _friendsRepository.removeFriend(_userId);
   });
 
+  Future<void> blockUser() => _performAction(() async {
+    final profile = state.viewedProfile!.profile;
+    await _blocklistRepository.blockUser(
+      BlockedUser(
+        id: profile.id,
+        username: profile.username,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        avatarStoragePath: profile.avatarStoragePath,
+        blockedAt: DateTime.now(),
+      ),
+    );
+  });
+
   Future<void> toggleMute() => _performAction(() async {
     var chat = await prepareChat();
     if (chat.isDraft) {
@@ -338,7 +361,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       }
     }
     final viewedProfile = state.viewedProfile;
-    if (chat == null || viewedProfile == null) return;
+    if (chat == null || viewedProfile == null || viewedProfile.isBlocked) return;
     final identityChanged =
         viewedProfile.profile.username != chat.peerUsername ||
         viewedProfile.profile.displayName != chat.userName ||
@@ -370,7 +393,11 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     final profile = state.viewedProfile;
     final friends = _friendsSnapshot;
     final requests = _requestsSnapshot;
-    if (isClosed || profile == null || friends == null || requests == null) {
+    if (isClosed ||
+        profile == null ||
+        profile.isBlocked ||
+        friends == null ||
+        requests == null) {
       return;
     }
 

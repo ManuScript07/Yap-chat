@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/profile/data/models/user_profile.dart';
 
-enum ProfileRelationship { none, friend, incoming, outgoing }
+enum ProfileRelationship { none, friend, incoming, outgoing, blocked }
 
 class ViewedProfileFriend extends Equatable {
   const ViewedProfileFriend({
@@ -50,6 +50,7 @@ class ViewedProfile extends Equatable {
   final bool showsLastSeen;
 
   bool get isFriend => relationship == ProfileRelationship.friend;
+  bool get isBlocked => relationship == ProfileRelationship.blocked;
 
   ViewedProfile copyWith({
     ProfileRelationship? relationship,
