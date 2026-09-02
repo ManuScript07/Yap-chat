@@ -240,7 +240,7 @@ class _ChatViewState extends State<_ChatView>
 
     final backgroundColor = context.scaffoldBackgroundColor;
     final presence = context.watch<PresenceCubit>().state;
-    final isOnline = widget.chat.blockedByPeer
+    final isOnline = widget.chat.blockedByPeer || widget.chat.peerIsGloballyBanned
         ? false
         : widget.chat.peerId.isEmpty
         ? widget.chat.isOnline
@@ -325,9 +325,11 @@ class _ChatViewState extends State<_ChatView>
                         lastSeenAt: _lastSeenAt,
                         showsLastSeen:
                             !widget.chat.blockedByPeer &&
+                            !widget.chat.peerIsGloballyBanned &&
                             widget.chat.showsLastSeen,
                         avatarUrl: widget.chat.avatarUrl,
-                        avatarLoader: widget.chat.blockedByPeer
+                        avatarLoader: widget.chat.blockedByPeer ||
+                                widget.chat.peerIsGloballyBanned
                             ? null
                             : () => context
                                   .read<IChatsRepository>()
@@ -354,6 +356,7 @@ class _ChatViewState extends State<_ChatView>
                       peerName: widget.chat.userName,
                       peerId: widget.chat.peerId,
                       blockedByMe: blockedByMe,
+                      peerIsGloballyBanned: widget.chat.peerIsGloballyBanned,
                       isBlockActionPending: blocklistState.isPending(
                         widget.chat.peerId,
                       ),
@@ -377,6 +380,7 @@ class _KeyboardAwareInput extends StatelessWidget {
     required this.peerName,
     required this.peerId,
     required this.blockedByMe,
+    required this.peerIsGloballyBanned,
     required this.isBlockActionPending,
     required this.onMessageSent,
     required this.onHeightChanged,
@@ -386,6 +390,7 @@ class _KeyboardAwareInput extends StatelessWidget {
   final String peerName;
   final String peerId;
   final bool blockedByMe;
+  final bool peerIsGloballyBanned;
   final bool isBlockActionPending;
   final VoidCallback onMessageSent;
   final ValueChanged<double> onHeightChanged;
@@ -435,6 +440,12 @@ class _KeyboardAwareInput extends StatelessWidget {
           buildWhen: (previous, current) =>
               previous.replyToMessage != current.replyToMessage,
           builder: (context, chatState) {
+            if (peerIsGloballyBanned) {
+              return SizeReporter(
+                onSizeChanged: (size) => onHeightChanged(size.height),
+                child: const _GloballyBannedComposer(),
+              );
+            }
             if (blockedByMe) {
               return SizeReporter(
                 onSizeChanged: (size) => onHeightChanged(size.height),
@@ -651,6 +662,47 @@ class _UnblockComposer extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+/// A global account ban is administered outside the chat.  Keeping this
+/// visually identical to the personal-unblock composer avoids a jarring
+/// layout jump, while intentionally exposing no action to the viewer.
+class _GloballyBannedComposer extends StatelessWidget {
+  const _GloballyBannedComposer();
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    final mainColor = context.colorScheme.onSurface;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        padding.left + 16,
+        8,
+        padding.right + 16,
+        padding.bottom + 8,
+      ),
+      child: SizedBox(
+        height: 50,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: mainColor.withValues(alpha: .4), width: 1.5),
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: Center(
+            child: Text(
+              'пользователь заблокирован',
+              style: TextStyle(
+                color: mainColor.withValues(alpha: .6),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .15,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

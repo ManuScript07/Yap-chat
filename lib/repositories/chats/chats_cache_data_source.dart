@@ -51,7 +51,13 @@ class ChatsCacheDataSource {
               table.ownerUserId.equals(owner) & table.id.equals(chatId),
         ))
         .getSingleOrNull();
-    return row != null && row.peerUsername.isEmpty;
+    // A globally banned peer uses an intentionally generic cached identity.
+    // Do not turn that presentation cache into a permanent local-only send
+    // state: the server remains authoritative and rejects a real global ban,
+    // while an administrator's unban can recover immediately after sync.
+    return row != null &&
+        row.peerUsername.isEmpty &&
+        row.peerDisplayName != _globallyBannedDisplayName;
   }
 
   Future<bool> replaceAll(List<Chat> chats, {String? ownerUserId}) async {
@@ -186,6 +192,11 @@ class ChatsCacheDataSource {
       isLastMessageFromMe: row.isLastMessageFromMe,
       isMuted: row.isMuted,
       blockedByPeer: row.peerUsername.isEmpty,
+      // The generic display name is server-produced only for a global ban.
+      // It is persisted with the ordinary chat cache, so offline startup does
+      // not need a separate status request.
+      peerIsGloballyBanned:
+          row.peerDisplayName == _globallyBannedDisplayName,
     );
   }
 
@@ -219,4 +230,6 @@ class ChatsCacheDataSource {
       MessageType.text => ChatPreviewType.text,
     };
   }
+
+  static const _globallyBannedDisplayName = 'Заблокированный пользователь';
 }

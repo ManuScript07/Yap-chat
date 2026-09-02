@@ -23,6 +23,7 @@ class Chat extends Equatable {
   final bool isMuted;
   final bool blockedByMe;
   final bool blockedByPeer;
+  final bool peerIsGloballyBanned;
 
   const Chat({
     required this.id,
@@ -43,6 +44,7 @@ class Chat extends Equatable {
     this.isMuted = false,
     this.blockedByMe = false,
     this.blockedByPeer = false,
+    this.peerIsGloballyBanned = false,
   });
 
   factory Chat.directDraft({
@@ -86,6 +88,7 @@ class Chat extends Equatable {
     bool? isMuted,
     bool? blockedByMe,
     bool? blockedByPeer,
+    bool? peerIsGloballyBanned,
   }) {
     return Chat(
       id: id ?? this.id,
@@ -106,6 +109,8 @@ class Chat extends Equatable {
       isMuted: isMuted ?? this.isMuted,
       blockedByMe: blockedByMe ?? this.blockedByMe,
       blockedByPeer: blockedByPeer ?? this.blockedByPeer,
+      peerIsGloballyBanned:
+          peerIsGloballyBanned ?? this.peerIsGloballyBanned,
     );
   }
 
@@ -129,6 +134,7 @@ class Chat extends Equatable {
     isMuted,
     blockedByMe,
     blockedByPeer,
+    peerIsGloballyBanned,
     isDraft,
   ];
 }
