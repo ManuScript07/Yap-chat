@@ -22,6 +22,9 @@ class NearbyCacheSnapshot {
 /// are hidden on read but retained on disk, so a temporary offline period
 /// never erases a previously loaded feed.
 class NearbyCacheDataSource {
+  static const _maximumSnapshotsPerUser = 2;
+  static const maximumPeoplePerSnapshot = 100;
+
   NearbyCacheDataSource({
     required SharedPreferences preferences,
     required String environment,
@@ -35,7 +38,9 @@ class NearbyCacheDataSource {
     final raw = _preferences.getString(_filtersKey(ownerUserId));
     if (raw == null) return const NearbyFilters();
     try {
-      return NearbyFilters.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      return NearbyFilters.fromJson(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
     } catch (_) {
       return const NearbyFilters();
     }
@@ -79,12 +84,7 @@ class NearbyCacheDataSource {
     NearbyFilters filters, {
     required List<NearbyPerson> people,
     required bool hasMore,
-  }) => _write(
-    ownerUserId,
-    filters,
-    people: people,
-    hasMore: hasMore,
-  );
+  }) => _write(ownerUserId, filters, people: people, hasMore: hasMore);
 
   Future<void> append(
     String ownerUserId,
@@ -94,14 +94,49 @@ class NearbyCacheDataSource {
   }) async {
     final existing = await read(ownerUserId, filters);
     final byId = <String, NearbyPerson>{
-      for (final person in existing?.people ?? const <NearbyPerson>[]) person.id: person,
+      for (final person in existing?.people ?? const <NearbyPerson>[])
+        person.id: person,
       for (final person in people) person.id: person,
     };
     await _write(
       ownerUserId,
       filters,
-      people: byId.values.take(180).toList(growable: false),
+      people: byId.values
+          .take(maximumPeoplePerSnapshot)
+          .toList(growable: false),
       hasMore: hasMore,
+    );
+  }
+
+  /// Removes newly blocked people from every locally retained filter snapshot.
+  /// This is deliberately local-only: an unblock must not resurrect a stale
+  /// cached result that the server may no longer consider nearby.
+  Future<void> removePeople(String ownerUserId, Set<String> userIds) async {
+    if (userIds.isEmpty) return;
+    final prefix = '$_keyPrefix$ownerUserId.feed.';
+    final keys = _preferences.getKeys().where((key) => key.startsWith(prefix));
+    await Future.wait(
+      keys.map((key) async {
+        final raw = _preferences.getString(key);
+        if (raw == null) return;
+        try {
+          final value = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+          final people = value['people'];
+          if (people is! List) return;
+          final retained = people
+              .where((item) {
+                if (item is! Map) return false;
+                return !userIds.contains(item['id'] as String?);
+              })
+              .toList(growable: false);
+          if (retained.length == people.length) return;
+          value['people'] = retained;
+          await _preferences.setString(key, jsonEncode(value));
+        } catch (_) {
+          // A corrupt optional snapshot is ignored and will be replaced by the
+          // next explicit server refresh.
+        }
+      }),
     );
   }
 
@@ -118,14 +153,51 @@ class NearbyCacheDataSource {
     NearbyFilters filters, {
     required List<NearbyPerson> people,
     required bool hasMore,
-  }) => _preferences.setString(
-    _feedKey(ownerUserId, filters),
-    jsonEncode({
-      'cached_at': DateTime.now().toUtc().toIso8601String(),
-      'has_more': hasMore,
-      'people': people.map((person) => person.toJson()).toList(growable: false),
-    }),
-  );
+  }) async {
+    await _preferences.setString(
+      _feedKey(ownerUserId, filters),
+      jsonEncode({
+        'cached_at': DateTime.now().toUtc().toIso8601String(),
+        'has_more': hasMore,
+        'people': people
+            .take(maximumPeoplePerSnapshot)
+            .map((person) => person.toJson())
+            .toList(growable: false),
+      }),
+    );
+    await _trimSnapshots(ownerUserId);
+  }
+
+  Future<void> _trimSnapshots(String ownerUserId) async {
+    final prefix = '$_keyPrefix$ownerUserId.feed.';
+    final snapshots = <({String key, DateTime cachedAt})>[];
+    for (final key in _preferences.getKeys().where(
+      (key) => key.startsWith(prefix),
+    )) {
+      final raw = _preferences.getString(key);
+      if (raw == null) continue;
+      try {
+        final value = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        snapshots.add((
+          key: key,
+          cachedAt:
+              DateTime.tryParse(value['cached_at'] as String? ?? '')?.toUtc() ??
+              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        ));
+      } catch (_) {
+        snapshots.add((
+          key: key,
+          cachedAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        ));
+      }
+    }
+    snapshots.sort((left, right) => right.cachedAt.compareTo(left.cachedAt));
+    await Future.wait(
+      snapshots
+          .skip(_maximumSnapshotsPerUser)
+          .map((snapshot) => _preferences.remove(snapshot.key)),
+    );
+  }
 
   String _filtersKey(String ownerUserId) => '$_keyPrefix$ownerUserId.filters';
 

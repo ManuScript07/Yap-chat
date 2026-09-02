@@ -32,9 +32,10 @@ class MainPage extends StatelessWidget {
           create: (context) => NearbyCubit(
             repository: context.read<INearbyRepository>(),
             locationRepository: context.read<ILocationRepository>(),
-            locationTrackingCoordinator:
-                context.read<LocationTrackingCoordinator>(),
+            locationTrackingCoordinator: context
+                .read<LocationTrackingCoordinator>(),
             accountSessionController: context.read<AccountSessionController>(),
+            blocklistRepository: context.read<IBlocklistRepository>(),
           ),
         ),
       ],

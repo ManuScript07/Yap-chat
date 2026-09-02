@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/widgets/profile_setup_widgets.dart';
+import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/nearby/bloc/bloc.dart';
 import 'package:yap_chat/features/nearby/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
@@ -74,66 +75,69 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
           ),
         ],
         child: BlocConsumer<NearbyCubit, NearbyState>(
-        listenWhen: (previous, current) =>
-            previous.status != current.status &&
-            current.status == NearbyStatus.locationRequired &&
-            current.locationIssue == null,
-        listener: (context, state) {
-          if (_locationPromptedAutomatically) return;
-          _locationPromptedAutomatically = true;
-          unawaited(context.read<NearbyCubit>().requestLocation());
-        },
-        builder: (context, state) {
-          final mediaQuery = MediaQuery.of(context);
-          const navBarHeight = 70.0;
-          const navBarOffset = 16.0;
-          const controlHeight = 50.0;
-          final filterBottom = mediaQuery.viewPadding.bottom +
-              navBarHeight +
-              navBarOffset +
-              16.0;
-          final contentBottom = filterBottom + controlHeight + 20;
+          listenWhen: (previous, current) =>
+              previous.status != current.status &&
+              current.status == NearbyStatus.locationRequired &&
+              current.locationIssue == null,
+          listener: (context, state) {
+            if (_locationPromptedAutomatically) return;
+            _locationPromptedAutomatically = true;
+            unawaited(context.read<NearbyCubit>().requestLocation());
+          },
+          builder: (context, state) {
+            final mediaQuery = MediaQuery.of(context);
+            const navBarHeight = 70.0;
+            const navBarOffset = 16.0;
+            const controlHeight = 50.0;
+            final filterBottom =
+                mediaQuery.viewPadding.bottom +
+                navBarHeight +
+                navBarOffset +
+                16.0;
+            final contentBottom = filterBottom + controlHeight + 20;
 
-          return Scaffold(
-            extendBodyBehindAppBar: true,
-            backgroundColor: context.scaffoldBackgroundColor,
-            appBar: PrimaryAppBar(title: context.l10n.nearbyTitle),
-            body: Stack(
-              children: [
-                _NearbyFeed(
-                  controller: _scrollController,
-                  state: state,
-                  bottomPadding: contentBottom,
-                  onRefresh: () => context.read<NearbyCubit>().refresh(),
-                ),
-                if (state.status == NearbyStatus.locationRequired)
-                  Positioned.fill(
-                    child: _LocationRequiredOverlay(
-                      onRetry: () => context.read<NearbyCubit>().requestLocation(),
+            return Scaffold(
+              extendBodyBehindAppBar: true,
+              backgroundColor: context.scaffoldBackgroundColor,
+              appBar: PrimaryAppBar(title: context.l10n.nearbyTitle),
+              body: Stack(
+                children: [
+                  _NearbyFeed(
+                    controller: _scrollController,
+                    state: state,
+                    bottomPadding: contentBottom,
+                    onRefresh: () => context.read<NearbyCubit>().refresh(),
+                  ),
+                  if (state.status == NearbyStatus.locationRequired)
+                    Positioned.fill(
+                      child: _LocationRequiredOverlay(
+                        onRetry: () =>
+                            context.read<NearbyCubit>().requestLocation(),
+                      ),
+                    ),
+                  if (state.isRefreshing &&
+                      state.status == NearbyStatus.locationRequired)
+                    const Positioned.fill(child: _LocationUpdatingOverlay()),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: const BottomAmbientGlow(),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: filterBottom,
+                    child: _FiltersButton(
+                      onPressed: state.isRefreshing
+                          ? null
+                          : () => _openFilters(state.filters),
                     ),
                   ),
-                if (state.isRefreshing && state.status == NearbyStatus.locationRequired)
-                  const Positioned.fill(child: _LocationUpdatingOverlay()),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: const BottomAmbientGlow(),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: filterBottom,
-                  child: _FiltersButton(
-                    onPressed: state.isRefreshing
-                        ? null
-                        : () => _openFilters(state.filters),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -204,11 +208,17 @@ class _NearbyFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final systemPadding = MediaQuery.paddingOf(context);
+    final blockedUserIds = context.select<BlocklistCubit, Set<String>>(
+      (cubit) => cubit.state.blockedUserIds,
+    );
+    final people = state.people
+        .where((person) => !blockedUserIds.contains(person.id))
+        .toList(growable: false);
     if (state.status == NearbyStatus.initial ||
-        state.status == NearbyStatus.loading && state.people.isEmpty) {
+        state.status == NearbyStatus.loading && people.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (state.status == NearbyStatus.failure && state.people.isEmpty) {
+    if (state.status == NearbyStatus.failure && people.isEmpty) {
       return Center(child: Text(context.l10n.nearbyLoadFailed));
     }
     return RefreshIndicator(
@@ -224,7 +234,7 @@ class _NearbyFeed extends StatelessWidget {
               right: 16 + systemPadding.right,
               bottom: 8,
             ),
-            sliver: state.people.isEmpty
+            sliver: people.isEmpty
                 ? SliverToBoxAdapter(
                     child: SizedBox(
                       height: 250,
@@ -246,10 +256,9 @@ class _NearbyFeed extends StatelessWidget {
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                         ),
-                    itemCount: state.people.length,
-                    itemBuilder: (context, index) => _NearbyPersonTile(
-                      person: state.people[index],
-                    ),
+                    itemCount: people.length,
+                    itemBuilder: (context, index) =>
+                        _NearbyPersonTile(person: people[index]),
                   ),
           ),
           if (state.isLoadingMore)
@@ -295,9 +304,9 @@ class _NearbyPersonTile extends StatelessWidget {
               children: [
                 UserAvatar(
                   avatarUrl: person.avatarUrl,
-                  avatarLoader: () => context
-                      .read<INearbyRepository>()
-                      .resolveAvatar(person),
+                  avatarLoader: () =>
+                      context.read<INearbyRepository>().resolveAvatar(person),
+                  preferAvatarLoader: true,
                   avatarRevision: person.avatarStoragePath ?? person.avatarUrl,
                   size: constraints.maxWidth,
                   borderRadius: 0,
@@ -383,12 +392,17 @@ class _FiltersButton extends StatelessWidget {
               icon: const Icon(Icons.tune_rounded, size: 25),
               label: Text(context.l10n.nearbyFilters),
               style: FilledButton.styleFrom(
-                backgroundColor: context.colorScheme.onSurface.withValues(alpha: .15),
+                backgroundColor: context.colorScheme.onSurface.withValues(
+                  alpha: .15,
+                ),
                 foregroundColor: context.colorScheme.onSurface,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 shape: const StadiumBorder(),
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                textStyle: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -409,7 +423,9 @@ class _LocationRequiredOverlay extends StatelessWidget {
       Positioned.fill(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-          child: ColoredBox(color: context.scaffoldBackgroundColor.withValues(alpha: .42)),
+          child: ColoredBox(
+            color: context.scaffoldBackgroundColor.withValues(alpha: .42),
+          ),
         ),
       ),
       Align(
@@ -428,14 +444,19 @@ class _LocationRequiredOverlay extends StatelessWidget {
                   children: [
                     Text(
                       context.l10n.nearbyLocationRequiredTitle,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       context.l10n.nearbyLocationRequiredContent,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: context.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        color: context.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -483,7 +504,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     child: SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 20 + MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -498,7 +524,11 @@ class _FiltersSheetState extends State<_FiltersSheet> {
           const SizedBox(height: 24),
           Text(
             context.l10n.nearbyFilters,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600, letterSpacing: .5),
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .5,
+            ),
           ),
           const SizedBox(height: 14),
           _FilterRow(
@@ -518,7 +548,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             child: FilledButton(
               onPressed: () => Navigator.of(context).pop(_filters),
               style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               child: Text(context.l10n.nearbyApply),
             ),
@@ -554,13 +586,20 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 ),
               ),
               const SizedBox(height: 24),
-              Text(sheetContext.l10n.profileGenderTitle, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+              Text(
+                sheetContext.l10n.profileGenderTitle,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 22),
               ProfileGenderPicker(
                 selectedGender: _filters.gender,
                 resetLabel: sheetContext.l10n.authOnboardingReset,
                 onSelected: (gender) => Navigator.of(sheetContext).pop(gender),
-                onReset: () => Navigator.of(sheetContext).pop(ProfileGender.unspecified),
+                onReset: () =>
+                    Navigator.of(sheetContext).pop(ProfileGender.unspecified),
               ),
             ],
           ),
@@ -568,9 +607,11 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       ),
     );
     if (selected == null || !mounted) return;
-    setState(() => _filters = selected == ProfileGender.unspecified
-        ? _filters.copyWith(clearGender: true)
-        : _filters.copyWith(gender: selected));
+    setState(
+      () => _filters = selected == ProfileGender.unspecified
+          ? _filters.copyWith(clearGender: true)
+          : _filters.copyWith(gender: selected),
+    );
   }
 
   Future<void> _selectAge() async {
@@ -589,16 +630,22 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       ),
     );
     if (selected != null && mounted) {
-      setState(() => _filters = _filters.copyWith(
-        minimumAge: selected.minimum,
-        maximumAge: selected.maximum,
-      ));
+      setState(
+        () => _filters = _filters.copyWith(
+          minimumAge: selected.minimum,
+          maximumAge: selected.maximum,
+        ),
+      );
     }
   }
 }
 
 class _FilterRow extends StatelessWidget {
-  const _FilterRow({required this.label, required this.value, required this.onTap});
+  const _FilterRow({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
 
   final String label;
   final String value;
@@ -613,11 +660,30 @@ class _FilterRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(label.toLowerCase(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: .5)),
+            child: Text(
+              label.toLowerCase(),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .5,
+              ),
+            ),
           ),
-          Text(value, style: TextStyle(color: context.colorScheme.onSurfaceVariant, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: .5)),
+          Text(
+            value,
+            style: TextStyle(
+              color: context.colorScheme.onSurfaceVariant,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .5,
+            ),
+          ),
           const SizedBox(width: 6),
-          Icon(Icons.chevron_right_rounded, color: context.colorScheme.onSurfaceVariant, size: 32),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.colorScheme.onSurfaceVariant,
+            size: 32,
+          ),
         ],
       ),
     ),
@@ -635,8 +701,12 @@ class _AgeSheet extends StatefulWidget {
 }
 
 class _AgeSheetState extends State<_AgeSheet> {
-  late final TextEditingController _minimum = TextEditingController(text: widget.minimumAge.toString());
-  late final TextEditingController _maximum = TextEditingController(text: widget.maximumAge.toString());
+  late final TextEditingController _minimum = TextEditingController(
+    text: widget.minimumAge.toString(),
+  );
+  late final TextEditingController _maximum = TextEditingController(
+    text: widget.maximumAge.toString(),
+  );
   String? _error;
 
   @override
@@ -650,24 +720,64 @@ class _AgeSheetState extends State<_AgeSheet> {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     child: SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 20 + MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 42, height: 4, decoration: BoxDecoration(color: context.colorScheme.onSurface, borderRadius: BorderRadius.circular(4))),
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.colorScheme.onSurface,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
           const SizedBox(height: 24),
-          Text(context.l10n.nearbyAge, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600, letterSpacing: .5)),
+          Text(
+            context.l10n.nearbyAge,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .5,
+            ),
+          ),
           const SizedBox(height: 24),
           Row(
             children: [
-              Expanded(child: _AgeInput(label: context.l10n.nearbyAgeFrom, controller: _minimum, errorText: _error, onChanged: _clearError)),
+              Expanded(
+                child: _AgeInput(
+                  label: context.l10n.nearbyAgeFrom,
+                  controller: _minimum,
+                  errorText: _error,
+                  onChanged: _clearError,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _AgeInput(label: context.l10n.nearbyAgeTo, controller: _maximum, errorText: _error, onChanged: _clearError)),
+              Expanded(
+                child: _AgeInput(
+                  label: context.l10n.nearbyAgeTo,
+                  controller: _maximum,
+                  errorText: _error,
+                  onChanged: _clearError,
+                ),
+              ),
             ],
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
-            Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: context.colorScheme.error, fontWeight: FontWeight.w700)),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
           const SizedBox(height: 24),
           SizedBox(
@@ -675,7 +785,11 @@ class _AgeSheetState extends State<_AgeSheet> {
             height: 52,
             child: FilledButton(
               onPressed: _apply,
-              style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
               child: Text(context.l10n.nearbyApply),
             ),
           ),
@@ -691,7 +805,11 @@ class _AgeSheetState extends State<_AgeSheet> {
   void _apply() {
     final minimum = int.tryParse(_minimum.text);
     final maximum = int.tryParse(_maximum.text);
-    if (minimum == null || maximum == null || minimum < 14 || maximum > 99 || minimum > maximum) {
+    if (minimum == null ||
+        maximum == null ||
+        minimum < 14 ||
+        maximum > 99 ||
+        minimum > maximum) {
       setState(() => _error = context.l10n.nearbyAgeInvalid);
       return;
     }
@@ -700,7 +818,12 @@ class _AgeSheetState extends State<_AgeSheet> {
 }
 
 class _AgeInput extends StatelessWidget {
-  const _AgeInput({required this.label, required this.controller, required this.errorText, required this.onChanged});
+  const _AgeInput({
+    required this.label,
+    required this.controller,
+    required this.errorText,
+    required this.onChanged,
+  });
 
   final String label;
   final TextEditingController controller;
@@ -724,8 +847,9 @@ class _AgeInput extends StatelessWidget {
   );
 }
 
-String _genderLabel(BuildContext context, ProfileGender? gender) => switch (gender) {
-  ProfileGender.male => context.l10n.profileGenderMale,
-  ProfileGender.female => context.l10n.profileGenderFemale,
-  _ => context.l10n.profileGenderUnspecified,
-};
+String _genderLabel(BuildContext context, ProfileGender? gender) =>
+    switch (gender) {
+      ProfileGender.male => context.l10n.profileGenderMale,
+      ProfileGender.female => context.l10n.profileGenderFemale,
+      _ => context.l10n.profileGenderUnspecified,
+    };

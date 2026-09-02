@@ -31,6 +31,21 @@ class MockNearbyRepository implements INearbyRepository {
       getCachedFeed(filters);
 
   @override
+  Future<void> removeCachedPeople(Set<String> userIds) async {
+    if (userIds.isEmpty) return;
+    for (final entry in _snapshots.entries.toList()) {
+      final snapshot = entry.value;
+      _snapshots[entry.key] = NearbyCacheSnapshot(
+        people: snapshot.people
+            .where((person) => !userIds.contains(person.id))
+            .toList(growable: false),
+        hasMore: snapshot.hasMore,
+        cachedAt: snapshot.cachedAt,
+      );
+    }
+  }
+
+  @override
   Future<String?> resolveAvatar(NearbyPerson person) async => person.avatarUrl;
 
   @override

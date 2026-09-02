@@ -10,6 +10,7 @@ class UserAvatar extends StatefulWidget {
     this.avatarUrl,
     this.avatarImage,
     this.avatarLoader,
+    this.preferAvatarLoader = false,
     this.avatarRevision,
     this.size = 48,
     this.borderRadius = 10,
@@ -20,6 +21,11 @@ class UserAvatar extends StatefulWidget {
   final String? avatarUrl;
   final ImageProvider? avatarImage;
   final Future<String?> Function()? avatarLoader;
+
+  /// Avoids a simultaneous direct network image request while [avatarLoader]
+  /// is filling the disk cache. On loader failure, [avatarUrl] remains the
+  /// fallback.
+  final bool preferAvatarLoader;
   final Object? avatarRevision;
   final double size;
   final double borderRadius;
@@ -147,7 +153,11 @@ class _UserAvatarState extends State<UserAvatar> {
   }
 
   Widget _avatar({required int targetWidth, required Color iconColor}) {
-    final value = _resolvedAvatarPath ?? widget.avatarUrl;
+    final value =
+        _resolvedAvatarPath ??
+        (widget.preferAvatarLoader && _isAvatarLoading
+            ? null
+            : widget.avatarUrl);
     if (value == null || value.isEmpty) {
       if (_isAvatarLoading) return const SizedBox.expand();
       return Icon(Icons.person, color: iconColor, size: widget.size * 0.65);

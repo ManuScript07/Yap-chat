@@ -60,7 +60,9 @@ class NearbyRepository implements INearbyRepository {
     final active = _activeRefreshes[key];
     if (active != null) return active;
     final future = _remote.fetch(filters: filters).then((page) async {
-      final retained = page.people.where((person) => person.isStillActive).toList(growable: false);
+      final retained = page.people
+          .where((person) => person.isStillActive)
+          .toList(growable: false);
       await _accountSessionController.commit(
         scope,
         () => _cache.replace(
@@ -97,13 +99,19 @@ class NearbyRepository implements INearbyRepository {
   ) async {
     final cached = await _cache.read(scope.userId, filters);
     _accountSessionController.ensureCurrent(scope);
-    if (cached == null || !cached.hasMore || cached.people.isEmpty) return cached;
+    if (cached == null || !cached.hasMore) return cached;
+    // The activity window can age every locally saved row out. There is then
+    // no safe cursor, so restart from the first server page instead of leaving
+    // an empty feed with hasMore permanently set.
+    if (cached.people.isEmpty) return await refreshFeed(filters);
     final page = await _remote.fetch(
       filters: filters,
       afterUserId: cached.people.last.id,
     );
     _accountSessionController.ensureCurrent(scope);
-    final retained = page.people.where((person) => person.isStillActive).toList(growable: false);
+    final retained = page.people
+        .where((person) => person.isStillActive)
+        .toList(growable: false);
     await _accountSessionController.commit(
       scope,
       () => _cache.append(
@@ -114,6 +122,16 @@ class NearbyRepository implements INearbyRepository {
       ),
     );
     return _cache.read(scope.userId, filters);
+  }
+
+  @override
+  Future<void> removeCachedPeople(Set<String> userIds) async {
+    if (userIds.isEmpty) return;
+    final scope = _accountSessionController.capture();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.removePeople(scope.userId, userIds),
+    );
   }
 
   @override
