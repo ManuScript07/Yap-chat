@@ -106,6 +106,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatInputHint => 'Введите сообщение';
 
   @override
+  String get chatUserBlocked => 'Пользователь заблокирован';
+
+  @override
   String get chatOnlineStatus => 'В сети';
 
   @override

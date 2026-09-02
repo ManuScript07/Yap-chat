@@ -32,6 +32,7 @@
     }
   },
   "chatInputHint": "Введите сообщение",
+  "chatUserBlocked": "Пользователь заблокирован",
   "chatOnlineStatus": "В сети",
   "chatOfflineStatus": "Не в сети",
   "chatLastSeenToday": "Был(а) в {time}",

@@ -32,6 +32,7 @@
     }
   },
   "chatInputHint": "Type a message",
+  "chatUserBlocked": "User is blocked",
   "chatOnlineStatus": "Online",
   "chatOfflineStatus": "Offline",
   "chatLastSeenToday": "Last seen at {time}",

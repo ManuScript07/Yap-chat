@@ -42,113 +42,127 @@ class _BannedAccountPageState extends State<BannedAccountPage> {
     final supportEmail = accessSupportEmail ?? publicSupportEmail;
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.block_rounded,
-                    size: 64,
-                    color: context.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    context.l10n.authBannedTitle,
-                    textAlign: TextAlign.center,
-                    style: context.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    context.l10n.authBannedDescription,
-                    textAlign: TextAlign.center,
-                    style: context.textTheme.bodyLarge?.copyWith(
-                      color: context.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (userId != null) ...[
-                    const SizedBox(height: 18),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () async {
-                        await Clipboard.setData(ClipboardData(text: userId));
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.block_rounded,
+                          size: 64,
+                          color: context.colorScheme.primary,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                userId,
-                                textAlign: TextAlign.center,
-                                style: context.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        const SizedBox(height: 20),
+                        Text(
+                          context.l10n.authBannedTitle,
+                          textAlign: TextAlign.center,
+                          style: context.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          context.l10n.authBannedDescription,
+                          textAlign: TextAlign.center,
+                          style: context.textTheme.bodyLarge?.copyWith(
+                            color: context.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (userId != null) ...[
+                          const SizedBox(height: 18),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () async {
+                              await Clipboard.setData(
+                                ClipboardData(text: userId),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      userId,
+                                      textAlign: TextAlign.center,
+                                      style: context.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    size: 18,
+                                    color: context.colorScheme.onSurfaceVariant,
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.copy_rounded,
-                              size: 18,
-                              color: context.colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                        if (supportEmail != null) ...[
+                          const SizedBox(height: 10),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => Clipboard.setData(
+                              ClipboardData(text: supportEmail),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (supportEmail != null) ...[
-                    const SizedBox(height: 10),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () => Clipboard.setData(
-                        ClipboardData(text: supportEmail),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                context.l10n.authBannedSupport(supportEmail),
-                                textAlign: TextAlign.center,
-                                style: context.textTheme.bodyMedium?.copyWith(
-                                  color: context.colorScheme.onSurfaceVariant,
-                                ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      context.l10n.authBannedSupport(
+                                        supportEmail,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      style: context.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: context.colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    size: 18,
+                                    color: context.colorScheme.onSurfaceVariant,
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.copy_rounded,
-                              size: 18,
-                              color: context.colorScheme.onSurfaceVariant,
-                            ),
-                          ],
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: () => context.read<AuthBloc>().add(
+                            const AuthSignOutRequested(),
+                          ),
+                          child: Text(context.l10n.authSignOut),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () => context.read<AuthBloc>().add(
-                      const AuthSignOutRequested(),
-                    ),
-                    child: Text(context.l10n.authSignOut),
                   ),
-                ],
+                ),
               ),
             ),
           ),

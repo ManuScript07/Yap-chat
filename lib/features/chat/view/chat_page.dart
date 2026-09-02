@@ -686,17 +686,29 @@ class _GloballyBannedComposer extends StatelessWidget {
         height: 50,
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: mainColor.withValues(alpha: .4), width: 1.5),
+            border: Border.all(
+              color: mainColor.withValues(alpha: .4),
+              width: 1.5,
+            ),
             borderRadius: BorderRadius.circular(32),
           ),
-          child: Center(
-            child: Text(
-              'пользователь заблокирован',
-              style: TextStyle(
-                color: mainColor.withValues(alpha: .6),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: .15,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: Container(
+                color: mainColor.withValues(alpha: .15),
+                child: Center(
+                  child: Text(
+                    context.l10n.chatUserBlocked.toLowerCase(),
+                    style: TextStyle(
+                      color: mainColor.withValues(alpha: .6),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .15,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

@@ -469,13 +469,25 @@ class _ProfileScaffold extends StatelessWidget {
   ) async {
     final reason = await showModalBottomSheet<UserReportReason>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
       backgroundColor: context.scaffoldBackgroundColor,
       barrierColor: context.colorScheme.primary.withValues(alpha: .22),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
+      clipBehavior: Clip.antiAlias,
       showDragHandle: true,
-      builder: (sheetContext) => _ReportReasonSheet(),
+      builder: (sheetContext) {
+        final size = MediaQuery.sizeOf(sheetContext);
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(size.width, 720),
+            maxHeight: size.height * .72,
+          ),
+          child: SingleChildScrollView(child: _ReportReasonSheet()),
+        );
+      },
     );
     if (reason == null || !context.mounted) return;
 
@@ -1347,8 +1359,12 @@ class _ReportReasonSheet extends StatelessWidget {
       height: 1.2,
       letterSpacing: .5,
     );
-    return SafeArea(
-      top: false,
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+      ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           12,
@@ -1361,18 +1377,24 @@ class _ReportReasonSheet extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.chat_bubble_outline_rounded),
-              title: Text(context.l10n.viewedProfileReportSpam, style: style),
+              title: Text(
+                context.l10n.viewedProfileReportSpam.toLowerCase(),
+                style: style,
+              ),
               onTap: () => Navigator.of(context).pop(UserReportReason.spam),
             ),
             ListTile(
               leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: Text(context.l10n.viewedProfileReportScam, style: style),
+              title: Text(
+                context.l10n.viewedProfileReportScam.toLowerCase(),
+                style: style,
+              ),
               onTap: () => Navigator.of(context).pop(UserReportReason.scam),
             ),
             ListTile(
               leading: const Icon(Icons.visibility_off_rounded),
               title: Text(
-                context.l10n.viewedProfileReportPornography,
+                context.l10n.viewedProfileReportPornography.toLowerCase(),
                 style: style,
               ),
               onTap: () =>
@@ -1380,7 +1402,10 @@ class _ReportReasonSheet extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.more_horiz_rounded),
-              title: Text(context.l10n.viewedProfileReportOther, style: style),
+              title: Text(
+                context.l10n.viewedProfileReportOther.toLowerCase(),
+                style: style,
+              ),
               onTap: () => Navigator.of(context).pop(UserReportReason.other),
             ),
           ],

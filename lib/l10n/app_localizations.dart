@@ -200,6 +200,12 @@ abstract class AppLocalizations {
   /// **'Введите сообщение'**
   String get chatInputHint;
 
+  /// No description provided for @chatUserBlocked.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пользователь заблокирован'**
+  String get chatUserBlocked;
+
   /// No description provided for @chatOnlineStatus.
   ///
   /// In ru, this message translates to:

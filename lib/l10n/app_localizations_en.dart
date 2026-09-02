@@ -100,6 +100,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputHint => 'Type a message';
 
   @override
+  String get chatUserBlocked => 'User is blocked';
+
+  @override
   String get chatOnlineStatus => 'Online';
 
   @override
