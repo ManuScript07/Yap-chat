@@ -110,6 +110,12 @@ abstract class AppLocalizations {
   /// **'Друны'**
   String get navFriends;
 
+  /// No description provided for @navNearby.
+  ///
+  /// In ru, this message translates to:
+  /// **'Рядом'**
+  String get navNearby;
+
   /// No description provided for @navProfile.
   ///
   /// In ru, this message translates to:
@@ -1885,6 +1891,90 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'друг это я'**
   String get viewedProfileFriendIsYou;
+
+  /// No description provided for @nearbyTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'люди рядом'**
+  String get nearbyTitle;
+
+  /// No description provided for @nearbyFilters.
+  ///
+  /// In ru, this message translates to:
+  /// **'фильтры'**
+  String get nearbyFilters;
+
+  /// No description provided for @nearbyAge.
+  ///
+  /// In ru, this message translates to:
+  /// **'возраст'**
+  String get nearbyAge;
+
+  /// No description provided for @nearbyAgeFrom.
+  ///
+  /// In ru, this message translates to:
+  /// **'от'**
+  String get nearbyAgeFrom;
+
+  /// No description provided for @nearbyAgeTo.
+  ///
+  /// In ru, this message translates to:
+  /// **'до'**
+  String get nearbyAgeTo;
+
+  /// No description provided for @nearbyAgeInvalid.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите возраст от 14 до 99 лет: значение «от» не должно быть больше «до».'**
+  String get nearbyAgeInvalid;
+
+  /// No description provided for @nearbyApply.
+  ///
+  /// In ru, this message translates to:
+  /// **'применить'**
+  String get nearbyApply;
+
+  /// No description provided for @nearbyEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Рядом пока никого нет'**
+  String get nearbyEmpty;
+
+  /// No description provided for @nearbyLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить людей рядом'**
+  String get nearbyLoadFailed;
+
+  /// No description provided for @nearbyLocationRequiredTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нужна геолокация'**
+  String get nearbyLocationRequiredTitle;
+
+  /// No description provided for @nearbyLocationRequiredContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поделитесь актуальной геопозицией, чтобы увидеть людей рядом.'**
+  String get nearbyLocationRequiredContent;
+
+  /// No description provided for @nearbyLocationUpdate.
+  ///
+  /// In ru, this message translates to:
+  /// **'обновить геолокацию'**
+  String get nearbyLocationUpdate;
+
+  /// No description provided for @nearbyLocationUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось получить геолокацию. Попробуйте ещё раз.'**
+  String get nearbyLocationUnavailable;
+
+  /// No description provided for @nearbyRateLimited.
+  ///
+  /// In ru, this message translates to:
+  /// **'Слишком много обновлений. Попробуйте через минуту.'**
+  String get nearbyRateLimited;
 }
 
 class _AppLocalizationsDelegate

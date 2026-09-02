@@ -15,6 +15,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navFriends => 'Друны';
 
   @override
+  String get navNearby => 'Рядом';
+
+  @override
   String get navProfile => 'Акк';
 
   @override
@@ -1036,4 +1039,50 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get viewedProfileFriendIsYou => 'друг это я';
+
+  @override
+  String get nearbyTitle => 'люди рядом';
+
+  @override
+  String get nearbyFilters => 'фильтры';
+
+  @override
+  String get nearbyAge => 'возраст';
+
+  @override
+  String get nearbyAgeFrom => 'от';
+
+  @override
+  String get nearbyAgeTo => 'до';
+
+  @override
+  String get nearbyAgeInvalid =>
+      'Введите возраст от 14 до 99 лет: значение «от» не должно быть больше «до».';
+
+  @override
+  String get nearbyApply => 'применить';
+
+  @override
+  String get nearbyEmpty => 'Рядом пока никого нет';
+
+  @override
+  String get nearbyLoadFailed => 'Не удалось загрузить людей рядом';
+
+  @override
+  String get nearbyLocationRequiredTitle => 'Нужна геолокация';
+
+  @override
+  String get nearbyLocationRequiredContent =>
+      'Поделитесь актуальной геопозицией, чтобы увидеть людей рядом.';
+
+  @override
+  String get nearbyLocationUpdate => 'обновить геолокацию';
+
+  @override
+  String get nearbyLocationUnavailable =>
+      'Не удалось получить геолокацию. Попробуйте ещё раз.';
+
+  @override
+  String get nearbyRateLimited =>
+      'Слишком много обновлений. Попробуйте через минуту.';
 }

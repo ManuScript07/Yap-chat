@@ -36,7 +36,9 @@ abstract interface class ILocationRepository {
 
   /// Returns the current account's last published location from local storage.
   /// A stale record is represented by `null`.
-  Future<CachedTrackedLocation?> getCachedCurrentLocation();
+  Future<CachedTrackedLocation?> getCachedCurrentLocation({
+    Duration maxAge = const Duration(hours: 24),
+  });
 
   /// Reads the current service and permission state without showing OS UI.
   Future<LocationAccessStatus> getLocationAccessStatus();
@@ -49,6 +51,13 @@ abstract interface class ILocationRepository {
   /// This never requests a permission or opens system UI. If location access
   /// is unavailable, the refresh is skipped.
   Future<TrackedLocationRefreshResult> refreshTrackedLocation(
+    String userId, {
+    bool forcePublish = false,
+  });
+
+  /// Requests OS permission if necessary, then refreshes the tracked location.
+  /// Background callers must continue to use [refreshTrackedLocation].
+  Future<TrackedLocationRefreshResult> refreshTrackedLocationWithPermission(
     String userId, {
     bool forcePublish = false,
   });

@@ -2,6 +2,7 @@
   "@@locale": "en",
   "navChats": "Chats",
   "navFriends": "Friends",
+  "navNearby": "Nearby",
   "navProfile": "Profile",
   "searchHintChats": "search chats",
   "@@CHATS": "",
@@ -430,5 +431,19 @@
     }
   },
   "viewedProfileNoFriends": "no friends",
-  "viewedProfileFriendIsYou": "that's you"
+  "viewedProfileFriendIsYou": "that's you",
+  "nearbyTitle": "people nearby",
+  "nearbyFilters": "filters",
+  "nearbyAge": "age",
+  "nearbyAgeFrom": "from",
+  "nearbyAgeTo": "to",
+  "nearbyAgeInvalid": "Enter an age from 14 to 99. The minimum cannot exceed the maximum.",
+  "nearbyApply": "apply",
+  "nearbyEmpty": "No one nearby yet",
+  "nearbyLoadFailed": "Couldn't load people nearby",
+  "nearbyLocationRequiredTitle": "Location is needed",
+  "nearbyLocationRequiredContent": "Share your current location to see people nearby.",
+  "nearbyLocationUpdate": "update location",
+  "nearbyLocationUnavailable": "Couldn't get your location. Try again."
+  ,"nearbyRateLimited": "Too many updates. Try again in a minute."
 }

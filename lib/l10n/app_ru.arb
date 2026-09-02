@@ -2,6 +2,7 @@
   "@@locale": "ru",
   "navChats": "Чатикс",
   "navFriends": "Друны",
+  "navNearby": "Рядом",
   "navProfile": "Акк",
   "searchHintChats": "поиск по чатам",
   "@@CHATS": "",
@@ -430,5 +431,19 @@
     }
   },
   "viewedProfileNoFriends": "нет друзей",
-  "viewedProfileFriendIsYou": "друг это я"
+  "viewedProfileFriendIsYou": "друг это я",
+  "nearbyTitle": "люди рядом",
+  "nearbyFilters": "фильтры",
+  "nearbyAge": "возраст",
+  "nearbyAgeFrom": "от",
+  "nearbyAgeTo": "до",
+  "nearbyAgeInvalid": "Введите возраст от 14 до 99 лет: значение «от» не должно быть больше «до».",
+  "nearbyApply": "применить",
+  "nearbyEmpty": "Рядом пока никого нет",
+  "nearbyLoadFailed": "Не удалось загрузить людей рядом",
+  "nearbyLocationRequiredTitle": "Нужна геолокация",
+  "nearbyLocationRequiredContent": "Поделитесь актуальной геопозицией, чтобы увидеть людей рядом.",
+  "nearbyLocationUpdate": "обновить геолокацию",
+  "nearbyLocationUnavailable": "Не удалось получить геолокацию. Попробуйте ещё раз."
+  ,"nearbyRateLimited": "Слишком много обновлений. Попробуйте через минуту."
 }

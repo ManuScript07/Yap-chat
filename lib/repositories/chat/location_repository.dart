@@ -77,7 +77,9 @@ class LocationRepository implements ILocationRepository {
   }
 
   @override
-  Future<CachedTrackedLocation?> getCachedCurrentLocation() async {
+  Future<CachedTrackedLocation?> getCachedCurrentLocation({
+    Duration maxAge = const Duration(hours: 24),
+  }) async {
     final userId = _currentUserId();
     if (userId == null || userId.isEmpty) return null;
 
@@ -89,7 +91,7 @@ class LocationRepository implements ILocationRepository {
     if (latitude == null || longitude == null || updatedAt == null) return null;
 
     final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
-    if (age.isNegative || age >= const Duration(hours: 24)) return null;
+    if (age.isNegative || age >= maxAge) return null;
     return CachedTrackedLocation(
       latitude: latitude,
       longitude: longitude,
@@ -161,6 +163,69 @@ class LocationRepository implements ILocationRepository {
     if (_publishLocation == null &&
         (client == null || client.auth.currentUser?.id != normalizedUserId)) {
       return TrackedLocationRefreshResult.unavailable;
+    }
+
+    await _publish(position.latitude, position.longitude);
+    await Future.wait([
+      _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
+      _preferences.setDouble(
+        _longitudeKey(normalizedUserId),
+        position.longitude,
+      ),
+      _preferences.setString(
+        _publishedAtKey(normalizedUserId),
+        DateTime.now().toUtc().toIso8601String(),
+      ),
+    ]);
+    return TrackedLocationRefreshResult.updated;
+  }
+
+  @override
+  Future<TrackedLocationRefreshResult> refreshTrackedLocationWithPermission(
+    String userId, {
+    bool forcePublish = false,
+  }) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return TrackedLocationRefreshResult.unavailable;
+    }
+    final client = _client;
+    if (_publishLocation == null &&
+        (client == null || client.auth.currentUser?.id != normalizedUserId)) {
+      return TrackedLocationRefreshResult.unavailable;
+    }
+    if (!await _isLocationServiceEnabled()) {
+      throw LocationServiceDisabledFailure();
+    }
+
+    var permission = await _checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await _requestPermission();
+    }
+    if (permission == LocationPermission.denied) {
+      throw LocationPermissionDeniedFailure();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      throw LocationPermissionPermanentlyDeniedFailure();
+    }
+    if (permission != LocationPermission.whileInUse &&
+        permission != LocationPermission.always) {
+      throw LocationPermissionDeniedFailure();
+    }
+
+    final Position position;
+    try {
+      position = await _getPosition(
+        const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: _trackedLocationTimeout,
+        ),
+      );
+    } on TimeoutException {
+      return TrackedLocationRefreshResult.unavailable;
+    }
+    if (!forcePublish && !_shouldPublish(normalizedUserId, position)) {
+      return TrackedLocationRefreshResult.unchanged;
     }
 
     await _publish(position.latitude, position.longitude);

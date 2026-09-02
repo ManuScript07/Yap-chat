@@ -27,6 +27,7 @@ class RepositoryContainer {
     required this.userReportsRepository,
     required this.contactsRepository,
     required this.settingsRepository,
+    required this.nearbyRepository,
   });
 
   factory RepositoryContainer.prod({required AppConfig config}) {
@@ -73,6 +74,16 @@ class RepositoryContainer {
       cache: SettingsCacheDataSource(database: config.database),
       remote: SettingsRemoteDataSource(client: client),
       accountSessionController: config.accountSessionController,
+    );
+    final nearbyRepository = NearbyRepository(
+      cache: NearbyCacheDataSource(
+        preferences: config.preferences,
+        environment: config.environment.name,
+      ),
+      remote: NearbyRemoteDataSource(client: client),
+      mediaCache: mediaCache,
+      accountSessionController: config.accountSessionController,
+      config: config,
     );
     final profileCache = ProfileCacheDataSource(database: config.database);
     final viewedProfileCache = ViewedProfileCacheDataSource(
@@ -191,6 +202,7 @@ class RepositoryContainer {
       ),
       contactsRepository: ContactsRepository(),
       settingsRepository: settingsRepository,
+      nearbyRepository: nearbyRepository,
     );
   }
 
@@ -229,6 +241,7 @@ class RepositoryContainer {
       userReportsRepository: const MockUserReportsRepository(),
       contactsRepository: const MockContactsRepository(),
       settingsRepository: MockSettingsRepository(),
+      nearbyRepository: MockNearbyRepository(),
     );
   }
 
@@ -248,6 +261,7 @@ class RepositoryContainer {
   final IUserReportsRepository userReportsRepository;
   final IContactsRepository contactsRepository;
   final ISettingsRepository settingsRepository;
+  final INearbyRepository nearbyRepository;
 
   Future<void> dispose() async {
     mediaCache.dispose();

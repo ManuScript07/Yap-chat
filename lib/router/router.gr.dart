@@ -27,6 +27,7 @@ import 'package:yap_chat/features/friends/view/add_friend_by_username_page.dart'
 import 'package:yap_chat/features/friends/view/add_friend_page.dart' as _i3;
 import 'package:yap_chat/features/friends/view/friends_page.dart' as _i8;
 import 'package:yap_chat/features/main/view/main_page.dart' as _i9;
+import 'package:yap_chat/features/nearby/view/nearby_people_page.dart' as _i21;
 import 'package:yap_chat/features/new_chat/view/new_chat_page.dart' as _i10;
 import 'package:yap_chat/features/profile/view/profile_page.dart' as _i11;
 import 'package:yap_chat/features/profile/view/user_friends_page.dart' as _i14;
@@ -188,6 +189,22 @@ class ChatsRoute extends _i17.PageRouteInfo<void> {
     name,
     builder: (data) {
       return const _i7.ChatsPage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i21.NearbyPeoplePage]
+class NearbyPeopleRoute extends _i17.PageRouteInfo<void> {
+  const NearbyPeopleRoute({List<_i17.PageRouteInfo>? children})
+    : super(NearbyPeopleRoute.name, initialChildren: children);
+
+  static const String name = 'NearbyPeopleRoute';
+
+  static _i17.PageInfo page = _i17.PageInfo(
+    name,
+    builder: (data) {
+      return const _i21.NearbyPeoplePage();
     },
   );
 }

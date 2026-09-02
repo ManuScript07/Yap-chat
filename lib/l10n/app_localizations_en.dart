@@ -15,6 +15,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navFriends => 'Friends';
 
   @override
+  String get navNearby => 'Nearby';
+
+  @override
   String get navProfile => 'Profile';
 
   @override
@@ -1024,4 +1027,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewedProfileFriendIsYou => 'that\'s you';
+
+  @override
+  String get nearbyTitle => 'people nearby';
+
+  @override
+  String get nearbyFilters => 'filters';
+
+  @override
+  String get nearbyAge => 'age';
+
+  @override
+  String get nearbyAgeFrom => 'from';
+
+  @override
+  String get nearbyAgeTo => 'to';
+
+  @override
+  String get nearbyAgeInvalid =>
+      'Enter an age from 14 to 99. The minimum cannot exceed the maximum.';
+
+  @override
+  String get nearbyApply => 'apply';
+
+  @override
+  String get nearbyEmpty => 'No one nearby yet';
+
+  @override
+  String get nearbyLoadFailed => 'Couldn\'t load people nearby';
+
+  @override
+  String get nearbyLocationRequiredTitle => 'Location is needed';
+
+  @override
+  String get nearbyLocationRequiredContent =>
+      'Share your current location to see people nearby.';
+
+  @override
+  String get nearbyLocationUpdate => 'update location';
+
+  @override
+  String get nearbyLocationUnavailable =>
+      'Couldn\'t get your location. Try again.';
+
+  @override
+  String get nearbyRateLimited => 'Too many updates. Try again in a minute.';
 }

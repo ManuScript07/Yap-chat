@@ -1,9 +1,11 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/features/friends/friends.dart';
+import 'package:yap_chat/features/nearby/nearby.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -26,6 +28,15 @@ class MainPage extends StatelessWidget {
               FriendsBloc(repository: context.read<IFriendsRepository>())
                 ..add(const FriendsLoadStarted()),
         ),
+        BlocProvider<NearbyCubit>(
+          create: (context) => NearbyCubit(
+            repository: context.read<INearbyRepository>(),
+            locationRepository: context.read<ILocationRepository>(),
+            locationTrackingCoordinator:
+                context.read<LocationTrackingCoordinator>(),
+            accountSessionController: context.read<AccountSessionController>(),
+          ),
+        ),
       ],
       child: const _MainView(),
     );
@@ -40,7 +51,12 @@ class _MainView extends StatelessWidget {
     const chatsTabIndex = 0;
 
     return AutoTabsRouter(
-      routes: const [ChatsRoute(), FriendsRoute(), ProfileRoute()],
+      routes: const [
+        ChatsRoute(),
+        NearbyPeopleRoute(),
+        FriendsRoute(),
+        ProfileRoute(),
+      ],
       transitionBuilder: (context, child, animation) {
         return FadeTransition(opacity: animation, child: child);
       },
@@ -104,6 +120,11 @@ class _MainView extends StatelessWidget {
                   activeIcon: Icons.sms_rounded,
                   label: context.l10n.navChats,
                   unreadCount: unreadChatsCount,
+                ),
+                FloatingNavigationBarItem(
+                  icon: Icons.people_outline_rounded,
+                  activeIcon: Icons.people_rounded,
+                  label: context.l10n.navNearby,
                 ),
                 FloatingNavigationBarItem(
                   icon: Icons.mood_outlined,

@@ -76,6 +76,7 @@ class AppRouter extends RootStackRouter {
           reverseDuration: const Duration(milliseconds: 150),
           children: [
             AutoRoute(path: 'chats', page: ChatsRoute.page),
+            AutoRoute(path: 'nearby', page: NearbyPeopleRoute.page),
             AutoRoute(path: 'friends', page: FriendsRoute.page),
             AutoRoute(path: 'profile', page: ProfileRoute.page),
           ],

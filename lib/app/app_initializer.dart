@@ -81,6 +81,7 @@ class _AppInitializerState extends State<AppInitializer> {
       settingsRepository: _repositories.settingsRepository,
       blocklistRepository: _repositories.blocklistRepository,
       userReportsRepository: _repositories.userReportsRepository,
+      nearbyRepository: _repositories.nearbyRepository,
       talker: widget.config.talker,
     );
   }
@@ -156,6 +157,9 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
         RepositoryProvider<ISettingsRepository>.value(
           value: _repositories.settingsRepository,
+        ),
+        RepositoryProvider<INearbyRepository>.value(
+          value: _repositories.nearbyRepository,
         ),
         RepositoryProvider<IAppPublicContentRepository>.value(
           value: _appPublicContentRepository,

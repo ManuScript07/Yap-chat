@@ -21,6 +21,7 @@ class LocationTrackingCoordinator {
 
   Timer? _timer;
   Future<void>? _activeRefresh;
+  Future<TrackedLocationRefreshResult>? _activeInteractiveRefresh;
   String? _activeRefreshUserId;
   String? _userId;
   bool _isForeground = true;
@@ -48,6 +49,40 @@ class LocationTrackingCoordinator {
     _timer?.cancel();
     _timer = null;
     await _activeRefresh;
+    await _activeInteractiveRefresh;
+  }
+
+  /// Serializes an explicit foreground request with background tracking.
+  /// It is the only path allowed to show an OS permission prompt, while the
+  /// periodic contour remains silent.
+  Future<TrackedLocationRefreshResult> refreshWithPermission() {
+    final active = _activeInteractiveRefresh;
+    if (active != null) return active;
+    final userId = _userId;
+    if (_isDisposed || userId == null || !_isForeground) {
+      return Future.value(TrackedLocationRefreshResult.unavailable);
+    }
+    final refresh = _performInteractiveRefresh(userId);
+    _activeInteractiveRefresh = refresh;
+    return refresh.whenComplete(() {
+      if (identical(_activeInteractiveRefresh, refresh)) {
+        _activeInteractiveRefresh = null;
+      }
+    });
+  }
+
+  Future<TrackedLocationRefreshResult> _performInteractiveRefresh(
+    String userId,
+  ) async {
+    // A silent refresh may already have collected a position. Finish it
+    // first; the interactive call then sees its updated local timestamp and
+    // avoids a duplicate server write whenever possible.
+    await _activeRefresh;
+    final result = await _locationRepository.refreshTrackedLocationWithPermission(
+      userId,
+    );
+    _talker.info('Interactive location refresh completed: ${result.name}');
+    return result;
   }
 
   void _restartTimer() {
