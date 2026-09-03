@@ -20,7 +20,7 @@ class LocationTrackingCoordinator {
   final Duration refreshInterval;
 
   Timer? _timer;
-  Future<void>? _activeRefresh;
+  Future<TrackedLocationRefreshResult>? _activeRefresh;
   Future<TrackedLocationRefreshResult>? _activeInteractiveRefresh;
   String? _activeRefreshUserId;
   String? _userId;
@@ -71,6 +71,19 @@ class LocationTrackingCoordinator {
     });
   }
 
+  /// Obtains a current position without displaying OS UI and publishes it
+  /// through the shared location contour when it has materially changed.
+  ///
+  /// A feed refresh uses this before asking the server for nearby people, so
+  /// its ordering is based on the current location rather than a still-valid
+  /// cached point. It deliberately shares in-flight work with lifecycle and
+  /// interactive refreshes to avoid duplicate GPS reads and RPCs.
+  Future<TrackedLocationRefreshResult> refreshSilently() {
+    final activeInteractiveRefresh = _activeInteractiveRefresh;
+    if (activeInteractiveRefresh != null) return activeInteractiveRefresh;
+    return _refresh();
+  }
+
   Future<TrackedLocationRefreshResult> _performInteractiveRefresh(
     String userId,
   ) async {
@@ -78,9 +91,8 @@ class LocationTrackingCoordinator {
     // first; the interactive call then sees its updated local timestamp and
     // avoids a duplicate server write whenever possible.
     await _activeRefresh;
-    final result = await _locationRepository.refreshTrackedLocationWithPermission(
-      userId,
-    );
+    final result = await _locationRepository
+        .refreshTrackedLocationWithPermission(userId);
     _talker.info('Interactive location refresh completed: ${result.name}');
     return result;
   }
@@ -89,20 +101,21 @@ class LocationTrackingCoordinator {
     _timer?.cancel();
     _timer = null;
     if (_isDisposed || !_isForeground || _userId == null) return;
-    _timer = Timer.periodic(refreshInterval, (_) => unawaited(_refresh()));
+    _timer = Timer.periodic(
+      refreshInterval,
+      (_) => unawaited(_refresh().then<void>((_) {})),
+    );
   }
 
-  Future<void> _refresh({bool forcePublish = false}) {
+  Future<TrackedLocationRefreshResult> _refresh({bool forcePublish = false}) {
     final activeRefresh = _activeRefresh;
     final userId = _userId;
     if (_isDisposed || !_isForeground || userId == null) {
-      return Future<void>.value();
+      return Future.value(TrackedLocationRefreshResult.unavailable);
     }
     if (activeRefresh != null) {
       if (_activeRefreshUserId == userId) return activeRefresh;
-      return activeRefresh.then(
-        (_) => _refresh(forcePublish: forcePublish),
-      );
+      return activeRefresh.then((_) => _refresh(forcePublish: forcePublish));
     }
 
     final refresh = _performRefresh(userId, forcePublish: forcePublish);
@@ -116,7 +129,7 @@ class LocationTrackingCoordinator {
     });
   }
 
-  Future<void> _performRefresh(
+  Future<TrackedLocationRefreshResult> _performRefresh(
     String userId, {
     required bool forcePublish,
   }) async {
@@ -129,8 +142,10 @@ class LocationTrackingCoordinator {
         'Location refresh completed: ${result.name}; '
         'forcePublish=$forcePublish',
       );
+      return result;
     } catch (error, stackTrace) {
       _talker.handle(error, stackTrace, 'Location refresh failed');
+      return TrackedLocationRefreshResult.unavailable;
     }
   }
 }

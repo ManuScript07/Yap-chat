@@ -36,6 +36,8 @@ class MainPage extends StatelessWidget {
                 .read<LocationTrackingCoordinator>(),
             accountSessionController: context.read<AccountSessionController>(),
             blocklistRepository: context.read<IBlocklistRepository>(),
+            profileFriendsRepository:
+                context.read<IFriendsRepository>() as IProfileFriendsRepository,
           ),
         ),
       ],

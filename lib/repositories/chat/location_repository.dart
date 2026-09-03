@@ -8,7 +8,7 @@ import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 typedef LocationPositionGetter =
     Future<Position> Function(LocationSettings settings);
 typedef LocationPublisher =
-    Future<void> Function(double latitude, double longitude);
+    Future<bool> Function(double latitude, double longitude);
 
 class LocationRepository implements ILocationRepository {
   LocationRepository({
@@ -165,7 +165,8 @@ class LocationRepository implements ILocationRepository {
       return TrackedLocationRefreshResult.unavailable;
     }
 
-    await _publish(position.latitude, position.longitude);
+    final published = await _publish(position.latitude, position.longitude);
+    if (!published) return TrackedLocationRefreshResult.unchanged;
     await Future.wait([
       _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
       _preferences.setDouble(
@@ -228,7 +229,8 @@ class LocationRepository implements ILocationRepository {
       return TrackedLocationRefreshResult.unchanged;
     }
 
-    await _publish(position.latitude, position.longitude);
+    final published = await _publish(position.latitude, position.longitude);
+    if (!published) return TrackedLocationRefreshResult.unchanged;
     await Future.wait([
       _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
       _preferences.setDouble(
@@ -265,11 +267,11 @@ class LocationRepository implements ILocationRepository {
         minimumMovementMeters;
   }
 
-  Future<void> _publish(double latitude, double longitude) {
+  Future<bool> _publish(double latitude, double longitude) {
     final publisher = _publishLocation;
     if (publisher != null) return publisher(latitude, longitude);
-    return _client!.rpc<void>(
-      'update_my_location',
+    return _client!.rpc<bool>(
+      'update_my_location_with_result',
       params: {'new_latitude': latitude, 'new_longitude': longitude},
     );
   }

@@ -173,6 +173,13 @@ class FriendsCacheDataSource {
           ))
           .go();
 
+  Future<void> clearDistances({String? ownerUserId}) =>
+      (_database.delete(_database.cachedUserDistances)..where(
+            (table) =>
+                table.ownerUserId.equals(ownerUserId ?? _userIdProvider()),
+          ))
+          .go();
+
   Future<void> replaceAll({
     String? ownerUserId,
     required List<Friend> friends,
@@ -198,9 +205,7 @@ class FriendsCacheDataSource {
     final cachedLocations = await (_database.select(
       _database.cachedFriendLocations,
     )..where((table) => table.ownerUserId.equals(owner))).get();
-    final cutoff = DateTime.now()
-        .toUtc()
-        .subtract(const Duration(hours: 24));
+    final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 24));
     final expiredLocationIds = cachedLocations
         .where(
           (row) => DateTime.fromMillisecondsSinceEpoch(

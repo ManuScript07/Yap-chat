@@ -7,6 +7,7 @@ import 'package:yap_chat/features/nearby/bloc/nearby_state.dart';
 import 'package:yap_chat/features/nearby/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 import 'package:yap_chat/repositories/blocks/abstract_blocklist_repository.dart';
+import 'package:yap_chat/repositories/friends/abstract_friends_repository.dart';
 import 'package:yap_chat/repositories/nearby/nearby.dart';
 
 class NearbyCubit extends Cubit<NearbyState> {
@@ -16,10 +17,12 @@ class NearbyCubit extends Cubit<NearbyState> {
     required LocationTrackingCoordinator locationTrackingCoordinator,
     required AccountSessionController accountSessionController,
     required IBlocklistRepository blocklistRepository,
+    required IProfileFriendsRepository profileFriendsRepository,
   }) : _repository = repository,
        _locationRepository = locationRepository,
        _locationTrackingCoordinator = locationTrackingCoordinator,
        _accountSessionController = accountSessionController,
+       _profileFriendsRepository = profileFriendsRepository,
        super(const NearbyState()) {
     _blocklistSubscription = blocklistRepository.watchBlockedUserIds().listen(
       (userIds) => unawaited(_removeNewlyBlockedPeople(userIds)),
@@ -30,6 +33,7 @@ class NearbyCubit extends Cubit<NearbyState> {
   final ILocationRepository _locationRepository;
   final LocationTrackingCoordinator _locationTrackingCoordinator;
   final AccountSessionController _accountSessionController;
+  final IProfileFriendsRepository _profileFriendsRepository;
   late final StreamSubscription<Set<String>> _blocklistSubscription;
   Set<String> _blockedUserIds = const {};
   Future<void>? _initialization;
@@ -113,7 +117,11 @@ class NearbyCubit extends Cubit<NearbyState> {
         _requireLocation(NearbyLocationIssue.unavailable);
         return;
       }
-      await _refresh(force: true);
+      if (result == TrackedLocationRefreshResult.updated &&
+          !await _invalidateDistancesAfterLocationUpdate()) {
+        return;
+      }
+      await _refresh(force: true, refreshOwnLocation: false);
     } on LocationServiceDisabledFailure {
       _requireLocation(NearbyLocationIssue.serviceDisabled);
     } on LocationPermissionPermanentlyDeniedFailure {
@@ -144,21 +152,41 @@ class NearbyCubit extends Cubit<NearbyState> {
     }
   }
 
-  Future<void> refresh() => _refresh(force: false);
+  /// A user-initiated feed refresh first silently synchronizes the shared
+  /// location. This keeps nearby ordering, friend locations and server-side
+  /// distance calculations on the same point without reopening OS UI.
+  Future<void> refresh() => _refresh(force: false, refreshOwnLocation: true);
 
-  Future<void> _refresh({required bool force}) {
+  Future<void> _refresh({
+    required bool force,
+    bool refreshOwnLocation = false,
+  }) {
     final active = _feedRefresh;
     if (active != null) return active;
-    final future = _performRefresh(force: force);
+    final future = _performRefresh(
+      force: force,
+      refreshOwnLocation: refreshOwnLocation,
+    );
     _feedRefresh = future;
     return future.whenComplete(() => _feedRefresh = null);
   }
 
-  Future<void> _performRefresh({required bool force}) async {
+  Future<void> _performRefresh({
+    required bool force,
+    required bool refreshOwnLocation,
+  }) async {
     if (state.status == NearbyStatus.locationRequired && !force) return;
     if (!_tryConsumeFeedRequest()) return;
     if (!isClosed) emit(state.copyWith(isRefreshing: true));
     try {
+      if (refreshOwnLocation) {
+        final locationResult = await _locationTrackingCoordinator
+            .refreshSilently();
+        if (locationResult == TrackedLocationRefreshResult.updated) {
+          if (!await _invalidateDistancesAfterLocationUpdate()) return;
+        }
+        if (isClosed) return;
+      }
       final snapshot = await _repository.refreshFeed(state.filters);
       if (!isClosed) {
         emit(
@@ -249,6 +277,19 @@ class NearbyCubit extends Cubit<NearbyState> {
     } catch (_) {
       // The in-memory list is already protected; an optional cache cleanup
       // failure must not affect the local block.
+    }
+  }
+
+  Future<bool> _invalidateDistancesAfterLocationUpdate() async {
+    try {
+      await _profileFriendsRepository.clearCachedUserDistances();
+      return true;
+    } on StaleAccountSessionException {
+      return false;
+    } catch (_) {
+      // A cache cleanup must not make an otherwise valid feed refresh fail.
+      // The ten-minute distance TTL remains a safe fallback.
+      return true;
     }
   }
 

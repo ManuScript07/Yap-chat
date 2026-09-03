@@ -35,6 +35,7 @@ abstract interface class IProfileFriendsRepository {
   Future<UserDistance?> getCachedUserDistance(String userId);
   Future<bool> isCachedUserDistanceFresh(String userId);
   Future<void> cacheUserDistance(String userId, UserDistance distance);
+  Future<void> clearCachedUserDistances();
   Future<UserDistance?> getUserDistance(String userId);
   Future<void> removeFriend(String friendId);
 }
@@ -52,6 +53,8 @@ extension ProfileFriendsRepositoryAccess on IFriendsRepository {
       _profiles.isCachedUserDistanceFresh(userId);
   Future<void> cacheUserDistance(String userId, UserDistance distance) =>
       _profiles.cacheUserDistance(userId, distance);
+  Future<void> clearCachedUserDistances() =>
+      _profiles.clearCachedUserDistances();
   Future<UserDistance?> getUserDistance(String userId) =>
       _profiles.getUserDistance(userId);
   Future<void> removeFriend(String friendId) =>

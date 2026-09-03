@@ -249,6 +249,9 @@ class MockFriendsRepository
   Future<void> cacheUserDistance(String userId, UserDistance distance) async {}
 
   @override
+  Future<void> clearCachedUserDistances() async {}
+
+  @override
   Future<UserDistance?> getUserDistance(String userId) async => UserDistance(
     value: 3,
     unit: DistanceUnit.kilometers,

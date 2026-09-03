@@ -631,6 +631,15 @@ class FriendsRepository
   }
 
   @override
+  Future<void> clearCachedUserDistances() async {
+    final scope = _accountSessionController.capture();
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.clearDistances(ownerUserId: scope.userId),
+    );
+  }
+
+  @override
   Future<UserDistance?> getUserDistance(String userId) async {
     final scope = _accountSessionController.capture();
     final cached = await _cache.readDistance(userId, ownerUserId: scope.userId);
