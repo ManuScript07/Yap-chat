@@ -12,6 +12,10 @@ abstract interface class IChatsRepository {
 
   Future<Chat?> getChatById(String chatId);
 
+  /// Returns an existing direct chat from the local cache only.
+  /// It never starts a network synchronization.
+  Future<Chat?> getCachedChatByPeerId(String peerId);
+
   /// Возвращает локальный путь к аватару, скачивая его только при cache miss.
   Future<String?> resolveAvatar(Chat chat);
 

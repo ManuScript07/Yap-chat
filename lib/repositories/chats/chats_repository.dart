@@ -142,6 +142,19 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
+  Future<Chat?> getCachedChatByPeerId(String peerId) async {
+    final normalizedPeerId = peerId.trim();
+    if (normalizedPeerId.isEmpty) return null;
+    final scope = _accountSessionController.capture();
+    final cached = await _cache.read(ownerUserId: scope.userId);
+    _accountSessionController.ensureCurrent(scope);
+    for (final chat in cached) {
+      if (chat.peerId == normalizedPeerId) return chat;
+    }
+    return null;
+  }
+
+  @override
   Future<Chat> prepareDirectChat({
     required String peerId,
     required String peerUsername,

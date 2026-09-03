@@ -107,6 +107,14 @@ class MockChatsRepository implements IChatsRepository {
   }
 
   @override
+  Future<Chat?> getCachedChatByPeerId(String peerId) async {
+    for (final chat in _chats) {
+      if (chat.peerId == peerId) return chat;
+    }
+    return null;
+  }
+
+  @override
   Future<String?> resolveAvatar(Chat chat) async => chat.avatarUrl;
 
   @override

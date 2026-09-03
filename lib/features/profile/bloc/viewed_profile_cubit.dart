@@ -95,8 +95,14 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   List<Friend>? _friendsSnapshot;
   List<FriendRequest>? _requestsSnapshot;
   bool _isRealtimeProfileRefreshPending = false;
+  bool _isRealtimeProfileRefreshQueued = false;
+  int _profileRequestRevision = 0;
 
   Future<void> load() async {
+    // A block can arrive while the cache-first load is still in flight. The
+    // later response of that older request must never restore private fields
+    // after a realtime refresh has already received the redacted profile.
+    final requestRevision = ++_profileRequestRevision;
     _chatsSubscription ??= _chatsRepository.watchChats().listen(
       _syncLastSeenFromChats,
       onError: (_, _) {},
@@ -118,7 +124,24 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       _syncRelationshipFromCache();
     }, onError: (_, _) {});
     emit(state.copyWith(status: ViewedProfileStatus.loading));
+    final cachedChatFuture = _chatsRepository.getCachedChatByPeerId(_userId);
     final cached = await _profileRepository.getCachedViewedProfile(_userId);
+    if (requestRevision != _profileRequestRevision || isClosed) return;
+    Chat? cachedChat;
+    try {
+      cachedChat = await cachedChatFuture;
+    } catch (_) {
+      // A local chat-cache failure must not prevent normal profile loading.
+    }
+    if (requestRevision != _profileRequestRevision || isClosed) return;
+    if (cachedChat?.blockedByPeer ?? false) {
+      _showPeerBlockedProfile(
+        cached,
+        fallbackDisplayName: cachedChat!.userName,
+      );
+      unawaited(_refreshProfileFromRealtime());
+      return;
+    }
     if (cached != null && !isClosed) {
       emit(
         state.copyWith(
@@ -131,7 +154,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     }
     try {
       final remote = await _profileRepository.getViewedProfile(_userId);
-      if (isClosed) return;
+      if (requestRevision != _profileRequestRevision || isClosed) return;
       emit(
         state.copyWith(
           status: ViewedProfileStatus.success,
@@ -382,7 +405,27 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       }
     }
     final viewedProfile = state.viewedProfile;
-    if (chat == null || viewedProfile == null || viewedProfile.isBlocked) return;
+    if (chat == null) {
+      return;
+    }
+    // Chat summaries already receive the authoritative blockedByPeer flag.
+    // Use it as a direct invalidation for an open profile too. Previously the
+    // profile refresh depended on an incidental identity difference (such as
+    // an avatar change), so a correctly hidden chat could leave a stale full
+    // profile on screen.
+    if (chat.blockedByPeer) {
+      if (viewedProfile?.isBlocked != true) {
+        _showPeerBlockedProfile(
+          viewedProfile,
+          fallbackDisplayName: chat.userName,
+        );
+        unawaited(_refreshProfileFromRealtime());
+      }
+      return;
+    }
+    if (viewedProfile == null || viewedProfile.isBlocked) {
+      return;
+    }
     final identityChanged =
         viewedProfile.profile.username != chat.peerUsername ||
         viewedProfile.profile.displayName != chat.userName ||
@@ -470,23 +513,64 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   }
 
   Future<void> _refreshProfileFromRealtime() async {
-    if (_isRealtimeProfileRefreshPending) return;
+    if (_isRealtimeProfileRefreshPending) {
+      // A block can arrive while a less important profile refresh is still
+      // in progress. Do one more read afterwards rather than dropping the
+      // security-relevant invalidation.
+      _isRealtimeProfileRefreshQueued = true;
+      return;
+    }
     _isRealtimeProfileRefreshPending = true;
     try {
-      final refreshed = await _profileRepository.getViewedProfile(
-        _userId,
-        registerView: false,
-      );
-      if (!isClosed) {
-        emit(state.copyWith(viewedProfile: refreshed));
-        _syncRelationshipFromCache();
-        await _loadSupportingData(refreshed);
-      }
-    } catch (_) {
-      // Keep the cached profile visible until the next successful update.
+      do {
+        _isRealtimeProfileRefreshQueued = false;
+        final requestRevision = ++_profileRequestRevision;
+        try {
+          final refreshed = await _profileRepository.getViewedProfile(
+            _userId,
+            registerView: false,
+          );
+          if (requestRevision == _profileRequestRevision && !isClosed) {
+            emit(state.copyWith(viewedProfile: refreshed));
+            _syncRelationshipFromCache();
+            await _loadSupportingData(refreshed);
+          }
+        } catch (_) {
+          // Keep the cached profile visible until the next successful update.
+        }
+      } while (_isRealtimeProfileRefreshQueued && !isClosed);
     } finally {
       _isRealtimeProfileRefreshPending = false;
     }
+  }
+
+  void _showPeerBlockedProfile(
+    ViewedProfile? profile, {
+    required String fallbackDisplayName,
+  }) {
+    if (isClosed || profile?.isBlocked == true) return;
+    final identity = profile?.profile;
+    final redacted = ViewedProfile(
+      profile: UserProfile(
+        id: identity?.id ?? _userId,
+        username: '',
+        displayName: identity?.displayName ?? fallbackDisplayName,
+        onboardingCompleted: true,
+      ),
+      relationship: ProfileRelationship.blocked,
+      friendCount: 0,
+      friendsPreview: const [],
+      viewCount: 0,
+      showsLastSeen: false,
+    );
+    emit(
+      state.copyWith(
+        status: ViewedProfileStatus.success,
+        viewedProfile: redacted,
+        clearLocation: true,
+        clearDistance: true,
+      ),
+    );
   }
 
   @override
