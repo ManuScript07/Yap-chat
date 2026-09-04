@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:auto_route/auto_route.dart';
@@ -28,6 +29,7 @@ class NearbyPeoplePage extends StatefulWidget {
 class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   final _scrollController = ScrollController();
   var _locationPromptedAutomatically = false;
+  var _isPullRefreshing = false;
 
   @override
   void initState() {
@@ -107,6 +109,11 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                     state: state,
                     bottomPadding: contentBottom,
                     onRefresh: () => context.read<NearbyCubit>().refresh(),
+                    onRefreshActivityChanged: (isActive) {
+                      if (mounted && _isPullRefreshing != isActive) {
+                        setState(() => _isPullRefreshing = isActive);
+                      }
+                    },
                   ),
                   if (state.status == NearbyStatus.locationRequired)
                     Positioned.fill(
@@ -129,7 +136,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                     right: 0,
                     bottom: filterBottom,
                     child: _FiltersButton(
-                      onPressed: state.isRefreshing
+                      onPressed: state.isRefreshing || _isPullRefreshing
                           ? null
                           : () => _openFilters(state.filters),
                     ),
@@ -192,18 +199,145 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   }
 }
 
-class _NearbyFeed extends StatelessWidget {
+class _NearbyFeed extends StatefulWidget {
   const _NearbyFeed({
     required this.controller,
     required this.state,
     required this.bottomPadding,
     required this.onRefresh,
+    required this.onRefreshActivityChanged,
   });
 
   final ScrollController controller;
   final NearbyState state;
   final double bottomPadding;
   final Future<void> Function() onRefresh;
+  final ValueChanged<bool> onRefreshActivityChanged;
+
+  @override
+  State<_NearbyFeed> createState() => _NearbyFeedState();
+}
+
+class _NearbyFeedState extends State<_NearbyFeed> {
+  final _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
+  var _pullExtent = 0.0;
+  var _isRefreshRunning = false;
+  var _isPulling = false;
+  var _isArmed = false;
+  var _hasArmedHaptic = false;
+
+  static const _refreshTriggerExtent = 42.0;
+  static const _refreshRevealStart = 14.0;
+  static const _refreshGap = 76.0;
+  static const _minimumRefreshIndicatorDuration = Duration(milliseconds: 280);
+
+  double get _dragProgress =>
+      ((_pullExtent - _refreshRevealStart) /
+              (_refreshTriggerExtent - _refreshRevealStart))
+          .clamp(0.0, 1.0);
+
+  double get _refreshInset =>
+      _isRefreshRunning || _isArmed ? _refreshGap : _refreshGap * _dragProgress;
+
+  bool get _shouldShowIndicator => _isRefreshRunning || _dragProgress > 0;
+
+  bool _trackPull(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (_isRefreshRunning) return false;
+
+    if (notification is ScrollStartNotification) {
+      _isPulling =
+          notification.dragDetails != null &&
+          notification.metrics.extentBefore <= 0;
+      return false;
+    }
+    if (notification is ScrollUpdateNotification ||
+        notification is OverscrollNotification) {
+      if (!_isPulling &&
+          notification is ScrollUpdateNotification &&
+          notification.dragDetails != null) {
+        _isPulling = notification.metrics.extentBefore <= 0;
+      }
+      if (_isPulling) {
+        var pullExtent = math.max(0.0, -notification.metrics.pixels).toDouble();
+        if (notification is OverscrollNotification) {
+          pullExtent = math
+              .max(pullExtent, _pullExtent + notification.overscroll.abs())
+              .toDouble();
+        }
+        _setPullExtent(pullExtent);
+      }
+    } else if (notification is ScrollEndNotification && _isPulling) {
+      final shouldRefresh = _isArmed;
+      _isPulling = false;
+      if (shouldRefresh) {
+        final indicator = _refreshIndicatorKey.currentState;
+        if (indicator != null) {
+          unawaited(indicator.show());
+        } else {
+          unawaited(_handleRefresh());
+        }
+      } else {
+        _resetPull();
+      }
+    }
+    return false;
+  }
+
+  void _setPullExtent(double pullExtent) {
+    final normalized = pullExtent.clamp(0.0, _refreshTriggerExtent).toDouble();
+    final isArmed = normalized >= _refreshTriggerExtent;
+    if (isArmed && !_hasArmedHaptic) {
+      _hasArmedHaptic = true;
+      unawaited(HapticFeedback.mediumImpact());
+    } else if (!isArmed) {
+      _hasArmedHaptic = false;
+    }
+    if ((_pullExtent != normalized || _isArmed != isArmed) && mounted) {
+      setState(() {
+        _pullExtent = normalized;
+        _isArmed = isArmed;
+      });
+    }
+  }
+
+  void _resetPull() {
+    if (!mounted) return;
+    setState(() {
+      _pullExtent = 0;
+      _isArmed = false;
+      _hasArmedHaptic = false;
+    });
+  }
+
+  Future<void> _handleRefresh() async {
+    final startedAt = DateTime.now();
+    widget.onRefreshActivityChanged(true);
+    if (mounted) {
+      setState(() {
+        _isRefreshRunning = true;
+        _isArmed = false;
+        _pullExtent = _refreshTriggerExtent;
+      });
+    }
+    try {
+      await widget.onRefresh();
+    } finally {
+      final remaining =
+          _minimumRefreshIndicatorDuration -
+          DateTime.now().difference(startedAt);
+      if (!remaining.isNegative) await Future<void>.delayed(remaining);
+      if (mounted) {
+        setState(() {
+          _isRefreshRunning = false;
+          _pullExtent = 0;
+          _isArmed = false;
+          _hasArmedHaptic = false;
+        });
+      }
+      widget.onRefreshActivityChanged(false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,69 +345,105 @@ class _NearbyFeed extends StatelessWidget {
     final blockedUserIds = context.select<BlocklistCubit, Set<String>>(
       (cubit) => cubit.state.blockedUserIds,
     );
-    final people = state.people
+    final people = widget.state.people
         .where((person) => !blockedUserIds.contains(person.id))
         .toList(growable: false);
-    if (state.status == NearbyStatus.initial ||
-        state.status == NearbyStatus.loading && people.isEmpty) {
+    if (widget.state.status == NearbyStatus.initial ||
+        widget.state.status == NearbyStatus.loading && people.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (state.status == NearbyStatus.failure && people.isEmpty) {
+    if (widget.state.status == NearbyStatus.failure && people.isEmpty) {
       return Center(child: Text(context.l10n.nearbyLoadFailed));
     }
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: CustomScrollView(
-        controller: controller,
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: EdgeInsets.only(
-              top: 130,
-              left: 16 + systemPadding.left,
-              right: 16 + systemPadding.right,
-              bottom: 8,
-            ),
-            sliver: people.isEmpty
-                ? SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 250,
-                      child: Center(
-                        child: Text(
-                          context.l10n.nearbyEmpty,
-                          textAlign: TextAlign.center,
-                          style: context.textTheme.bodyLarge?.copyWith(
-                            color: context.colorScheme.onSurfaceVariant,
+    return RefreshIndicator.noSpinner(
+      key: _refreshIndicatorKey,
+      onRefresh: _handleRefresh,
+      child: Stack(
+        children: [
+          NotificationListener<ScrollNotification>(
+            onNotification: _trackPull,
+            child: CustomScrollView(
+              controller: widget.controller,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    top: 130 + _refreshInset,
+                    left: 16 + systemPadding.left,
+                    right: 16 + systemPadding.right,
+                    bottom: 8,
+                  ),
+                  sliver: people.isEmpty
+                      ? SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: 250,
+                            child: Center(
+                              child: Text(
+                                context.l10n.nearbyEmpty,
+                                textAlign: TextAlign.center,
+                                style: context.textTheme.bodyLarge?.copyWith(
+                                  color: context.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
                           ),
+                        )
+                      : SliverGrid.builder(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                              ),
+                          itemCount: people.length,
+                          itemBuilder: (context, index) =>
+                              _NearbyPersonTile(person: people[index]),
+                        ),
+                ),
+                if (widget.state.isLoadingMore)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(18),
+                      child: Center(
+                        child: SizedBox.square(
+                          dimension: 24,
+                          child: CircularProgressIndicator(strokeWidth: 3),
                         ),
                       ),
                     ),
-                  )
-                : SliverGrid.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                    itemCount: people.length,
-                    itemBuilder: (context, index) =>
-                        _NearbyPersonTile(person: people[index]),
                   ),
+                SliverToBoxAdapter(
+                  child: SizedBox(height: widget.bottomPadding),
+                ),
+              ],
+            ),
           ),
-          if (state.isLoadingMore)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(18),
-                child: Center(
-                  child: SizedBox.square(
-                    dimension: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
+          if (_shouldShowIndicator)
+            Positioned(
+              top: 130 + (_refreshInset - 36) / 2,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Opacity(
+                  opacity: _isRefreshRunning || _isArmed ? 1 : _dragProgress,
+                  child: Transform.scale(
+                    scale:
+                        .65 +
+                        .35 *
+                            (_isRefreshRunning || _isArmed ? 1 : _dragProgress),
+                    child: SizedBox.square(
+                      dimension: 36,
+                      child: CircularProgressIndicator(
+                        value: _isRefreshRunning ? null : _dragProgress,
+                        strokeWidth: 3,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          SliverToBoxAdapter(child: SizedBox(height: bottomPadding)),
         ],
       ),
     );

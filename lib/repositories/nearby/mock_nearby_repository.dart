@@ -5,6 +5,7 @@ import 'package:yap_chat/repositories/nearby/nearby_cache_data_source.dart';
 class MockNearbyRepository implements INearbyRepository {
   NearbyFilters _filters = const NearbyFilters();
   final Map<String, NearbyCacheSnapshot> _snapshots = {};
+  DateTime? _locationConfirmedAt;
 
   @override
   Future<NearbyFilters> getFilters() async => _filters;
@@ -19,12 +20,22 @@ class MockNearbyRepository implements INearbyRepository {
       _snapshots[filters.cacheKey];
 
   @override
-  Future<NearbyCacheSnapshot> refreshFeed(NearbyFilters filters) async =>
-      _snapshots[filters.cacheKey] ??= NearbyCacheSnapshot(
-        people: const [],
-        hasMore: false,
-        cachedAt: DateTime.now().toUtc(),
-      );
+  Future<bool> hasFreshLocationConfirmation() async {
+    final confirmedAt = _locationConfirmedAt;
+    if (confirmedAt == null) return false;
+    return DateTime.now().toUtc().difference(confirmedAt) <
+        const Duration(hours: 12);
+  }
+
+  @override
+  Future<NearbyCacheSnapshot> refreshFeed(NearbyFilters filters) async {
+    _locationConfirmedAt = DateTime.now().toUtc();
+    return _snapshots[filters.cacheKey] ??= NearbyCacheSnapshot(
+      people: const [],
+      hasMore: false,
+      cachedAt: _locationConfirmedAt!,
+    );
+  }
 
   @override
   Future<NearbyCacheSnapshot?> loadMore(NearbyFilters filters) =>

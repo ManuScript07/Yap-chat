@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/core/services/account_session_controller.dart';
 import 'package:yap_chat/features/nearby/bloc/nearby_state.dart';
@@ -18,6 +19,7 @@ class NearbyCubit extends Cubit<NearbyState> {
     required AccountSessionController accountSessionController,
     required IBlocklistRepository blocklistRepository,
     required IProfileFriendsRepository profileFriendsRepository,
+    this.refreshTimeout = defaultRefreshTimeout,
   }) : _repository = repository,
        _locationRepository = locationRepository,
        _locationTrackingCoordinator = locationTrackingCoordinator,
@@ -34,6 +36,8 @@ class NearbyCubit extends Cubit<NearbyState> {
   final LocationTrackingCoordinator _locationTrackingCoordinator;
   final AccountSessionController _accountSessionController;
   final IProfileFriendsRepository _profileFriendsRepository;
+  static const defaultRefreshTimeout = Duration(seconds: 12);
+  final Duration refreshTimeout;
   late final StreamSubscription<Set<String>> _blocklistSubscription;
   Set<String> _blockedUserIds = const {};
   Future<void>? _initialization;
@@ -84,8 +88,32 @@ class NearbyCubit extends Cubit<NearbyState> {
       final ownLocation = await _locationRepository.getCachedCurrentLocation(
         maxAge: const Duration(hours: 12),
       );
-      if (ownLocation == null) {
-        _requireLocation();
+      final hasFreshLocationConfirmation =
+          _hasFreshServerLocationConfirmation(cached) ||
+          await _repository.hasFreshLocationConfirmation();
+      if (ownLocation == null && !hasFreshLocationConfirmation) {
+        // A cold start can arrive here while the authenticated application's
+        // foreground refresh is still publishing the same point. Let the
+        // shared contour settle first, so a location acquired here is also
+        // used by friends and distance calculations.
+        final refreshResult = await _locationTrackingCoordinator
+            .refreshSilently();
+        if (isClosed) return;
+        if (refreshResult == TrackedLocationRefreshResult.updated &&
+            !await _invalidateDistancesAfterLocationUpdate()) {
+          return;
+        }
+        // A local publication timestamp is an optimization, not the source
+        // of truth. It may be absent after an unchanged server write even
+        // though `user_locations.updated_at` is still recent. In that case
+        // the feed RPC is the single authoritative 12-hour check. It also
+        // preserves the required blur when that RPC says no current location
+        // exists or when it cannot be reached.
+        await _refresh(
+          force: true,
+          refreshOwnLocation: false,
+          requireLocationOnFailure: true,
+        );
         return;
       }
       // A populated snapshot remains untouched until an explicit pull to
@@ -160,12 +188,14 @@ class NearbyCubit extends Cubit<NearbyState> {
   Future<void> _refresh({
     required bool force,
     bool refreshOwnLocation = false,
+    bool requireLocationOnFailure = false,
   }) {
     final active = _feedRefresh;
     if (active != null) return active;
     final future = _performRefresh(
       force: force,
       refreshOwnLocation: refreshOwnLocation,
+      requireLocationOnFailure: requireLocationOnFailure,
     );
     _feedRefresh = future;
     return future.whenComplete(() => _feedRefresh = null);
@@ -174,35 +204,61 @@ class NearbyCubit extends Cubit<NearbyState> {
   Future<void> _performRefresh({
     required bool force,
     required bool refreshOwnLocation,
+    required bool requireLocationOnFailure,
   }) async {
     if (state.status == NearbyStatus.locationRequired && !force) return;
     if (!_tryConsumeFeedRequest()) return;
     if (!isClosed) emit(state.copyWith(isRefreshing: true));
     try {
-      if (refreshOwnLocation) {
-        final locationResult = await _locationTrackingCoordinator
-            .refreshSilently();
-        if (locationResult == TrackedLocationRefreshResult.updated) {
-          if (!await _invalidateDistancesAfterLocationUpdate()) return;
+      await _refreshFeedAndLocation(
+        refreshOwnLocation: refreshOwnLocation,
+      ).timeout(refreshTimeout);
+    } catch (error) {
+      if (!isClosed) {
+        if (_isNearbyRateLimitedError(error)) {
+          emit(
+            state.copyWith(
+              status: state.people.isEmpty
+                  ? NearbyStatus.failure
+                  : NearbyStatus.ready,
+              isRefreshing: false,
+              rateLimitFeedbackId: state.rateLimitFeedbackId + 1,
+            ),
+          );
+        } else if (requireLocationOnFailure ||
+            _isLocationRequiredError(error)) {
+          _requireLocation();
+        } else {
+          emit(
+            state.copyWith(status: NearbyStatus.failure, isRefreshing: false),
+          );
         }
-        if (isClosed) return;
       }
-      final snapshot = await _repository.refreshFeed(state.filters);
-      if (!isClosed) {
-        emit(
-          state.copyWith(
-            status: NearbyStatus.ready,
-            people: snapshot.people,
-            hasMore: snapshot.hasMore,
-            isRefreshing: false,
-            clearLocationIssue: true,
-          ),
-        );
+    }
+  }
+
+  Future<void> _refreshFeedAndLocation({
+    required bool refreshOwnLocation,
+  }) async {
+    if (refreshOwnLocation) {
+      final locationResult = await _locationTrackingCoordinator
+          .refreshSilently();
+      if (locationResult == TrackedLocationRefreshResult.updated) {
+        if (!await _invalidateDistancesAfterLocationUpdate()) return;
       }
-    } catch (_) {
-      if (!isClosed) {
-        emit(state.copyWith(status: NearbyStatus.failure, isRefreshing: false));
-      }
+      if (isClosed) return;
+    }
+    final snapshot = await _repository.refreshFeed(state.filters);
+    if (!isClosed) {
+      emit(
+        state.copyWith(
+          status: NearbyStatus.ready,
+          people: snapshot.people,
+          hasMore: snapshot.hasMore,
+          isRefreshing: false,
+          clearLocationIssue: true,
+        ),
+      );
     }
   }
 
@@ -292,6 +348,20 @@ class NearbyCubit extends Cubit<NearbyState> {
       return true;
     }
   }
+
+  bool _hasFreshServerLocationConfirmation(NearbyCacheSnapshot? snapshot) {
+    if (snapshot == null) return false;
+    final age = DateTime.now().toUtc().difference(snapshot.cachedAt.toUtc());
+    return !age.isNegative && age < const Duration(hours: 12);
+  }
+
+  bool _isLocationRequiredError(Object error) =>
+      error is PostgrestException &&
+      error.message.contains('nearby_location_required');
+
+  bool _isNearbyRateLimitedError(Object error) =>
+      error is PostgrestException &&
+      error.message.contains('nearby_rate_limited');
 
   @override
   Future<void> close() async {

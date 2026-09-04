@@ -21,6 +21,7 @@ class LocationRepository implements ILocationRepository {
     LocationPublisher? publishLocation,
     String? Function()? currentUserId,
     double Function(double, double, double, double)? distanceBetween,
+    Duration locationPublishTimeout = defaultLocationPublishTimeout,
   }) : _preferences = preferences,
        _client = client,
        _isLocationServiceEnabled =
@@ -33,11 +34,13 @@ class LocationRepository implements ILocationRepository {
                Geolocator.getCurrentPosition(locationSettings: settings)),
        _publishLocation = publishLocation,
        _currentUserId = currentUserId ?? (() => client?.auth.currentUser?.id),
-       _distanceBetween = distanceBetween ?? Geolocator.distanceBetween;
+       _distanceBetween = distanceBetween ?? Geolocator.distanceBetween,
+       _locationPublishTimeout = locationPublishTimeout;
 
   static const minimumMovementMeters = 100.0;
   static const maximumUnchangedAge = Duration(hours: 12);
   static const _trackedLocationTimeout = Duration(seconds: 20);
+  static const defaultLocationPublishTimeout = Duration(seconds: 10);
 
   final SharedPreferences _preferences;
   final SupabaseClient? _client;
@@ -48,6 +51,7 @@ class LocationRepository implements ILocationRepository {
   final LocationPublisher? _publishLocation;
   final String? Function() _currentUserId;
   final double Function(double, double, double, double) _distanceBetween;
+  final Duration _locationPublishTimeout;
 
   @override
   Future<Position> getCurrentPosition() async {
@@ -165,7 +169,11 @@ class LocationRepository implements ILocationRepository {
       return TrackedLocationRefreshResult.unavailable;
     }
 
-    final published = await _publish(position.latitude, position.longitude);
+    final published = await _publishWithTimeout(
+      position.latitude,
+      position.longitude,
+    );
+    if (published == null) return TrackedLocationRefreshResult.unavailable;
     if (!published) return TrackedLocationRefreshResult.unchanged;
     await Future.wait([
       _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
@@ -229,7 +237,11 @@ class LocationRepository implements ILocationRepository {
       return TrackedLocationRefreshResult.unchanged;
     }
 
-    final published = await _publish(position.latitude, position.longitude);
+    final published = await _publishWithTimeout(
+      position.latitude,
+      position.longitude,
+    );
+    if (published == null) return TrackedLocationRefreshResult.unavailable;
     if (!published) return TrackedLocationRefreshResult.unchanged;
     await Future.wait([
       _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
@@ -274,6 +286,17 @@ class LocationRepository implements ILocationRepository {
       'update_my_location_with_result',
       params: {'new_latitude': latitude, 'new_longitude': longitude},
     );
+  }
+
+  Future<bool?> _publishWithTimeout(double latitude, double longitude) async {
+    try {
+      return await _publish(
+        latitude,
+        longitude,
+      ).timeout(_locationPublishTimeout);
+    } on TimeoutException {
+      return null;
+    }
   }
 
   String _latitudeKey(String userId) => 'tracked_location.$userId.latitude';

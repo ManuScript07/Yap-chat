@@ -5,6 +5,7 @@ abstract interface class INearbyRepository {
   Future<NearbyFilters> getFilters();
   Future<void> saveFilters(NearbyFilters filters);
   Future<NearbyCacheSnapshot?> getCachedFeed(NearbyFilters filters);
+  Future<bool> hasFreshLocationConfirmation();
   Future<NearbyCacheSnapshot> refreshFeed(NearbyFilters filters);
   Future<NearbyCacheSnapshot?> loadMore(NearbyFilters filters);
   Future<void> removeCachedPeople(Set<String> userIds);
