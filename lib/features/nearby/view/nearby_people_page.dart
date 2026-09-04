@@ -51,9 +51,21 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
+    final nearby = context.read<NearbyCubit>();
+    final state = nearby.state;
+    // An empty viewport is always at its bottom edge. It must not turn that
+    // layout detail into an automatic pagination request, especially while a
+    // pull-to-refresh is already fetching the first page.
+    if (state.isRefreshing ||
+        state.isLoadingMore ||
+        state.people.isEmpty ||
+        !state.hasMore ||
+        state.status != NearbyStatus.ready) {
+      return;
+    }
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - 360) {
-      unawaited(context.read<NearbyCubit>().loadMore());
+      unawaited(nearby.loadMore());
     }
   }
 
@@ -250,7 +262,7 @@ class _NearbyFeedState extends State<_NearbyFeed> {
 
   bool _trackPull(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
-    if (_isRefreshRunning) return false;
+    if (_isRefreshRunning || widget.state.isRefreshing) return false;
 
     if (notification is ScrollStartNotification) {
       _isPulling =
@@ -359,12 +371,11 @@ class _NearbyFeedState extends State<_NearbyFeed> {
         widget.state.status == NearbyStatus.loading && people.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (widget.state.status == NearbyStatus.failure && people.isEmpty) {
-      return Center(child: Text(context.l10n.nearbyLoadFailed));
-    }
     return RefreshIndicator.noSpinner(
       key: _refreshIndicatorKey,
       onRefresh: _handleRefresh,
+      notificationPredicate: (_) =>
+          !widget.state.isRefreshing || _isRefreshRunning,
       child: TweenAnimationBuilder<double>(
         tween: Tween<double>(end: _refreshInset),
         duration: _isPulling
@@ -456,7 +467,27 @@ class _NearbyFeedState extends State<_NearbyFeed> {
                 ),
               ),
             ),
-            if (people.isEmpty)
+            Positioned(
+              top: 142,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: widget.state.isRefreshing && !_isRefreshRunning
+                      ? 1
+                      : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  child: const Center(
+                    child: SizedBox.square(
+                      dimension: 36,
+                      child: CircularProgressIndicator(strokeWidth: 4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (people.isEmpty && !widget.state.isRefreshing)
               Positioned.fill(
                 child: IgnorePointer(
                   child: Padding(
@@ -464,9 +495,11 @@ class _NearbyFeedState extends State<_NearbyFeed> {
                       top: 130,
                       bottom: widget.bottomPadding,
                     ),
-                    child: const Align(
+                    child: Align(
                       alignment: Alignment(0, -0.12),
-                      child: _NearbyEmptyState(),
+                      child: _NearbyEmptyState(
+                        failed: widget.state.status == NearbyStatus.failure,
+                      ),
                     ),
                   ),
                 ),
@@ -479,7 +512,9 @@ class _NearbyFeedState extends State<_NearbyFeed> {
 }
 
 class _NearbyEmptyState extends StatelessWidget {
-  const _NearbyEmptyState();
+  const _NearbyEmptyState({required this.failed});
+
+  final bool failed;
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +541,7 @@ class _NearbyEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            context.l10n.nearbyEmpty,
+            failed ? context.l10n.nearbyLoadFailed : context.l10n.nearbyEmpty,
             textAlign: TextAlign.center,
             style: messageStyle,
           ),
