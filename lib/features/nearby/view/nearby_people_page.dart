@@ -6,6 +6,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/widgets/profile_setup_widgets.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
@@ -88,7 +89,17 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
           return Scaffold(
             extendBodyBehindAppBar: true,
             backgroundColor: context.scaffoldBackgroundColor,
-            appBar: PrimaryAppBar(title: context.l10n.nearbyTitle),
+            appBar: PrimaryAppBar(
+              title: context.l10n.nearbyTitle,
+              titleWidget: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  context.l10n.nearbyTitle,
+                  style: AppTextStyles.titleLargeFlex,
+                ),
+              ),
+            ),
             body: Stack(
               children: [
                 _NearbyFeed(
@@ -103,21 +114,24 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                   },
                 ),
                 if (state.status == NearbyStatus.locationRequired)
+                  const Positioned.fill(child: _LocationRequiredBackdrop()),
+                if (state.status == NearbyStatus.locationRequired)
                   Positioned.fill(
                     child: _LocationRequiredOverlay(
+                      bottomInset: contentBottom,
                       onRetry: () =>
                           context.read<NearbyCubit>().requestLocation(),
                     ),
                   ),
-                if (state.isRefreshing &&
-                    state.status == NearbyStatus.locationRequired)
-                  const Positioned.fill(child: _LocationUpdatingOverlay()),
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: 0,
                   child: const BottomAmbientGlow(),
                 ),
+                if (state.isRefreshing &&
+                    state.status == NearbyStatus.locationRequired)
+                  const Positioned.fill(child: _LocationUpdatingOverlay()),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -378,28 +392,14 @@ class _NearbyFeedState extends State<_NearbyFeed> {
                       ),
                       sliver: people.isEmpty
                           ? SliverToBoxAdapter(
-                              child: SizedBox(
-                                height: 250,
-                                child: Center(
-                                  child: Text(
-                                    context.l10n.nearbyEmpty,
-                                    textAlign: TextAlign.center,
-                                    style: context.textTheme.bodyLarge
-                                        ?.copyWith(
-                                          color: context
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                        ),
-                                  ),
-                                ),
-                              ),
+                              child: const SizedBox(height: 250),
                             )
                           : SliverGrid.builder(
                               gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    crossAxisSpacing: 8,
-                                    mainAxisSpacing: 8,
+                                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                                    maxCrossAxisExtent: 150,
+                                    crossAxisSpacing: 6,
+                                    mainAxisSpacing: 6,
                                   ),
                               itemCount: people.length,
                               itemBuilder: (context, index) =>
@@ -456,8 +456,61 @@ class _NearbyFeedState extends State<_NearbyFeed> {
                 ),
               ),
             ),
+            if (people.isEmpty)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: 130,
+                      bottom: widget.bottomPadding,
+                    ),
+                    child: const Align(
+                      alignment: Alignment(0, -0.12),
+                      child: _NearbyEmptyState(),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NearbyEmptyState extends StatelessWidget {
+  const _NearbyEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final messageStyle = context.textTheme.titleLarge?.copyWith(
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+      color: context.colorScheme.onSurface,
+    );
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset(
+            'assets/images/mood_bad_24dp.svg',
+            width: 72,
+            height: 72,
+            colorFilter: const ColorFilter.mode(
+              AppColors.incomingBubble,
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            context.l10n.nearbyEmpty,
+            textAlign: TextAlign.center,
+            style: messageStyle,
+          ),
+        ],
       ),
     );
   }
@@ -478,71 +531,85 @@ class _NearbyPersonTile extends StatelessWidget {
       label: person.displayName,
       child: InkWell(
         onTap: () => unawaited(openViewedProfile(context, userId: person.id)),
-        borderRadius: BorderRadius.circular(16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: LayoutBuilder(
-            builder: (context, constraints) => Stack(
+        borderRadius: BorderRadius.circular(8),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final onlineBadgeSize = (constraints.maxWidth * .18)
+                .clamp(16.0, 20.0)
+                .toDouble();
+            return Stack(
+              clipBehavior: Clip.none,
               fit: StackFit.expand,
               children: [
-                UserAvatar(
-                  avatarUrl: person.avatarUrl,
-                  avatarLoader: () =>
-                      context.read<INearbyRepository>().resolveAvatar(person),
-                  preferAvatarLoader: true,
-                  avatarRevision: person.avatarStoragePath ?? person.avatarUrl,
-                  size: constraints.maxWidth,
-                  borderRadius: 0,
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: .68),
-                      ],
-                      stops: const [.46, 1],
-                    ),
-                  ),
-                ),
-                if (isOnline)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: context.scaffoldBackgroundColor,
-                          width: 1.5,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      UserAvatar(
+                        avatarUrl: person.avatarUrl,
+                        avatarLoader: () => context
+                            .read<INearbyRepository>()
+                            .resolveAvatar(person),
+                        preferAvatarLoader: true,
+                        avatarRevision:
+                            person.avatarStoragePath ?? person.avatarUrl,
+                        size: constraints.maxWidth,
+                        borderRadius: 0,
+                      ),
+                      Positioned(
+                        left: 8,
+                        right: 8,
+                        bottom: 7,
+                        child: Text(
+                          person.displayName,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 4),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
+                ),
                 Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 7,
-                  child: Text(
-                    person.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                  top: -2,
+                  left: -2,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    switchInCurve: Curves.easeOutBack,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(scale: animation, child: child),
                     ),
+                    child: isOnline
+                        ? Container(
+                            key: const ValueKey('online-badge'),
+                            width: onlineBadgeSize,
+                            height: onlineBadgeSize,
+                            decoration: BoxDecoration(
+                              color: context.colorScheme.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: context.scaffoldBackgroundColor,
+                                width: 2,
+                              ),
+                            ),
+                          )
+                        : const SizedBox(key: ValueKey('online-badge-hidden')),
                   ),
                 ),
               ],
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -595,69 +662,123 @@ class _FiltersButton extends StatelessWidget {
   );
 }
 
+class _LocationRequiredBackdrop extends StatelessWidget {
+  const _LocationRequiredBackdrop();
+
+  @override
+  Widget build(BuildContext context) => BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+    child: ColoredBox(
+      color: context.scaffoldBackgroundColor.withValues(alpha: .42),
+    ),
+  );
+}
+
 class _LocationRequiredOverlay extends StatelessWidget {
-  const _LocationRequiredOverlay({required this.onRetry});
+  const _LocationRequiredOverlay({
+    required this.bottomInset,
+    required this.onRetry,
+  });
+
+  final double bottomInset;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    if (!isLandscape) {
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
+          child: _LocationRequiredPanel(onRetry: onRetry),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final panelWidth = math.min(constraints.maxWidth, 420.0);
+          final scrollExtent = math.max(bottomInset - 50, 0.0);
+          return SingleChildScrollView(
+            reverse: true,
+            physics: const ClampingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight + scrollExtent,
+              ),
+              child: Align(
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: panelWidth,
+                  child: _LocationRequiredPanel(onRetry: onRetry),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LocationRequiredPanel extends StatelessWidget {
+  const _LocationRequiredPanel({required this.onRetry});
 
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Stack(
-    children: [
-      Positioned.fill(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-          child: ColoredBox(
-            color: context.scaffoldBackgroundColor.withValues(alpha: .42),
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(28),
+    clipBehavior: Clip.antiAlias,
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            context.l10n.nearbyLocationRequiredTitle,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
           ),
-        ),
-      ),
-      Align(
-        alignment: Alignment.bottomCenter,
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
-            child: Material(
-              color: context.scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(28),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      context.l10n.nearbyLocationRequiredTitle,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      context.l10n.nearbyLocationRequiredContent,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: context.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: FilledButton(
-                        onPressed: onRetry,
-                        child: Text(context.l10n.nearbyLocationUpdate),
-                      ),
-                    ),
-                  ],
+          const SizedBox(height: 8),
+          Text(
+            context.l10n.nearbyLocationRequiredContent,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: SizedBox(
+              width: 230,
+              height: 58,
+              child: FilledButton(
+                onPressed: onRetry,
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.colorScheme.primary,
+                  foregroundColor: context.colorScheme.onSurface,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  context.l10n.nearbyLocationUpdateShort,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .5,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
+    ),
   );
 }
 
@@ -725,17 +846,27 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             onTap: _selectAge,
           ),
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).pop(_filters),
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+          Center(
+            child: SizedBox(
+              width: 230,
+              height: 58,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(_filters),
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.colorScheme.primary,
+                  foregroundColor: context.colorScheme.onSurface,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  context.l10n.nearbyApply.toLowerCase(),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .5,
+                  ),
                 ),
               ),
-              child: Text(context.l10n.nearbyApply),
             ),
           ),
         ],
@@ -930,50 +1061,67 @@ class _AgeSheetState extends State<_AgeSheet> {
             ),
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: _AgeInput(
-                  label: context.l10n.nearbyAgeFrom,
-                  controller: _minimum,
-                  errorText: _error,
-                  onChanged: _clearError,
+          SizedBox(
+            width: math.min(MediaQuery.sizeOf(context).width - 32, 300.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _AgeInput(
+                    label: context.l10n.nearbyAgeFrom,
+                    controller: _minimum,
+                    errorText: _error == null
+                        ? null
+                        : context.l10n.nearbyAgeInvalidShort,
+                    onChanged: _clearError,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _AgeInput(
-                  label: context.l10n.nearbyAgeTo,
-                  controller: _maximum,
-                  errorText: _error,
-                  onChanged: _clearError,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _AgeInput(
+                    label: context.l10n.nearbyAgeTo,
+                    controller: _maximum,
+                    errorText: _error == null
+                        ? null
+                        : context.l10n.nearbyAgeInvalidShort,
+                    onChanged: _clearError,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: context.colorScheme.error,
+              style: const TextStyle(
+                color: Colors.red,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ],
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: _apply,
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+          Center(
+            child: SizedBox(
+              width: 230,
+              height: 58,
+              child: FilledButton(
+                onPressed: _apply,
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.colorScheme.primary,
+                  foregroundColor: context.colorScheme.onSurface,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  context.l10n.nearbyApply.toLowerCase(),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .5,
+                  ),
                 ),
               ),
-              child: Text(context.l10n.nearbyApply),
             ),
           ),
         ],
@@ -1020,13 +1168,15 @@ class _AgeInput extends StatelessWidget {
     hint: '—',
     maxLength: 2,
     maxLines: 1,
-    tooLongText: context.l10n.nearbyAgeInvalid,
+    tooLongText: context.l10n.nearbyAgeInvalidShort,
     errorText: errorText,
     keyboardType: TextInputType.number,
     onChanged: onChanged,
     textAlign: TextAlign.center,
     autocorrect: false,
-    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+    inputFormatters: [
+      FilteringTextInputFormatter.digitsOnly,
+    ],
   );
 }
 

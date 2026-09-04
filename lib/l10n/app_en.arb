@@ -438,12 +438,14 @@
   "nearbyAgeFrom": "from",
   "nearbyAgeTo": "to",
   "nearbyAgeInvalid": "Enter an age from 18 to 99. The minimum cannot exceed the maximum.",
+  "nearbyAgeInvalidShort": "from 18 to 99",
   "nearbyApply": "apply",
-  "nearbyEmpty": "No one nearby yet",
-  "nearbyLoadFailed": "Couldn't load people nearby",
+  "nearbyEmpty": "no one nearby yet",
+  "nearbyLoadFailed": "couldn't load people nearby",
   "nearbyLocationRequiredTitle": "Location is needed",
   "nearbyLocationRequiredContent": "Share your current location to see people nearby.",
   "nearbyLocationUpdate": "update location",
-  "nearbyLocationUnavailable": "Couldn't get your location. Try again."
-  ,"nearbyRateLimited": "Too many updates. Try again in a minute."
+  "nearbyLocationUpdateShort": "update",
+  "nearbyLocationUnavailable": "Couldn't get your location. Try again.",
+  "nearbyRateLimited": "Too many updates. Try again in a minute."
 }

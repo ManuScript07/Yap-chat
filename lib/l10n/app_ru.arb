@@ -438,12 +438,14 @@
   "nearbyAgeFrom": "от",
   "nearbyAgeTo": "до",
   "nearbyAgeInvalid": "Введите возраст от 18 до 99 лет: значение «от» не должно быть больше «до».",
+  "nearbyAgeInvalidShort": "от 18 до 99",
   "nearbyApply": "применить",
-  "nearbyEmpty": "Рядом пока никого нет",
-  "nearbyLoadFailed": "Не удалось загрузить людей рядом",
+  "nearbyEmpty": "рядом пока никого нет",
+  "nearbyLoadFailed": "не удалось загрузить людей рядом",
   "nearbyLocationRequiredTitle": "Нужна геолокация",
   "nearbyLocationRequiredContent": "Поделитесь актуальной геопозицией, чтобы увидеть людей рядом.",
   "nearbyLocationUpdate": "обновить геолокацию",
-  "nearbyLocationUnavailable": "Не удалось получить геолокацию. Попробуйте ещё раз."
-  ,"nearbyRateLimited": "Слишком много обновлений. Попробуйте через минуту."
+  "nearbyLocationUpdateShort": "обновить",
+  "nearbyLocationUnavailable": "Не удалось получить геолокацию. Попробуйте ещё раз.",
+  "nearbyRateLimited": "Слишком много обновлений. Попробуйте через минуту."
 }

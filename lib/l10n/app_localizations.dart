@@ -1928,6 +1928,12 @@ abstract class AppLocalizations {
   /// **'Введите возраст от 18 до 99 лет: значение «от» не должно быть больше «до».'**
   String get nearbyAgeInvalid;
 
+  /// No description provided for @nearbyAgeInvalidShort.
+  ///
+  /// In ru, this message translates to:
+  /// **'от 18 до 99'**
+  String get nearbyAgeInvalidShort;
+
   /// No description provided for @nearbyApply.
   ///
   /// In ru, this message translates to:
@@ -1937,13 +1943,13 @@ abstract class AppLocalizations {
   /// No description provided for @nearbyEmpty.
   ///
   /// In ru, this message translates to:
-  /// **'Рядом пока никого нет'**
+  /// **'рядом пока никого нет'**
   String get nearbyEmpty;
 
   /// No description provided for @nearbyLoadFailed.
   ///
   /// In ru, this message translates to:
-  /// **'Не удалось загрузить людей рядом'**
+  /// **'не удалось загрузить людей рядом'**
   String get nearbyLoadFailed;
 
   /// No description provided for @nearbyLocationRequiredTitle.
@@ -1963,6 +1969,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'обновить геолокацию'**
   String get nearbyLocationUpdate;
+
+  /// No description provided for @nearbyLocationUpdateShort.
+  ///
+  /// In ru, this message translates to:
+  /// **'обновить'**
+  String get nearbyLocationUpdateShort;
 
   /// No description provided for @nearbyLocationUnavailable.
   ///

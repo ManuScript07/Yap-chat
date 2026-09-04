@@ -1060,13 +1060,16 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите возраст от 18 до 99 лет: значение «от» не должно быть больше «до».';
 
   @override
+  String get nearbyAgeInvalidShort => 'от 18 до 99';
+
+  @override
   String get nearbyApply => 'применить';
 
   @override
-  String get nearbyEmpty => 'Рядом пока никого нет';
+  String get nearbyEmpty => 'рядом пока никого нет';
 
   @override
-  String get nearbyLoadFailed => 'Не удалось загрузить людей рядом';
+  String get nearbyLoadFailed => 'не удалось загрузить людей рядом';
 
   @override
   String get nearbyLocationRequiredTitle => 'Нужна геолокация';
@@ -1077,6 +1080,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get nearbyLocationUpdate => 'обновить геолокацию';
+
+  @override
+  String get nearbyLocationUpdateShort => 'обновить';
 
   @override
   String get nearbyLocationUnavailable =>

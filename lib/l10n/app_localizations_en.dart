@@ -1048,13 +1048,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter an age from 18 to 99. The minimum cannot exceed the maximum.';
 
   @override
+  String get nearbyAgeInvalidShort => 'from 18 to 99';
+
+  @override
   String get nearbyApply => 'apply';
 
   @override
-  String get nearbyEmpty => 'No one nearby yet';
+  String get nearbyEmpty => 'no one nearby yet';
 
   @override
-  String get nearbyLoadFailed => 'Couldn\'t load people nearby';
+  String get nearbyLoadFailed => 'couldn\'t load people nearby';
 
   @override
   String get nearbyLocationRequiredTitle => 'Location is needed';
@@ -1065,6 +1068,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nearbyLocationUpdate => 'update location';
+
+  @override
+  String get nearbyLocationUpdateShort => 'update';
 
   @override
   String get nearbyLocationUnavailable =>

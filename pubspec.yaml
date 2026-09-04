@@ -78,6 +78,7 @@ flutter:
     - .env
     - assets/logo/
     - assets/images/empty_chat.svg
+    - assets/images/mood_bad_24dp.svg
 
   fonts:
     - family: RobotoFlex
