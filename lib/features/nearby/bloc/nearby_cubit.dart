@@ -75,7 +75,21 @@ class NearbyCubit extends Cubit<NearbyState> {
     try {
       final filters = await _repository.getFilters();
       final cached = await _repository.getCachedFeed(filters);
+      final ownLocation = await _locationRepository.getCachedCurrentLocation(
+        maxAge: const Duration(hours: 12),
+      );
       if (isClosed) return;
+      if (ownLocation == null) {
+        // The persisted publication timestamp is the only offline source of
+        // truth. A feed's cache time merely says when people were loaded; it
+        // must never extend the twelve-hour lifetime of the user's point.
+        _requireLocation(
+          filters: filters,
+          people: cached?.people,
+          hasMore: cached?.hasMore,
+        );
+        return;
+      }
       emit(
         state.copyWith(
           status: NearbyStatus.ready,
@@ -85,37 +99,6 @@ class NearbyCubit extends Cubit<NearbyState> {
           clearLocationIssue: true,
         ),
       );
-      final ownLocation = await _locationRepository.getCachedCurrentLocation(
-        maxAge: const Duration(hours: 12),
-      );
-      final hasFreshLocationConfirmation =
-          _hasFreshServerLocationConfirmation(cached) ||
-          await _repository.hasFreshLocationConfirmation();
-      if (ownLocation == null && !hasFreshLocationConfirmation) {
-        // A cold start can arrive here while the authenticated application's
-        // foreground refresh is still publishing the same point. Let the
-        // shared contour settle first, so a location acquired here is also
-        // used by friends and distance calculations.
-        final refreshResult = await _locationTrackingCoordinator
-            .refreshSilently();
-        if (isClosed) return;
-        if (refreshResult == TrackedLocationRefreshResult.updated &&
-            !await _invalidateDistancesAfterLocationUpdate()) {
-          return;
-        }
-        // A local publication timestamp is an optimization, not the source
-        // of truth. It may be absent after an unchanged server write even
-        // though `user_locations.updated_at` is still recent. In that case
-        // the feed RPC is the single authoritative 12-hour check. It also
-        // preserves the required blur when that RPC says no current location
-        // exists or when it cannot be reached.
-        await _refresh(
-          force: true,
-          refreshOwnLocation: false,
-          requireLocationOnFailure: true,
-        );
-        return;
-      }
       // A populated snapshot remains untouched until an explicit pull to
       // refresh. A first visit has no snapshot, so it is loaded once.
       if (cached == null || (cached.people.isEmpty && cached.hasMore)) {
@@ -142,7 +125,7 @@ class NearbyCubit extends Cubit<NearbyState> {
       final result = await _locationTrackingCoordinator.refreshWithPermission();
       _accountSessionController.ensureCurrent(scope);
       if (result == TrackedLocationRefreshResult.unavailable) {
-        _requireLocation(NearbyLocationIssue.unavailable);
+        _requireLocation(issue: NearbyLocationIssue.unavailable);
         return;
       }
       if (result == TrackedLocationRefreshResult.updated &&
@@ -151,11 +134,11 @@ class NearbyCubit extends Cubit<NearbyState> {
       }
       await _refresh(force: true, refreshOwnLocation: false);
     } on LocationServiceDisabledFailure {
-      _requireLocation(NearbyLocationIssue.serviceDisabled);
+      _requireLocation(issue: NearbyLocationIssue.serviceDisabled);
     } on LocationPermissionPermanentlyDeniedFailure {
-      _requireLocation(NearbyLocationIssue.permanentlyDenied);
+      _requireLocation(issue: NearbyLocationIssue.permanentlyDenied);
     } on LocationPermissionDeniedFailure {
-      _requireLocation(NearbyLocationIssue.denied);
+      _requireLocation(issue: NearbyLocationIssue.denied);
     } on StaleAccountSessionException {
       return;
     } catch (_) {
@@ -164,7 +147,7 @@ class NearbyCubit extends Cubit<NearbyState> {
       );
       if (isClosed) return;
       if (ownLocation == null) {
-        _requireLocation(NearbyLocationIssue.unavailable);
+        _requireLocation(issue: NearbyLocationIssue.unavailable);
       } else {
         // Publishing succeeded but the following feed refresh may have lost
         // connectivity. The server still has a current own location, so a
@@ -349,12 +332,6 @@ class NearbyCubit extends Cubit<NearbyState> {
     }
   }
 
-  bool _hasFreshServerLocationConfirmation(NearbyCacheSnapshot? snapshot) {
-    if (snapshot == null) return false;
-    final age = DateTime.now().toUtc().difference(snapshot.cachedAt.toUtc());
-    return !age.isNegative && age < const Duration(hours: 12);
-  }
-
   bool _isLocationRequiredError(Object error) =>
       error is PostgrestException &&
       error.message.contains('nearby_location_required');
@@ -369,11 +346,19 @@ class NearbyCubit extends Cubit<NearbyState> {
     return super.close();
   }
 
-  void _requireLocation([NearbyLocationIssue? issue]) {
+  void _requireLocation({
+    NearbyLocationIssue? issue,
+    NearbyFilters? filters,
+    List<NearbyPerson>? people,
+    bool? hasMore,
+  }) {
     if (isClosed) return;
     emit(
       state.copyWith(
         status: NearbyStatus.locationRequired,
+        filters: filters,
+        people: people,
+        hasMore: hasMore,
         isRefreshing: false,
         locationIssue: issue,
         locationFeedbackId: issue == null

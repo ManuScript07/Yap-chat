@@ -54,16 +54,6 @@ class NearbyRepository implements INearbyRepository {
   }
 
   @override
-  Future<bool> hasFreshLocationConfirmation() async {
-    final scope = _accountSessionController.capture();
-    final confirmedAt = await _cache.readLocationConfirmation(scope.userId);
-    _accountSessionController.ensureCurrent(scope);
-    if (confirmedAt == null) return false;
-    final age = DateTime.now().toUtc().difference(confirmedAt);
-    return !age.isNegative && age < const Duration(hours: 12);
-  }
-
-  @override
   Future<NearbyCacheSnapshot> refreshFeed(NearbyFilters filters) {
     final scope = _accountSessionController.capture();
     final key = _key(scope, filters);

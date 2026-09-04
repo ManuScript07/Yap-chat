@@ -84,7 +84,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
           listener: (context, state) {
             if (_locationPromptedAutomatically) return;
             _locationPromptedAutomatically = true;
-            unawaited(context.read<NearbyCubit>().requestLocation());
+            unawaited(_requestInitialLocation());
           },
           builder: (context, state) {
             final mediaQuery = MediaQuery.of(context);
@@ -148,6 +148,13 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _requestInitialLocation() async {
+    final locations = context.read<ILocationRepository>();
+    final access = await locations.getLocationAccessStatus();
+    if (!mounted || access == LocationAccessStatus.granted) return;
+    await context.read<NearbyCubit>().requestLocation();
   }
 
   Future<void> _openFilters(NearbyFilters filters) async {
@@ -358,93 +365,113 @@ class _NearbyFeedState extends State<_NearbyFeed> {
     return RefreshIndicator.noSpinner(
       key: _refreshIndicatorKey,
       onRefresh: _handleRefresh,
-      child: Stack(
-        children: [
-          NotificationListener<ScrollNotification>(
-            onNotification: _trackPull,
-            child: CustomScrollView(
-              controller: widget.controller,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.only(
-                    top: 130 + _refreshInset,
-                    left: 16 + systemPadding.left,
-                    right: 16 + systemPadding.right,
-                    bottom: 8,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: _refreshInset),
+        duration: _isPulling
+            ? Duration.zero
+            : const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        builder: (context, animatedInset, _) => Stack(
+          children: [
+            Transform.translate(
+              offset: Offset(0, animatedInset),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _trackPull,
+                child: CustomScrollView(
+                  controller: widget.controller,
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
                   ),
-                  sliver: people.isEmpty
-                      ? SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: 250,
-                            child: Center(
-                              child: Text(
-                                context.l10n.nearbyEmpty,
-                                textAlign: TextAlign.center,
-                                style: context.textTheme.bodyLarge?.copyWith(
-                                  color: context.colorScheme.onSurfaceVariant,
+                  slivers: [
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        top: 130,
+                        left: 16 + systemPadding.left,
+                        right: 16 + systemPadding.right,
+                        bottom: 8,
+                      ),
+                      sliver: people.isEmpty
+                          ? SliverToBoxAdapter(
+                              child: SizedBox(
+                                height: 250,
+                                child: Center(
+                                  child: Text(
+                                    context.l10n.nearbyEmpty,
+                                    textAlign: TextAlign.center,
+                                    style: context.textTheme.bodyLarge
+                                        ?.copyWith(
+                                          color: context
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
                                 ),
                               ),
+                            )
+                          : SliverGrid.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 8,
+                                  ),
+                              itemCount: people.length,
+                              itemBuilder: (context, index) =>
+                                  _NearbyPersonTile(person: people[index]),
+                            ),
+                    ),
+                    if (widget.state.isLoadingMore)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Center(
+                            child: SizedBox.square(
+                              dimension: 24,
+                              child: CircularProgressIndicator(strokeWidth: 3),
                             ),
                           ),
-                        )
-                      : SliverGrid.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
-                              ),
-                          itemCount: people.length,
-                          itemBuilder: (context, index) =>
-                              _NearbyPersonTile(person: people[index]),
-                        ),
-                ),
-                if (widget.state.isLoadingMore)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(18),
-                      child: Center(
-                        child: SizedBox.square(
-                          dimension: 24,
-                          child: CircularProgressIndicator(strokeWidth: 3),
                         ),
                       ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: widget.bottomPadding),
                     ),
-                  ),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: widget.bottomPadding),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-          if (_shouldShowIndicator)
             Positioned(
-              top: 130 + (_refreshInset - 36) / 2,
+              top: 130 + (animatedInset - 36) / 2,
               left: 0,
               right: 0,
-              child: Center(
-                child: Opacity(
-                  opacity: _isRefreshRunning || _isArmed ? 1 : _dragProgress,
-                  child: Transform.scale(
-                    scale:
-                        .65 +
-                        .35 *
-                            (_isRefreshRunning || _isArmed ? 1 : _dragProgress),
-                    child: SizedBox.square(
-                      dimension: 36,
-                      child: CircularProgressIndicator(
-                        value: _isRefreshRunning ? null : _dragProgress,
-                        strokeWidth: 3,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _shouldShowIndicator
+                      ? (_isRefreshRunning || _isArmed ? 1 : _dragProgress)
+                      : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  child: Center(
+                    child: Transform.scale(
+                      scale:
+                          .65 +
+                          .35 *
+                              (_isRefreshRunning || _isArmed
+                                  ? 1
+                                  : _dragProgress),
+                      child: SizedBox.square(
+                        dimension: 36,
+                        child: CircularProgressIndicator(
+                          value: _isRefreshRunning ? null : _dragProgress,
+                          strokeWidth: 4,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

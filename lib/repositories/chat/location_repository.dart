@@ -9,6 +9,22 @@ typedef LocationPositionGetter =
     Future<Position> Function(LocationSettings settings);
 typedef LocationPublisher =
     Future<bool> Function(double latitude, double longitude);
+typedef LocationMetadataPublisher =
+    Future<LocationPublishResult> Function(double latitude, double longitude);
+
+class LocationPublishResult {
+  const LocationPublishResult({
+    required this.didUpdate,
+    required this.latitude,
+    required this.longitude,
+    required this.updatedAt,
+  });
+
+  final bool didUpdate;
+  final double latitude;
+  final double longitude;
+  final DateTime? updatedAt;
+}
 
 class LocationRepository implements ILocationRepository {
   LocationRepository({
@@ -19,6 +35,7 @@ class LocationRepository implements ILocationRepository {
     Future<LocationPermission> Function()? requestPermission,
     LocationPositionGetter? getPosition,
     LocationPublisher? publishLocation,
+    LocationMetadataPublisher? publishLocationMetadata,
     String? Function()? currentUserId,
     double Function(double, double, double, double)? distanceBetween,
     Duration locationPublishTimeout = defaultLocationPublishTimeout,
@@ -33,6 +50,7 @@ class LocationRepository implements ILocationRepository {
            ((settings) =>
                Geolocator.getCurrentPosition(locationSettings: settings)),
        _publishLocation = publishLocation,
+       _publishLocationMetadata = publishLocationMetadata,
        _currentUserId = currentUserId ?? (() => client?.auth.currentUser?.id),
        _distanceBetween = distanceBetween ?? Geolocator.distanceBetween,
        _locationPublishTimeout = locationPublishTimeout;
@@ -49,6 +67,7 @@ class LocationRepository implements ILocationRepository {
   final Future<LocationPermission> Function() _requestPermission;
   final LocationPositionGetter _getPosition;
   final LocationPublisher? _publishLocation;
+  final LocationMetadataPublisher? _publishLocationMetadata;
   final String? Function() _currentUserId;
   final double Function(double, double, double, double) _distanceBetween;
   final Duration _locationPublishTimeout;
@@ -135,6 +154,7 @@ class LocationRepository implements ILocationRepository {
 
     final client = _client;
     if (_publishLocation == null &&
+        _publishLocationMetadata == null &&
         (client == null || client.auth.currentUser?.id != normalizedUserId)) {
       return TrackedLocationRefreshResult.unavailable;
     }
@@ -165,6 +185,7 @@ class LocationRepository implements ILocationRepository {
     }
 
     if (_publishLocation == null &&
+        _publishLocationMetadata == null &&
         (client == null || client.auth.currentUser?.id != normalizedUserId)) {
       return TrackedLocationRefreshResult.unavailable;
     }
@@ -174,19 +195,7 @@ class LocationRepository implements ILocationRepository {
       position.longitude,
     );
     if (published == null) return TrackedLocationRefreshResult.unavailable;
-    if (!published) return TrackedLocationRefreshResult.unchanged;
-    await Future.wait([
-      _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
-      _preferences.setDouble(
-        _longitudeKey(normalizedUserId),
-        position.longitude,
-      ),
-      _preferences.setString(
-        _publishedAtKey(normalizedUserId),
-        DateTime.now().toUtc().toIso8601String(),
-      ),
-    ]);
-    return TrackedLocationRefreshResult.updated;
+    return _savePublishedLocation(normalizedUserId, published);
   }
 
   @override
@@ -200,6 +209,7 @@ class LocationRepository implements ILocationRepository {
     }
     final client = _client;
     if (_publishLocation == null &&
+        _publishLocationMetadata == null &&
         (client == null || client.auth.currentUser?.id != normalizedUserId)) {
       return TrackedLocationRefreshResult.unavailable;
     }
@@ -242,19 +252,26 @@ class LocationRepository implements ILocationRepository {
       position.longitude,
     );
     if (published == null) return TrackedLocationRefreshResult.unavailable;
-    if (!published) return TrackedLocationRefreshResult.unchanged;
+    return _savePublishedLocation(normalizedUserId, published);
+  }
+
+  Future<TrackedLocationRefreshResult> _savePublishedLocation(
+    String userId,
+    LocationPublishResult result,
+  ) async {
+    final updatedAt = result.updatedAt;
+    if (updatedAt == null) return TrackedLocationRefreshResult.unchanged;
     await Future.wait([
-      _preferences.setDouble(_latitudeKey(normalizedUserId), position.latitude),
-      _preferences.setDouble(
-        _longitudeKey(normalizedUserId),
-        position.longitude,
-      ),
+      _preferences.setDouble(_latitudeKey(userId), result.latitude),
+      _preferences.setDouble(_longitudeKey(userId), result.longitude),
       _preferences.setString(
-        _publishedAtKey(normalizedUserId),
-        DateTime.now().toUtc().toIso8601String(),
+        _publishedAtKey(userId),
+        updatedAt.toUtc().toIso8601String(),
       ),
     ]);
-    return TrackedLocationRefreshResult.updated;
+    return result.didUpdate
+        ? TrackedLocationRefreshResult.updated
+        : TrackedLocationRefreshResult.unchanged;
   }
 
   bool _shouldPublish(String userId, Position position) {
@@ -279,16 +296,52 @@ class LocationRepository implements ILocationRepository {
         minimumMovementMeters;
   }
 
-  Future<bool> _publish(double latitude, double longitude) {
+  Future<LocationPublishResult> _publish(
+    double latitude,
+    double longitude,
+  ) async {
+    final metadataPublisher = _publishLocationMetadata;
+    if (metadataPublisher != null) {
+      return metadataPublisher(latitude, longitude);
+    }
     final publisher = _publishLocation;
-    if (publisher != null) return publisher(latitude, longitude);
-    return _client!.rpc<bool>(
-      'update_my_location_with_result',
+    if (publisher != null) {
+      final didUpdate = await publisher(latitude, longitude);
+      return LocationPublishResult(
+        didUpdate: didUpdate,
+        latitude: latitude,
+        longitude: longitude,
+        updatedAt: didUpdate ? DateTime.now().toUtc() : null,
+      );
+    }
+    final response = await _client!.rpc<List<dynamic>>(
+      'update_my_location_with_metadata',
       params: {'new_latitude': latitude, 'new_longitude': longitude},
+    );
+    if (response.isEmpty || response.first is! Map) {
+      throw StateError('Location metadata response is missing.');
+    }
+    final value = Map<String, dynamic>.from(response.first as Map);
+    final updatedAt = DateTime.tryParse(value['updated_at'] as String? ?? '');
+    final serverLatitude = (value['latitude'] as num?)?.toDouble();
+    final serverLongitude = (value['longitude'] as num?)?.toDouble();
+    if (updatedAt == null ||
+        serverLatitude == null ||
+        serverLongitude == null) {
+      throw StateError('Location metadata response is invalid.');
+    }
+    return LocationPublishResult(
+      didUpdate: value['did_update'] as bool? ?? false,
+      latitude: serverLatitude,
+      longitude: serverLongitude,
+      updatedAt: updatedAt,
     );
   }
 
-  Future<bool?> _publishWithTimeout(double latitude, double longitude) async {
+  Future<LocationPublishResult?> _publishWithTimeout(
+    double latitude,
+    double longitude,
+  ) async {
     try {
       return await _publish(
         latitude,

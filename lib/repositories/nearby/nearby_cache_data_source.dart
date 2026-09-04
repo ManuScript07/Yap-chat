@@ -79,15 +79,6 @@ class NearbyCacheDataSource {
     }
   }
 
-  /// The nearby RPC only succeeds when the server has a location younger than
-  /// twelve hours. Keep that confirmation separately from a filter snapshot:
-  /// changing filters must not make a still-valid server location disappear
-  /// while the device GPS is disabled or the app is offline.
-  Future<DateTime?> readLocationConfirmation(String ownerUserId) async =>
-      DateTime.tryParse(
-        _preferences.getString(_locationConfirmationKey(ownerUserId)) ?? '',
-      )?.toUtc();
-
   Future<void> replace(
     String ownerUserId,
     NearbyFilters filters, {
@@ -174,10 +165,6 @@ class NearbyCacheDataSource {
             .toList(growable: false),
       }),
     );
-    await _preferences.setString(
-      _locationConfirmationKey(ownerUserId),
-      DateTime.now().toUtc().toIso8601String(),
-    );
     await _trimSnapshots(ownerUserId);
   }
 
@@ -213,9 +200,6 @@ class NearbyCacheDataSource {
   }
 
   String _filtersKey(String ownerUserId) => '$_keyPrefix$ownerUserId.filters';
-
-  String _locationConfirmationKey(String ownerUserId) =>
-      '$_keyPrefix$ownerUserId.location_confirmation';
 
   String _feedKey(String ownerUserId, NearbyFilters filters) =>
       '$_keyPrefix$ownerUserId.feed.${filters.normalized().cacheKey}';
