@@ -9,16 +9,16 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
-  String get navChats => 'Чатикс';
+  String get navChats => 'чатикс';
 
   @override
-  String get navFriends => 'Друны';
+  String get navFriends => 'друны';
 
   @override
-  String get navNearby => 'Рядом';
+  String get navNearby => 'рядом';
 
   @override
-  String get navProfile => 'Акк';
+  String get navProfile => 'акк';
 
   @override
   String get searchHintChats => 'поиск по чатам';
@@ -27,13 +27,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatsMessagePrefixYou => 'Ты';
 
   @override
-  String get timeJustNow => 'Только что';
+  String get timeJustNow => 'только что';
 
   @override
-  String get today => 'Сегодня';
+  String get today => 'сегодня';
 
   @override
-  String get timeYesterday => 'Вчера';
+  String get timeYesterday => 'вчера';
 
   @override
   String timeMinutesAgo(num count) {
@@ -75,10 +75,10 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get failedToLoadChats => 'Не удалось загрузить чаты';
+  String get failedToLoadChats => 'не удалось загрузить чаты';
 
   @override
-  String get noChats => 'У вас нет чатов';
+  String get noChats => 'у вас нет чатов';
 
   @override
   String get chatsNoSearchResults => 'ничего не нашли';
@@ -106,155 +106,155 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get chatInputHint => 'Введите сообщение';
+  String get chatInputHint => 'введите сообщение';
 
   @override
-  String get chatUserBlocked => 'Пользователь заблокирован';
+  String get chatUserBlocked => 'пользователь заблокирован';
 
   @override
-  String get chatOnlineStatus => 'В сети';
+  String get chatOnlineStatus => 'в сети';
 
   @override
-  String get chatOfflineStatus => 'Не в сети';
+  String get chatOfflineStatus => 'не в сети';
 
   @override
   String chatLastSeenToday(Object time) {
-    return 'Был(а) в $time';
+    return 'был(а) в $time';
   }
 
   @override
   String chatLastSeenYesterday(Object time) {
-    return 'Был(а) вчера в $time';
+    return 'был(а) вчера в $time';
   }
 
   @override
   String chatLastSeenDate(Object date, Object time) {
-    return 'Был(а) $date в $time';
+    return 'был(а) $date в $time';
   }
 
   @override
-  String get chatAddPhoto => 'Добавить фото';
+  String get chatAddPhoto => 'добавить фото';
 
   @override
-  String get chatActionCamera => 'Камера';
+  String get chatActionCamera => 'камера';
 
   @override
-  String get chatActionGallery => 'Галерея';
+  String get chatActionGallery => 'галерея';
 
   @override
-  String get chatActionLocation => 'Локация';
+  String get chatActionLocation => 'локация';
 
   @override
   String chatSendFiles(Object count) {
-    return 'Отправить ($count)';
+    return 'отправить ($count)';
   }
 
   @override
-  String get chatSelectFiles => 'Выберите файлы';
+  String get chatSelectFiles => 'выберите файлы';
 
   @override
   String get noMessages => 'тут пока ничего нет';
 
   @override
-  String get permissionDenied => 'Разрешение отклонено';
+  String get permissionDenied => 'разрешение отклонено';
 
   @override
   String get youMustAllowCameraPermission =>
-      'Чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.';
+      'чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.';
 
   @override
-  String get cancel => 'Отмена';
+  String get cancel => 'отмена';
 
   @override
-  String get settings => 'Настроки';
+  String get settings => 'настроки';
 
   @override
-  String get settingsTitle => 'Настройки';
+  String get settingsTitle => 'настройки';
 
   @override
-  String get settingsPrivacy => 'Приватность';
+  String get settingsPrivacy => 'приватность';
 
   @override
-  String get settingsVisibility => 'Настройки видимости';
+  String get settingsVisibility => 'настройки видимости';
 
   @override
-  String get settingsLanguage => 'Язык';
+  String get settingsLanguage => 'язык';
 
   @override
-  String get settingsHelp => 'Помощь';
+  String get settingsHelp => 'помощь';
 
   @override
-  String get settingsAbout => 'О приложении';
+  String get settingsAbout => 'о приложении';
 
   @override
-  String get settingsSocial => 'Мы в соцсетях';
+  String get settingsSocial => 'мы в соцсетях';
 
   @override
-  String get settingsLogout => 'Выход';
+  String get settingsLogout => 'выход';
 
   @override
-  String get settingsLogoutConfirmationTitle => 'Выйти из аккаунта?';
+  String get settingsLogoutConfirmationTitle => 'выйти из аккаунта?';
 
   @override
   String get settingsLogoutConfirmationContent =>
-      'Вы уверены, что хотите выйти из аккаунта?';
+      'вы уверены, что хотите выйти из аккаунта?';
 
   @override
-  String get settingsLogoutConfirm => 'Выйти';
+  String get settingsLogoutConfirm => 'выйти';
 
   @override
-  String get settingsDeleteAccount => 'Удалить аккаунт';
+  String get settingsDeleteAccount => 'удалить аккаунт';
 
   @override
-  String get settingsBlacklist => 'Чёрный список';
+  String get settingsBlacklist => 'чёрный список';
 
   @override
-  String get settingsSearchByUsername => 'Искать по никнейму';
+  String get settingsSearchByUsername => 'искать по никнейму';
 
   @override
-  String get settingsSearchByPhone => 'Искать по номеру';
+  String get settingsSearchByPhone => 'искать по номеру';
 
   @override
-  String get settingsSearchByName => 'Искать по имени';
+  String get settingsSearchByName => 'искать по имени';
 
   @override
   String get settingsLastSeenVisibility => 'отображение времени захода';
 
   @override
-  String get settingsLastSeenAll => 'Все';
+  String get settingsLastSeenAll => 'все';
 
   @override
-  String get settingsLastSeenFriends => 'Только друзья';
+  String get settingsLastSeenFriends => 'только друзья';
 
   @override
-  String get settingsLastSeenNobody => 'Никто';
+  String get settingsLastSeenNobody => 'никто';
 
   @override
-  String get settingsPrivacyChangeTitle => 'Изменить видимость поиска?';
+  String get settingsPrivacyChangeTitle => 'изменить видимость поиска?';
 
   @override
   String get settingsPrivacyChangeContent =>
       'Это изменит, смогут ли другие пользователи найти вас этим способом. Текущие друзья по-прежнему будут вас видеть.';
 
   @override
-  String get settingsPrivacyChangeConfirm => 'Изменить';
+  String get settingsPrivacyChangeConfirm => 'изменить';
 
   @override
-  String get settingsPrivacySaved => 'Настройка приватности сохранена';
+  String get settingsPrivacySaved => 'настройка приватности сохранена';
 
   @override
   String get settingsPrivacySaveFailed =>
-      'Не удалось сохранить настройку приватности';
+      'не удалось сохранить настройку приватности';
 
   @override
   String get settingsPrivacyLoadFailed =>
-      'Не удалось загрузить настройки приватности';
+      'не удалось загрузить настройки приватности';
 
   @override
-  String get settingsShareLocation => 'Делиться гео';
+  String get settingsShareLocation => 'делиться гео';
 
   @override
-  String get settingsShareDistance => 'Показывать расстояние';
+  String get settingsShareDistance => 'показывать расстояние';
 
   @override
   String get settingsFriendsSeeGeo => 'видят твоё точное гео';
@@ -266,22 +266,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsLanguageEnglish => 'english';
 
   @override
-  String get settingsLanguageSaved => 'Язык сохранён';
+  String get settingsLanguageSaved => 'язык сохранён';
 
   @override
-  String get settingsLanguageSaveFailed => 'Не удалось сохранить язык';
+  String get settingsLanguageSaveFailed => 'не удалось сохранить язык';
 
   @override
-  String get settingsSupportEmail => 'Написать на почту';
+  String get settingsSupportEmail => 'написать на почту';
 
   @override
-  String get settingsCopyEmail => 'Скопировать почту';
+  String get settingsCopyEmail => 'скопировать почту';
 
   @override
-  String get settingsEmailCopied => 'Почта скопирована';
+  String get settingsEmailCopied => 'почта скопирована';
 
   @override
-  String get settingsPublicContentUnavailable => 'Информация пока недоступна';
+  String get settingsPublicContentUnavailable => 'информация пока недоступна';
 
   @override
   String get settingsSearchBlacklist => 'поиск';
@@ -291,25 +291,25 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get settingsBlacklistLoadFailed =>
-      'Не удалось загрузить черный список';
+      'не удалось загрузить черный список';
 
   @override
   String get settingsComingSoon => 'скоро';
 
   @override
-  String get settingsTerms => 'Условия обслуживания';
+  String get settingsTerms => 'условия обслуживания';
 
   @override
-  String get settingsPrivacyPolicy => 'Политика конфиденциальности';
+  String get settingsPrivacyPolicy => 'политика конфиденциальности';
 
   @override
-  String get photoHasBeenSavedToGallery => 'Фото сохранено в галерею';
+  String get photoHasBeenSavedToGallery => 'фото сохранено в галерею';
 
   @override
   String get failedToSavePhoto => 'Не удалось сохранить фото';
 
   @override
-  String get repeat => 'Повторить';
+  String get repeat => 'Пповторить';
 
   @override
   String locationConfirmation(Object name) {

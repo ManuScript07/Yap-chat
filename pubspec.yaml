@@ -77,6 +77,8 @@ flutter:
   assets:
     - .env
     - assets/logo/
+    - assets/images/distance_24dp_outlined.svg
+    - assets/images/distance_24dp.svg
     - assets/images/empty_chat.svg
     - assets/images/mood_bad_24dp.svg
 

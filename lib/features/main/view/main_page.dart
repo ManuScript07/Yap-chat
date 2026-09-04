@@ -124,9 +124,9 @@ class _MainView extends StatelessWidget {
                   label: context.l10n.navChats,
                   unreadCount: unreadChatsCount,
                 ),
-                FloatingNavigationBarItem(
-                  icon: Icons.people_outline_rounded,
-                  activeIcon: Icons.people_rounded,
+                FloatingNavigationBarItem.asset(
+                  iconAsset: 'assets/images/distance_24dp_outlined.svg',
+                  activeIconAsset: 'assets/images/distance_24dp.svg',
                   label: context.l10n.navNearby,
                 ),
                 FloatingNavigationBarItem(

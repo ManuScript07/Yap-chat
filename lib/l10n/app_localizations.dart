@@ -101,25 +101,25 @@ abstract class AppLocalizations {
   /// No description provided for @navChats.
   ///
   /// In ru, this message translates to:
-  /// **'Чатикс'**
+  /// **'чатикс'**
   String get navChats;
 
   /// No description provided for @navFriends.
   ///
   /// In ru, this message translates to:
-  /// **'Друны'**
+  /// **'друны'**
   String get navFriends;
 
   /// No description provided for @navNearby.
   ///
   /// In ru, this message translates to:
-  /// **'Рядом'**
+  /// **'рядом'**
   String get navNearby;
 
   /// No description provided for @navProfile.
   ///
   /// In ru, this message translates to:
-  /// **'Акк'**
+  /// **'акк'**
   String get navProfile;
 
   /// No description provided for @searchHintChats.
@@ -137,19 +137,19 @@ abstract class AppLocalizations {
   /// No description provided for @timeJustNow.
   ///
   /// In ru, this message translates to:
-  /// **'Только что'**
+  /// **'только что'**
   String get timeJustNow;
 
   /// No description provided for @today.
   ///
   /// In ru, this message translates to:
-  /// **'Сегодня'**
+  /// **'сегодня'**
   String get today;
 
   /// No description provided for @timeYesterday.
   ///
   /// In ru, this message translates to:
-  /// **'Вчера'**
+  /// **'вчера'**
   String get timeYesterday;
 
   /// No description provided for @timeMinutesAgo.
@@ -173,13 +173,13 @@ abstract class AppLocalizations {
   /// No description provided for @failedToLoadChats.
   ///
   /// In ru, this message translates to:
-  /// **'Не удалось загрузить чаты'**
+  /// **'не удалось загрузить чаты'**
   String get failedToLoadChats;
 
   /// No description provided for @noChats.
   ///
   /// In ru, this message translates to:
-  /// **'У вас нет чатов'**
+  /// **'у вас нет чатов'**
   String get noChats;
 
   /// No description provided for @chatsNoSearchResults.
@@ -203,79 +203,79 @@ abstract class AppLocalizations {
   /// No description provided for @chatInputHint.
   ///
   /// In ru, this message translates to:
-  /// **'Введите сообщение'**
+  /// **'введите сообщение'**
   String get chatInputHint;
 
   /// No description provided for @chatUserBlocked.
   ///
   /// In ru, this message translates to:
-  /// **'Пользователь заблокирован'**
+  /// **'пользователь заблокирован'**
   String get chatUserBlocked;
 
   /// No description provided for @chatOnlineStatus.
   ///
   /// In ru, this message translates to:
-  /// **'В сети'**
+  /// **'в сети'**
   String get chatOnlineStatus;
 
   /// No description provided for @chatOfflineStatus.
   ///
   /// In ru, this message translates to:
-  /// **'Не в сети'**
+  /// **'не в сети'**
   String get chatOfflineStatus;
 
   /// No description provided for @chatLastSeenToday.
   ///
   /// In ru, this message translates to:
-  /// **'Был(а) в {time}'**
+  /// **'был(а) в {time}'**
   String chatLastSeenToday(Object time);
 
   /// No description provided for @chatLastSeenYesterday.
   ///
   /// In ru, this message translates to:
-  /// **'Был(а) вчера в {time}'**
+  /// **'был(а) вчера в {time}'**
   String chatLastSeenYesterday(Object time);
 
   /// No description provided for @chatLastSeenDate.
   ///
   /// In ru, this message translates to:
-  /// **'Был(а) {date} в {time}'**
+  /// **'был(а) {date} в {time}'**
   String chatLastSeenDate(Object date, Object time);
 
   /// No description provided for @chatAddPhoto.
   ///
   /// In ru, this message translates to:
-  /// **'Добавить фото'**
+  /// **'добавить фото'**
   String get chatAddPhoto;
 
   /// No description provided for @chatActionCamera.
   ///
   /// In ru, this message translates to:
-  /// **'Камера'**
+  /// **'камера'**
   String get chatActionCamera;
 
   /// No description provided for @chatActionGallery.
   ///
   /// In ru, this message translates to:
-  /// **'Галерея'**
+  /// **'галерея'**
   String get chatActionGallery;
 
   /// No description provided for @chatActionLocation.
   ///
   /// In ru, this message translates to:
-  /// **'Локация'**
+  /// **'локация'**
   String get chatActionLocation;
 
   /// No description provided for @chatSendFiles.
   ///
   /// In ru, this message translates to:
-  /// **'Отправить ({count})'**
+  /// **'отправить ({count})'**
   String chatSendFiles(Object count);
 
   /// No description provided for @chatSelectFiles.
   ///
   /// In ru, this message translates to:
-  /// **'Выберите файлы'**
+  /// **'выберите файлы'**
   String get chatSelectFiles;
 
   /// No description provided for @noMessages.
@@ -287,121 +287,121 @@ abstract class AppLocalizations {
   /// No description provided for @permissionDenied.
   ///
   /// In ru, this message translates to:
-  /// **'Разрешение отклонено'**
+  /// **'разрешение отклонено'**
   String get permissionDenied;
 
   /// No description provided for @youMustAllowCameraPermission.
   ///
   /// In ru, this message translates to:
-  /// **'Чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.'**
+  /// **'чтобы сделать фото, необходимо разрешить доступ к камере в настройках приложения.'**
   String get youMustAllowCameraPermission;
 
   /// No description provided for @cancel.
   ///
   /// In ru, this message translates to:
-  /// **'Отмена'**
+  /// **'отмена'**
   String get cancel;
 
   /// No description provided for @settings.
   ///
   /// In ru, this message translates to:
-  /// **'Настроки'**
+  /// **'настроки'**
   String get settings;
 
   /// No description provided for @settingsTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Настройки'**
+  /// **'настройки'**
   String get settingsTitle;
 
   /// No description provided for @settingsPrivacy.
   ///
   /// In ru, this message translates to:
-  /// **'Приватность'**
+  /// **'приватность'**
   String get settingsPrivacy;
 
   /// No description provided for @settingsVisibility.
   ///
   /// In ru, this message translates to:
-  /// **'Настройки видимости'**
+  /// **'настройки видимости'**
   String get settingsVisibility;
 
   /// No description provided for @settingsLanguage.
   ///
   /// In ru, this message translates to:
-  /// **'Язык'**
+  /// **'язык'**
   String get settingsLanguage;
 
   /// No description provided for @settingsHelp.
   ///
   /// In ru, this message translates to:
-  /// **'Помощь'**
+  /// **'помощь'**
   String get settingsHelp;
 
   /// No description provided for @settingsAbout.
   ///
   /// In ru, this message translates to:
-  /// **'О приложении'**
+  /// **'о приложении'**
   String get settingsAbout;
 
   /// No description provided for @settingsSocial.
   ///
   /// In ru, this message translates to:
-  /// **'Мы в соцсетях'**
+  /// **'мы в соцсетях'**
   String get settingsSocial;
 
   /// No description provided for @settingsLogout.
   ///
   /// In ru, this message translates to:
-  /// **'Выход'**
+  /// **'выход'**
   String get settingsLogout;
 
   /// No description provided for @settingsLogoutConfirmationTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Выйти из аккаунта?'**
+  /// **'выйти из аккаунта?'**
   String get settingsLogoutConfirmationTitle;
 
   /// No description provided for @settingsLogoutConfirmationContent.
   ///
   /// In ru, this message translates to:
-  /// **'Вы уверены, что хотите выйти из аккаунта?'**
+  /// **'вы уверены, что хотите выйти из аккаунта?'**
   String get settingsLogoutConfirmationContent;
 
   /// No description provided for @settingsLogoutConfirm.
   ///
   /// In ru, this message translates to:
-  /// **'Выйти'**
+  /// **'выйти'**
   String get settingsLogoutConfirm;
 
   /// No description provided for @settingsDeleteAccount.
   ///
   /// In ru, this message translates to:
-  /// **'Удалить аккаунт'**
+  /// **'удалить аккаунт'**
   String get settingsDeleteAccount;
 
   /// No description provided for @settingsBlacklist.
   ///
   /// In ru, this message translates to:
-  /// **'Чёрный список'**
+  /// **'чёрный список'**
   String get settingsBlacklist;
 
   /// No description provided for @settingsSearchByUsername.
   ///
   /// In ru, this message translates to:
-  /// **'Искать по никнейму'**
+  /// **'искать по никнейму'**
   String get settingsSearchByUsername;
 
   /// No description provided for @settingsSearchByPhone.
   ///
   /// In ru, this message translates to:
-  /// **'Искать по номеру'**
+  /// **'искать по номеру'**
   String get settingsSearchByPhone;
 
   /// No description provided for @settingsSearchByName.
   ///
   /// In ru, this message translates to:
-  /// **'Искать по имени'**
+  /// **'искать по имени'**
   String get settingsSearchByName;
 
   /// No description provided for @settingsLastSeenVisibility.
@@ -413,25 +413,25 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLastSeenAll.
   ///
   /// In ru, this message translates to:
-  /// **'Все'**
+  /// **'все'**
   String get settingsLastSeenAll;
 
   /// No description provided for @settingsLastSeenFriends.
   ///
   /// In ru, this message translates to:
-  /// **'Только друзья'**
+  /// **'только друзья'**
   String get settingsLastSeenFriends;
 
   /// No description provided for @settingsLastSeenNobody.
   ///
   /// In ru, this message translates to:
-  /// **'Никто'**
+  /// **'никто'**
   String get settingsLastSeenNobody;
 
   /// No description provided for @settingsPrivacyChangeTitle.
   ///
   /// In ru, this message translates to:
-  /// **'Изменить видимость поиска?'**
+  /// **'изменить видимость поиска?'**
   String get settingsPrivacyChangeTitle;
 
   /// No description provided for @settingsPrivacyChangeContent.
@@ -443,37 +443,37 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPrivacyChangeConfirm.
   ///
   /// In ru, this message translates to:
-  /// **'Изменить'**
+  /// **'изменить'**
   String get settingsPrivacyChangeConfirm;
 
   /// No description provided for @settingsPrivacySaved.
   ///
   /// In ru, this message translates to:
-  /// **'Настройка приватности сохранена'**
+  /// **'настройка приватности сохранена'**
   String get settingsPrivacySaved;
 
   /// No description provided for @settingsPrivacySaveFailed.
   ///
   /// In ru, this message translates to:
-  /// **'Не удалось сохранить настройку приватности'**
+  /// **'не удалось сохранить настройку приватности'**
   String get settingsPrivacySaveFailed;
 
   /// No description provided for @settingsPrivacyLoadFailed.
   ///
   /// In ru, this message translates to:
-  /// **'Не удалось загрузить настройки приватности'**
+  /// **'не удалось загрузить настройки приватности'**
   String get settingsPrivacyLoadFailed;
 
   /// No description provided for @settingsShareLocation.
   ///
   /// In ru, this message translates to:
-  /// **'Делиться гео'**
+  /// **'делиться гео'**
   String get settingsShareLocation;
 
   /// No description provided for @settingsShareDistance.
   ///
   /// In ru, this message translates to:
-  /// **'Показывать расстояние'**
+  /// **'показывать расстояние'**
   String get settingsShareDistance;
 
   /// No description provided for @settingsFriendsSeeGeo.
@@ -497,37 +497,37 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLanguageSaved.
   ///
   /// In ru, this message translates to:
-  /// **'Язык сохранён'**
+  /// **'язык сохранён'**
   String get settingsLanguageSaved;
 
   /// No description provided for @settingsLanguageSaveFailed.
   ///
   /// In ru, this message translates to:
-  /// **'Не удалось сохранить язык'**
+  /// **'не удалось сохранить язык'**
   String get settingsLanguageSaveFailed;
 
   /// No description provided for @settingsSupportEmail.
   ///
   /// In ru, this message translates to:
-  /// **'Написать на почту'**
+  /// **'написать на почту'**
   String get settingsSupportEmail;
 
   /// No description provided for @settingsCopyEmail.
   ///
   /// In ru, this message translates to:
-  /// **'Скопировать почту'**
+  /// **'скопировать почту'**
   String get settingsCopyEmail;
 
   /// No description provided for @settingsEmailCopied.
   ///
   /// In ru, this message translates to:
-  /// **'Почта скопирована'**
+  /// **'почта скопирована'**
   String get settingsEmailCopied;
 
   /// No description provided for @settingsPublicContentUnavailable.
   ///
   /// In ru, this message translates to:
-  /// **'Информация пока недоступна'**
+  /// **'информация пока недоступна'**
   String get settingsPublicContentUnavailable;
 
   /// No description provided for @settingsSearchBlacklist.
@@ -545,7 +545,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsBlacklistLoadFailed.
   ///
   /// In ru, this message translates to:
-  /// **'Не удалось загрузить черный список'**
+  /// **'не удалось загрузить черный список'**
   String get settingsBlacklistLoadFailed;
 
   /// No description provided for @settingsComingSoon.
@@ -557,19 +557,19 @@ abstract class AppLocalizations {
   /// No description provided for @settingsTerms.
   ///
   /// In ru, this message translates to:
-  /// **'Условия обслуживания'**
+  /// **'условия обслуживания'**
   String get settingsTerms;
 
   /// No description provided for @settingsPrivacyPolicy.
   ///
   /// In ru, this message translates to:
-  /// **'Политика конфиденциальности'**
+  /// **'политика конфиденциальности'**
   String get settingsPrivacyPolicy;
 
   /// No description provided for @photoHasBeenSavedToGallery.
   ///
   /// In ru, this message translates to:
-  /// **'Фото сохранено в галерею'**
+  /// **'фото сохранено в галерею'**
   String get photoHasBeenSavedToGallery;
 
   /// No description provided for @failedToSavePhoto.
@@ -581,7 +581,7 @@ abstract class AppLocalizations {
   /// No description provided for @repeat.
   ///
   /// In ru, this message translates to:
-  /// **'Повторить'**
+  /// **'Пповторить'**
   String get repeat;
 
   /// No description provided for @locationConfirmation.
