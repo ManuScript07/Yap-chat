@@ -10,6 +10,7 @@ class ViewedProfileFriend extends Equatable {
     required this.displayName,
     this.avatarUrl,
     this.avatarStoragePath,
+    this.mutualFriendCount = 0,
   });
 
   final String id;
@@ -17,6 +18,7 @@ class ViewedProfileFriend extends Equatable {
   final String displayName;
   final String? avatarUrl;
   final String? avatarStoragePath;
+  final int mutualFriendCount;
 
   @override
   List<Object?> get props => [
@@ -25,7 +27,41 @@ class ViewedProfileFriend extends Equatable {
     displayName,
     avatarUrl,
     avatarStoragePath,
+    mutualFriendCount,
   ];
+}
+
+/// One cursor page of another user's visible friends.  The server calculates
+/// [ViewedProfileFriend.mutualFriendCount] for this bounded page in the same
+/// RPC, so rendering a list never becomes an N+1 request pattern.
+class ViewedProfileFriendsPage extends Equatable {
+  const ViewedProfileFriendsPage({
+    required this.friends,
+    required this.hasMore,
+  });
+
+  final List<ViewedProfileFriend> friends;
+  final bool hasMore;
+
+  @override
+  List<Object?> get props => [friends, hasMore];
+}
+
+/// A local cache snapshot.  Its timestamp belongs to the assembled list,
+/// rather than each row, because a refresh replaces the first page atomically.
+class ViewedProfileFriendsSnapshot extends Equatable {
+  const ViewedProfileFriendsSnapshot({
+    required this.friends,
+    required this.hasMore,
+    required this.cachedAt,
+  });
+
+  final List<ViewedProfileFriend> friends;
+  final bool hasMore;
+  final DateTime cachedAt;
+
+  @override
+  List<Object?> get props => [friends, hasMore, cachedAt];
 }
 
 class ViewedProfile extends Equatable {

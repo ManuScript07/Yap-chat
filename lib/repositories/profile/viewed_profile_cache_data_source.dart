@@ -70,7 +70,10 @@ class ViewedProfileCacheDataSource {
             table.ownerUserId.equals(ownerUserId) &
             table.targetUserId.equals(targetUserId),
       )
-      ..orderBy([(table) => OrderingTerm.asc(table.displayName)]);
+      ..orderBy([
+        (table) => OrderingTerm.asc(table.displayName),
+        (table) => OrderingTerm.asc(table.friendUserId),
+      ]);
     return (await query.get())
         .map(
           (row) => ViewedProfileFriend(
@@ -79,6 +82,7 @@ class ViewedProfileCacheDataSource {
             displayName: row.displayName,
             avatarUrl: row.avatarUrl,
             avatarStoragePath: row.avatarStoragePath,
+            mutualFriendCount: row.mutualFriendCount,
           ),
         )
         .toList(growable: false);
@@ -97,10 +101,31 @@ class ViewedProfileCacheDataSource {
     return (await query.getSingleOrNull())?.cachedAt;
   }
 
+  Future<ViewedProfileFriendsSnapshot?> readFriendsSnapshot(
+    String ownerUserId,
+    String targetUserId,
+  ) async {
+    final markerQuery = _database.select(_database.cachedViewedProfileFriendLists)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(ownerUserId) &
+            table.targetUserId.equals(targetUserId),
+      );
+    final marker = await markerQuery.getSingleOrNull();
+    if (marker == null) return null;
+    return ViewedProfileFriendsSnapshot(
+      friends: await readFriends(ownerUserId, targetUserId),
+      hasMore: marker.hasMore,
+      cachedAt: marker.cachedAt,
+    );
+  }
+
   Future<void> replaceFriends(
     String ownerUserId,
     String targetUserId,
-    List<ViewedProfileFriend> friends,
+    List<ViewedProfileFriend> friends, {
+    bool hasMore = false,
+  }
   ) => _database.transaction(() async {
     final cachedAt = DateTime.now().toUtc();
     await (_database.delete(_database.cachedViewedProfileFriends)..where(
@@ -121,6 +146,7 @@ class ViewedProfileCacheDataSource {
               displayName: friend.displayName,
               avatarUrl: Value(friend.avatarUrl),
               avatarStoragePath: Value(friend.avatarStoragePath),
+              mutualFriendCount: Value(friend.mutualFriendCount),
               cachedAt: cachedAt,
             ),
           );
@@ -131,6 +157,43 @@ class ViewedProfileCacheDataSource {
           CachedViewedProfileFriendListsCompanion.insert(
             ownerUserId: ownerUserId,
             targetUserId: targetUserId,
+            hasMore: Value(hasMore),
+            cachedAt: cachedAt,
+          ),
+        );
+  });
+
+  Future<void> appendFriends(
+    String ownerUserId,
+    String targetUserId,
+    List<ViewedProfileFriend> friends, {
+    required bool hasMore,
+  }) => _database.transaction(() async {
+    final cachedAt = DateTime.now().toUtc();
+    for (final friend in friends) {
+      await _database
+          .into(_database.cachedViewedProfileFriends)
+          .insertOnConflictUpdate(
+            CachedViewedProfileFriendsCompanion.insert(
+              ownerUserId: ownerUserId,
+              targetUserId: targetUserId,
+              friendUserId: friend.id,
+              username: friend.username,
+              displayName: friend.displayName,
+              avatarUrl: Value(friend.avatarUrl),
+              avatarStoragePath: Value(friend.avatarStoragePath),
+              mutualFriendCount: Value(friend.mutualFriendCount),
+              cachedAt: cachedAt,
+            ),
+          );
+    }
+    await _database
+        .into(_database.cachedViewedProfileFriendLists)
+        .insertOnConflictUpdate(
+          CachedViewedProfileFriendListsCompanion.insert(
+            ownerUserId: ownerUserId,
+            targetUserId: targetUserId,
+            hasMore: Value(hasMore),
             cachedAt: cachedAt,
           ),
         );
@@ -167,6 +230,7 @@ class ViewedProfileCacheDataSource {
     'display_name': friend.displayName,
     'avatar_url': friend.avatarUrl,
     'avatar_storage_path': friend.avatarStoragePath,
+    'mutual_friend_count': friend.mutualFriendCount,
   };
 
   List<ViewedProfileFriend> _decodeFriends(String value) {
@@ -188,5 +252,6 @@ class ViewedProfileCacheDataSource {
             ? row['avatar_url'] as String?
             : null,
         avatarStoragePath: row['avatar_storage_path'] as String?,
+        mutualFriendCount: (row['mutual_friend_count'] as num?)?.toInt() ?? 0,
       );
 }

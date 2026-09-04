@@ -215,6 +215,7 @@ class CachedViewedProfileFriends extends Table {
   TextColumn get displayName => text()();
   TextColumn get avatarUrl => text().nullable()();
   TextColumn get avatarStoragePath => text().nullable()();
+  IntColumn get mutualFriendCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
@@ -224,6 +225,7 @@ class CachedViewedProfileFriends extends Table {
 class CachedViewedProfileFriendLists extends Table {
   TextColumn get ownerUserId => text()();
   TextColumn get targetUserId => text()();
+  BoolColumn get hasMore => boolean().withDefault(const Constant(false))();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
@@ -299,7 +301,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -395,6 +397,18 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 19) {
         await _createBlocklistCacheTables();
+      }
+      if (from >= 15 && from < 20) {
+        await migrator.addColumn(
+          cachedViewedProfileFriends,
+          cachedViewedProfileFriends.mutualFriendCount,
+        );
+      }
+      if (from >= 16 && from < 20) {
+        await migrator.addColumn(
+          cachedViewedProfileFriendLists,
+          cachedViewedProfileFriendLists.hasMore,
+        );
       }
     },
     beforeOpen: (details) async {

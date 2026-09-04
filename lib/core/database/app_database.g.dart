@@ -8229,6 +8229,18 @@ class $CachedViewedProfileFriendsTable extends CachedViewedProfileFriends
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _mutualFriendCountMeta = const VerificationMeta(
+    'mutualFriendCount',
+  );
+  @override
+  late final GeneratedColumn<int> mutualFriendCount = GeneratedColumn<int>(
+    'mutual_friend_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -8249,6 +8261,7 @@ class $CachedViewedProfileFriendsTable extends CachedViewedProfileFriends
     displayName,
     avatarUrl,
     avatarStoragePath,
+    mutualFriendCount,
     cachedAt,
   ];
   @override
@@ -8330,6 +8343,15 @@ class $CachedViewedProfileFriendsTable extends CachedViewedProfileFriends
         ),
       );
     }
+    if (data.containsKey('mutual_friend_count')) {
+      context.handle(
+        _mutualFriendCountMeta,
+        mutualFriendCount.isAcceptableOrUnknown(
+          data['mutual_friend_count']!,
+          _mutualFriendCountMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -8382,6 +8404,10 @@ class $CachedViewedProfileFriendsTable extends CachedViewedProfileFriends
         DriftSqlType.string,
         data['${effectivePrefix}avatar_storage_path'],
       ),
+      mutualFriendCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}mutual_friend_count'],
+      )!,
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -8404,6 +8430,7 @@ class CachedViewedProfileFriend extends DataClass
   final String displayName;
   final String? avatarUrl;
   final String? avatarStoragePath;
+  final int mutualFriendCount;
   final DateTime cachedAt;
   const CachedViewedProfileFriend({
     required this.ownerUserId,
@@ -8413,6 +8440,7 @@ class CachedViewedProfileFriend extends DataClass
     required this.displayName,
     this.avatarUrl,
     this.avatarStoragePath,
+    required this.mutualFriendCount,
     required this.cachedAt,
   });
   @override
@@ -8429,6 +8457,7 @@ class CachedViewedProfileFriend extends DataClass
     if (!nullToAbsent || avatarStoragePath != null) {
       map['avatar_storage_path'] = Variable<String>(avatarStoragePath);
     }
+    map['mutual_friend_count'] = Variable<int>(mutualFriendCount);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -8446,6 +8475,7 @@ class CachedViewedProfileFriend extends DataClass
       avatarStoragePath: avatarStoragePath == null && nullToAbsent
           ? const Value.absent()
           : Value(avatarStoragePath),
+      mutualFriendCount: Value(mutualFriendCount),
       cachedAt: Value(cachedAt),
     );
   }
@@ -8465,6 +8495,7 @@ class CachedViewedProfileFriend extends DataClass
       avatarStoragePath: serializer.fromJson<String?>(
         json['avatarStoragePath'],
       ),
+      mutualFriendCount: serializer.fromJson<int>(json['mutualFriendCount']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -8479,6 +8510,7 @@ class CachedViewedProfileFriend extends DataClass
       'displayName': serializer.toJson<String>(displayName),
       'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'avatarStoragePath': serializer.toJson<String?>(avatarStoragePath),
+      'mutualFriendCount': serializer.toJson<int>(mutualFriendCount),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -8491,6 +8523,7 @@ class CachedViewedProfileFriend extends DataClass
     String? displayName,
     Value<String?> avatarUrl = const Value.absent(),
     Value<String?> avatarStoragePath = const Value.absent(),
+    int? mutualFriendCount,
     DateTime? cachedAt,
   }) => CachedViewedProfileFriend(
     ownerUserId: ownerUserId ?? this.ownerUserId,
@@ -8502,6 +8535,7 @@ class CachedViewedProfileFriend extends DataClass
     avatarStoragePath: avatarStoragePath.present
         ? avatarStoragePath.value
         : this.avatarStoragePath,
+    mutualFriendCount: mutualFriendCount ?? this.mutualFriendCount,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedViewedProfileFriend copyWithCompanion(
@@ -8525,6 +8559,9 @@ class CachedViewedProfileFriend extends DataClass
       avatarStoragePath: data.avatarStoragePath.present
           ? data.avatarStoragePath.value
           : this.avatarStoragePath,
+      mutualFriendCount: data.mutualFriendCount.present
+          ? data.mutualFriendCount.value
+          : this.mutualFriendCount,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -8539,6 +8576,7 @@ class CachedViewedProfileFriend extends DataClass
           ..write('displayName: $displayName, ')
           ..write('avatarUrl: $avatarUrl, ')
           ..write('avatarStoragePath: $avatarStoragePath, ')
+          ..write('mutualFriendCount: $mutualFriendCount, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -8553,6 +8591,7 @@ class CachedViewedProfileFriend extends DataClass
     displayName,
     avatarUrl,
     avatarStoragePath,
+    mutualFriendCount,
     cachedAt,
   );
   @override
@@ -8566,6 +8605,7 @@ class CachedViewedProfileFriend extends DataClass
           other.displayName == this.displayName &&
           other.avatarUrl == this.avatarUrl &&
           other.avatarStoragePath == this.avatarStoragePath &&
+          other.mutualFriendCount == this.mutualFriendCount &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -8578,6 +8618,7 @@ class CachedViewedProfileFriendsCompanion
   final Value<String> displayName;
   final Value<String?> avatarUrl;
   final Value<String?> avatarStoragePath;
+  final Value<int> mutualFriendCount;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedViewedProfileFriendsCompanion({
@@ -8588,6 +8629,7 @@ class CachedViewedProfileFriendsCompanion
     this.displayName = const Value.absent(),
     this.avatarUrl = const Value.absent(),
     this.avatarStoragePath = const Value.absent(),
+    this.mutualFriendCount = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -8599,6 +8641,7 @@ class CachedViewedProfileFriendsCompanion
     required String displayName,
     this.avatarUrl = const Value.absent(),
     this.avatarStoragePath = const Value.absent(),
+    this.mutualFriendCount = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -8615,6 +8658,7 @@ class CachedViewedProfileFriendsCompanion
     Expression<String>? displayName,
     Expression<String>? avatarUrl,
     Expression<String>? avatarStoragePath,
+    Expression<int>? mutualFriendCount,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -8626,6 +8670,7 @@ class CachedViewedProfileFriendsCompanion
       if (displayName != null) 'display_name': displayName,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (avatarStoragePath != null) 'avatar_storage_path': avatarStoragePath,
+      if (mutualFriendCount != null) 'mutual_friend_count': mutualFriendCount,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -8639,6 +8684,7 @@ class CachedViewedProfileFriendsCompanion
     Value<String>? displayName,
     Value<String?>? avatarUrl,
     Value<String?>? avatarStoragePath,
+    Value<int>? mutualFriendCount,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -8650,6 +8696,7 @@ class CachedViewedProfileFriendsCompanion
       displayName: displayName ?? this.displayName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
+      mutualFriendCount: mutualFriendCount ?? this.mutualFriendCount,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -8679,6 +8726,9 @@ class CachedViewedProfileFriendsCompanion
     if (avatarStoragePath.present) {
       map['avatar_storage_path'] = Variable<String>(avatarStoragePath.value);
     }
+    if (mutualFriendCount.present) {
+      map['mutual_friend_count'] = Variable<int>(mutualFriendCount.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -8698,6 +8748,7 @@ class CachedViewedProfileFriendsCompanion
           ..write('displayName: $displayName, ')
           ..write('avatarUrl: $avatarUrl, ')
           ..write('avatarStoragePath: $avatarStoragePath, ')
+          ..write('mutualFriendCount: $mutualFriendCount, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -8738,6 +8789,21 @@ class $CachedViewedProfileFriendListsTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _hasMoreMeta = const VerificationMeta(
+    'hasMore',
+  );
+  @override
+  late final GeneratedColumn<bool> hasMore = GeneratedColumn<bool>(
+    'has_more',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_more" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -8750,7 +8816,12 @@ class $CachedViewedProfileFriendListsTable
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [ownerUserId, targetUserId, cachedAt];
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    targetUserId,
+    hasMore,
+    cachedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -8785,6 +8856,12 @@ class $CachedViewedProfileFriendListsTable
     } else if (isInserting) {
       context.missing(_targetUserIdMeta);
     }
+    if (data.containsKey('has_more')) {
+      context.handle(
+        _hasMoreMeta,
+        hasMore.isAcceptableOrUnknown(data['has_more']!, _hasMoreMeta),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -8813,6 +8890,10 @@ class $CachedViewedProfileFriendListsTable
         DriftSqlType.string,
         data['${effectivePrefix}target_user_id'],
       )!,
+      hasMore: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_more'],
+      )!,
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -8830,10 +8911,12 @@ class CachedViewedProfileFriendList extends DataClass
     implements Insertable<CachedViewedProfileFriendList> {
   final String ownerUserId;
   final String targetUserId;
+  final bool hasMore;
   final DateTime cachedAt;
   const CachedViewedProfileFriendList({
     required this.ownerUserId,
     required this.targetUserId,
+    required this.hasMore,
     required this.cachedAt,
   });
   @override
@@ -8841,6 +8924,7 @@ class CachedViewedProfileFriendList extends DataClass
     final map = <String, Expression>{};
     map['owner_user_id'] = Variable<String>(ownerUserId);
     map['target_user_id'] = Variable<String>(targetUserId);
+    map['has_more'] = Variable<bool>(hasMore);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -8849,6 +8933,7 @@ class CachedViewedProfileFriendList extends DataClass
     return CachedViewedProfileFriendListsCompanion(
       ownerUserId: Value(ownerUserId),
       targetUserId: Value(targetUserId),
+      hasMore: Value(hasMore),
       cachedAt: Value(cachedAt),
     );
   }
@@ -8861,6 +8946,7 @@ class CachedViewedProfileFriendList extends DataClass
     return CachedViewedProfileFriendList(
       ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
       targetUserId: serializer.fromJson<String>(json['targetUserId']),
+      hasMore: serializer.fromJson<bool>(json['hasMore']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -8870,6 +8956,7 @@ class CachedViewedProfileFriendList extends DataClass
     return <String, dynamic>{
       'ownerUserId': serializer.toJson<String>(ownerUserId),
       'targetUserId': serializer.toJson<String>(targetUserId),
+      'hasMore': serializer.toJson<bool>(hasMore),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -8877,10 +8964,12 @@ class CachedViewedProfileFriendList extends DataClass
   CachedViewedProfileFriendList copyWith({
     String? ownerUserId,
     String? targetUserId,
+    bool? hasMore,
     DateTime? cachedAt,
   }) => CachedViewedProfileFriendList(
     ownerUserId: ownerUserId ?? this.ownerUserId,
     targetUserId: targetUserId ?? this.targetUserId,
+    hasMore: hasMore ?? this.hasMore,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedViewedProfileFriendList copyWithCompanion(
@@ -8893,6 +8982,7 @@ class CachedViewedProfileFriendList extends DataClass
       targetUserId: data.targetUserId.present
           ? data.targetUserId.value
           : this.targetUserId,
+      hasMore: data.hasMore.present ? data.hasMore.value : this.hasMore,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -8902,19 +8992,21 @@ class CachedViewedProfileFriendList extends DataClass
     return (StringBuffer('CachedViewedProfileFriendList(')
           ..write('ownerUserId: $ownerUserId, ')
           ..write('targetUserId: $targetUserId, ')
+          ..write('hasMore: $hasMore, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(ownerUserId, targetUserId, cachedAt);
+  int get hashCode => Object.hash(ownerUserId, targetUserId, hasMore, cachedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CachedViewedProfileFriendList &&
           other.ownerUserId == this.ownerUserId &&
           other.targetUserId == this.targetUserId &&
+          other.hasMore == this.hasMore &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -8922,17 +9014,20 @@ class CachedViewedProfileFriendListsCompanion
     extends UpdateCompanion<CachedViewedProfileFriendList> {
   final Value<String> ownerUserId;
   final Value<String> targetUserId;
+  final Value<bool> hasMore;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedViewedProfileFriendListsCompanion({
     this.ownerUserId = const Value.absent(),
     this.targetUserId = const Value.absent(),
+    this.hasMore = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CachedViewedProfileFriendListsCompanion.insert({
     required String ownerUserId,
     required String targetUserId,
+    this.hasMore = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -8941,12 +9036,14 @@ class CachedViewedProfileFriendListsCompanion
   static Insertable<CachedViewedProfileFriendList> custom({
     Expression<String>? ownerUserId,
     Expression<String>? targetUserId,
+    Expression<bool>? hasMore,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (ownerUserId != null) 'owner_user_id': ownerUserId,
       if (targetUserId != null) 'target_user_id': targetUserId,
+      if (hasMore != null) 'has_more': hasMore,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -8955,12 +9052,14 @@ class CachedViewedProfileFriendListsCompanion
   CachedViewedProfileFriendListsCompanion copyWith({
     Value<String>? ownerUserId,
     Value<String>? targetUserId,
+    Value<bool>? hasMore,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
     return CachedViewedProfileFriendListsCompanion(
       ownerUserId: ownerUserId ?? this.ownerUserId,
       targetUserId: targetUserId ?? this.targetUserId,
+      hasMore: hasMore ?? this.hasMore,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -8974,6 +9073,9 @@ class CachedViewedProfileFriendListsCompanion
     }
     if (targetUserId.present) {
       map['target_user_id'] = Variable<String>(targetUserId.value);
+    }
+    if (hasMore.present) {
+      map['has_more'] = Variable<bool>(hasMore.value);
     }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
@@ -8989,6 +9091,7 @@ class CachedViewedProfileFriendListsCompanion
     return (StringBuffer('CachedViewedProfileFriendListsCompanion(')
           ..write('ownerUserId: $ownerUserId, ')
           ..write('targetUserId: $targetUserId, ')
+          ..write('hasMore: $hasMore, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -14067,6 +14170,7 @@ typedef $$CachedViewedProfileFriendsTableCreateCompanionBuilder =
       required String displayName,
       Value<String?> avatarUrl,
       Value<String?> avatarStoragePath,
+      Value<int> mutualFriendCount,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -14079,6 +14183,7 @@ typedef $$CachedViewedProfileFriendsTableUpdateCompanionBuilder =
       Value<String> displayName,
       Value<String?> avatarUrl,
       Value<String?> avatarStoragePath,
+      Value<int> mutualFriendCount,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -14124,6 +14229,11 @@ class $$CachedViewedProfileFriendsTableFilterComposer
 
   ColumnFilters<String> get avatarStoragePath => $composableBuilder(
     column: $table.avatarStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get mutualFriendCount => $composableBuilder(
+    column: $table.mutualFriendCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14177,6 +14287,11 @@ class $$CachedViewedProfileFriendsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get mutualFriendCount => $composableBuilder(
+    column: $table.mutualFriendCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -14220,6 +14335,11 @@ class $$CachedViewedProfileFriendsTableAnnotationComposer
 
   GeneratedColumn<String> get avatarStoragePath => $composableBuilder(
     column: $table.avatarStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get mutualFriendCount => $composableBuilder(
+    column: $table.mutualFriendCount,
     builder: (column) => column,
   );
 
@@ -14280,6 +14400,7 @@ class $$CachedViewedProfileFriendsTableTableManager
                 Value<String> displayName = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<String?> avatarStoragePath = const Value.absent(),
+                Value<int> mutualFriendCount = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedViewedProfileFriendsCompanion(
@@ -14290,6 +14411,7 @@ class $$CachedViewedProfileFriendsTableTableManager
                 displayName: displayName,
                 avatarUrl: avatarUrl,
                 avatarStoragePath: avatarStoragePath,
+                mutualFriendCount: mutualFriendCount,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -14302,6 +14424,7 @@ class $$CachedViewedProfileFriendsTableTableManager
                 required String displayName,
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<String?> avatarStoragePath = const Value.absent(),
+                Value<int> mutualFriendCount = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedViewedProfileFriendsCompanion.insert(
@@ -14312,6 +14435,7 @@ class $$CachedViewedProfileFriendsTableTableManager
                 displayName: displayName,
                 avatarUrl: avatarUrl,
                 avatarStoragePath: avatarStoragePath,
+                mutualFriendCount: mutualFriendCount,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -14348,6 +14472,7 @@ typedef $$CachedViewedProfileFriendListsTableCreateCompanionBuilder =
     CachedViewedProfileFriendListsCompanion Function({
       required String ownerUserId,
       required String targetUserId,
+      Value<bool> hasMore,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -14355,6 +14480,7 @@ typedef $$CachedViewedProfileFriendListsTableUpdateCompanionBuilder =
     CachedViewedProfileFriendListsCompanion Function({
       Value<String> ownerUserId,
       Value<String> targetUserId,
+      Value<bool> hasMore,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -14375,6 +14501,11 @@ class $$CachedViewedProfileFriendListsTableFilterComposer
 
   ColumnFilters<String> get targetUserId => $composableBuilder(
     column: $table.targetUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasMore => $composableBuilder(
+    column: $table.hasMore,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14403,6 +14534,11 @@ class $$CachedViewedProfileFriendListsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get hasMore => $composableBuilder(
+    column: $table.hasMore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -14427,6 +14563,9 @@ class $$CachedViewedProfileFriendListsTableAnnotationComposer
     column: $table.targetUserId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get hasMore =>
+      $composableBuilder(column: $table.hasMore, builder: (column) => column);
 
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
@@ -14480,11 +14619,13 @@ class $$CachedViewedProfileFriendListsTableTableManager
               ({
                 Value<String> ownerUserId = const Value.absent(),
                 Value<String> targetUserId = const Value.absent(),
+                Value<bool> hasMore = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedViewedProfileFriendListsCompanion(
                 ownerUserId: ownerUserId,
                 targetUserId: targetUserId,
+                hasMore: hasMore,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -14492,11 +14633,13 @@ class $$CachedViewedProfileFriendListsTableTableManager
               ({
                 required String ownerUserId,
                 required String targetUserId,
+                Value<bool> hasMore = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedViewedProfileFriendListsCompanion.insert(
                 ownerUserId: ownerUserId,
                 targetUserId: targetUserId,
+                hasMore: hasMore,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),

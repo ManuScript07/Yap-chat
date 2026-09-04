@@ -423,6 +423,14 @@
   },
   "viewedProfileUsernameCopied": "Username copied",
   "viewedProfileUserFriends": "{name}'s friends",
+  "viewedProfileMutualFriends": "{count, plural, =0{no mutual friends} one{{count} mutual friend} other{{count} mutual friends}}",
+  "@viewedProfileMutualFriends": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "@viewedProfileUserFriends": {
     "placeholders": {
       "name": {

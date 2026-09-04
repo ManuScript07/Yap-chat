@@ -1035,6 +1035,20 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String viewedProfileMutualFriends(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count общих друзей',
+      many: '$count общих друзей',
+      few: '$count общих друга',
+      one: '$count общий друг',
+      zero: 'нет общих друзей',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get viewedProfileNoFriends => 'нет друзей';
 
   @override

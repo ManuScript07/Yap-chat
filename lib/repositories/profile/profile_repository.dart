@@ -41,7 +41,10 @@ class ProfileRepository
   final AccountSessionController _accountSessionController;
   final ViewedProfileCacheDataSource _viewedProfileCache;
   final MediaCacheService _mediaCache;
-  final Map<String, Future<List<ViewedProfileFriend>>>
+  static const _viewedProfileFriendsPageSize = 30;
+  static const _viewedProfileFriendsRequestTimeout = Duration(seconds: 10);
+
+  final Map<String, Future<ViewedProfileFriendsPage>>
   _activeViewedProfileFriendsRequests = {};
 
   @override
@@ -130,14 +133,93 @@ class ProfileRepository
   }
 
   @override
-  Future<List<ViewedProfileFriend>> getViewedProfileFriends(
+  Future<ViewedProfileFriendsSnapshot?> getCachedViewedProfileFriendsSnapshot(
     String userId,
   ) async {
     final scope = _accountSessionController.capture();
-    final operationKey = '${scope.userId}:$userId';
+    final snapshot = await _viewedProfileCache.readFriendsSnapshot(
+      scope.userId,
+      userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    if (snapshot == null) return null;
+    return ViewedProfileFriendsSnapshot(
+      friends: snapshot.friends
+          .where((friend) => friend.id != scope.userId)
+          .toList(growable: false),
+      hasMore: snapshot.hasMore,
+      cachedAt: snapshot.cachedAt,
+    );
+  }
+
+  @override
+  Future<List<ViewedProfileFriend>> getViewedProfileFriends(
+    String userId,
+  ) async => (await refreshViewedProfileFriends(userId)).friends;
+
+  @override
+  Future<ViewedProfileFriendsPage> refreshViewedProfileFriends(
+    String userId,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final page = await _fetchViewedProfileFriendsPage(userId, scope);
+    await _accountSessionController.commit(
+      scope,
+      () => _viewedProfileCache.replaceFriends(
+        scope.userId,
+        userId,
+        page.friends,
+        hasMore: page.hasMore,
+      ),
+    );
+    return page;
+  }
+
+  @override
+  Future<ViewedProfileFriendsSnapshot?> loadMoreViewedProfileFriends(
+    String userId,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final snapshot = await _viewedProfileCache.readFriendsSnapshot(
+      scope.userId,
+      userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    if (snapshot == null || !snapshot.hasMore || snapshot.friends.isEmpty) {
+      return snapshot;
+    }
+
+    final page = await _fetchViewedProfileFriendsPage(
+      userId,
+      scope,
+      after: snapshot.friends.last,
+    );
+    await _accountSessionController.commit(
+      scope,
+      () => _viewedProfileCache.appendFriends(
+        scope.userId,
+        userId,
+        page.friends,
+        hasMore: page.hasMore,
+      ),
+    );
+    return _viewedProfileCache.readFriendsSnapshot(scope.userId, userId);
+  }
+
+  Future<ViewedProfileFriendsPage> _fetchViewedProfileFriendsPage(
+    String userId,
+    AccountSessionSnapshot scope, {
+    ViewedProfileFriend? after,
+  }) async {
+    final operationKey = [
+      scope.userId,
+      userId,
+      after?.displayName ?? '',
+      after?.id ?? '',
+    ].join('\u0000');
     final active = _activeViewedProfileFriendsRequests[operationKey];
     if (active != null) return active;
-    final request = _fetchViewedProfileFriends(userId, scope);
+    final request = _requestViewedProfileFriendsPage(userId, scope, after);
     _activeViewedProfileFriendsRequests[operationKey] = request;
     try {
       return await request;
@@ -151,24 +233,32 @@ class ProfileRepository
     }
   }
 
-  Future<List<ViewedProfileFriend>> _fetchViewedProfileFriends(
+  Future<ViewedProfileFriendsPage> _requestViewedProfileFriendsPage(
     String userId,
     AccountSessionSnapshot scope,
+    ViewedProfileFriend? after,
   ) async {
     final response = await _client.rpc<List<dynamic>>(
       'get_user_profile_friends',
-      params: {'target_user_id': userId},
-    );
+      params: {
+        'target_user_id': userId,
+        'after_display_name': after?.displayName,
+        'after_user_id': after?.id,
+        'page_size': _viewedProfileFriendsPageSize,
+      },
+    ).timeout(_viewedProfileFriendsRequestTimeout);
     _accountSessionController.ensureCurrent(scope);
     final friends = response
         .map((item) => _viewedFriend(Map<String, dynamic>.from(item as Map)))
         .where((friend) => friend.id != scope.userId)
         .toList(growable: false);
-    await _accountSessionController.commit(
-      scope,
-      () => _viewedProfileCache.replaceFriends(scope.userId, userId, friends),
+    return ViewedProfileFriendsPage(
+      friends: friends,
+      hasMore: response.isNotEmpty &&
+          (Map<String, dynamic>.from(response.last as Map)['has_more']
+              as bool? ??
+              false),
     );
-    return friends;
   }
 
   @override
@@ -507,6 +597,7 @@ class ProfileRepository
       displayName: row['display_name'] as String? ?? '',
       avatarUrl: storagePath == null ? row['avatar_url'] as String? : null,
       avatarStoragePath: storagePath,
+      mutualFriendCount: (row['mutual_friend_count'] as num?)?.toInt() ?? 0,
     );
   }
 

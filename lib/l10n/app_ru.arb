@@ -423,6 +423,14 @@
   },
   "viewedProfileUsernameCopied": "Никнейм скопирован",
   "viewedProfileUserFriends": "Друны {name}",
+  "viewedProfileMutualFriends": "{count, plural, =0{нет общих друзей} one{{count} общий друг} few{{count} общих друга} many{{count} общих друзей} other{{count} общих друзей}}",
+  "@viewedProfileMutualFriends": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "@viewedProfileUserFriends": {
     "placeholders": {
       "name": {

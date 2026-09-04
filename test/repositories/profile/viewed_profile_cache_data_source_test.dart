@@ -87,4 +87,32 @@ void main() {
     expect(await cache.readFriends('owner', 'target'), isEmpty);
     expect(await cache.readFriendsCachedAt('owner', 'target'), isNotNull);
   });
+
+  test('appends a paginated page and persists its cursor state', () async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    final cache = ViewedProfileCacheDataSource(
+      database: database,
+      profileCache: ProfileCacheDataSource(database: database),
+    );
+    const alice = ViewedProfileFriend(
+      id: 'alice',
+      username: 'alice_user',
+      displayName: 'Alice',
+      mutualFriendCount: 2,
+    );
+    const bob = ViewedProfileFriend(
+      id: 'bob',
+      username: 'bob_user',
+      displayName: 'Bob',
+    );
+
+    await cache.replaceFriends('owner', 'target', const [alice], hasMore: true);
+    await cache.appendFriends('owner', 'target', const [bob], hasMore: false);
+
+    final snapshot = await cache.readFriendsSnapshot('owner', 'target');
+    expect(snapshot?.friends, const [alice, bob]);
+    expect(snapshot?.hasMore, isFalse);
+    expect(snapshot?.cachedAt, isNotNull);
+  });
 }

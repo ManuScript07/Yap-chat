@@ -1880,6 +1880,12 @@ abstract class AppLocalizations {
   /// **'Друны {name}'**
   String viewedProfileUserFriends(String name);
 
+  /// No description provided for @viewedProfileMutualFriends.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count, plural, =0{нет общих друзей} one{{count} общий друг} few{{count} общих друга} many{{count} общих друзей} other{{count} общих друзей}}'**
+  String viewedProfileMutualFriends(int count);
+
   /// No description provided for @viewedProfileNoFriends.
   ///
   /// In ru, this message translates to:

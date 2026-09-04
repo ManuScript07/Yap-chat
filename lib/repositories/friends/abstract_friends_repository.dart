@@ -3,6 +3,8 @@ import 'package:yap_chat/features/friends/data/data.dart';
 abstract interface class IFriendsRepository {
   Stream<List<Friend>> watchFriends();
   Stream<List<FriendRequest>> watchRequests();
+  Stream<List<Friend>> watchCachedFriends();
+  Stream<List<FriendRequest>> watchCachedRequests();
 
   Future<List<Friend>> getFriends();
   Future<List<FriendRequest>> getRequests();

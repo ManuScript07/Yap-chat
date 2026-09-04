@@ -74,6 +74,18 @@ class FriendsRepository
   }
 
   @override
+  Stream<List<Friend>> watchCachedFriends() {
+    final scope = _accountSessionController.capture();
+    return _cache.watchFriends(ownerUserId: scope.userId);
+  }
+
+  @override
+  Stream<List<FriendRequest>> watchCachedRequests() {
+    final scope = _accountSessionController.capture();
+    return _cache.watchRequests(ownerUserId: scope.userId);
+  }
+
+  @override
   Stream<String> watchProfileChanges() {
     unawaited(_ensureStarted());
     return _profileChangesController.stream;

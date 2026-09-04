@@ -73,6 +73,21 @@ class MockProfileRepository
   ) async => const [];
 
   @override
+  Future<ViewedProfileFriendsSnapshot?> getCachedViewedProfileFriendsSnapshot(
+    String userId,
+  ) async => null;
+
+  @override
+  Future<ViewedProfileFriendsPage> refreshViewedProfileFriends(
+    String userId,
+  ) async => const ViewedProfileFriendsPage(friends: [], hasMore: false);
+
+  @override
+  Future<ViewedProfileFriendsSnapshot?> loadMoreViewedProfileFriends(
+    String userId,
+  ) async => null;
+
+  @override
   Future<String?> resolveViewedProfileFriendAvatar(
     ViewedProfileFriend friend,
   ) async => friend.avatarUrl;

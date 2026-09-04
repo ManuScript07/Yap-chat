@@ -1023,6 +1023,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String viewedProfileMutualFriends(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count mutual friends',
+      one: '$count mutual friend',
+      zero: 'no mutual friends',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get viewedProfileNoFriends => 'no friends';
 
   @override

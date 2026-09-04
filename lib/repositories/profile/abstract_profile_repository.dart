@@ -28,6 +28,13 @@ abstract interface class IViewedProfileRepository {
   );
   Future<DateTime?> getCachedViewedProfileFriendsUpdatedAt(String userId);
   Future<List<ViewedProfileFriend>> getViewedProfileFriends(String userId);
+  Future<ViewedProfileFriendsSnapshot?> getCachedViewedProfileFriendsSnapshot(
+    String userId,
+  );
+  Future<ViewedProfileFriendsPage> refreshViewedProfileFriends(String userId);
+  Future<ViewedProfileFriendsSnapshot?> loadMoreViewedProfileFriends(
+    String userId,
+  );
   Future<String?> resolveViewedProfileFriendAvatar(ViewedProfileFriend friend);
   Future<int?> getCachedProfileViewCount(String userId);
   Future<int> getProfileViewCount(String userId);
@@ -50,6 +57,14 @@ extension ViewedProfileRepositoryAccess on IProfileRepository {
       _viewedProfiles.getCachedViewedProfileFriendsUpdatedAt(userId);
   Future<List<ViewedProfileFriend>> getViewedProfileFriends(String userId) =>
       _viewedProfiles.getViewedProfileFriends(userId);
+  Future<ViewedProfileFriendsSnapshot?> getCachedViewedProfileFriendsSnapshot(
+    String userId,
+  ) => _viewedProfiles.getCachedViewedProfileFriendsSnapshot(userId);
+  Future<ViewedProfileFriendsPage> refreshViewedProfileFriends(String userId) =>
+      _viewedProfiles.refreshViewedProfileFriends(userId);
+  Future<ViewedProfileFriendsSnapshot?> loadMoreViewedProfileFriends(
+    String userId,
+  ) => _viewedProfiles.loadMoreViewedProfileFriends(userId);
   Future<String?> resolveViewedProfileFriendAvatar(
     ViewedProfileFriend friend,
   ) => _viewedProfiles.resolveViewedProfileFriendAvatar(friend);
