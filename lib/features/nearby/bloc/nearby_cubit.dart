@@ -44,13 +44,15 @@ class NearbyCubit extends Cubit<NearbyState> {
   Future<void>? _locationRefresh;
   Future<void>? _feedRefresh;
   final List<DateTime> _feedRequestStarts = [];
+  var _queryRevision = 0;
+  static const _maximumFeedRequestsPerMinute = 8;
 
   bool _tryConsumeFeedRequest() {
     final now = DateTime.now().toUtc();
     _feedRequestStarts.removeWhere(
       (startedAt) => now.difference(startedAt) >= const Duration(minutes: 1),
     );
-    if (_feedRequestStarts.length >= 20) {
+    if (_feedRequestStarts.length >= _maximumFeedRequestsPerMinute) {
       if (!isClosed) {
         emit(
           state.copyWith(rateLimitFeedbackId: state.rateLimitFeedbackId + 1),
@@ -175,19 +177,29 @@ class NearbyCubit extends Cubit<NearbyState> {
   }) {
     final active = _feedRefresh;
     if (active != null) return active;
-    final future = _performRefresh(
+    final filters = state.filters;
+    final revision = _queryRevision;
+    final operation = _performRefresh(
       force: force,
       refreshOwnLocation: refreshOwnLocation,
       requireLocationOnFailure: requireLocationOnFailure,
+      filters: filters,
+      revision: revision,
     );
-    _feedRefresh = future;
-    return future.whenComplete(() => _feedRefresh = null);
+    late final Future<void> tracked;
+    tracked = operation.whenComplete(() {
+      if (identical(_feedRefresh, tracked)) _feedRefresh = null;
+    });
+    _feedRefresh = tracked;
+    return tracked;
   }
 
   Future<void> _performRefresh({
     required bool force,
     required bool refreshOwnLocation,
     required bool requireLocationOnFailure,
+    required NearbyFilters filters,
+    required int revision,
   }) async {
     if (state.status == NearbyStatus.locationRequired && !force) return;
     if (!_tryConsumeFeedRequest()) return;
@@ -195,15 +207,15 @@ class NearbyCubit extends Cubit<NearbyState> {
     try {
       await _refreshFeedAndLocation(
         refreshOwnLocation: refreshOwnLocation,
+        filters: filters,
+        revision: revision,
       ).timeout(refreshTimeout);
     } catch (error) {
-      if (!isClosed) {
+      if (!isClosed && _isCurrentQuery(revision, filters)) {
         if (_isNearbyRateLimitedError(error)) {
           emit(
             state.copyWith(
-              status: state.people.isEmpty
-                  ? NearbyStatus.failure
-                  : NearbyStatus.ready,
+              status: NearbyStatus.ready,
               isRefreshing: false,
               rateLimitFeedbackId: state.rateLimitFeedbackId + 1,
             ),
@@ -222,6 +234,8 @@ class NearbyCubit extends Cubit<NearbyState> {
 
   Future<void> _refreshFeedAndLocation({
     required bool refreshOwnLocation,
+    required NearbyFilters filters,
+    required int revision,
   }) async {
     if (refreshOwnLocation) {
       final locationResult = await _locationTrackingCoordinator
@@ -229,10 +243,10 @@ class NearbyCubit extends Cubit<NearbyState> {
       if (locationResult == TrackedLocationRefreshResult.updated) {
         if (!await _invalidateDistancesAfterLocationUpdate()) return;
       }
-      if (isClosed) return;
+      if (isClosed || !_isCurrentQuery(revision, filters)) return;
     }
-    final snapshot = await _repository.refreshFeed(state.filters);
-    if (!isClosed) {
+    final snapshot = await _repository.refreshFeed(filters);
+    if (!isClosed && _isCurrentQuery(revision, filters)) {
       emit(
         state.copyWith(
           status: NearbyStatus.ready,
@@ -252,10 +266,12 @@ class NearbyCubit extends Cubit<NearbyState> {
       return;
     }
     if (!_tryConsumeFeedRequest()) return;
+    final filters = state.filters;
+    final revision = _queryRevision;
     emit(state.copyWith(isLoadingMore: true));
     try {
-      final snapshot = await _repository.loadMore(state.filters);
-      if (!isClosed && snapshot != null) {
+      final snapshot = await _repository.loadMore(filters);
+      if (!isClosed && _isCurrentQuery(revision, filters) && snapshot != null) {
         emit(
           state.copyWith(
             people: snapshot.people,
@@ -265,22 +281,28 @@ class NearbyCubit extends Cubit<NearbyState> {
         );
       }
     } catch (_) {
-      if (!isClosed) emit(state.copyWith(isLoadingMore: false));
+      if (!isClosed && _isCurrentQuery(revision, filters)) {
+        emit(state.copyWith(isLoadingMore: false));
+      }
     }
   }
 
   Future<void> applyFilters(NearbyFilters filters) async {
     final normalized = filters.normalized();
     if (normalized == state.filters) return;
+    final revision = ++_queryRevision;
     await _repository.saveFilters(normalized);
+    if (isClosed || revision != _queryRevision) return;
     final cached = await _repository.getCachedFeed(normalized);
-    if (isClosed) return;
+    if (isClosed || revision != _queryRevision) return;
     emit(
       state.copyWith(
         status: NearbyStatus.ready,
         filters: normalized,
         people: cached?.people ?? const [],
         hasMore: cached?.hasMore ?? false,
+        isRefreshing: false,
+        isLoadingMore: false,
         clearLocationIssue: true,
       ),
     );
@@ -293,6 +315,11 @@ class NearbyCubit extends Cubit<NearbyState> {
     }
     // Applying a filter is an explicit user refresh and therefore may contact
     // the server; merely changing location never invalidates stored pages.
+    final active = _feedRefresh;
+    if (active != null) await active;
+    if (isClosed || revision != _queryRevision || state.filters != normalized) {
+      return;
+    }
     await refresh();
   }
 
@@ -339,6 +366,9 @@ class NearbyCubit extends Cubit<NearbyState> {
   bool _isNearbyRateLimitedError(Object error) =>
       error is PostgrestException &&
       error.message.contains('nearby_rate_limited');
+
+  bool _isCurrentQuery(int revision, NearbyFilters filters) =>
+      revision == _queryRevision && state.filters == filters;
 
   @override
   Future<void> close() async {

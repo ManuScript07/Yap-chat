@@ -12,7 +12,8 @@ class NearbyFilters extends Equatable {
   final int minimumAge;
   final int maximumAge;
 
-  String get cacheKey => '${gender?.databaseValue ?? 'all'}:$minimumAge:$maximumAge';
+  String get cacheKey =>
+      '${gender?.databaseValue ?? 'all'}:$minimumAge:$maximumAge';
 
   NearbyFilters copyWith({
     ProfileGender? gender,
@@ -42,9 +43,13 @@ class NearbyFilters extends Equatable {
   ).normalized();
 
   NearbyFilters normalized() {
-    final minimum = minimumAge.clamp(14, 99).toInt();
+    final minimum = minimumAge.clamp(18, 99).toInt();
     final maximum = maximumAge.clamp(minimum, 99).toInt();
-    return NearbyFilters(gender: gender, minimumAge: minimum, maximumAge: maximum);
+    return NearbyFilters(
+      gender: gender,
+      minimumAge: minimum,
+      maximumAge: maximum,
+    );
   }
 
   @override

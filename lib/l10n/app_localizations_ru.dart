@@ -1057,7 +1057,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get nearbyAgeInvalid =>
-      'Введите возраст от 14 до 99 лет: значение «от» не должно быть больше «до».';
+      'Введите возраст от 18 до 99 лет: значение «от» не должно быть больше «до».';
 
   @override
   String get nearbyApply => 'применить';

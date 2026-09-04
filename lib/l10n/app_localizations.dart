@@ -1925,7 +1925,7 @@ abstract class AppLocalizations {
   /// No description provided for @nearbyAgeInvalid.
   ///
   /// In ru, this message translates to:
-  /// **'Введите возраст от 14 до 99 лет: значение «от» не должно быть больше «до».'**
+  /// **'Введите возраст от 18 до 99 лет: значение «от» не должно быть больше «до».'**
   String get nearbyAgeInvalid;
 
   /// No description provided for @nearbyApply.

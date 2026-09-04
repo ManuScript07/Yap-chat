@@ -1045,7 +1045,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nearbyAgeInvalid =>
-      'Enter an age from 14 to 99. The minimum cannot exceed the maximum.';
+      'Enter an age from 18 to 99. The minimum cannot exceed the maximum.';
 
   @override
   String get nearbyApply => 'apply';

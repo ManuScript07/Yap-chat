@@ -437,7 +437,7 @@
   "nearbyAge": "age",
   "nearbyAgeFrom": "from",
   "nearbyAgeTo": "to",
-  "nearbyAgeInvalid": "Enter an age from 14 to 99. The minimum cannot exceed the maximum.",
+  "nearbyAgeInvalid": "Enter an age from 18 to 99. The minimum cannot exceed the maximum.",
   "nearbyApply": "apply",
   "nearbyEmpty": "No one nearby yet",
   "nearbyLoadFailed": "Couldn't load people nearby",

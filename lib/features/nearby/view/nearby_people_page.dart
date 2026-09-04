@@ -63,89 +63,75 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
           previous.locationFeedbackId != current.locationFeedbackId &&
           current.locationIssue != null,
       listener: (context, state) => _showLocationIssue(state.locationIssue!),
-      child: MultiBlocListener(
-        listeners: [
-          BlocListener<NearbyCubit, NearbyState>(
-            listenWhen: (previous, current) =>
-                previous.rateLimitFeedbackId != current.rateLimitFeedbackId,
-            listener: (context, _) => showAppSnackBar(
-              context,
-              message: context.l10n.nearbyRateLimited,
-              type: SnackBarType.error,
-              bottomMargin: 156,
-            ),
-          ),
-        ],
-        child: BlocConsumer<NearbyCubit, NearbyState>(
-          listenWhen: (previous, current) =>
-              previous.status != current.status &&
-              current.status == NearbyStatus.locationRequired &&
-              current.locationIssue == null,
-          listener: (context, state) {
-            if (_locationPromptedAutomatically) return;
-            _locationPromptedAutomatically = true;
-            unawaited(_requestInitialLocation());
-          },
-          builder: (context, state) {
-            final mediaQuery = MediaQuery.of(context);
-            const navBarHeight = 70.0;
-            const navBarOffset = 16.0;
-            const controlHeight = 50.0;
-            final filterBottom =
-                mediaQuery.viewPadding.bottom +
-                navBarHeight +
-                navBarOffset +
-                16.0;
-            final contentBottom = filterBottom + controlHeight + 20;
+      child: BlocConsumer<NearbyCubit, NearbyState>(
+        listenWhen: (previous, current) =>
+            previous.status != current.status &&
+            current.status == NearbyStatus.locationRequired &&
+            current.locationIssue == null,
+        listener: (context, state) {
+          if (_locationPromptedAutomatically) return;
+          _locationPromptedAutomatically = true;
+          unawaited(_requestInitialLocation());
+        },
+        builder: (context, state) {
+          final mediaQuery = MediaQuery.of(context);
+          const navBarHeight = 70.0;
+          const navBarOffset = 16.0;
+          const controlHeight = 50.0;
+          final filterBottom =
+              mediaQuery.viewPadding.bottom +
+              navBarHeight +
+              navBarOffset +
+              16.0;
+          final contentBottom = filterBottom + controlHeight + 20;
 
-            return Scaffold(
-              extendBodyBehindAppBar: true,
-              backgroundColor: context.scaffoldBackgroundColor,
-              appBar: PrimaryAppBar(title: context.l10n.nearbyTitle),
-              body: Stack(
-                children: [
-                  _NearbyFeed(
-                    controller: _scrollController,
-                    state: state,
-                    bottomPadding: contentBottom,
-                    onRefresh: () => context.read<NearbyCubit>().refresh(),
-                    onRefreshActivityChanged: (isActive) {
-                      if (mounted && _isPullRefreshing != isActive) {
-                        setState(() => _isPullRefreshing = isActive);
-                      }
-                    },
-                  ),
-                  if (state.status == NearbyStatus.locationRequired)
-                    Positioned.fill(
-                      child: _LocationRequiredOverlay(
-                        onRetry: () =>
-                            context.read<NearbyCubit>().requestLocation(),
-                      ),
-                    ),
-                  if (state.isRefreshing &&
-                      state.status == NearbyStatus.locationRequired)
-                    const Positioned.fill(child: _LocationUpdatingOverlay()),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: const BottomAmbientGlow(),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: filterBottom,
-                    child: _FiltersButton(
-                      onPressed: state.isRefreshing || _isPullRefreshing
-                          ? null
-                          : () => _openFilters(state.filters),
+          return Scaffold(
+            extendBodyBehindAppBar: true,
+            backgroundColor: context.scaffoldBackgroundColor,
+            appBar: PrimaryAppBar(title: context.l10n.nearbyTitle),
+            body: Stack(
+              children: [
+                _NearbyFeed(
+                  controller: _scrollController,
+                  state: state,
+                  bottomPadding: contentBottom,
+                  onRefresh: () => context.read<NearbyCubit>().refresh(),
+                  onRefreshActivityChanged: (isActive) {
+                    if (mounted && _isPullRefreshing != isActive) {
+                      setState(() => _isPullRefreshing = isActive);
+                    }
+                  },
+                ),
+                if (state.status == NearbyStatus.locationRequired)
+                  Positioned.fill(
+                    child: _LocationRequiredOverlay(
+                      onRetry: () =>
+                          context.read<NearbyCubit>().requestLocation(),
                     ),
                   ),
-                ],
-              ),
-            );
-          },
-        ),
+                if (state.isRefreshing &&
+                    state.status == NearbyStatus.locationRequired)
+                  const Positioned.fill(child: _LocationUpdatingOverlay()),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: const BottomAmbientGlow(),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: filterBottom,
+                  child: _FiltersButton(
+                    onPressed: state.isRefreshing || _isPullRefreshing
+                        ? null
+                        : () => _openFilters(state.filters),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1004,7 +990,7 @@ class _AgeSheetState extends State<_AgeSheet> {
     final maximum = int.tryParse(_maximum.text);
     if (minimum == null ||
         maximum == null ||
-        minimum < 14 ||
+        minimum < 18 ||
         maximum > 99 ||
         minimum > maximum) {
       setState(() => _error = context.l10n.nearbyAgeInvalid);
