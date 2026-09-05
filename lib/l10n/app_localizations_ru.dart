@@ -1035,6 +1035,9 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get viewedProfileFriendsTitle => 'друны';
+
+  @override
   String viewedProfileMutualFriends(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

@@ -1880,6 +1880,12 @@ abstract class AppLocalizations {
   /// **'Друны {name}'**
   String viewedProfileUserFriends(String name);
 
+  /// No description provided for @viewedProfileFriendsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'друны'**
+  String get viewedProfileFriendsTitle;
+
   /// No description provided for @viewedProfileMutualFriends.
   ///
   /// In ru, this message translates to:
