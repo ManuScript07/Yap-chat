@@ -261,18 +261,25 @@ class _ProfileScrollContent extends StatelessWidget {
             ),
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: OverflowBar(
+                alignment: MainAxisAlignment.center,
+                spacing: 24,
+                overflowAlignment: OverflowBarAlignment.center,
+                overflowSpacing: 8,
                 children: [
                   ProfileDaysLabel(days: days),
-                  const SizedBox(width: 24),
-                  Icon(
-                    Icons.visibility_outlined,
-                    color: inactiveColor,
-                    size: 24,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.visibility_outlined,
+                        color: inactiveColor,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 6),
+                      _ProfileViewCount(userId: profile.id),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  _ProfileViewCount(userId: profile.id),
                 ],
               ),
             ),

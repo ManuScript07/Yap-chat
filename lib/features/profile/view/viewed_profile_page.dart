@@ -1181,70 +1181,122 @@ class _ProfileStats extends StatelessWidget {
         : onlyFriendIsViewer
         ? context.l10n.viewedProfileFriendIsYou
         : context.l10n.friendsCount(viewedProfile.friendCount);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Flexible(
-          child: InkWell(
-            onTap: canOpenFriends ? onFriends : null,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: viewedProfile.friendsPreview.isEmpty
-                        ? 0
-                        : 32 + (viewedProfile.friendsPreview.length - 1) * 20,
-                    height: 32,
-                    child: Stack(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : 620.0;
+        final double friendsPreviewWidth = viewedProfile.friendsPreview.isEmpty
+            ? 0.0
+            : (32 + (viewedProfile.friendsPreview.length - 1) * 20)
+                .toDouble();
+        final double friendsTextMaxWidth = math.max(
+          0.0,
+          maxWidth -
+              16 -
+              friendsPreviewWidth -
+              (viewedProfile.friendsPreview.isEmpty ? 0 : 8),
+        ).toDouble();
+        final double viewCountTextMaxWidth = math.max(
+          0.0,
+          maxWidth - 25,
+        ).toDouble();
+
+        return SizedBox(
+          width: maxWidth,
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 18,
+            runSpacing: 4,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: InkWell(
+                  onTap: canOpenFriends ? onFriends : null,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        for (
-                          var index = 0;
-                          index < viewedProfile.friendsPreview.length;
-                          index++
-                        )
-                          Positioned(
-                            left: index * 20,
-                            child: _MiniFriendAvatar(
-                              friend: viewedProfile.friendsPreview[index],
+                        SizedBox(
+                          width: friendsPreviewWidth,
+                          height: 32,
+                          child: Stack(
+                            children: [
+                              for (
+                                var index = 0;
+                                index < viewedProfile.friendsPreview.length;
+                                index++
+                              )
+                                Positioned(
+                                  left: index * 20,
+                                  child: _MiniFriendAvatar(
+                                    friend: viewedProfile.friendsPreview[index],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (viewedProfile.friendsPreview.isNotEmpty)
+                          const SizedBox(width: 8),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: friendsTextMaxWidth,
+                          ),
+                          child: Text(
+                            friendsLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.colorScheme.onSurface,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
-                  if (viewedProfile.friendsPreview.isNotEmpty)
-                    const SizedBox(width: 8),
-                  Text(
-                    friendsLabel,
-                    style: TextStyle(
-                      color: context.colorScheme.onSurface,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: 20,
+                      color: context.colorScheme.outline,
+                    ),
+                    const SizedBox(width: 5),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: viewCountTextMaxWidth,
+                      ),
+                      child: Text(
+                        '${viewedProfile.viewCount}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.colorScheme.onSurface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 18),
-        Icon(
-          Icons.visibility_outlined,
-          size: 20,
-          color: context.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: 5),
-        Text(
-          '${viewedProfile.viewCount}',
-          style: TextStyle(
-            color: context.colorScheme.onSurface,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

@@ -97,6 +97,18 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               navBarOffset +
               16.0;
           final contentBottom = filterBottom + controlHeight + 20;
+          final blockedUserIds = context.select<BlocklistCubit, Set<String>>(
+            (cubit) => cubit.state.blockedUserIds,
+          );
+          final hasVisiblePeople = state.people.any(
+            (person) => !blockedUserIds.contains(person.id),
+          );
+          final shouldShowEmptyState =
+              !hasVisiblePeople &&
+              !state.isRefreshing &&
+              state.status != NearbyStatus.initial &&
+              state.status != NearbyStatus.loading &&
+              state.status != NearbyStatus.locationRequired;
 
           return Scaffold(
             extendBodyBehindAppBar: true,
@@ -133,6 +145,13 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                       bottomInset: contentBottom,
                       onRetry: () =>
                           context.read<NearbyCubit>().requestLocation(),
+                    ),
+                  ),
+                if (shouldShowEmptyState)
+                  Positioned.fill(
+                    child: _NearbyEmptyStateLayer(
+                      bottomPadding: contentBottom,
+                      failed: state.status == NearbyStatus.failure,
                     ),
                   ),
                 Positioned(
@@ -487,25 +506,50 @@ class _NearbyFeedState extends State<_NearbyFeed> {
                 ),
               ),
             ),
-            if (people.isEmpty && !widget.state.isRefreshing)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      top: 130,
-                      bottom: widget.bottomPadding,
-                    ),
-                    child: Align(
-                      alignment: Alignment(0, -0.12),
-                      child: _NearbyEmptyState(
-                        failed: widget.state.status == NearbyStatus.failure,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NearbyEmptyStateLayer extends StatelessWidget {
+  const _NearbyEmptyStateLayer({
+    required this.bottomPadding,
+    required this.failed,
+  });
+
+  final double bottomPadding;
+  final bool failed;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final emptyState = _NearbyEmptyState(failed: failed);
+
+    if (!isLandscape) {
+      return IgnorePointer(
+        child: Align(alignment: Alignment(0, -0.12), child: emptyState),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final scrollExtent = math.max(bottomPadding - 160, 0.0);
+          return SingleChildScrollView(
+            reverse: true,
+            physics: const ClampingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight + scrollExtent,
+              ),
+              child: Align(alignment: Alignment.center, child: emptyState),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1209,9 +1253,7 @@ class _AgeInput extends StatelessWidget {
     onChanged: onChanged,
     textAlign: TextAlign.center,
     autocorrect: false,
-    inputFormatters: [
-      FilteringTextInputFormatter.digitsOnly,
-    ],
+    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
   );
 }
 

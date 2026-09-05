@@ -248,7 +248,7 @@
   "friendsOutgoing": "исходящие",
   "friendsIncoming": "входящие",
   "friendsSearchHint": "поиск",
-  "friendsEmpty": "друзей пока нет, воспользуйтесь кнопкой сверху",
+  "friendsEmpty": "друзей пока нет воспользуйтесь кнопкой сверху",
   "friendsRequestsEmpty": "заявок пока нет",
   "friendsNoSearchResults": "ничего не нашли",
   "friendsLoadFailed": "Не удалось загрузить друнов",
