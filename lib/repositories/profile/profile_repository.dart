@@ -42,8 +42,10 @@ class ProfileRepository
   final ViewedProfileCacheDataSource _viewedProfileCache;
   final MediaCacheService _mediaCache;
   static const _viewedProfileFriendsPageSize = 30;
+  static const _viewedProfileRequestTimeout = Duration(seconds: 10);
   static const _viewedProfileFriendsRequestTimeout = Duration(seconds: 10);
 
+  final Map<String, Future<ViewedProfile>> _activeViewedProfileRequests = {};
   final Map<String, Future<ViewedProfileFriendsPage>>
   _activeViewedProfileFriendsRequests = {};
 
@@ -62,10 +64,34 @@ class ProfileRepository
     bool registerView = true,
   }) async {
     final scope = _accountSessionController.capture();
-    final response = await _client.rpc<List<dynamic>>(
-      'get_viewed_profile',
-      params: {'target_user_id': userId, 'should_register_view': registerView},
-    );
+    final operationKey = [scope.userId, userId, registerView].join('\u0000');
+    final active = _activeViewedProfileRequests[operationKey];
+    if (active != null) return active;
+    final request = _requestViewedProfile(userId, registerView, scope);
+    _activeViewedProfileRequests[operationKey] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(_activeViewedProfileRequests[operationKey], request)) {
+        _activeViewedProfileRequests.remove(operationKey);
+      }
+    }
+  }
+
+  Future<ViewedProfile> _requestViewedProfile(
+    String userId,
+    bool registerView,
+    AccountSessionSnapshot scope,
+  ) async {
+    final response = await _client
+        .rpc<List<dynamic>>(
+          'get_viewed_profile',
+          params: {
+            'target_user_id': userId,
+            'should_register_view': registerView,
+          },
+        )
+        .timeout(_viewedProfileRequestTimeout);
     _accountSessionController.ensureCurrent(scope);
     if (response.isEmpty) throw const ProfileNotFoundException();
     final row = Map<String, dynamic>.from(response.first as Map);
@@ -238,15 +264,17 @@ class ProfileRepository
     AccountSessionSnapshot scope,
     ViewedProfileFriend? after,
   ) async {
-    final response = await _client.rpc<List<dynamic>>(
-      'get_user_profile_friends',
-      params: {
-        'target_user_id': userId,
-        'after_display_name': after?.displayName,
-        'after_user_id': after?.id,
-        'page_size': _viewedProfileFriendsPageSize,
-      },
-    ).timeout(_viewedProfileFriendsRequestTimeout);
+    final response = await _client
+        .rpc<List<dynamic>>(
+          'get_user_profile_friends',
+          params: {
+            'target_user_id': userId,
+            'after_display_name': after?.displayName,
+            'after_user_id': after?.id,
+            'page_size': _viewedProfileFriendsPageSize,
+          },
+        )
+        .timeout(_viewedProfileFriendsRequestTimeout);
     _accountSessionController.ensureCurrent(scope);
     final friends = response
         .map((item) => _viewedFriend(Map<String, dynamic>.from(item as Map)))
@@ -254,9 +282,10 @@ class ProfileRepository
         .toList(growable: false);
     return ViewedProfileFriendsPage(
       friends: friends,
-      hasMore: response.isNotEmpty &&
+      hasMore:
+          response.isNotEmpty &&
           (Map<String, dynamic>.from(response.last as Map)['has_more']
-              as bool? ??
+                  as bool? ??
               false),
     );
   }
@@ -302,10 +331,9 @@ class ProfileRepository
   @override
   Future<int> getProfileViewCount(String userId) async {
     final scope = _accountSessionController.capture();
-    final value = await _client.rpc<num>(
-      'get_profile_view_count',
-      params: {'target_user_id': userId},
-    );
+    final value = await _client
+        .rpc<num>('get_profile_view_count', params: {'target_user_id': userId})
+        .timeout(_viewedProfileRequestTimeout);
     _accountSessionController.ensureCurrent(scope);
     final count = value.toInt();
     await _accountSessionController.commit(

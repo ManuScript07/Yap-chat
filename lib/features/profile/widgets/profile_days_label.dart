@@ -16,15 +16,19 @@ class ProfileDaysLabel extends StatelessWidget {
         size: 42,
       ),
       const SizedBox(width: 12),
-      Text(
-        context.l10n.profileDaysWithUs(days),
-        style: TextStyle(
-          color: context.colorScheme.outline,
-          fontSize: 20,
-          fontFamily: 'Roboto',
-          fontWeight: FontWeight.w500,
-          height: 1.20,
-          letterSpacing: .50,
+      Flexible(
+        child: Text(
+          context.l10n.profileDaysWithUs(days),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: context.colorScheme.outline,
+            fontSize: 20,
+            fontFamily: 'Roboto',
+            fontWeight: FontWeight.w500,
+            height: 1.20,
+            letterSpacing: .50,
+          ),
         ),
       ),
     ],

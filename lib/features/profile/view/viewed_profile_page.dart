@@ -129,18 +129,16 @@ class _ViewedProfileView extends StatelessWidget {
                       onPressed: () => context.router.maybePop(),
                     ),
                   ),
-                  Center(
-                    child: state.status == ViewedProfileStatus.failure
-                        ? Text(
-                            context.l10n.viewedProfileLoadFailed,
-                            style: TextStyle(
-                              color: context.colorScheme.onSurface,
-                            ),
-                          )
-                        : CircularProgressIndicator(
-                            color: context.colorScheme.primary,
-                          ),
-                  ),
+                  if (state.status == ViewedProfileStatus.failure)
+                    _ProfileLoadFailedState(
+                      message: context.l10n.viewedProfileLoadFailed,
+                    )
+                  else
+                    Center(
+                      child: CircularProgressIndicator(
+                        color: context.colorScheme.primary,
+                      ),
+                    ),
                 ],
               ),
             );
@@ -166,6 +164,34 @@ class _ViewedProfileView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProfileLoadFailedState extends StatelessWidget {
+  const _ProfileLoadFailedState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.topCenter,
+    child: Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.paddingOf(context).top + 156,
+        left: 24,
+        right: 24,
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: context.colorScheme.onSurfaceVariant,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+        ),
+      ),
+    ),
+  );
 }
 
 class _LoadingProfileAvatar extends StatelessWidget {
@@ -251,8 +277,10 @@ class _ProfileScaffold extends StatelessWidget {
                   onUnblock: isBlockedByMe
                       ? () => _confirmUnblock(context)
                       : null,
-                  onLocation: !viewedProfile.isFriend || state.location == null
-                      || isBlockedByMe
+                  onLocation:
+                      !viewedProfile.isFriend ||
+                          state.location == null ||
+                          isBlockedByMe
                       ? null
                       : () => _openLocation(context, state.location!),
                   onFriends: () => _openFriends(context),
@@ -368,92 +396,106 @@ class _ProfileScaffold extends StatelessWidget {
               child: BlocBuilder<BlocklistCubit, BlocklistState>(
                 builder: (_, blocklistState) =>
                     BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
-                  builder: (_, currentState) {
-                    final currentProfile =
-                        currentState.viewedProfile ?? viewedProfile;
-                    final isBlockedByMe = blocklistState.blocks(
-                      currentProfile.profile.id,
-                    );
-                    return _ProfileActionsSheet(
-                      viewedProfile: currentProfile,
-                      chatIsMuted: currentState.chat?.isMuted ?? false,
-                      canMute: currentProfile.isFriend && !isBlockedByMe,
-                      onMute: () async {
-                        Navigator.of(sheetContext).pop();
-                        await cubit.toggleMute();
-                      },
-                      onRemove: currentProfile.isFriend && !isBlockedByMe
-                        ? () async {
+                      builder: (_, currentState) {
+                        final currentProfile =
+                            currentState.viewedProfile ?? viewedProfile;
+                        final isBlockedByMe = blocklistState.blocks(
+                          currentProfile.profile.id,
+                        );
+                        return _ProfileActionsSheet(
+                          viewedProfile: currentProfile,
+                          chatIsMuted: currentState.chat?.isMuted ?? false,
+                          canMute: currentProfile.isFriend && !isBlockedByMe,
+                          onMute: () async {
+                            Navigator.of(sheetContext).pop();
+                            await cubit.toggleMute();
+                          },
+                          onRemove: currentProfile.isFriend && !isBlockedByMe
+                              ? () async {
+                                  final confirmed =
+                                      await showConfirmationDialog(
+                                        pageContext,
+                                        title: pageContext
+                                            .l10n
+                                            .viewedProfileRemoveFriendTitle,
+                                        content: pageContext.l10n
+                                            .viewedProfileRemoveFriendContent(
+                                              currentProfile
+                                                  .profile
+                                                  .displayName,
+                                            ),
+                                        confirmLabel: pageContext
+                                            .l10n
+                                            .viewedProfileRemoveFriend,
+                                      );
+                                  if (confirmed != true ||
+                                      !pageContext.mounted) {
+                                    return;
+                                  }
+                                  Navigator.of(sheetContext).pop();
+                                  await cubit.removeFriend();
+                                }
+                              : null,
+                          isBlockedByMe: isBlockedByMe,
+                          isBlockActionPending:
+                              blocklistState.isPending(
+                                currentProfile.profile.id,
+                              ) ||
+                              currentState.isActionPending,
+                          onBlock: () async {
                             final confirmed = await showConfirmationDialog(
                               pageContext,
-                              title: pageContext
-                                  .l10n
-                                  .viewedProfileRemoveFriendTitle,
+                              title: pageContext.l10n.viewedProfileBlockTitle,
                               content: pageContext.l10n
-                                  .viewedProfileRemoveFriendContent(
+                                  .viewedProfileBlockContent(
                                     currentProfile.profile.displayName,
                                   ),
-                              confirmLabel:
-                                  pageContext.l10n.viewedProfileRemoveFriend,
+                              confirmLabel: pageContext.l10n.viewedProfileBlock,
                             );
-                            if (confirmed != true || !pageContext.mounted) {
+                            if (confirmed != true || !pageContext.mounted)
                               return;
-                            }
                             Navigator.of(sheetContext).pop();
-                            await cubit.removeFriend();
-                          }
-                        : null,
-                      isBlockedByMe: isBlockedByMe,
-                      isBlockActionPending:
-                          blocklistState.isPending(currentProfile.profile.id) ||
-                          currentState.isActionPending,
-                      onBlock: () async {
-                        final confirmed = await showConfirmationDialog(
-                          pageContext,
-                          title: pageContext.l10n.viewedProfileBlockTitle,
-                          content: pageContext.l10n.viewedProfileBlockContent(
-                            currentProfile.profile.displayName,
-                          ),
-                          confirmLabel: pageContext.l10n.viewedProfileBlock,
-                        );
-                        if (confirmed != true || !pageContext.mounted) return;
-                        Navigator.of(sheetContext).pop();
-                        await cubit.blockUser();
-                      },
-                      onUnblock: () async {
-                        final confirmed = await showConfirmationDialog(
-                          pageContext,
-                          title: pageContext.l10n.unblockUserTitle,
-                          content: pageContext.l10n.unblockUserContent(
-                            currentProfile.profile.displayName,
-                          ),
-                          confirmLabel: pageContext.l10n.unblockUser,
-                        );
-                        if (confirmed != true || !pageContext.mounted) return;
-                        Navigator.of(sheetContext).pop();
-                        try {
-                          await pageContext
-                              .read<IBlocklistRepository>()
-                              .unblockUser(currentProfile.profile.id);
-                        } catch (_) {
-                          if (pageContext.mounted) {
-                            showAppSnackBar(
+                            await cubit.blockUser();
+                          },
+                          onUnblock: () async {
+                            final confirmed = await showConfirmationDialog(
                               pageContext,
-                              message: pageContext.l10n.friendsActionFailed,
-                              type: SnackBarType.error,
+                              title: pageContext.l10n.unblockUserTitle,
+                              content: pageContext.l10n.unblockUserContent(
+                                currentProfile.profile.displayName,
+                              ),
+                              confirmLabel: pageContext.l10n.unblockUser,
                             );
-                          }
-                        }
+                            if (confirmed != true || !pageContext.mounted)
+                              return;
+                            Navigator.of(sheetContext).pop();
+                            try {
+                              await pageContext
+                                  .read<IBlocklistRepository>()
+                                  .unblockUser(currentProfile.profile.id);
+                            } catch (_) {
+                              if (pageContext.mounted) {
+                                showAppSnackBar(
+                                  pageContext,
+                                  message: pageContext.l10n.friendsActionFailed,
+                                  type: SnackBarType.error,
+                                );
+                              }
+                            }
+                          },
+                          onReport: currentState.isActionPending
+                              ? null
+                              : () async {
+                                  Navigator.of(sheetContext).pop();
+                                  await _reportUser(
+                                    pageContext,
+                                    cubit,
+                                    currentProfile,
+                                  );
+                                },
+                        );
                       },
-                      onReport: currentState.isActionPending
-                          ? null
-                          : () async {
-                        Navigator.of(sheetContext).pop();
-                        await _reportUser(pageContext, cubit, currentProfile);
-                      },
-                    );
-                  },
-                ),
+                    ),
               ),
             ),
           ),
@@ -522,9 +564,9 @@ class _ProfileScaffold extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await context
-          .read<IBlocklistRepository>()
-          .unblockUser(viewedProfile.profile.id);
+      await context.read<IBlocklistRepository>().unblockUser(
+        viewedProfile.profile.id,
+      );
     } catch (_) {
       if (context.mounted) {
         showAppSnackBar(
