@@ -16,7 +16,10 @@ class FriendsCacheDataSource {
     final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriends)
       ..where((table) => table.ownerUserId.equals(owner))
-      ..orderBy([(table) => OrderingTerm.desc(table.friendsSince)]);
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.friendsSince),
+        (table) => OrderingTerm.desc(table.userId),
+      ]);
     return query.watch().map((rows) => List.unmodifiable(rows.map(_mapFriend)));
   }
 
@@ -34,8 +37,190 @@ class FriendsCacheDataSource {
     final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedFriends)
       ..where((table) => table.ownerUserId.equals(owner))
-      ..orderBy([(table) => OrderingTerm.desc(table.friendsSince)]);
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.friendsSince),
+        (table) => OrderingTerm.desc(table.userId),
+      ]);
     return (await query.get()).map(_mapFriend).toList(growable: false);
+  }
+
+  Future<bool> containsFriend(String friendId, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.selectOnly(_database.cachedFriends)
+      ..addColumns([_database.cachedFriends.userId])
+      ..where(
+        _database.cachedFriends.ownerUserId.equals(owner) &
+            _database.cachedFriends.userId.equals(friendId),
+      )
+      ..limit(1);
+    return await query.getSingleOrNull() != null;
+  }
+
+  Stream<FriendListCacheState> watchFriendListState({String? ownerUserId}) {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.select(_database.cachedFriendListStates)
+      ..where((table) => table.ownerUserId.equals(owner));
+    return query.watchSingleOrNull().asyncMap(
+      (row) => row == null
+          ? _deriveFriendListState(owner)
+          : Future.value(_mapFriendListState(row)),
+    );
+  }
+
+  Future<FriendListCacheState> readFriendListState({
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final row = await (_database.select(
+      _database.cachedFriendListStates,
+    )..where((table) => table.ownerUserId.equals(owner))).getSingleOrNull();
+    return row == null
+        ? _deriveFriendListState(owner)
+        : _mapFriendListState(row);
+  }
+
+  Future<void> replaceFriendListHead(
+    FriendPage page, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final previousFriends = await readFriends(ownerUserId: owner);
+    final previousState = await readFriendListState(ownerUserId: owner);
+    final previousCount = previousFriends.length;
+
+    await _database.transaction(() async {
+      await _upsertFriends(page.friends, owner);
+      final cachedCount = await _countFriends(owner);
+      final hasOnlyHeadPage = previousCount <= page.friends.length;
+      final nextCursor = hasOnlyHeadPage
+          ? page.nextCursor
+          : previousState.nextCursor;
+      final hasMore = cachedCount >= page.totalCount
+          ? false
+          : hasOnlyHeadPage
+          ? page.hasMore
+          : previousState.hasMore;
+      await _writeFriendListState(
+        owner: owner,
+        cursor: nextCursor,
+        hasMore: hasMore,
+        totalCount: page.totalCount,
+      );
+      await _removeExpiredLocations(owner);
+    });
+  }
+
+  Future<void> appendFriendPage(FriendPage page, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    await _database.transaction(() async {
+      await _upsertFriends(page.friends, owner);
+      final cachedCount = await _countFriends(owner);
+      await _writeFriendListState(
+        owner: owner,
+        cursor: page.nextCursor,
+        hasMore: cachedCount < page.totalCount && page.hasMore,
+        totalCount: page.totalCount,
+      );
+      await _removeExpiredLocations(owner);
+    });
+  }
+
+  Future<void> updateFriendFromRealtime(
+    Friend? friend, {
+    required String friendId,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    await _database.transaction(() async {
+      if (friend == null) {
+        await removeFriend(friendId, ownerUserId: owner);
+      } else {
+        await _database
+            .into(_database.cachedFriends)
+            .insertOnConflictUpdate(_friendRow(friend, owner));
+      }
+    });
+  }
+
+  /// Extends the local list with friends discovered by a trusted server-side
+  /// search. It deliberately does not change cursor metadata: a subsequent
+  /// cursor page may contain the same row and is safely upserted.
+  Future<void> cacheFoundFriends(
+    List<Friend> friends, {
+    String? ownerUserId,
+  }) async {
+    if (friends.isEmpty) return;
+    final owner = ownerUserId ?? _userIdProvider();
+    final state = await readFriendListState(ownerUserId: owner);
+    await _database.transaction(() async {
+      await _upsertFriends(friends, owner);
+      final cachedCount = await _countFriends(owner);
+      if (state.hasMore &&
+          state.totalCount > 0 &&
+          cachedCount >= state.totalCount) {
+        await _writeFriendListState(
+          owner: owner,
+          cursor: null,
+          hasMore: false,
+          totalCount: state.totalCount,
+        );
+      }
+    });
+  }
+
+  Future<int> _countFriends(String owner) async {
+    final count = _database.cachedFriends.userId.count();
+    final query = _database.selectOnly(_database.cachedFriends)
+      ..addColumns([count])
+      ..where(_database.cachedFriends.ownerUserId.equals(owner));
+    return (await query.getSingle()).read(count) ?? 0;
+  }
+
+  Future<FriendListCacheState> _deriveFriendListState(String owner) async {
+    final friends = await readFriends(ownerUserId: owner);
+    if (friends.isEmpty) return const FriendListCacheState();
+    final last = friends.last;
+    return FriendListCacheState(
+      nextCursor: FriendPageCursor(
+        friendsSince: last.friendsSince,
+        friendId: last.id,
+      ),
+      // Databases created before cursor metadata may contain a complete list.
+      // One extra page read is safe and lets the server establish the exact
+      // terminal boundary without discarding that offline cache.
+      hasMore: true,
+      totalCount: friends.length,
+    );
+  }
+
+  Future<void> _writeFriendListState({
+    required String owner,
+    required FriendPageCursor? cursor,
+    required bool hasMore,
+    required int totalCount,
+  }) => _database
+      .into(_database.cachedFriendListStates)
+      .insertOnConflictUpdate(
+        CachedFriendListStatesCompanion.insert(
+          ownerUserId: owner,
+          nextFriendsSince: Value(cursor?.friendsSince.toUtc()),
+          nextFriendId: Value(cursor?.friendId),
+          hasMore: Value(hasMore),
+          totalCount: Value(totalCount),
+          updatedAt: DateTime.now().toUtc(),
+        ),
+      );
+
+  FriendListCacheState _mapFriendListState(CachedFriendListState row) {
+    final since = row.nextFriendsSince;
+    final id = row.nextFriendId;
+    return FriendListCacheState(
+      nextCursor: since == null || id == null
+          ? null
+          : FriendPageCursor(friendsSince: since.toLocal(), friendId: id),
+      hasMore: row.hasMore,
+      totalCount: row.totalCount,
+    );
   }
 
   Future<List<FriendRequest>> readRequests({String? ownerUserId}) async {
@@ -184,12 +369,21 @@ class FriendsCacheDataSource {
     String? ownerUserId,
     required List<Friend> friends,
     required List<FriendRequest> requests,
+    bool markFriendsComplete = false,
   }) async {
     final owner = ownerUserId ?? _userIdProvider();
     final cachedFriends = await readFriends(ownerUserId: owner);
     final cachedRequests = await readRequests(ownerUserId: owner);
     if (_sameFriends(cachedFriends, friends) &&
         _sameRequests(cachedRequests, requests)) {
+      if (markFriendsComplete) {
+        await _writeFriendListState(
+          owner: owner,
+          cursor: null,
+          hasMore: false,
+          totalCount: friends.length,
+        );
+      }
       await _removeExpiredLocations(owner);
       return false;
     }
@@ -233,7 +427,45 @@ class FriendsCacheDataSource {
             .into(_database.cachedFriendRequests)
             .insertOnConflictUpdate(_requestRow(request, owner));
       }
+      if (markFriendsComplete) {
+        await _writeFriendListState(
+          owner: owner,
+          cursor: null,
+          hasMore: false,
+          totalCount: friends.length,
+        );
+      }
       await _removeExpiredLocations(owner);
+    });
+    return true;
+  }
+
+  Future<bool> replaceRequests(
+    List<FriendRequest> requests, {
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final cachedRequests = await readRequests(ownerUserId: owner);
+    if (_sameRequests(cachedRequests, requests)) return false;
+    await _database.transaction(() async {
+      final cachedById = {
+        for (final request in cachedRequests) request.id: request,
+      };
+      final requestIds = requests.map((request) => request.id).toSet();
+      await (_database.delete(_database.cachedFriendRequests)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                (requestIds.isEmpty
+                    ? const Constant(true)
+                    : table.requestId.isNotIn(requestIds)),
+          ))
+          .go();
+      for (final request in requests) {
+        if (_sameRequest(cachedById[request.id], request)) continue;
+        await _database
+            .into(_database.cachedFriendRequests)
+            .insertOnConflictUpdate(_requestRow(request, owner));
+      }
     });
     return true;
   }
@@ -368,6 +600,14 @@ class FriendsCacheDataSource {
           ))
           .go();
 
+  Future<void> _upsertFriends(List<Friend> friends, String owner) async {
+    for (final friend in friends) {
+      await _database
+          .into(_database.cachedFriends)
+          .insertOnConflictUpdate(_friendRow(friend, owner));
+    }
+  }
+
   Friend _mapFriend(CachedFriend row) => Friend(
     id: row.userId,
     username: row.username,
@@ -417,4 +657,16 @@ class FriendsCacheDataSource {
     requestedAt: request.requestedAt,
     cachedAt: DateTime.now().toUtc(),
   );
+}
+
+class FriendListCacheState {
+  const FriendListCacheState({
+    this.nextCursor,
+    this.hasMore = false,
+    this.totalCount = 0,
+  });
+
+  final FriendPageCursor? nextCursor;
+  final bool hasMore;
+  final int totalCount;
 }

@@ -123,6 +123,23 @@ class CachedFriends extends Table {
   Set<Column> get primaryKey => {ownerUserId, userId};
 }
 
+/// Persists the deepest loaded cursor for the paged own-friends feed.
+///
+/// Cached friend rows themselves remain the page cache. Keeping the cursor in
+/// a separate one-row table lets the app retain already downloaded pages
+/// across a restart without refetching them.
+class CachedFriendListStates extends Table {
+  TextColumn get ownerUserId => text()();
+  DateTimeColumn get nextFriendsSince => dateTime().nullable()();
+  TextColumn get nextFriendId => text().nullable()();
+  BoolColumn get hasMore => boolean().withDefault(const Constant(false))();
+  IntColumn get totalCount => integer().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId};
+}
+
 class CachedFriendRequests extends Table {
   TextColumn get ownerUserId => text()();
   TextColumn get requestId => text()();
@@ -277,6 +294,7 @@ class CachedAppLanguages extends Table {
     CachedMessages,
     PendingChatOperations,
     CachedFriends,
+    CachedFriendListStates,
     CachedFriendRequests,
     CachedFriendLocations,
     CachedContactMatches,
@@ -306,7 +324,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -438,6 +456,9 @@ class AppDatabase extends _$AppDatabase {
             cachedChats.peerIsGloballyBanned,
           );
         }
+      }
+      if (from < 23) {
+        await migrator.createTable(cachedFriendListStates);
       }
     },
     beforeOpen: (details) async {

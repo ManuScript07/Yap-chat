@@ -44,10 +44,13 @@ class FriendsRepository
   final Uuid _uuid = const Uuid();
   StreamSubscription<FriendChange>? _changesSubscription;
   AccountSessionSnapshot? _startedScope;
+  AccountSessionSnapshot? _completeSnapshotScope;
   Timer? _realtimeSyncTimer;
   final StreamController<String> _profileChangesController =
       StreamController<String>.broadcast();
   Future<void>? _activeSync;
+  Future<void>? _activeFullSync;
+  Future<void>? _activePageLoad;
   final Map<String, ({DateTime cachedAt, List<FriendCandidate> results})>
   _searchCache = {};
   final Map<String, Future<List<FriendCandidate>>> _activeSearches = {};
@@ -63,10 +66,24 @@ class FriendsRepository
   final Map<String, Future<FriendLocationLookup>> _activeLocationRequests = {};
 
   @override
-  Stream<List<Friend>> watchFriends() {
+  Stream<List<Friend>> watchPaginatedFriends() {
     final scope = _accountSessionController.capture();
     unawaited(_ensureStarted());
     return _cache.watchFriends(ownerUserId: scope.userId);
+  }
+
+  @override
+  Stream<List<Friend>> watchFriends() {
+    final scope = _accountSessionController.capture();
+    unawaited(_ensureStarted(loadCompleteSnapshot: true));
+    return _cache.watchFriends(ownerUserId: scope.userId);
+  }
+
+  @override
+  Stream<FriendListCacheState> watchFriendListState() {
+    final scope = _accountSessionController.capture();
+    unawaited(_ensureStarted());
+    return _cache.watchFriendListState(ownerUserId: scope.userId);
   }
 
   @override
@@ -97,9 +114,20 @@ class FriendsRepository
   @override
   Future<List<Friend>> getFriends() async {
     final scope = _accountSessionController.capture();
-    await _synchronize();
+    await _synchronizeFull();
     _accountSessionController.ensureCurrent(scope);
     return _cache.readFriends(ownerUserId: scope.userId);
+  }
+
+  @override
+  Future<void> loadMoreFriends() async {
+    final active = _activePageLoad;
+    if (active != null) return active;
+    final load = _performLoadMoreFriends();
+    _activePageLoad = load;
+    return load.whenComplete(() {
+      if (identical(_activePageLoad, load)) _activePageLoad = null;
+    });
   }
 
   @override
@@ -123,8 +151,9 @@ class FriendsRepository
     }
     final active = _activeSearches[operationKey];
     if (active != null) return active;
-    final future = _remote.searchUsers(normalized).then((results) {
+    final future = _remote.searchUsers(normalized).then((results) async {
       _accountSessionController.ensureCurrent(scope);
+      await _cacheFriendsFoundBySearchSafely(results, scope);
       _searchCache[operationKey] = (cachedAt: DateTime.now(), results: results);
       while (_searchCache.length > 20) {
         _searchCache.remove(_searchCache.keys.first);
@@ -146,6 +175,12 @@ class FriendsRepository
       ownerUserId: scope.userId,
     );
     _accountSessionController.ensureCurrent(scope);
+    await _cacheFriendsFoundBySearchSafely(
+      records.values
+          .map((record) => record.candidate)
+          .whereType<FriendCandidate>(),
+      scope,
+    );
     final snapshot = await _buildContactSnapshot(
       records,
       ownerUserId: scope.userId,
@@ -171,6 +206,12 @@ class FriendsRepository
     if (_manualPhoneSearchCachePolicy.shouldRefresh(record, _clock().toUtc())) {
       return const ContactMatchSnapshot();
     }
+    await _cacheFriendsFoundBySearchSafely(
+      records.values
+          .map((cachedRecord) => cachedRecord.candidate)
+          .whereType<FriendCandidate>(),
+      scope,
+    );
     final snapshot = await _buildContactSnapshot(
       records,
       ownerUserId: scope.userId,
@@ -308,6 +349,7 @@ class FriendsRepository
       }
     }
     if (matches.isNotEmpty) {
+      await _cacheFriendsFoundBySearchSafely(matches.values, scope);
       await _accountSessionController.commit(
         scope,
         () => _contactMatchCache.writeMatches(
@@ -379,6 +421,7 @@ class FriendsRepository
       );
       _accountSessionController.ensureCurrent(scope);
     }
+    await _cacheFriendsFoundBySearchSafely(freshMatches.values, scope);
     if (stalePhoneNumbers.isNotEmpty) {
       await _accountSessionController.commit(
         scope,
@@ -431,7 +474,7 @@ class FriendsRepository
           ? request.direction == FriendRequestDirection.incoming
                 ? FriendRelationship.incoming
                 : FriendRelationship.outgoing
-          : freshCandidate?.relationship ?? FriendRelationship.none;
+          : candidate.relationship;
       matches[entry.key] = FriendCandidate(
         id: candidate.id,
         requestId: request?.id ?? freshCandidate?.requestId,
@@ -447,6 +490,58 @@ class FriendsRepository
       matches: Map.unmodifiable(matches),
       checkedPhoneNumbers: Set.unmodifiable(records.keys),
     );
+  }
+
+  Future<void> _cacheFriendsFoundBySearch(
+    Iterable<FriendCandidate> candidates,
+    AccountSessionSnapshot scope,
+  ) async {
+    final ids = candidates
+        .where(
+          (candidate) => candidate.relationship == FriendRelationship.friend,
+        )
+        .map((candidate) => candidate.id)
+        .toSet();
+    if (ids.isEmpty) return;
+
+    final cached = await _cache.readFriends(ownerUserId: scope.userId);
+    _accountSessionController.ensureCurrent(scope);
+    ids.removeAll(cached.map((friend) => friend.id));
+    if (ids.isEmpty) return;
+
+    const batchSize = 500;
+    final foundFriends = <Friend>[];
+    final pendingIds = ids.toList(growable: false);
+    for (var offset = 0; offset < pendingIds.length; offset += batchSize) {
+      final end = (offset + batchSize).clamp(0, pendingIds.length);
+      foundFriends.addAll(
+        await _remote.fetchCurrentFriends(pendingIds.sublist(offset, end)),
+      );
+      _accountSessionController.ensureCurrent(scope);
+    }
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.cacheFoundFriends(foundFriends, ownerUserId: scope.userId),
+    );
+  }
+
+  Future<void> _cacheFriendsFoundBySearchSafely(
+    Iterable<FriendCandidate> candidates,
+    AccountSessionSnapshot scope,
+  ) async {
+    try {
+      await _cacheFriendsFoundBySearch(candidates, scope);
+    } on StaleAccountSessionException {
+      rethrow;
+    } catch (error, stackTrace) {
+      // A search result remains valid even when the optional cache extension
+      // is temporarily unavailable (for example, while reconnecting).
+      _config.talker.handle(
+        error,
+        stackTrace,
+        'Searched friend cache extension failed',
+      );
+    }
   }
 
   @override
@@ -778,6 +873,8 @@ class FriendsRepository
   @override
   Future<void> pauseRealtime() {
     _activeSync = null;
+    _activeFullSync = null;
+    _activePageLoad = null;
     _searchCache.clear();
     _activeSearches.clear();
     _activeContactRefreshes.clear();
@@ -793,14 +890,22 @@ class FriendsRepository
     await _remote.resumeChanges();
   }
 
-  Future<void> _ensureStarted({bool forceSync = false}) async {
+  Future<void> _ensureStarted({
+    bool forceSync = false,
+    bool loadCompleteSnapshot = false,
+  }) async {
     final scope = _accountSessionController.capture();
     final startedScope = _startedScope;
     final isCurrentScope =
         startedScope != null &&
         startedScope.userId == scope.userId &&
         startedScope.generation == scope.generation;
-    if (isCurrentScope && !forceSync) return;
+    if (isCurrentScope && !forceSync) {
+      if (loadCompleteSnapshot && !_hasCompleteSnapshot(scope)) {
+        await _synchronizeFull();
+      }
+      return;
+    }
 
     _startedScope = scope;
     _changesSubscription ??= _remote.watchChanges().listen(
@@ -809,12 +914,82 @@ class FriendsRepository
         if (profileId != null && !_profileChangesController.isClosed) {
           _profileChangesController.add(profileId);
         }
-        _scheduleRealtimeSync();
+        _handleRealtimeChange(change);
       },
       onError: (Object error, StackTrace stackTrace) =>
           _config.talker.handle(error, stackTrace, 'Friends stream failed'),
     );
-    await _synchronizeSafely();
+    if (loadCompleteSnapshot) {
+      await _synchronizeFullSafely();
+    } else {
+      await _synchronizeSafely();
+    }
+  }
+
+  void _handleRealtimeChange(FriendChange change) {
+    final profileId = change.profileId;
+    if (profileId == null) {
+      _scheduleRealtimeSync();
+      return;
+    }
+
+    // This event is emitted only for identity fields. Updating the one cached
+    // record preserves pages that are already available offline; a head-page
+    // refresh alone would leave a later cached page stale.
+    if (change.reason == 'profile_updated') {
+      unawaited(_refreshCachedFriend(profileId));
+      return;
+    }
+
+    final friendshipWasRemoved =
+        change.table == 'friendships' && change.operation == 'DELETE';
+    final peerWasBlocked =
+        change.reason == 'block' && change.action == 'blocked';
+    if (friendshipWasRemoved || peerWasBlocked) {
+      final scope = _accountSessionController.capture();
+      unawaited(
+        _accountSessionController.commit(
+          scope,
+          () => _cache.updateFriendFromRealtime(
+            null,
+            friendId: profileId,
+            ownerUserId: scope.userId,
+          ),
+        ),
+      );
+    }
+    _scheduleRealtimeSync();
+  }
+
+  Future<void> _refreshCachedFriend(String friendId) async {
+    final scope = _accountSessionController.capture();
+    try {
+      final isCached = await _cache.containsFriend(
+        friendId,
+        ownerUserId: scope.userId,
+      );
+      _accountSessionController.ensureCurrent(scope);
+      if (!isCached) return;
+      final friend = await _remote.fetchCurrentFriend(friendId);
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.updateFriendFromRealtime(
+          friend,
+          friendId: friendId,
+          ownerUserId: scope.userId,
+        ),
+      );
+    } on StaleAccountSessionException {
+      return;
+    } catch (error, stackTrace) {
+      _config.talker.handle(
+        error,
+        stackTrace,
+        'Cached friend realtime refresh failed',
+      );
+      // The normal coalesced sync will recover from a transient RPC failure.
+      _scheduleRealtimeSync();
+    }
   }
 
   void _scheduleRealtimeSync() {
@@ -826,6 +1001,8 @@ class FriendsRepository
   }
 
   Future<void> _synchronize() {
+    final activeFull = _activeFullSync;
+    if (activeFull != null) return activeFull;
     final active = _activeSync;
     if (active != null) return active;
     final sync = _performSync();
@@ -838,17 +1015,65 @@ class FriendsRepository
   Future<void> _performSync() async {
     final scope = _accountSessionController.capture();
     final results = await Future.wait([
+      _remote.fetchFriendsPage(),
+      _remote.fetchRequests(),
+    ]);
+    await _accountSessionController.commit(scope, () async {
+      await _cache.replaceFriendListHead(
+        results[0] as FriendPage,
+        ownerUserId: scope.userId,
+      );
+      await _cache.replaceRequests(
+        results[1] as List<FriendRequest>,
+        ownerUserId: scope.userId,
+      );
+    });
+  }
+
+  Future<void> _synchronizeFull() {
+    final active = _activeFullSync;
+    if (active != null) return active;
+    final sync = _performFullSync();
+    _activeFullSync = sync;
+    return sync.whenComplete(() {
+      if (identical(_activeFullSync, sync)) _activeFullSync = null;
+    });
+  }
+
+  Future<void> _performFullSync() async {
+    // Do not let a first-page write race a complete snapshot write. The
+    // latter is only requested by legacy consumers that genuinely need all
+    // friends (new chat and privacy settings).
+    final activePageSync = _activeSync;
+    if (activePageSync != null) await activePageSync;
+    final scope = _accountSessionController.capture();
+    final results = await Future.wait([
       _remote.fetchFriends(),
       _remote.fetchRequests(),
     ]);
-    final refreshedFriends = results[0] as List<Friend>;
     await _accountSessionController.commit(
       scope,
       () => _cache.replaceAll(
-        ownerUserId: scope.userId,
-        friends: refreshedFriends,
+        friends: results[0] as List<Friend>,
         requests: results[1] as List<FriendRequest>,
+        ownerUserId: scope.userId,
+        markFriendsComplete: true,
       ),
+    );
+    _accountSessionController.ensureCurrent(scope);
+    _completeSnapshotScope = scope;
+  }
+
+  Future<void> _performLoadMoreFriends() async {
+    final scope = _accountSessionController.capture();
+    final state = await _cache.readFriendListState(ownerUserId: scope.userId);
+    _accountSessionController.ensureCurrent(scope);
+    final cursor = state.nextCursor;
+    if (!state.hasMore || cursor == null) return;
+    final page = await _remote.fetchFriendsPage(after: cursor);
+    await _accountSessionController.commit(
+      scope,
+      () => _cache.appendFriendPage(page, ownerUserId: scope.userId),
     );
   }
 
@@ -860,6 +1085,23 @@ class FriendsRepository
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Friends sync failed');
     }
+  }
+
+  Future<void> _synchronizeFullSafely() async {
+    try {
+      await _synchronizeFull();
+    } on StaleAccountSessionException {
+      return;
+    } catch (error, stackTrace) {
+      _config.talker.handle(error, stackTrace, 'Full friends sync failed');
+    }
+  }
+
+  bool _hasCompleteSnapshot(AccountSessionSnapshot scope) {
+    final completeScope = _completeSnapshotScope;
+    return completeScope != null &&
+        completeScope.userId == scope.userId &&
+        completeScope.generation == scope.generation;
   }
 
   Future<String?> _hydrateAvatar(String? storagePath, String? remoteUrl) async {

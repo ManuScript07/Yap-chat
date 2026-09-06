@@ -10,6 +10,9 @@ class FriendsState extends Equatable {
     this.status = FriendsStatus.initial,
     this.activeTab = FriendsTab.friends,
     this.friends = const [],
+    this.totalFriendCount = 0,
+    this.hasMoreFriends = false,
+    this.isLoadingMoreFriends = false,
     this.requests = const [],
     this.friendsQuery = '',
     this.requestsQuery = '',
@@ -19,6 +22,9 @@ class FriendsState extends Equatable {
   final FriendsStatus status;
   final FriendsTab activeTab;
   final List<Friend> friends;
+  final int totalFriendCount;
+  final bool hasMoreFriends;
+  final bool isLoadingMoreFriends;
   final List<FriendRequest> requests;
   final String friendsQuery;
   final String requestsQuery;
@@ -71,6 +77,9 @@ class FriendsState extends Equatable {
     FriendsStatus? status,
     FriendsTab? activeTab,
     List<Friend>? friends,
+    int? totalFriendCount,
+    bool? hasMoreFriends,
+    bool? isLoadingMoreFriends,
     List<FriendRequest>? requests,
     String? friendsQuery,
     String? requestsQuery,
@@ -80,6 +89,9 @@ class FriendsState extends Equatable {
     status: status ?? this.status,
     activeTab: activeTab ?? this.activeTab,
     friends: friends ?? this.friends,
+    totalFriendCount: totalFriendCount ?? this.totalFriendCount,
+    hasMoreFriends: hasMoreFriends ?? this.hasMoreFriends,
+    isLoadingMoreFriends: isLoadingMoreFriends ?? this.isLoadingMoreFriends,
     requests: requests ?? this.requests,
     friendsQuery: friendsQuery ?? this.friendsQuery,
     requestsQuery: requestsQuery ?? this.requestsQuery,
@@ -91,6 +103,9 @@ class FriendsState extends Equatable {
     status,
     activeTab,
     friends,
+    totalFriendCount,
+    hasMoreFriends,
+    isLoadingMoreFriends,
     requests,
     friendsQuery,
     requestsQuery,

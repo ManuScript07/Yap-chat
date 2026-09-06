@@ -4961,6 +4961,454 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
   }
 }
 
+class $CachedFriendListStatesTable extends CachedFriendListStates
+    with TableInfo<$CachedFriendListStatesTable, CachedFriendListState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedFriendListStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nextFriendsSinceMeta = const VerificationMeta(
+    'nextFriendsSince',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextFriendsSince =
+      GeneratedColumn<DateTime>(
+        'next_friends_since',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _nextFriendIdMeta = const VerificationMeta(
+    'nextFriendId',
+  );
+  @override
+  late final GeneratedColumn<String> nextFriendId = GeneratedColumn<String>(
+    'next_friend_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasMoreMeta = const VerificationMeta(
+    'hasMore',
+  );
+  @override
+  late final GeneratedColumn<bool> hasMore = GeneratedColumn<bool>(
+    'has_more',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_more" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _totalCountMeta = const VerificationMeta(
+    'totalCount',
+  );
+  @override
+  late final GeneratedColumn<int> totalCount = GeneratedColumn<int>(
+    'total_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    nextFriendsSince,
+    nextFriendId,
+    hasMore,
+    totalCount,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_friend_list_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedFriendListState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('next_friends_since')) {
+      context.handle(
+        _nextFriendsSinceMeta,
+        nextFriendsSince.isAcceptableOrUnknown(
+          data['next_friends_since']!,
+          _nextFriendsSinceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_friend_id')) {
+      context.handle(
+        _nextFriendIdMeta,
+        nextFriendId.isAcceptableOrUnknown(
+          data['next_friend_id']!,
+          _nextFriendIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_more')) {
+      context.handle(
+        _hasMoreMeta,
+        hasMore.isAcceptableOrUnknown(data['has_more']!, _hasMoreMeta),
+      );
+    }
+    if (data.containsKey('total_count')) {
+      context.handle(
+        _totalCountMeta,
+        totalCount.isAcceptableOrUnknown(data['total_count']!, _totalCountMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId};
+  @override
+  CachedFriendListState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedFriendListState(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      nextFriendsSince: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_friends_since'],
+      ),
+      nextFriendId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}next_friend_id'],
+      ),
+      hasMore: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_more'],
+      )!,
+      totalCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_count'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedFriendListStatesTable createAlias(String alias) {
+    return $CachedFriendListStatesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedFriendListState extends DataClass
+    implements Insertable<CachedFriendListState> {
+  final String ownerUserId;
+  final DateTime? nextFriendsSince;
+  final String? nextFriendId;
+  final bool hasMore;
+  final int totalCount;
+  final DateTime updatedAt;
+  const CachedFriendListState({
+    required this.ownerUserId,
+    this.nextFriendsSince,
+    this.nextFriendId,
+    required this.hasMore,
+    required this.totalCount,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    if (!nullToAbsent || nextFriendsSince != null) {
+      map['next_friends_since'] = Variable<DateTime>(nextFriendsSince);
+    }
+    if (!nullToAbsent || nextFriendId != null) {
+      map['next_friend_id'] = Variable<String>(nextFriendId);
+    }
+    map['has_more'] = Variable<bool>(hasMore);
+    map['total_count'] = Variable<int>(totalCount);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CachedFriendListStatesCompanion toCompanion(bool nullToAbsent) {
+    return CachedFriendListStatesCompanion(
+      ownerUserId: Value(ownerUserId),
+      nextFriendsSince: nextFriendsSince == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextFriendsSince),
+      nextFriendId: nextFriendId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextFriendId),
+      hasMore: Value(hasMore),
+      totalCount: Value(totalCount),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CachedFriendListState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedFriendListState(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      nextFriendsSince: serializer.fromJson<DateTime?>(
+        json['nextFriendsSince'],
+      ),
+      nextFriendId: serializer.fromJson<String?>(json['nextFriendId']),
+      hasMore: serializer.fromJson<bool>(json['hasMore']),
+      totalCount: serializer.fromJson<int>(json['totalCount']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'nextFriendsSince': serializer.toJson<DateTime?>(nextFriendsSince),
+      'nextFriendId': serializer.toJson<String?>(nextFriendId),
+      'hasMore': serializer.toJson<bool>(hasMore),
+      'totalCount': serializer.toJson<int>(totalCount),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CachedFriendListState copyWith({
+    String? ownerUserId,
+    Value<DateTime?> nextFriendsSince = const Value.absent(),
+    Value<String?> nextFriendId = const Value.absent(),
+    bool? hasMore,
+    int? totalCount,
+    DateTime? updatedAt,
+  }) => CachedFriendListState(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    nextFriendsSince: nextFriendsSince.present
+        ? nextFriendsSince.value
+        : this.nextFriendsSince,
+    nextFriendId: nextFriendId.present ? nextFriendId.value : this.nextFriendId,
+    hasMore: hasMore ?? this.hasMore,
+    totalCount: totalCount ?? this.totalCount,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CachedFriendListState copyWithCompanion(
+    CachedFriendListStatesCompanion data,
+  ) {
+    return CachedFriendListState(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      nextFriendsSince: data.nextFriendsSince.present
+          ? data.nextFriendsSince.value
+          : this.nextFriendsSince,
+      nextFriendId: data.nextFriendId.present
+          ? data.nextFriendId.value
+          : this.nextFriendId,
+      hasMore: data.hasMore.present ? data.hasMore.value : this.hasMore,
+      totalCount: data.totalCount.present
+          ? data.totalCount.value
+          : this.totalCount,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendListState(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('nextFriendsSince: $nextFriendsSince, ')
+          ..write('nextFriendId: $nextFriendId, ')
+          ..write('hasMore: $hasMore, ')
+          ..write('totalCount: $totalCount, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    nextFriendsSince,
+    nextFriendId,
+    hasMore,
+    totalCount,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedFriendListState &&
+          other.ownerUserId == this.ownerUserId &&
+          other.nextFriendsSince == this.nextFriendsSince &&
+          other.nextFriendId == this.nextFriendId &&
+          other.hasMore == this.hasMore &&
+          other.totalCount == this.totalCount &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedFriendListStatesCompanion
+    extends UpdateCompanion<CachedFriendListState> {
+  final Value<String> ownerUserId;
+  final Value<DateTime?> nextFriendsSince;
+  final Value<String?> nextFriendId;
+  final Value<bool> hasMore;
+  final Value<int> totalCount;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CachedFriendListStatesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.nextFriendsSince = const Value.absent(),
+    this.nextFriendId = const Value.absent(),
+    this.hasMore = const Value.absent(),
+    this.totalCount = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedFriendListStatesCompanion.insert({
+    required String ownerUserId,
+    this.nextFriendsSince = const Value.absent(),
+    this.nextFriendId = const Value.absent(),
+    this.hasMore = const Value.absent(),
+    this.totalCount = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       updatedAt = Value(updatedAt);
+  static Insertable<CachedFriendListState> custom({
+    Expression<String>? ownerUserId,
+    Expression<DateTime>? nextFriendsSince,
+    Expression<String>? nextFriendId,
+    Expression<bool>? hasMore,
+    Expression<int>? totalCount,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (nextFriendsSince != null) 'next_friends_since': nextFriendsSince,
+      if (nextFriendId != null) 'next_friend_id': nextFriendId,
+      if (hasMore != null) 'has_more': hasMore,
+      if (totalCount != null) 'total_count': totalCount,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedFriendListStatesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<DateTime?>? nextFriendsSince,
+    Value<String?>? nextFriendId,
+    Value<bool>? hasMore,
+    Value<int>? totalCount,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedFriendListStatesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      nextFriendsSince: nextFriendsSince ?? this.nextFriendsSince,
+      nextFriendId: nextFriendId ?? this.nextFriendId,
+      hasMore: hasMore ?? this.hasMore,
+      totalCount: totalCount ?? this.totalCount,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (nextFriendsSince.present) {
+      map['next_friends_since'] = Variable<DateTime>(nextFriendsSince.value);
+    }
+    if (nextFriendId.present) {
+      map['next_friend_id'] = Variable<String>(nextFriendId.value);
+    }
+    if (hasMore.present) {
+      map['has_more'] = Variable<bool>(hasMore.value);
+    }
+    if (totalCount.present) {
+      map['total_count'] = Variable<int>(totalCount.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFriendListStatesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('nextFriendsSince: $nextFriendsSince, ')
+          ..write('nextFriendId: $nextFriendId, ')
+          ..write('hasMore: $hasMore, ')
+          ..write('totalCount: $totalCount, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedFriendRequestsTable extends CachedFriendRequests
     with TableInfo<$CachedFriendRequestsTable, CachedFriendRequest> {
   @override
@@ -10341,6 +10789,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PendingChatOperationsTable pendingChatOperations =
       $PendingChatOperationsTable(this);
   late final $CachedFriendsTable cachedFriends = $CachedFriendsTable(this);
+  late final $CachedFriendListStatesTable cachedFriendListStates =
+      $CachedFriendListStatesTable(this);
   late final $CachedFriendRequestsTable cachedFriendRequests =
       $CachedFriendRequestsTable(this);
   late final $CachedFriendLocationsTable cachedFriendLocations =
@@ -10374,6 +10824,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedMessages,
     pendingChatOperations,
     cachedFriends,
+    cachedFriendListStates,
     cachedFriendRequests,
     cachedFriendLocations,
     cachedContactMatches,
@@ -12674,6 +13125,252 @@ typedef $$CachedFriendsTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $CachedFriendsTable, CachedFriend>,
       ),
       CachedFriend,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedFriendListStatesTableCreateCompanionBuilder =
+    CachedFriendListStatesCompanion Function({
+      required String ownerUserId,
+      Value<DateTime?> nextFriendsSince,
+      Value<String?> nextFriendId,
+      Value<bool> hasMore,
+      Value<int> totalCount,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedFriendListStatesTableUpdateCompanionBuilder =
+    CachedFriendListStatesCompanion Function({
+      Value<String> ownerUserId,
+      Value<DateTime?> nextFriendsSince,
+      Value<String?> nextFriendId,
+      Value<bool> hasMore,
+      Value<int> totalCount,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedFriendListStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedFriendListStatesTable> {
+  $$CachedFriendListStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextFriendsSince => $composableBuilder(
+    column: $table.nextFriendsSince,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nextFriendId => $composableBuilder(
+    column: $table.nextFriendId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasMore => $composableBuilder(
+    column: $table.hasMore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalCount => $composableBuilder(
+    column: $table.totalCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedFriendListStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedFriendListStatesTable> {
+  $$CachedFriendListStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextFriendsSince => $composableBuilder(
+    column: $table.nextFriendsSince,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nextFriendId => $composableBuilder(
+    column: $table.nextFriendId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasMore => $composableBuilder(
+    column: $table.hasMore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalCount => $composableBuilder(
+    column: $table.totalCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedFriendListStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedFriendListStatesTable> {
+  $$CachedFriendListStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get nextFriendsSince => $composableBuilder(
+    column: $table.nextFriendsSince,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nextFriendId => $composableBuilder(
+    column: $table.nextFriendId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasMore =>
+      $composableBuilder(column: $table.hasMore, builder: (column) => column);
+
+  GeneratedColumn<int> get totalCount => $composableBuilder(
+    column: $table.totalCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedFriendListStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedFriendListStatesTable,
+          CachedFriendListState,
+          $$CachedFriendListStatesTableFilterComposer,
+          $$CachedFriendListStatesTableOrderingComposer,
+          $$CachedFriendListStatesTableAnnotationComposer,
+          $$CachedFriendListStatesTableCreateCompanionBuilder,
+          $$CachedFriendListStatesTableUpdateCompanionBuilder,
+          (
+            CachedFriendListState,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedFriendListStatesTable,
+              CachedFriendListState
+            >,
+          ),
+          CachedFriendListState,
+          PrefetchHooks Function()
+        > {
+  $$CachedFriendListStatesTableTableManager(
+    _$AppDatabase db,
+    $CachedFriendListStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedFriendListStatesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedFriendListStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedFriendListStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<DateTime?> nextFriendsSince = const Value.absent(),
+                Value<String?> nextFriendId = const Value.absent(),
+                Value<bool> hasMore = const Value.absent(),
+                Value<int> totalCount = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendListStatesCompanion(
+                ownerUserId: ownerUserId,
+                nextFriendsSince: nextFriendsSince,
+                nextFriendId: nextFriendId,
+                hasMore: hasMore,
+                totalCount: totalCount,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                Value<DateTime?> nextFriendsSince = const Value.absent(),
+                Value<String?> nextFriendId = const Value.absent(),
+                Value<bool> hasMore = const Value.absent(),
+                Value<int> totalCount = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFriendListStatesCompanion.insert(
+                ownerUserId: ownerUserId,
+                nextFriendsSince: nextFriendsSince,
+                nextFriendId: nextFriendId,
+                hasMore: hasMore,
+                totalCount: totalCount,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedFriendListStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedFriendListStatesTable,
+      CachedFriendListState,
+      $$CachedFriendListStatesTableFilterComposer,
+      $$CachedFriendListStatesTableOrderingComposer,
+      $$CachedFriendListStatesTableAnnotationComposer,
+      $$CachedFriendListStatesTableCreateCompanionBuilder,
+      $$CachedFriendListStatesTableUpdateCompanionBuilder,
+      (
+        CachedFriendListState,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedFriendListStatesTable,
+          CachedFriendListState
+        >,
+      ),
+      CachedFriendListState,
       PrefetchHooks Function()
     >;
 typedef $$CachedFriendRequestsTableCreateCompanionBuilder =
@@ -15545,6 +16242,11 @@ class $AppDatabaseManager {
       $$PendingChatOperationsTableTableManager(_db, _db.pendingChatOperations);
   $$CachedFriendsTableTableManager get cachedFriends =>
       $$CachedFriendsTableTableManager(_db, _db.cachedFriends);
+  $$CachedFriendListStatesTableTableManager get cachedFriendListStates =>
+      $$CachedFriendListStatesTableTableManager(
+        _db,
+        _db.cachedFriendListStates,
+      );
   $$CachedFriendRequestsTableTableManager get cachedFriendRequests =>
       $$CachedFriendRequestsTableTableManager(_db, _db.cachedFriendRequests);
   $$CachedFriendLocationsTableTableManager get cachedFriendLocations =>

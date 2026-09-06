@@ -11,6 +11,7 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     : _repository = repository,
       super(const FriendsState()) {
     on<FriendsLoadStarted>(_onLoadStarted);
+    on<FriendsLoadMoreRequested>(_onLoadMoreRequested);
     on<FriendsTabChanged>(_onTabChanged);
     on<FriendsSearchChanged>(_onSearchChanged);
     on<FriendRequestCancelled>(_onRequestCancelled);
@@ -19,6 +20,7 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
       (_, emit) => emit(state.copyWith(clearActionError: true)),
     );
     on<FriendsCacheUpdated>(_onFriendsUpdated);
+    on<FriendListPaginationUpdated>(_onFriendListPaginationUpdated);
     on<FriendRequestsCacheUpdated>(_onRequestsUpdated);
     on<FriendsWatchFailed>(
       (_, emit) => emit(state.copyWith(status: FriendsStatus.failure)),
@@ -27,6 +29,7 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
 
   final IFriendsRepository _repository;
   StreamSubscription<List<Friend>>? _friendsSubscription;
+  StreamSubscription<FriendListCacheState>? _paginationSubscription;
   StreamSubscription<List<FriendRequest>>? _requestsSubscription;
 
   Future<void> _onLoadStarted(
@@ -35,15 +38,35 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
   ) async {
     emit(state.copyWith(status: FriendsStatus.loading, clearActionError: true));
     await _friendsSubscription?.cancel();
+    await _paginationSubscription?.cancel();
     await _requestsSubscription?.cancel();
-    _friendsSubscription = _repository.watchFriends().listen(
+    _friendsSubscription = _repository.watchPaginatedFriends().listen(
       (friends) => add(FriendsCacheUpdated(friends)),
+      onError: (_, _) => add(const FriendsWatchFailed()),
+    );
+    _paginationSubscription = _repository.watchFriendListState().listen(
+      (pagination) => add(FriendListPaginationUpdated(pagination)),
       onError: (_, _) => add(const FriendsWatchFailed()),
     );
     _requestsSubscription = _repository.watchRequests().listen(
       (requests) => add(FriendRequestsCacheUpdated(requests)),
       onError: (_, _) => add(const FriendsWatchFailed()),
     );
+  }
+
+  Future<void> _onLoadMoreRequested(
+    FriendsLoadMoreRequested event,
+    Emitter<FriendsState> emit,
+  ) async {
+    if (state.isLoadingMoreFriends || !state.hasMoreFriends) return;
+    emit(state.copyWith(isLoadingMoreFriends: true));
+    try {
+      await _repository.loadMoreFriends();
+    } catch (error) {
+      emit(state.copyWith(actionError: error));
+    } finally {
+      emit(state.copyWith(isLoadingMoreFriends: false));
+    }
   }
 
   void _onTabChanged(FriendsTabChanged event, Emitter<FriendsState> emit) {
@@ -90,6 +113,18 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     emit(state.copyWith(status: FriendsStatus.success, friends: event.friends));
   }
 
+  void _onFriendListPaginationUpdated(
+    FriendListPaginationUpdated event,
+    Emitter<FriendsState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        totalFriendCount: event.state.totalCount,
+        hasMoreFriends: event.state.hasMore,
+      ),
+    );
+  }
+
   void _onRequestsUpdated(
     FriendRequestsCacheUpdated event,
     Emitter<FriendsState> emit,
@@ -102,6 +137,7 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
   @override
   Future<void> close() async {
     await _friendsSubscription?.cancel();
+    await _paginationSubscription?.cancel();
     await _requestsSubscription?.cancel();
     return super.close();
   }

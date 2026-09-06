@@ -7,9 +7,19 @@ import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 
 class FriendChange {
-  const FriendChange({this.profileId});
+  const FriendChange({
+    this.profileId,
+    this.table,
+    this.operation,
+    this.reason,
+    this.action,
+  });
 
   final String? profileId;
+  final String? table;
+  final String? operation;
+  final String? reason;
+  final String? action;
 }
 
 class FriendsRemoteDataSource {
@@ -50,23 +60,81 @@ class FriendsRemoteDataSource {
         if (row['id'] is String && row['is_online'] is bool)
           row['id'] as String: row['is_online'] as bool,
     });
-    return rows
-        .map((row) {
-          final storagePath = row['avatar_storage_path'] as String?;
-          return Friend(
-            id: row['id'] as String,
-            username: row['username'] as String? ?? '',
-            displayName: row['display_name'] as String? ?? '',
-            avatarUrl: storagePath == null
-                ? row['avatar_url'] as String?
-                : null,
-            avatarStoragePath: storagePath,
-            friendsSince: DateTime.parse(
-              row['friends_since'] as String,
-            ).toLocal(),
-          );
-        })
+    return rows.map(_mapFriend).toList(growable: false);
+  }
+
+  Future<FriendPage> fetchFriendsPage({
+    FriendPageCursor? after,
+    int pageSize = 50,
+  }) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'get_friends_page',
+      params: {
+        'after_friends_since': after?.friendsSince.toUtc().toIso8601String(),
+        'after_friend_id': after?.friendId,
+        'page_size': pageSize,
+      },
+    );
+    final rows = response
+        .map((item) => Map<String, dynamic>.from(item as Map))
         .toList(growable: false);
+    _presenceStore?.recordAll({
+      for (final row in rows)
+        if (row['id'] is String && row['is_online'] is bool)
+          row['id'] as String: row['is_online'] as bool,
+    });
+    if (rows.isEmpty) {
+      return const FriendPage(friends: [], hasMore: false, totalCount: 0);
+    }
+    return FriendPage(
+      friends: rows.map(_mapFriend).toList(growable: false),
+      hasMore: rows.first['has_more'] as bool? ?? false,
+      totalCount: (rows.first['total_count'] as num?)?.toInt() ?? rows.length,
+    );
+  }
+
+  Future<Friend?> fetchCurrentFriend(String friendId) async {
+    final response = await _client.rpc<List<dynamic>>(
+      'get_current_friend',
+      params: {'target_friend_id': friendId},
+    );
+    if (response.isEmpty) return null;
+    final row = Map<String, dynamic>.from(response.first as Map);
+    final id = row['id'];
+    final isOnline = row['is_online'];
+    if (id is String && isOnline is bool) {
+      _presenceStore?.record(id, isOnline: isOnline);
+    }
+    return _mapFriend(row);
+  }
+
+  Future<List<Friend>> fetchCurrentFriends(List<String> friendIds) async {
+    if (friendIds.isEmpty) return const [];
+    final response = await _client.rpc<List<dynamic>>(
+      'get_current_friends',
+      params: {'target_friend_ids': friendIds},
+    );
+    final rows = response
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+    _presenceStore?.recordAll({
+      for (final row in rows)
+        if (row['id'] is String && row['is_online'] is bool)
+          row['id'] as String: row['is_online'] as bool,
+    });
+    return rows.map(_mapFriend).toList(growable: false);
+  }
+
+  Friend _mapFriend(Map<String, dynamic> row) {
+    final storagePath = row['avatar_storage_path'] as String?;
+    return Friend(
+      id: row['id'] as String,
+      username: row['username'] as String? ?? '',
+      displayName: row['display_name'] as String? ?? '',
+      avatarUrl: storagePath == null ? row['avatar_url'] as String? : null,
+      avatarStoragePath: storagePath,
+      friendsSince: DateTime.parse(row['friends_since'] as String).toLocal(),
+    );
   }
 
   Future<List<FriendRequest>> fetchRequests() async {
@@ -281,7 +349,13 @@ class FriendsRemoteDataSource {
                   ? Map<String, dynamic>.from(nested)
                   : event;
               controller.add(
-                FriendChange(profileId: payload['profile_id'] as String?),
+                FriendChange(
+                  profileId: payload['profile_id'] as String?,
+                  table: payload['table'] as String?,
+                  operation: payload['operation'] as String?,
+                  reason: payload['reason'] as String?,
+                  action: payload['action'] as String?,
+                ),
               );
             }
           },

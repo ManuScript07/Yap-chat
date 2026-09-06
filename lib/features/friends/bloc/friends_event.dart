@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/friends/bloc/friends_state.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
+import 'package:yap_chat/repositories/friends/friends_cache_data_source.dart';
 
 sealed class FriendsEvent extends Equatable {
   const FriendsEvent();
@@ -11,6 +12,10 @@ sealed class FriendsEvent extends Equatable {
 
 final class FriendsLoadStarted extends FriendsEvent {
   const FriendsLoadStarted();
+}
+
+final class FriendsLoadMoreRequested extends FriendsEvent {
+  const FriendsLoadMoreRequested();
 }
 
 final class FriendsTabChanged extends FriendsEvent {
@@ -61,6 +66,15 @@ final class FriendsCacheUpdated extends FriendsEvent {
 
   @override
   List<Object?> get props => [friends];
+}
+
+final class FriendListPaginationUpdated extends FriendsEvent {
+  const FriendListPaginationUpdated(this.state);
+
+  final FriendListCacheState state;
+
+  @override
+  List<Object?> get props => [state];
 }
 
 final class FriendRequestsCacheUpdated extends FriendsEvent {

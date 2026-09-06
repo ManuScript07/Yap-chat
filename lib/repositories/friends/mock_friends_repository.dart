@@ -3,24 +3,27 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/friends/abstract_friends_repository.dart';
+import 'package:yap_chat/repositories/friends/friends_cache_data_source.dart';
 
 class MockFriendsRepository
     implements IFriendsRepository, IProfileFriendsRepository {
-  MockFriendsRepository()
-    : _friends = [
-        // Friend(
-        //   id: 'friend-1',
-        //   username: 'masha',
-        //   displayName: 'Маша',
-        //   friendsSince: DateTime.now().subtract(const Duration(days: 2)),
-        // ),
-        // Friend(
-        //   id: 'friend-2',
-        //   username: 'sasha',
-        //   displayName: 'Саша',
-        //   friendsSince: DateTime.now().subtract(const Duration(days: 7)),
-        // ),
-      ],
+  MockFriendsRepository({bool includeSampleFriends = false})
+    : _friends = includeSampleFriends
+          ? [
+              Friend(
+                id: 'friend-1',
+                username: 'masha',
+                displayName: 'Маша',
+                friendsSince: DateTime.now().subtract(const Duration(days: 2)),
+              ),
+              Friend(
+                id: 'friend-2',
+                username: 'sasha',
+                displayName: 'Саша',
+                friendsSince: DateTime.now().subtract(const Duration(days: 7)),
+              ),
+            ]
+          : [],
       _requests = [
         FriendRequest(
           id: 'request-incoming',
@@ -55,10 +58,18 @@ class MockFriendsRepository
   List<FriendRequest> get _requestsSnapshot => List.unmodifiable(_requests);
 
   @override
+  Stream<List<Friend>> watchPaginatedFriends() => watchFriends();
+
+  @override
   Stream<List<Friend>> watchFriends() async* {
     yield _friendsSnapshot;
     yield* _friendsController.stream;
   }
+
+  @override
+  Stream<FriendListCacheState> watchFriendListState() => Stream.value(
+    FriendListCacheState(hasMore: false, totalCount: _friends.length),
+  );
 
   @override
   Stream<List<FriendRequest>> watchRequests() async* {
@@ -74,6 +85,9 @@ class MockFriendsRepository
 
   @override
   Future<List<Friend>> getFriends() async => _friendsSnapshot;
+
+  @override
+  Future<void> loadMoreFriends() async {}
 
   @override
   Future<List<FriendRequest>> getRequests() async => _requestsSnapshot;

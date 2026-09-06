@@ -320,7 +320,9 @@ class _FriendsListState extends State<_FriendsList> {
       buildWhen: (previous, current) =>
           previous.status != current.status ||
           previous.friends != current.friends ||
-          previous.friendsQuery != current.friendsQuery,
+          previous.friendsQuery != current.friendsQuery ||
+          previous.totalFriendCount != current.totalFriendCount ||
+          previous.isLoadingMoreFriends != current.isLoadingMoreFriends,
       builder: (context, state) =>
           BlocBuilder<FriendSearchCubit, FriendSearchState>(
             builder: (context, searchState) {
@@ -361,44 +363,74 @@ class _FriendsListState extends State<_FriendsList> {
                   child: emptyState,
                 );
               }
-              return ListView(
-                key: const PageStorageKey('friends-list'),
-                padding: EdgeInsets.only(
-                  top: widget.topPadding,
-                  bottom: widget.bottomPadding,
-                ),
-                children: [
-                  if (friends.isNotEmpty) ...[
-                    FriendsSectionTitle(
-                      title: query.isEmpty
-                          ? context.l10n.friendsAll
-                          : context.l10n.friendsTabFriends,
-                      count: friends.length,
-                    ),
-                    ...friends.map(
-                      (friend) => FriendListItem(
-                        key: ValueKey(friend.id),
-                        friend: friend,
-                        avatarLoader: () => context
-                            .read<IFriendsRepository>()
-                            .resolveFriendAvatar(friend),
-                        onChat: () => _openChat(context, friend),
-                        onTap: () =>
-                            openViewedProfile(context, userId: friend.id),
-                        onLocation: () => _openLocation(context, friend),
-                        isLocationEnabled: !_openingLocations.contains(
-                          friend.id,
+              return NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (query.isEmpty &&
+                      !showGlobal &&
+                      notification.metrics.extentAfter < 320) {
+                    context.read<FriendsBloc>().add(
+                      const FriendsLoadMoreRequested(),
+                    );
+                  }
+                  return false;
+                },
+                child: ListView(
+                  key: const PageStorageKey('friends-list'),
+                  padding: EdgeInsets.only(
+                    top: widget.topPadding,
+                    bottom: widget.bottomPadding,
+                  ),
+                  children: [
+                    if (friends.isNotEmpty) ...[
+                      FriendsSectionTitle(
+                        title: query.isEmpty
+                            ? context.l10n.friendsAll
+                            : context.l10n.friendsTabFriends,
+                        count: query.isEmpty
+                            ? state.totalFriendCount
+                            : friends.length,
+                      ),
+                      ...friends.map(
+                        (friend) => FriendListItem(
+                          key: ValueKey(friend.id),
+                          friend: friend,
+                          avatarLoader: () => context
+                              .read<IFriendsRepository>()
+                              .resolveFriendAvatar(friend),
+                          onChat: () => _openChat(context, friend),
+                          onTap: () =>
+                              openViewedProfile(context, userId: friend.id),
+                          onLocation: () => _openLocation(context, friend),
+                          isLocationEnabled: !_openingLocations.contains(
+                            friend.id,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
+                    if (query.isEmpty &&
+                        !showGlobal &&
+                        state.isLoadingMoreFriends)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 18),
+                        child: Center(
+                          child: SizedBox.square(
+                            dimension: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          ),
+                        ),
+                      ),
+                    if (showGlobal) ...[
+                      FriendsSectionTitle(
+                        title: context.l10n.friendsGlobalSearch,
+                      ),
+                      ..._globalSearchChildren(
+                        context,
+                        searchState,
+                        state.friends.map((friend) => friend.id).toSet(),
+                      ),
+                    ],
                   ],
-                  if (showGlobal) ...[
-                    FriendsSectionTitle(
-                      title: context.l10n.friendsGlobalSearch,
-                    ),
-                    ..._globalSearchChildren(context, searchState),
-                  ],
-                ],
+                ),
               );
             },
           ),
@@ -408,6 +440,7 @@ class _FriendsListState extends State<_FriendsList> {
   List<Widget> _globalSearchChildren(
     BuildContext context,
     FriendSearchState state,
+    Set<String> cachedFriendIds,
   ) {
     final widgets = <Widget>[];
     if (state.status == FriendSearchStatus.loading) {
@@ -444,24 +477,31 @@ class _FriendsListState extends State<_FriendsList> {
     final repository = context.read<IFriendsRepository>();
     final cubit = context.read<FriendSearchCubit>();
     widgets.addAll(
-      state.results.map(
-        (candidate) => FriendCandidateItem(
-          key: ValueKey('global:${candidate.id}'),
-          candidate: candidate,
-          friendsLabel: context.l10n.friendsCount,
-          relationshipLabel: (relationship) => switch (relationship) {
-            FriendRelationship.friend => context.l10n.friendsAlreadyAdded,
-            FriendRelationship.outgoing => context.l10n.friendsRequestSent,
-            FriendRelationship.incoming => context.l10n.friendsRequestIncoming,
-            FriendRelationship.none => '',
-          },
-          avatarLoader: () => repository.resolveCandidateAvatar(candidate),
-          onAdd: () => cubit.sendRequest(candidate),
-          onTap: () => openViewedProfile(context, userId: candidate.id),
-          onAccept: () => cubit.respondToIncoming(candidate, accept: true),
-          onReject: () => cubit.respondToIncoming(candidate, accept: false),
-        ),
-      ),
+      state.results
+          .where(
+            (candidate) =>
+                candidate.relationship != FriendRelationship.friend ||
+                !cachedFriendIds.contains(candidate.id),
+          )
+          .map(
+            (candidate) => FriendCandidateItem(
+              key: ValueKey('global:${candidate.id}'),
+              candidate: candidate,
+              friendsLabel: context.l10n.friendsCount,
+              relationshipLabel: (relationship) => switch (relationship) {
+                FriendRelationship.friend => context.l10n.friendsAlreadyAdded,
+                FriendRelationship.outgoing => context.l10n.friendsRequestSent,
+                FriendRelationship.incoming =>
+                  context.l10n.friendsRequestIncoming,
+                FriendRelationship.none => '',
+              },
+              avatarLoader: () => repository.resolveCandidateAvatar(candidate),
+              onAdd: () => cubit.sendRequest(candidate),
+              onTap: () => openViewedProfile(context, userId: candidate.id),
+              onAccept: () => cubit.respondToIncoming(candidate, accept: true),
+              onReject: () => cubit.respondToIncoming(candidate, accept: false),
+            ),
+          ),
     );
     return widgets;
   }
