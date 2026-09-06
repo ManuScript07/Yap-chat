@@ -49,13 +49,14 @@ class ChatRepository implements IChatRepository {
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
   final Set<String> _deliveringOperationIds = {};
+  Timer? _retryTimer;
+  Future<void>? _activePendingRetry;
   bool _isNetworkPaused = false;
 
   @override
   Stream<List<ChatMessage>> getMessagesStream(String chatId) {
     late final StreamController<List<ChatMessage>> controller;
     StreamSubscription<List<ChatMessage>>? cacheSubscription;
-    Timer? retryTimer;
     AccountSessionSnapshot? streamScope;
 
     controller = StreamController<List<ChatMessage>>(
@@ -66,14 +67,12 @@ class ChatRepository implements IChatRepository {
         cacheSubscription = _cache
             .watchMessages(chatId, currentUserId: scope.userId)
             .listen(controller.add, onError: controller.addError);
-        retryTimer = Timer.periodic(_retryInterval, (_) {
-          if (!_isNetworkPaused) unawaited(_retryPending(chatId, scope));
-        });
+        _ensureRetryTimer();
         unawaited(_initializeChat(chatId, scope));
       },
       onCancel: () async {
         _syncService.closeConversation(chatId, session: streamScope);
-        retryTimer?.cancel();
+        _stopRetryTimerIfIdle();
         await cacheSubscription?.cancel();
       },
     );
@@ -103,12 +102,15 @@ class ChatRepository implements IChatRepository {
     _isNetworkPaused = false;
     final scope = _accountSessionController.capture();
     final chatIds = _syncService.openConversationIds;
+    if (chatIds.isNotEmpty) _ensureRetryTimer();
     await Future.wait(chatIds.map((chatId) => _initializeChat(chatId, scope)));
   }
 
   @override
   Future<void> pauseNetwork() async {
     _isNetworkPaused = true;
+    _retryTimer?.cancel();
+    _retryTimer = null;
   }
 
   @override
@@ -385,6 +387,46 @@ class ChatRepository implements IChatRepository {
     );
     for (final operation in operations.where((item) => item.chatId == chatId)) {
       await _deliver(operation, scope);
+    }
+  }
+
+  /// A screen may have more than one listener (and transitions can briefly
+  /// overlap screens). Retrying per stream turns that into duplicate scans of
+  /// the same persistent outbox. Keep one repository-level clock instead.
+  void _ensureRetryTimer() {
+    if (_isNetworkPaused || _retryTimer != null) return;
+    _retryTimer = Timer.periodic(_retryInterval, (_) {
+      unawaited(_retryPendingForOpenChats());
+    });
+  }
+
+  void _stopRetryTimerIfIdle() {
+    if (_syncService.openConversationIds.isNotEmpty) return;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+  }
+
+  Future<void> _retryPendingForOpenChats() async {
+    if (_isNetworkPaused) return;
+    final active = _activePendingRetry;
+    if (active != null) return active;
+
+    final retry = _performPendingRetryForOpenChats();
+    _activePendingRetry = retry;
+    return retry.whenComplete(() {
+      if (identical(_activePendingRetry, retry)) {
+        _activePendingRetry = null;
+      }
+    });
+  }
+
+  Future<void> _performPendingRetryForOpenChats() async {
+    final scope = _accountSessionController.capture();
+    for (final chatId in _syncService.openConversationIds) {
+      if (_isNetworkPaused || !_accountSessionController.isCurrent(scope)) {
+        return;
+      }
+      await _retryPending(chatId, scope);
     }
   }
 

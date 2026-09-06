@@ -55,6 +55,11 @@ class CachedChats extends Table {
   BoolColumn get isMuted => boolean()();
   DateTimeColumn get lastSeenAt => dateTime().nullable()();
   BoolColumn get showsLastSeen => boolean().withDefault(const Constant(true))();
+  BoolColumn get blockedByMe => boolean().withDefault(const Constant(false))();
+  BoolColumn get blockedByPeer =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get peerIsGloballyBanned =>
+      boolean().withDefault(const Constant(false))();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
@@ -301,13 +306,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) async {
       await migrator.createAll();
       await _createBlocklistCacheTables();
+      await _createChatCacheIndexes();
     },
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
@@ -410,12 +416,36 @@ class AppDatabase extends _$AppDatabase {
           cachedViewedProfileFriendLists.hasMore,
         );
       }
+      if (from < 21) {
+        await _createChatCacheIndexes();
+      }
+      if (from < 22) {
+        final columns = await customSelect(
+          'PRAGMA table_info(cached_chats)',
+        ).get();
+        final names = columns
+            .map((column) => column.read<String>('name'))
+            .toSet();
+        if (!names.contains('blocked_by_me')) {
+          await migrator.addColumn(cachedChats, cachedChats.blockedByMe);
+        }
+        if (!names.contains('blocked_by_peer')) {
+          await migrator.addColumn(cachedChats, cachedChats.blockedByPeer);
+        }
+        if (!names.contains('peer_is_globally_banned')) {
+          await migrator.addColumn(
+            cachedChats,
+            cachedChats.peerIsGloballyBanned,
+          );
+        }
+      }
     },
     beforeOpen: (details) async {
       // Version 19 was briefly shipped while the blacklist cache schema was
       // being introduced. Keep this idempotent repair here so an existing
       // database carrying that version cannot silently miss the raw tables.
       await _createBlocklistCacheTables();
+      await _createChatCacheIndexes();
       if (details.hadUpgrade && details.versionBefore! < 10) {
         // Reclaim pages that previously contained duplicated avatar BLOBs.
         await customStatement('VACUUM');
@@ -441,6 +471,17 @@ class AppDatabase extends _$AppDatabase {
         owner_user_id TEXT NOT NULL PRIMARY KEY,
         cached_at_ms INTEGER NOT NULL
       )
+    ''');
+  }
+
+  Future<void> _createChatCacheIndexes() async {
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_messages_owner_chat_time_idx
+      ON cached_messages (owner_user_id, chat_id, timestamp DESC, id DESC)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS pending_chat_operations_owner_type_chat_idx
+      ON pending_chat_operations (owner_user_id, type, chat_id, created_at ASC)
     ''');
   }
 

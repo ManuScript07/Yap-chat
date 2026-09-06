@@ -34,6 +34,7 @@ class ChatsRepository implements IChatsRepository {
        _uuid = uuid;
 
   static const _reconciliationInterval = Duration(seconds: 20);
+  static const _summarySyncDebounce = Duration(milliseconds: 250);
 
   final AppConfig _config;
   final ChatsCacheDataSource _cache;
@@ -49,48 +50,101 @@ class ChatsRepository implements IChatsRepository {
   Future<void> _changeQueue = Future<void>.value();
   bool _reconciliationQueued = false;
   bool _isRealtimePaused = false;
+  StreamController<List<Chat>>? _watchController;
+  StreamSubscription<List<Chat>>? _cacheSubscription;
+  StreamSubscription<ConversationChange>? _realtimeSubscription;
+  Timer? _reconciliationTimer;
+  Timer? _summarySyncTimer;
+  AccountSessionSnapshot? _watchScope;
+  List<Chat>? _latestChats;
 
   @override
   Stream<List<Chat>> watchChats() {
-    late final StreamController<List<Chat>> controller;
-    StreamSubscription<List<Chat>>? cacheSubscription;
-    StreamSubscription<ConversationChange>? realtimeSubscription;
-    Timer? reconciliationTimer;
+    return Stream.multi((listener) {
+      StreamSubscription<List<Chat>>? subscription;
+      var cancelled = false;
 
-    controller = StreamController<List<Chat>>(
-      onListen: () {
-        final scope = _accountSessionController.capture();
-        cacheSubscription = _cache
-            .watch(ownerUserId: scope.userId)
-            .listen(controller.add, onError: controller.addError);
-        realtimeSubscription = _remote.watchChanges().listen(
-          (change) {
-            try {
-              _enqueueChange(
-                change,
-                controller,
-                _accountSessionController.capture(),
-              );
-            } on StaleAccountSessionException {
-              return;
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            _config.talker.handle(error, stackTrace, 'Chats realtime failed');
-          },
+      Future<void> subscribe() async {
+        final controller = _ensureWatchController();
+        subscription = controller.stream.listen(
+          listener.add,
+          onError: listener.addError,
         );
-        unawaited(_initialize(controller));
-        reconciliationTimer = Timer.periodic(_reconciliationInterval, (_) {
-          if (!_isRealtimePaused) _enqueueReconciliation(controller);
-        });
-      },
-      onCancel: () async {
-        reconciliationTimer?.cancel();
-        await cacheSubscription?.cancel();
-        await realtimeSubscription?.cancel();
+
+        // A broadcast stream does not replay. Give a late consumer the
+        // current cache snapshot without starting another remote sync, timer,
+        // or Realtime subscription.
+        final scope = _accountSessionController.capture();
+        final snapshot = _watchScope?.userId == scope.userId
+            ? _latestChats
+            : await _cache.read(ownerUserId: scope.userId);
+        if (!cancelled && snapshot != null) listener.add(snapshot);
+      }
+
+      unawaited(subscribe());
+      listener.onCancel = () async {
+        cancelled = true;
+        await subscription?.cancel();
+      };
+    });
+  }
+
+  StreamController<List<Chat>> _ensureWatchController() {
+    final existing = _watchController;
+    if (existing != null && !existing.isClosed) return existing;
+
+    late final StreamController<List<Chat>> controller;
+    controller = StreamController<List<Chat>>.broadcast(
+      onListen: () => unawaited(_startWatching(controller)),
+      onCancel: () => unawaited(_stopWatching()),
+    );
+    _watchController = controller;
+    return controller;
+  }
+
+  Future<void> _startWatching(StreamController<List<Chat>> controller) async {
+    if (_watchScope != null) return;
+    final scope = _accountSessionController.capture();
+    _watchScope = scope;
+    _cacheSubscription = _cache.watch(ownerUserId: scope.userId).listen((
+      chats,
+    ) {
+      if (!_accountSessionController.isCurrent(scope) || controller.isClosed) {
+        return;
+      }
+      _latestChats = chats;
+      controller.add(chats);
+    }, onError: controller.addError);
+    _realtimeSubscription = _remote.watchChanges().listen(
+      (change) => _enqueueChange(change, scope),
+      onError: (Object error, StackTrace stackTrace) {
+        _config.talker.handle(error, stackTrace, 'Chats realtime failed');
       },
     );
-    return controller.stream;
+    unawaited(_initialize(scope));
+    _reconciliationTimer = Timer.periodic(_reconciliationInterval, (_) {
+      if (!_isRealtimePaused) _enqueueReconciliation();
+    });
+  }
+
+  Future<void> _stopWatching() async {
+    _reconciliationTimer?.cancel();
+    _reconciliationTimer = null;
+    _summarySyncTimer?.cancel();
+    _summarySyncTimer = null;
+
+    // Detach fields before awaiting cancellation. A new listener can arrive
+    // while a StreamController is finishing its onCancel callback; it must
+    // create fresh subscriptions rather than have them cleared by this older
+    // teardown operation.
+    final cacheSubscription = _cacheSubscription;
+    final realtimeSubscription = _realtimeSubscription;
+    _cacheSubscription = null;
+    _realtimeSubscription = null;
+    _watchScope = null;
+    _latestChats = null;
+    await cacheSubscription?.cancel();
+    await realtimeSubscription?.cancel();
   }
 
   @override
@@ -106,7 +160,7 @@ class ChatsRepository implements IChatsRepository {
     final scope = _accountSessionController.capture();
     try {
       await _retryPendingDeletions(scope);
-      await _synchronize(ensureLatestMessages: true);
+      await _synchronize();
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
       final cached = await _cache.read(ownerUserId: scope.userId);
@@ -129,7 +183,7 @@ class ChatsRepository implements IChatsRepository {
     if (cachedChat != null) return cachedChat;
 
     try {
-      await _synchronize(ensureLatestMessages: true);
+      await _synchronize();
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Chat lookup failed');
       return null;
@@ -217,7 +271,7 @@ class ChatsRepository implements IChatsRepository {
     // A preceding list refresh may still be in flight. Force a fresh summary
     // after creating/reopening the conversation so the returned id is visible
     // before ChatBloc starts sending the first message.
-    await _synchronize(ensureLatestMessages: true);
+    await _synchronize();
     _accountSessionController.ensureCurrent(scope);
     final chat = _findChat(
       await _cache.read(ownerUserId: scope.userId),
@@ -309,29 +363,49 @@ class ChatsRepository implements IChatsRepository {
     _isRealtimePaused = true;
     _activeSync = null;
     _activeDeletionRetry = null;
+    _summarySyncTimer?.cancel();
+    _summarySyncTimer = null;
     return _remote.pauseChanges();
   }
 
   @override
   Future<void> resumeRealtime() async {
     _isRealtimePaused = false;
+    await _restartWatcherForCurrentAccount();
     await _remote.resumeChanges();
     await _retryPendingDeletions(_accountSessionController.capture());
-    await _synchronize(ensureLatestMessages: true);
+    await _synchronize();
   }
 
-  Future<void> _initialize(StreamController<List<Chat>> controller) async {
-    await _retryPendingDeletions(_accountSessionController.capture());
-    await _synchronizeSafely(controller, ensureLatestMessages: true);
+  Future<void> _restartWatcherForCurrentAccount() async {
+    final activeScope = _watchScope;
+    final currentScope = _accountSessionController.capture();
+    if (activeScope == null ||
+        activeScope.userId == currentScope.userId &&
+            activeScope.generation == currentScope.generation) {
+      return;
+    }
+
+    await _cacheSubscription?.cancel();
+    await _realtimeSubscription?.cancel();
+    _cacheSubscription = null;
+    _realtimeSubscription = null;
+    _watchScope = null;
+    _latestChats = null;
+    final controller = _watchController;
+    if (controller != null && controller.hasListener && !controller.isClosed) {
+      await _startWatching(controller);
+    }
   }
 
-  void _enqueueChange(
-    ConversationChange change,
-    StreamController<List<Chat>> controller,
-    AccountSessionSnapshot scope,
-  ) {
+  Future<void> _initialize(AccountSessionSnapshot scope) async {
+    await _retryPendingDeletions(scope);
+    await _synchronizeSafely(scope);
+  }
+
+  void _enqueueChange(ConversationChange change, AccountSessionSnapshot scope) {
     _changeQueue = _changeQueue
-        .then((_) => _handleChange(change, controller, scope))
+        .then((_) => _handleChange(change, scope))
         .catchError((Object error, StackTrace stackTrace) {
           _config.talker.handle(
             error,
@@ -341,11 +415,11 @@ class ChatsRepository implements IChatsRepository {
         });
   }
 
-  void _enqueueReconciliation(StreamController<List<Chat>> controller) {
+  void _enqueueReconciliation() {
     if (_reconciliationQueued) return;
     _reconciliationQueued = true;
     _changeQueue = _changeQueue
-        .then((_) => _synchronizeSafely(controller, ensureLatestMessages: true))
+        .then((_) => _synchronizeSafely(_accountSessionController.capture()))
         .whenComplete(() => _reconciliationQueued = false)
         .catchError((Object error, StackTrace stackTrace) {
           _config.talker.handle(
@@ -358,14 +432,13 @@ class ChatsRepository implements IChatsRepository {
 
   Future<void> _handleChange(
     ConversationChange change,
-    StreamController<List<Chat>> controller,
     AccountSessionSnapshot scope,
   ) async {
     _accountSessionController.ensureCurrent(scope);
     await _retryPendingDeletions(scope);
     final conversationId = change.conversationId;
     if (conversationId == null) {
-      await _synchronizeSafely(controller, ensureLatestMessages: true);
+      _scheduleSummarySync(immediately: true);
       return;
     }
     final pendingIds = (await _chatCache.readPendingChatDeletions(
@@ -378,17 +451,34 @@ class ChatsRepository implements IChatsRepository {
       );
       await _clearLocalConversations({conversationId}, scope);
     } else if (!pendingIds.contains(conversationId)) {
-      try {
-        await _synchronizeConversation(conversationId);
-      } catch (error, stackTrace) {
-        _config.talker.handle(
-          error,
-          stackTrace,
-          'Background conversation synchronization failed',
-        );
+      if (_conversationSync.isConversationOpen(conversationId)) {
+        try {
+          await _synchronizeConversation(conversationId);
+        } catch (error, stackTrace) {
+          _config.talker.handle(
+            error,
+            stackTrace,
+            'Background conversation synchronization failed',
+          );
+        }
       }
+      _scheduleSummarySync();
     }
-    await _synchronizeSafely(controller);
+  }
+
+  void _scheduleSummarySync({bool immediately = false}) {
+    if (_isRealtimePaused) return;
+    if (immediately) {
+      _summarySyncTimer?.cancel();
+      _summarySyncTimer = null;
+      _enqueueReconciliation();
+      return;
+    }
+    if (_summarySyncTimer != null) return;
+    _summarySyncTimer = Timer(_summarySyncDebounce, () {
+      _summarySyncTimer = null;
+      _enqueueReconciliation();
+    });
   }
 
   Future<void> _clearLocalConversations(
@@ -469,25 +559,20 @@ class ChatsRepository implements IChatsRepository {
     }
   }
 
-  Future<void> _synchronize({bool ensureLatestMessages = false}) async {
+  Future<void> _synchronize() async {
     final activeSync = _activeSync;
     if (activeSync != null) {
       await activeSync;
-      if (!ensureLatestMessages) return;
-      final newerSync = _activeSync;
-      if (newerSync != null && !identical(newerSync, activeSync)) {
-        await newerSync;
-        return;
-      }
+      return;
     }
-    final sync = _performSync(ensureLatestMessages: ensureLatestMessages);
+    final sync = _performSync();
     _activeSync = sync;
     await sync.whenComplete(() {
       if (identical(_activeSync, sync)) _activeSync = null;
     });
   }
 
-  Future<void> _performSync({required bool ensureLatestMessages}) async {
+  Future<void> _performSync() async {
     final scope = _accountSessionController.capture();
     final chats = await _remote.fetchChats();
     _accountSessionController.ensureCurrent(scope);
@@ -497,27 +582,6 @@ class ChatsRepository implements IChatsRepository {
     final visibleChats = chats
         .where((chat) => !pendingChatIds.contains(chat.id))
         .toList(growable: false);
-    if (ensureLatestMessages) {
-      for (final chat in visibleChats) {
-        final lastMessageId = chat.lastMessageId;
-        if (lastMessageId == null) continue;
-        final cached = await _chatCache.readMessage(
-          lastMessageId,
-          currentUserId: scope.userId,
-        );
-        if (cached == null || _conversationSync.isConversationOpen(chat.id)) {
-          try {
-            await _synchronizeConversation(chat.id);
-          } catch (error, stackTrace) {
-            _config.talker.handle(
-              error,
-              stackTrace,
-              'Conversation reconciliation failed',
-            );
-          }
-        }
-      }
-    }
     final reconciled = await Future.wait(
       visibleChats.map((chat) => _mergeLocalPreview(chat, scope)),
     );
@@ -551,11 +615,10 @@ class ChatsRepository implements IChatsRepository {
     Chat chat,
     AccountSessionSnapshot scope,
   ) async {
-    final messages = await _chatCache.readMessages(
+    final latest = await _chatCache.readLatestMessage(
       chat.id,
       currentUserId: scope.userId,
     );
-    final latest = messages.firstOrNull;
     if (latest == null) return chat;
     final isPending =
         latest.status == MessageStatus.sending ||
@@ -606,17 +669,15 @@ class ChatsRepository implements IChatsRepository {
     }
   }
 
-  Future<void> _synchronizeSafely(
-    StreamController<List<Chat>> controller, {
-    bool ensureLatestMessages = false,
-  }) async {
+  Future<void> _synchronizeSafely(AccountSessionSnapshot scope) async {
     try {
-      await _synchronize(ensureLatestMessages: ensureLatestMessages);
+      await _synchronize();
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
-      final ownerUserId = _accountSessionController.userId;
-      if (ownerUserId != null &&
-          (await _cache.read(ownerUserId: ownerUserId)).isEmpty &&
+      final controller = _watchController;
+      if (_accountSessionController.isCurrent(scope) &&
+          (await _cache.read(ownerUserId: scope.userId)).isEmpty &&
+          controller != null &&
           !controller.isClosed) {
         controller.addError(error, stackTrace);
       }

@@ -12,6 +12,7 @@ import 'package:yap_chat/repositories/friends/friends_remote_data_source.dart';
 class FriendsRepository
     implements IFriendsRepository, IProfileFriendsRepository {
   static const _locationCacheTtl = Duration(minutes: 10);
+  static const _realtimeSyncDebounce = Duration(milliseconds: 250);
 
   FriendsRepository({
     required AppConfig config,
@@ -42,6 +43,8 @@ class FriendsRepository
   final DateTime Function() _clock;
   final Uuid _uuid = const Uuid();
   StreamSubscription<FriendChange>? _changesSubscription;
+  AccountSessionSnapshot? _startedScope;
+  Timer? _realtimeSyncTimer;
   final StreamController<String> _profileChangesController =
       StreamController<String>.broadcast();
   Future<void>? _activeSync;
@@ -779,28 +782,47 @@ class FriendsRepository
     _activeSearches.clear();
     _activeContactRefreshes.clear();
     _activeLocationRequests.clear();
+    _realtimeSyncTimer?.cancel();
+    _realtimeSyncTimer = null;
     return _remote.pauseChanges();
   }
 
   @override
   Future<void> resumeRealtime() async {
-    await _ensureStarted();
-    await Future.wait([_remote.resumeChanges(), _synchronize()]);
+    await _ensureStarted(forceSync: true);
+    await _remote.resumeChanges();
   }
 
-  Future<void> _ensureStarted() async {
+  Future<void> _ensureStarted({bool forceSync = false}) async {
+    final scope = _accountSessionController.capture();
+    final startedScope = _startedScope;
+    final isCurrentScope =
+        startedScope != null &&
+        startedScope.userId == scope.userId &&
+        startedScope.generation == scope.generation;
+    if (isCurrentScope && !forceSync) return;
+
+    _startedScope = scope;
     _changesSubscription ??= _remote.watchChanges().listen(
       (change) {
         final profileId = change.profileId;
         if (profileId != null && !_profileChangesController.isClosed) {
           _profileChangesController.add(profileId);
         }
-        unawaited(_synchronizeSafely());
+        _scheduleRealtimeSync();
       },
       onError: (Object error, StackTrace stackTrace) =>
           _config.talker.handle(error, stackTrace, 'Friends stream failed'),
     );
     await _synchronizeSafely();
+  }
+
+  void _scheduleRealtimeSync() {
+    if (_realtimeSyncTimer != null) return;
+    _realtimeSyncTimer = Timer(_realtimeSyncDebounce, () {
+      _realtimeSyncTimer = null;
+      unawaited(_synchronizeSafely());
+    });
   }
 
   Future<void> _synchronize() {

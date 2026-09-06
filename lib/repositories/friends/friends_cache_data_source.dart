@@ -180,28 +180,106 @@ class FriendsCacheDataSource {
           ))
           .go();
 
-  Future<void> replaceAll({
+  Future<bool> replaceAll({
     String? ownerUserId,
     required List<Friend> friends,
     required List<FriendRequest> requests,
-  }) => _database.transaction(() async {
+  }) async {
     final owner = ownerUserId ?? _userIdProvider();
-    await (_database.delete(
-      _database.cachedFriends,
-    )..where((table) => table.ownerUserId.equals(owner))).go();
-    await (_database.delete(
-      _database.cachedFriendRequests,
-    )..where((table) => table.ownerUserId.equals(owner))).go();
-    for (final friend in friends) {
-      await _database
-          .into(_database.cachedFriends)
-          .insert(_friendRow(friend, owner));
+    final cachedFriends = await readFriends(ownerUserId: owner);
+    final cachedRequests = await readRequests(ownerUserId: owner);
+    if (_sameFriends(cachedFriends, friends) &&
+        _sameRequests(cachedRequests, requests)) {
+      await _removeExpiredLocations(owner);
+      return false;
     }
-    for (final request in requests) {
-      await _database
-          .into(_database.cachedFriendRequests)
-          .insert(_requestRow(request, owner));
-    }
+
+    await _database.transaction(() async {
+      final cachedFriendsById = {
+        for (final friend in cachedFriends) friend.id: friend,
+      };
+      final cachedRequestsById = {
+        for (final request in cachedRequests) request.id: request,
+      };
+      final friendIds = friends.map((friend) => friend.id).toSet();
+      final requestIds = requests.map((request) => request.id).toSet();
+
+      await (_database.delete(_database.cachedFriends)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                (friendIds.isEmpty
+                    ? const Constant(true)
+                    : table.userId.isNotIn(friendIds)),
+          ))
+          .go();
+      await (_database.delete(_database.cachedFriendRequests)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                (requestIds.isEmpty
+                    ? const Constant(true)
+                    : table.requestId.isNotIn(requestIds)),
+          ))
+          .go();
+
+      for (final friend in friends) {
+        if (_sameFriend(cachedFriendsById[friend.id], friend)) continue;
+        await _database
+            .into(_database.cachedFriends)
+            .insertOnConflictUpdate(_friendRow(friend, owner));
+      }
+      for (final request in requests) {
+        if (_sameRequest(cachedRequestsById[request.id], request)) continue;
+        await _database
+            .into(_database.cachedFriendRequests)
+            .insertOnConflictUpdate(_requestRow(request, owner));
+      }
+      await _removeExpiredLocations(owner);
+    });
+    return true;
+  }
+
+  bool _sameFriends(List<Friend> cached, List<Friend> incoming) {
+    if (cached.length != incoming.length) return false;
+    final cachedById = {for (final friend in cached) friend.id: friend};
+    return incoming.every(
+      (friend) => _sameFriend(cachedById[friend.id], friend),
+    );
+  }
+
+  bool _sameRequests(List<FriendRequest> cached, List<FriendRequest> incoming) {
+    if (cached.length != incoming.length) return false;
+    final cachedById = {for (final request in cached) request.id: request};
+    return incoming.every(
+      (request) => _sameRequest(cachedById[request.id], request),
+    );
+  }
+
+  bool _sameFriend(Friend? cached, Friend incoming) =>
+      cached != null &&
+      cached.id == incoming.id &&
+      cached.username == incoming.username &&
+      cached.displayName == incoming.displayName &&
+      cached.avatarUrl == incoming.avatarUrl &&
+      cached.avatarStoragePath == incoming.avatarStoragePath &&
+      _sameSecond(cached.friendsSince, incoming.friendsSince);
+
+  bool _sameRequest(FriendRequest? cached, FriendRequest incoming) =>
+      cached != null &&
+      cached.id == incoming.id &&
+      cached.peerId == incoming.peerId &&
+      cached.peerUsername == incoming.peerUsername &&
+      cached.peerDisplayName == incoming.peerDisplayName &&
+      cached.peerAvatarUrl == incoming.peerAvatarUrl &&
+      cached.peerAvatarStoragePath == incoming.peerAvatarStoragePath &&
+      cached.peerFriendCount == incoming.peerFriendCount &&
+      cached.direction == incoming.direction &&
+      _sameSecond(cached.requestedAt, incoming.requestedAt);
+
+  bool _sameSecond(DateTime first, DateTime second) =>
+      first.millisecondsSinceEpoch ~/ 1000 ==
+      second.millisecondsSinceEpoch ~/ 1000;
+
+  Future<void> _removeExpiredLocations(String owner) async {
     final cachedLocations = await (_database.select(
       _database.cachedFriendLocations,
     )..where((table) => table.ownerUserId.equals(owner))).get();
@@ -234,7 +312,7 @@ class FriendsCacheDataSource {
           ))
           .go();
     }
-  });
+  }
 
   Future<void> addRequest(FriendRequest request, {String? ownerUserId}) =>
       _database

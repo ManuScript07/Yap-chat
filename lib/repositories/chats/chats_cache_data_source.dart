@@ -51,13 +51,10 @@ class ChatsCacheDataSource {
               table.ownerUserId.equals(owner) & table.id.equals(chatId),
         ))
         .getSingleOrNull();
-    // A globally banned peer uses an intentionally generic cached identity.
-    // Do not turn that presentation cache into a permanent local-only send
-    // state: the server remains authoritative and rejects a real global ban,
-    // while an administrator's unban can recover immediately after sync.
-    return row != null &&
-        row.peerUsername.isEmpty &&
-        row.peerDisplayName != _globallyBannedDisplayName;
+    // Global bans deliberately remain server-authoritative: an administrator
+    // may revoke one while this device is offline. Personal blocks, however,
+    // are cached explicitly so a blocked sender never emits a network request.
+    return row != null && (row.blockedByMe || row.blockedByPeer);
   }
 
   Future<bool> replaceAll(List<Chat> chats, {String? ownerUserId}) async {
@@ -113,7 +110,10 @@ class ChatsCacheDataSource {
         sameSecond(left.lastSeenAt, right.lastSeenAt) &&
         left.showsLastSeen == right.showsLastSeen &&
         left.isLastMessageFromMe == right.isLastMessageFromMe &&
-        left.isMuted == right.isMuted;
+        left.isMuted == right.isMuted &&
+        left.blockedByMe == right.blockedByMe &&
+        left.blockedByPeer == right.blockedByPeer &&
+        left.peerIsGloballyBanned == right.peerIsGloballyBanned;
   }
 
   Future<void> remove(Set<String> ids, {String? ownerUserId}) async {
@@ -191,12 +191,9 @@ class ChatsCacheDataSource {
       showsLastSeen: row.showsLastSeen,
       isLastMessageFromMe: row.isLastMessageFromMe,
       isMuted: row.isMuted,
-      blockedByPeer: row.peerUsername.isEmpty,
-      // The generic display name is server-produced only for a global ban.
-      // It is persisted with the ordinary chat cache, so offline startup does
-      // not need a separate status request.
-      peerIsGloballyBanned:
-          row.peerDisplayName == _globallyBannedDisplayName,
+      blockedByMe: row.blockedByMe,
+      blockedByPeer: row.blockedByPeer,
+      peerIsGloballyBanned: row.peerIsGloballyBanned,
     );
   }
 
@@ -218,6 +215,9 @@ class ChatsCacheDataSource {
       isMuted: chat.isMuted,
       lastSeenAt: Value(chat.lastSeenAt),
       showsLastSeen: Value(chat.showsLastSeen),
+      blockedByMe: Value(chat.blockedByMe),
+      blockedByPeer: Value(chat.blockedByPeer),
+      peerIsGloballyBanned: Value(chat.peerIsGloballyBanned),
       cachedAt: DateTime.now().toUtc(),
     );
   }
@@ -231,5 +231,4 @@ class ChatsCacheDataSource {
     };
   }
 
-  static const _globallyBannedDisplayName = 'Заблокированный пользователь';
 }

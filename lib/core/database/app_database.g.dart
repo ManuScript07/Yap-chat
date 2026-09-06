@@ -1588,6 +1588,50 @@ class $CachedChatsTable extends CachedChats
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _blockedByMeMeta = const VerificationMeta(
+    'blockedByMe',
+  );
+  @override
+  late final GeneratedColumn<bool> blockedByMe = GeneratedColumn<bool>(
+    'blocked_by_me',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("blocked_by_me" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _blockedByPeerMeta = const VerificationMeta(
+    'blockedByPeer',
+  );
+  @override
+  late final GeneratedColumn<bool> blockedByPeer = GeneratedColumn<bool>(
+    'blocked_by_peer',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("blocked_by_peer" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _peerIsGloballyBannedMeta =
+      const VerificationMeta('peerIsGloballyBanned');
+  @override
+  late final GeneratedColumn<bool> peerIsGloballyBanned = GeneratedColumn<bool>(
+    'peer_is_globally_banned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("peer_is_globally_banned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -1617,6 +1661,9 @@ class $CachedChatsTable extends CachedChats
     isMuted,
     lastSeenAt,
     showsLastSeen,
+    blockedByMe,
+    blockedByPeer,
+    peerIsGloballyBanned,
     cachedAt,
   ];
   @override
@@ -1785,6 +1832,33 @@ class $CachedChatsTable extends CachedChats
         ),
       );
     }
+    if (data.containsKey('blocked_by_me')) {
+      context.handle(
+        _blockedByMeMeta,
+        blockedByMe.isAcceptableOrUnknown(
+          data['blocked_by_me']!,
+          _blockedByMeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('blocked_by_peer')) {
+      context.handle(
+        _blockedByPeerMeta,
+        blockedByPeer.isAcceptableOrUnknown(
+          data['blocked_by_peer']!,
+          _blockedByPeerMeta,
+        ),
+      );
+    }
+    if (data.containsKey('peer_is_globally_banned')) {
+      context.handle(
+        _peerIsGloballyBannedMeta,
+        peerIsGloballyBanned.isAcceptableOrUnknown(
+          data['peer_is_globally_banned']!,
+          _peerIsGloballyBannedMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -1866,6 +1940,18 @@ class $CachedChatsTable extends CachedChats
         DriftSqlType.bool,
         data['${effectivePrefix}shows_last_seen'],
       )!,
+      blockedByMe: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}blocked_by_me'],
+      )!,
+      blockedByPeer: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}blocked_by_peer'],
+      )!,
+      peerIsGloballyBanned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}peer_is_globally_banned'],
+      )!,
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -1896,6 +1982,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
   final bool isMuted;
   final DateTime? lastSeenAt;
   final bool showsLastSeen;
+  final bool blockedByMe;
+  final bool blockedByPeer;
+  final bool peerIsGloballyBanned;
   final DateTime cachedAt;
   const CachedChat({
     required this.ownerUserId,
@@ -1914,6 +2003,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     required this.isMuted,
     this.lastSeenAt,
     required this.showsLastSeen,
+    required this.blockedByMe,
+    required this.blockedByPeer,
+    required this.peerIsGloballyBanned,
     required this.cachedAt,
   });
   @override
@@ -1943,6 +2035,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
     }
     map['shows_last_seen'] = Variable<bool>(showsLastSeen);
+    map['blocked_by_me'] = Variable<bool>(blockedByMe);
+    map['blocked_by_peer'] = Variable<bool>(blockedByPeer);
+    map['peer_is_globally_banned'] = Variable<bool>(peerIsGloballyBanned);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -1973,6 +2068,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ? const Value.absent()
           : Value(lastSeenAt),
       showsLastSeen: Value(showsLastSeen),
+      blockedByMe: Value(blockedByMe),
+      blockedByPeer: Value(blockedByPeer),
+      peerIsGloballyBanned: Value(peerIsGloballyBanned),
       cachedAt: Value(cachedAt),
     );
   }
@@ -2003,6 +2101,11 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       isMuted: serializer.fromJson<bool>(json['isMuted']),
       lastSeenAt: serializer.fromJson<DateTime?>(json['lastSeenAt']),
       showsLastSeen: serializer.fromJson<bool>(json['showsLastSeen']),
+      blockedByMe: serializer.fromJson<bool>(json['blockedByMe']),
+      blockedByPeer: serializer.fromJson<bool>(json['blockedByPeer']),
+      peerIsGloballyBanned: serializer.fromJson<bool>(
+        json['peerIsGloballyBanned'],
+      ),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -2028,6 +2131,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       'isMuted': serializer.toJson<bool>(isMuted),
       'lastSeenAt': serializer.toJson<DateTime?>(lastSeenAt),
       'showsLastSeen': serializer.toJson<bool>(showsLastSeen),
+      'blockedByMe': serializer.toJson<bool>(blockedByMe),
+      'blockedByPeer': serializer.toJson<bool>(blockedByPeer),
+      'peerIsGloballyBanned': serializer.toJson<bool>(peerIsGloballyBanned),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -2049,6 +2155,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     bool? isMuted,
     Value<DateTime?> lastSeenAt = const Value.absent(),
     bool? showsLastSeen,
+    bool? blockedByMe,
+    bool? blockedByPeer,
+    bool? peerIsGloballyBanned,
     DateTime? cachedAt,
   }) => CachedChat(
     ownerUserId: ownerUserId ?? this.ownerUserId,
@@ -2073,6 +2182,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     isMuted: isMuted ?? this.isMuted,
     lastSeenAt: lastSeenAt.present ? lastSeenAt.value : this.lastSeenAt,
     showsLastSeen: showsLastSeen ?? this.showsLastSeen,
+    blockedByMe: blockedByMe ?? this.blockedByMe,
+    blockedByPeer: blockedByPeer ?? this.blockedByPeer,
+    peerIsGloballyBanned: peerIsGloballyBanned ?? this.peerIsGloballyBanned,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedChat copyWithCompanion(CachedChatsCompanion data) {
@@ -2119,6 +2231,15 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       showsLastSeen: data.showsLastSeen.present
           ? data.showsLastSeen.value
           : this.showsLastSeen,
+      blockedByMe: data.blockedByMe.present
+          ? data.blockedByMe.value
+          : this.blockedByMe,
+      blockedByPeer: data.blockedByPeer.present
+          ? data.blockedByPeer.value
+          : this.blockedByPeer,
+      peerIsGloballyBanned: data.peerIsGloballyBanned.present
+          ? data.peerIsGloballyBanned.value
+          : this.peerIsGloballyBanned,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -2142,6 +2263,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ..write('isMuted: $isMuted, ')
           ..write('lastSeenAt: $lastSeenAt, ')
           ..write('showsLastSeen: $showsLastSeen, ')
+          ..write('blockedByMe: $blockedByMe, ')
+          ..write('blockedByPeer: $blockedByPeer, ')
+          ..write('peerIsGloballyBanned: $peerIsGloballyBanned, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -2165,6 +2289,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     isMuted,
     lastSeenAt,
     showsLastSeen,
+    blockedByMe,
+    blockedByPeer,
+    peerIsGloballyBanned,
     cachedAt,
   );
   @override
@@ -2187,6 +2314,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           other.isMuted == this.isMuted &&
           other.lastSeenAt == this.lastSeenAt &&
           other.showsLastSeen == this.showsLastSeen &&
+          other.blockedByMe == this.blockedByMe &&
+          other.blockedByPeer == this.blockedByPeer &&
+          other.peerIsGloballyBanned == this.peerIsGloballyBanned &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -2207,6 +2337,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
   final Value<bool> isMuted;
   final Value<DateTime?> lastSeenAt;
   final Value<bool> showsLastSeen;
+  final Value<bool> blockedByMe;
+  final Value<bool> blockedByPeer;
+  final Value<bool> peerIsGloballyBanned;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedChatsCompanion({
@@ -2226,6 +2359,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     this.isMuted = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
     this.showsLastSeen = const Value.absent(),
+    this.blockedByMe = const Value.absent(),
+    this.blockedByPeer = const Value.absent(),
+    this.peerIsGloballyBanned = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2246,6 +2382,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     required bool isMuted,
     this.lastSeenAt = const Value.absent(),
     this.showsLastSeen = const Value.absent(),
+    this.blockedByMe = const Value.absent(),
+    this.blockedByPeer = const Value.absent(),
+    this.peerIsGloballyBanned = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -2277,6 +2416,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Expression<bool>? isMuted,
     Expression<DateTime>? lastSeenAt,
     Expression<bool>? showsLastSeen,
+    Expression<bool>? blockedByMe,
+    Expression<bool>? blockedByPeer,
+    Expression<bool>? peerIsGloballyBanned,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -2299,6 +2441,10 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       if (isMuted != null) 'is_muted': isMuted,
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
       if (showsLastSeen != null) 'shows_last_seen': showsLastSeen,
+      if (blockedByMe != null) 'blocked_by_me': blockedByMe,
+      if (blockedByPeer != null) 'blocked_by_peer': blockedByPeer,
+      if (peerIsGloballyBanned != null)
+        'peer_is_globally_banned': peerIsGloballyBanned,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2321,6 +2467,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Value<bool>? isMuted,
     Value<DateTime?>? lastSeenAt,
     Value<bool>? showsLastSeen,
+    Value<bool>? blockedByMe,
+    Value<bool>? blockedByPeer,
+    Value<bool>? peerIsGloballyBanned,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -2342,6 +2491,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       isMuted: isMuted ?? this.isMuted,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       showsLastSeen: showsLastSeen ?? this.showsLastSeen,
+      blockedByMe: blockedByMe ?? this.blockedByMe,
+      blockedByPeer: blockedByPeer ?? this.blockedByPeer,
+      peerIsGloballyBanned: peerIsGloballyBanned ?? this.peerIsGloballyBanned,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2402,6 +2554,17 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     if (showsLastSeen.present) {
       map['shows_last_seen'] = Variable<bool>(showsLastSeen.value);
     }
+    if (blockedByMe.present) {
+      map['blocked_by_me'] = Variable<bool>(blockedByMe.value);
+    }
+    if (blockedByPeer.present) {
+      map['blocked_by_peer'] = Variable<bool>(blockedByPeer.value);
+    }
+    if (peerIsGloballyBanned.present) {
+      map['peer_is_globally_banned'] = Variable<bool>(
+        peerIsGloballyBanned.value,
+      );
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -2430,6 +2593,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
           ..write('isMuted: $isMuted, ')
           ..write('lastSeenAt: $lastSeenAt, ')
           ..write('showsLastSeen: $showsLastSeen, ')
+          ..write('blockedByMe: $blockedByMe, ')
+          ..write('blockedByPeer: $blockedByPeer, ')
+          ..write('peerIsGloballyBanned: $peerIsGloballyBanned, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -10904,6 +11070,9 @@ typedef $$CachedChatsTableCreateCompanionBuilder =
       required bool isMuted,
       Value<DateTime?> lastSeenAt,
       Value<bool> showsLastSeen,
+      Value<bool> blockedByMe,
+      Value<bool> blockedByPeer,
+      Value<bool> peerIsGloballyBanned,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -10925,6 +11094,9 @@ typedef $$CachedChatsTableUpdateCompanionBuilder =
       Value<bool> isMuted,
       Value<DateTime?> lastSeenAt,
       Value<bool> showsLastSeen,
+      Value<bool> blockedByMe,
+      Value<bool> blockedByPeer,
+      Value<bool> peerIsGloballyBanned,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -11015,6 +11187,21 @@ class $$CachedChatsTableFilterComposer
 
   ColumnFilters<bool> get showsLastSeen => $composableBuilder(
     column: $table.showsLastSeen,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get blockedByMe => $composableBuilder(
+    column: $table.blockedByMe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get blockedByPeer => $composableBuilder(
+    column: $table.blockedByPeer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get peerIsGloballyBanned => $composableBuilder(
+    column: $table.peerIsGloballyBanned,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11113,6 +11300,21 @@ class $$CachedChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get blockedByMe => $composableBuilder(
+    column: $table.blockedByMe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get blockedByPeer => $composableBuilder(
+    column: $table.blockedByPeer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get peerIsGloballyBanned => $composableBuilder(
+    column: $table.peerIsGloballyBanned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -11202,6 +11404,21 @@ class $$CachedChatsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get blockedByMe => $composableBuilder(
+    column: $table.blockedByMe,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get blockedByPeer => $composableBuilder(
+    column: $table.blockedByPeer,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get peerIsGloballyBanned => $composableBuilder(
+    column: $table.peerIsGloballyBanned,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
 }
@@ -11253,6 +11470,9 @@ class $$CachedChatsTableTableManager
                 Value<bool> isMuted = const Value.absent(),
                 Value<DateTime?> lastSeenAt = const Value.absent(),
                 Value<bool> showsLastSeen = const Value.absent(),
+                Value<bool> blockedByMe = const Value.absent(),
+                Value<bool> blockedByPeer = const Value.absent(),
+                Value<bool> peerIsGloballyBanned = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedChatsCompanion(
@@ -11272,6 +11492,9 @@ class $$CachedChatsTableTableManager
                 isMuted: isMuted,
                 lastSeenAt: lastSeenAt,
                 showsLastSeen: showsLastSeen,
+                blockedByMe: blockedByMe,
+                blockedByPeer: blockedByPeer,
+                peerIsGloballyBanned: peerIsGloballyBanned,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -11293,6 +11516,9 @@ class $$CachedChatsTableTableManager
                 required bool isMuted,
                 Value<DateTime?> lastSeenAt = const Value.absent(),
                 Value<bool> showsLastSeen = const Value.absent(),
+                Value<bool> blockedByMe = const Value.absent(),
+                Value<bool> blockedByPeer = const Value.absent(),
+                Value<bool> peerIsGloballyBanned = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedChatsCompanion.insert(
@@ -11312,6 +11538,9 @@ class $$CachedChatsTableTableManager
                 isMuted: isMuted,
                 lastSeenAt: lastSeenAt,
                 showsLastSeen: showsLastSeen,
+                blockedByMe: blockedByMe,
+                blockedByPeer: blockedByPeer,
+                peerIsGloballyBanned: peerIsGloballyBanned,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),

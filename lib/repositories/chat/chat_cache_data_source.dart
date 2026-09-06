@@ -55,6 +55,28 @@ class ChatCacheDataSource {
         .toList(growable: false);
   }
 
+  /// Returns only the newest cached message. Summary reconciliation only needs
+  /// this row to preserve a local pending preview; reading the whole history
+  /// for every chat makes that reconciliation proportional to cached history.
+  Future<ChatMessage?> readLatestMessage(
+    String chatId, {
+    required String currentUserId,
+  }) async {
+    final query = _database.select(_database.cachedMessages)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(currentUserId) &
+            table.chatId.equals(chatId),
+      )
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.id),
+      ])
+      ..limit(1);
+    final row = await query.getSingleOrNull();
+    return row == null ? null : _mapMessage(row, currentUserId);
+  }
+
   Future<ChatMessage?> readMessage(
     String id, {
     required String currentUserId,
