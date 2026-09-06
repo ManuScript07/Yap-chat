@@ -12,6 +12,7 @@ import 'package:yap_chat/repositories/profile/avatar_deletion_queue.dart';
 import 'package:yap_chat/repositories/profile/profile_cache_data_source.dart';
 import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
 import 'package:yap_chat/repositories/profile/viewed_profile_cache_data_source.dart';
+import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 
 class ProfileRepository
     implements IProfileRepository, IViewedProfileRepository {
@@ -24,6 +25,7 @@ class ProfileRepository
     required AccountSessionController accountSessionController,
     required ViewedProfileCacheDataSource viewedProfileCache,
     required MediaCacheService mediaCache,
+    PresenceStatusStore? presenceStore,
   }) : _client = client,
        _cache = cache,
        _avatarStorage = avatarStorage,
@@ -31,6 +33,7 @@ class ProfileRepository
        _accountSessionController = accountSessionController,
        _viewedProfileCache = viewedProfileCache,
        _mediaCache = mediaCache,
+       _presenceStore = presenceStore,
        _talker = talker;
 
   final SupabaseClient _client;
@@ -41,6 +44,7 @@ class ProfileRepository
   final AccountSessionController _accountSessionController;
   final ViewedProfileCacheDataSource _viewedProfileCache;
   final MediaCacheService _mediaCache;
+  final PresenceStatusStore? _presenceStore;
   static const _viewedProfileFriendsPageSize = 30;
   static const _viewedProfileRequestTimeout = Duration(seconds: 10);
   static const _viewedProfileFriendsRequestTimeout = Duration(seconds: 10);
@@ -95,6 +99,9 @@ class ProfileRepository
     _accountSessionController.ensureCurrent(scope);
     if (response.isEmpty) throw const ProfileNotFoundException();
     final row = Map<String, dynamic>.from(response.first as Map);
+    if (row['is_online'] case final bool isOnline) {
+      _presenceStore?.record(userId, isOnline: isOnline);
+    }
     final photos = _photoRows(row['photos']);
     final baseProfile = UserProfile.fromMap(row);
     // Older profiles can have only the primary avatar columns populated. Keep

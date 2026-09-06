@@ -146,18 +146,24 @@ class _ViewedProfileView extends StatelessWidget {
           final isBlockedByMe = context.select<BlocklistCubit, bool>(
             (cubit) => cubit.state.blocks(viewedProfile.profile.id),
           );
-          return BlocListener<PresenceCubit, PresenceState>(
-            listenWhen: (previous, current) =>
-                !viewedProfile.isBlocked &&
-                previous.isOnline(viewedProfile.profile.id) &&
-                !current.isOnline(viewedProfile.profile.id),
-            listener: (context, _) =>
-                context.read<ViewedProfileCubit>().markOfflineNow(),
-            child: _ProfileScaffold(
-              viewedProfile: viewedProfile,
-              state: state,
-              isBlockedByMe: isBlockedByMe,
-              originChatId: originChatId,
+          return PresenceWatchScope(
+            scopeName: 'viewed-profile',
+            userIds: viewedProfile.isBlocked
+                ? const <String>[]
+                : <String>[viewedProfile.profile.id],
+            child: BlocListener<PresenceCubit, PresenceState>(
+              listenWhen: (previous, current) =>
+                  !viewedProfile.isBlocked &&
+                  previous.isOnline(viewedProfile.profile.id) &&
+                  !current.isOnline(viewedProfile.profile.id),
+              listener: (context, _) =>
+                  context.read<ViewedProfileCubit>().markOfflineNow(),
+              child: _ProfileScaffold(
+                viewedProfile: viewedProfile,
+                state: state,
+                isBlockedByMe: isBlockedByMe,
+                originChatId: originChatId,
+              ),
             ),
           );
         },
@@ -1188,19 +1194,19 @@ class _ProfileStats extends StatelessWidget {
             : 620.0;
         final double friendsPreviewWidth = viewedProfile.friendsPreview.isEmpty
             ? 0.0
-            : (32 + (viewedProfile.friendsPreview.length - 1) * 20)
-                .toDouble();
-        final double friendsTextMaxWidth = math.max(
-          0.0,
-          maxWidth -
-              16 -
-              friendsPreviewWidth -
-              (viewedProfile.friendsPreview.isEmpty ? 0 : 8),
-        ).toDouble();
-        final double viewCountTextMaxWidth = math.max(
-          0.0,
-          maxWidth - 25,
-        ).toDouble();
+            : (32 + (viewedProfile.friendsPreview.length - 1) * 20).toDouble();
+        final double friendsTextMaxWidth = math
+            .max(
+              0.0,
+              maxWidth -
+                  16 -
+                  friendsPreviewWidth -
+                  (viewedProfile.friendsPreview.isEmpty ? 0 : 8),
+            )
+            .toDouble();
+        final double viewCountTextMaxWidth = math
+            .max(0.0, maxWidth - 25)
+            .toDouble();
 
         return SizedBox(
           width: maxWidth,

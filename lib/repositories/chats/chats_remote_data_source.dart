@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
-import 'package:yap_chat/core/services/reconnect_backoff.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
+import 'package:yap_chat/repositories/presence/presence_status_store.dart';
+import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
 
 class ConversationChange {
   const ConversationChange({
@@ -19,20 +18,17 @@ class ChatsRemoteDataSource {
   ChatsRemoteDataSource({
     required SupabaseClient client,
     required Talker talker,
+    UserRealtimeDataSource? userRealtime,
+    PresenceStatusStore? presenceStore,
   }) : _client = client,
-       _talker = talker,
-       _reconnectBackoff = ReconnectBackoff(
-         onError: (error, stackTrace) =>
-             talker.handle(error, stackTrace, 'Chats realtime retry failed'),
-       );
+       _userRealtime =
+           userRealtime ??
+           UserRealtimeDataSource(client: client, talker: talker),
+       _presenceStore = presenceStore;
 
   final SupabaseClient _client;
-  final Talker _talker;
-  final ReconnectBackoff _reconnectBackoff;
-  StreamController<ConversationChange>? _changesController;
-  RealtimeChannel? _changesChannel;
-  Future<void> _channelOperation = Future<void>.value();
-  bool _isPaused = false;
+  final UserRealtimeDataSource _userRealtime;
+  final PresenceStatusStore? _presenceStore;
 
   String get currentUserId {
     final id = _client.auth.currentUser?.id;
@@ -45,6 +41,11 @@ class ChatsRemoteDataSource {
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
+    _presenceStore?.recordAll({
+      for (final row in rows)
+        if (row['peer_id'] is String && row['peer_is_online'] is bool)
+          row['peer_id'] as String: row['peer_is_online'] as bool,
+    });
     return rows
         .map((row) {
           final storagePath = row['peer_avatar_storage_path'] as String?;
@@ -85,145 +86,17 @@ class ChatsRemoteDataSource {
   }
 
   Stream<ConversationChange> watchChanges() {
-    return (_changesController ??=
-            StreamController<ConversationChange>.broadcast(
-              onListen: () =>
-                  unawaited(_serializeChannelOperation(_ensureChannel)),
-              onCancel: () =>
-                  unawaited(_serializeChannelOperation(_removeCurrentChannel)),
-            ))
-        .stream;
-  }
-
-  Future<void> pauseChanges() {
-    _isPaused = true;
-    _reconnectBackoff.cancel();
-    return _serializeChannelOperation(_removeCurrentChannel);
-  }
-
-  Future<void> resumeChanges() {
-    _isPaused = false;
-    _reconnectBackoff.reset();
-    return _serializeChannelOperation(() async {
-      await _removeCurrentChannel();
-      await _ensureChannel();
-    });
-  }
-
-  Future<void> _ensureChannel() async {
-    if (_isPaused || _changesChannel != null) return;
-    final controller = _changesController;
-    if (controller == null || controller.isClosed || !controller.hasListener) {
-      return;
-    }
-    late final RealtimeChannel channel;
-    channel = _client
-        .channel(
-          'user:$currentUserId:chats',
-          opts: const RealtimeChannelConfig(private: true),
-        )
-        .onBroadcast(
-          event: 'changed',
-          callback: (event) {
-            if (!identical(_changesChannel, channel)) return;
-            final nested = event['payload'];
-            final payload = nested is Map
-                ? Map<String, dynamic>.from(nested)
-                : event;
-            final reason = payload['reason'] as String? ?? 'changed';
-            final conversationId = payload['conversation_id'];
-            if (conversationId is String) {
-              controller.add(
-                ConversationChange(
-                  conversationId: conversationId,
-                  reason: reason,
-                ),
-              );
-            }
-            final conversationIds = payload['conversation_ids'];
-            if (conversationIds is List) {
-              for (final id in conversationIds.whereType<String>()) {
-                controller.add(
-                  ConversationChange(conversationId: id, reason: reason),
-                );
-              }
-            }
-          },
-        );
-    _changesChannel = channel;
-    channel.subscribe((status, _) {
-      if (!identical(_changesChannel, channel) || controller.isClosed) return;
-      switch (status) {
-        case RealtimeSubscribeStatus.subscribed:
-          _reconnectBackoff.reset();
-          _talker.debug('Chats realtime subscribed');
-          controller.add(
-            const ConversationChange(
-              conversationId: null,
-              reason: 'subscribed',
-            ),
-          );
-        case RealtimeSubscribeStatus.closed:
-        case RealtimeSubscribeStatus.channelError:
-        case RealtimeSubscribeStatus.timedOut:
-          _handleChannelFailure(channel, status);
-      }
-    });
-  }
-
-  void _handleChannelFailure(
-    RealtimeChannel channel,
-    RealtimeSubscribeStatus status,
-  ) {
-    if (!identical(_changesChannel, channel)) return;
-    _changesChannel = null;
-    _talker.warning('Chats realtime unavailable: ${status.name}');
-    unawaited(
-      _serializeChannelOperation(() async {
-        await _removeChannel(channel);
-        _scheduleReconnect();
-      }),
+    return _userRealtime.watchConversationEvents().map(
+      (event) => ConversationChange(
+        conversationId: event.conversationId,
+        reason: event.reason,
+      ),
     );
   }
 
-  void _scheduleReconnect() {
-    if (_isPaused || !(_changesController?.hasListener ?? false)) return;
-    final delay = _reconnectBackoff.schedule(
-      () => _serializeChannelOperation(_ensureChannel),
-    );
-    if (delay != null) {
-      _talker.debug(
-        'Chats realtime reconnect scheduled in ${delay.inSeconds}s',
-      );
-    }
-  }
+  Future<void> pauseChanges() => _userRealtime.pause();
 
-  Future<void> _removeCurrentChannel() async {
-    final channel = _changesChannel;
-    _changesChannel = null;
-    if (channel != null) await _removeChannel(channel);
-  }
-
-  Future<void> _removeChannel(RealtimeChannel channel) async {
-    try {
-      await _client.removeChannel(channel);
-    } catch (error, stackTrace) {
-      _talker.handle(
-        error,
-        stackTrace,
-        'Chats realtime channel removal failed',
-      );
-    }
-  }
-
-  Future<void> _serializeChannelOperation(Future<void> Function() action) {
-    final operation = _channelOperation.then(
-      (_) => action(),
-      onError: (_) => action(),
-    );
-    _channelOperation = operation;
-    return operation;
-  }
+  Future<void> resumeChanges() => _userRealtime.resume();
 
   Future<void> hideChats(Set<String> ids, {required DateTime clearedAt}) =>
       _client.rpc<void>(

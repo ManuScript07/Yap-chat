@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/core/services/reconnect_backoff.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
+import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 
 class FriendChange {
   const FriendChange({this.profileId});
@@ -15,8 +16,10 @@ class FriendsRemoteDataSource {
   FriendsRemoteDataSource({
     required SupabaseClient client,
     required Talker talker,
+    PresenceStatusStore? presenceStore,
   }) : _client = client,
        _talker = talker,
+       _presenceStore = presenceStore,
        _backoff = ReconnectBackoff(
          onError: (error, stackTrace) =>
              talker.handle(error, stackTrace, 'Friends realtime retry failed'),
@@ -25,6 +28,7 @@ class FriendsRemoteDataSource {
   final SupabaseClient _client;
   final Talker _talker;
   final ReconnectBackoff _backoff;
+  final PresenceStatusStore? _presenceStore;
   StreamController<FriendChange>? _changesController;
   RealtimeChannel? _channel;
   Future<void> _channelOperation = Future<void>.value();
@@ -38,9 +42,16 @@ class FriendsRemoteDataSource {
 
   Future<List<Friend>> fetchFriends() async {
     final response = await _client.rpc<List<dynamic>>('get_friends');
-    return response
-        .map((item) {
-          final row = Map<String, dynamic>.from(item as Map);
+    final rows = response
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+    _presenceStore?.recordAll({
+      for (final row in rows)
+        if (row['id'] is String && row['is_online'] is bool)
+          row['id'] as String: row['is_online'] as bool,
+    });
+    return rows
+        .map((row) {
           final storagePath = row['avatar_storage_path'] as String?;
           return Friend(
             id: row['id'] as String,

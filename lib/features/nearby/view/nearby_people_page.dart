@@ -110,70 +110,76 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               state.status != NearbyStatus.loading &&
               state.status != NearbyStatus.locationRequired;
 
-          return Scaffold(
-            extendBodyBehindAppBar: true,
-            backgroundColor: context.scaffoldBackgroundColor,
-            appBar: PrimaryAppBar(
-              title: context.l10n.nearbyTitle,
-              titleWidget: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  context.l10n.nearbyTitle,
-                  style: AppTextStyles.titleLargeFlex,
+          return PresenceWatchScope(
+            scopeName: 'nearby',
+            userIds: state.people
+                .where((person) => !blockedUserIds.contains(person.id))
+                .map((person) => person.id),
+            child: Scaffold(
+              extendBodyBehindAppBar: true,
+              backgroundColor: context.scaffoldBackgroundColor,
+              appBar: PrimaryAppBar(
+                title: context.l10n.nearbyTitle,
+                titleWidget: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    context.l10n.nearbyTitle,
+                    style: AppTextStyles.titleLargeFlex,
+                  ),
                 ),
               ),
-            ),
-            body: Stack(
-              children: [
-                _NearbyFeed(
-                  controller: _scrollController,
-                  state: state,
-                  bottomPadding: contentBottom,
-                  onRefresh: () => context.read<NearbyCubit>().refresh(),
-                  onRefreshActivityChanged: (isActive) {
-                    if (mounted && _isPullRefreshing != isActive) {
-                      setState(() => _isPullRefreshing = isActive);
-                    }
-                  },
-                ),
-                if (state.status == NearbyStatus.locationRequired)
-                  const Positioned.fill(child: _LocationRequiredBackdrop()),
-                if (state.status == NearbyStatus.locationRequired)
-                  Positioned.fill(
-                    child: _LocationRequiredOverlay(
-                      bottomInset: contentBottom,
-                      onRetry: () =>
-                          context.read<NearbyCubit>().requestLocation(),
+              body: Stack(
+                children: [
+                  _NearbyFeed(
+                    controller: _scrollController,
+                    state: state,
+                    bottomPadding: contentBottom,
+                    onRefresh: () => context.read<NearbyCubit>().refresh(),
+                    onRefreshActivityChanged: (isActive) {
+                      if (mounted && _isPullRefreshing != isActive) {
+                        setState(() => _isPullRefreshing = isActive);
+                      }
+                    },
+                  ),
+                  if (state.status == NearbyStatus.locationRequired)
+                    const Positioned.fill(child: _LocationRequiredBackdrop()),
+                  if (state.status == NearbyStatus.locationRequired)
+                    Positioned.fill(
+                      child: _LocationRequiredOverlay(
+                        bottomInset: contentBottom,
+                        onRetry: () =>
+                            context.read<NearbyCubit>().requestLocation(),
+                      ),
+                    ),
+                  if (shouldShowEmptyState)
+                    Positioned.fill(
+                      child: _NearbyEmptyStateLayer(
+                        bottomPadding: contentBottom,
+                        failed: state.status == NearbyStatus.failure,
+                      ),
+                    ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: const BottomAmbientGlow(),
+                  ),
+                  if (state.isRefreshing &&
+                      state.status == NearbyStatus.locationRequired)
+                    const Positioned.fill(child: _LocationUpdatingOverlay()),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: filterBottom,
+                    child: _FiltersButton(
+                      onPressed: state.isRefreshing || _isPullRefreshing
+                          ? null
+                          : () => _openFilters(state.filters),
                     ),
                   ),
-                if (shouldShowEmptyState)
-                  Positioned.fill(
-                    child: _NearbyEmptyStateLayer(
-                      bottomPadding: contentBottom,
-                      failed: state.status == NearbyStatus.failure,
-                    ),
-                  ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: const BottomAmbientGlow(),
-                ),
-                if (state.isRefreshing &&
-                    state.status == NearbyStatus.locationRequired)
-                  const Positioned.fill(child: _LocationUpdatingOverlay()),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: filterBottom,
-                  child: _FiltersButton(
-                    onPressed: state.isRefreshing || _isPullRefreshing
-                        ? null
-                        : () => _openFilters(state.filters),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

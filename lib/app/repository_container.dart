@@ -53,13 +53,21 @@ class RepositoryContainer {
       database: config.database,
       userIdProvider: () => client.auth.currentUser!.id,
     );
+    final presenceStore = PresenceStatusStore();
+    final userRealtime = UserRealtimeDataSource(
+      client: client,
+      talker: config.talker,
+    );
     final chatsRemote = ChatsRemoteDataSource(
       client: client,
       talker: config.talker,
+      userRealtime: userRealtime,
+      presenceStore: presenceStore,
     );
     final friendsRemote = FriendsRemoteDataSource(
       client: client,
       talker: config.talker,
+      presenceStore: presenceStore,
     );
     final friendsCache = FriendsCacheDataSource(
       database: config.database,
@@ -80,7 +88,10 @@ class RepositoryContainer {
         preferences: config.preferences,
         environment: config.environment.name,
       ),
-      remote: NearbyRemoteDataSource(client: client),
+      remote: NearbyRemoteDataSource(
+        client: client,
+        presenceStore: presenceStore,
+      ),
       mediaCache: mediaCache,
       accountSessionController: config.accountSessionController,
       config: config,
@@ -160,10 +171,13 @@ class RepositoryContainer {
           imageProcessor: const AvatarImageProcessor(),
         ),
         accountSessionController: config.accountSessionController,
+        presenceStore: presenceStore,
       ),
       presenceRepository: PresenceRepository(
         client: client,
         talker: config.talker,
+        userRealtime: userRealtime,
+        statusStore: presenceStore,
       ),
       pushNotificationsRepository:
           config.isLocal || config.firebaseMessaging == null
