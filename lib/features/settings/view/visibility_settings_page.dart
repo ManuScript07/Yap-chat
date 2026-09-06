@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
@@ -29,11 +31,27 @@ class _VisibilitySettingsView extends StatefulWidget {
 
 class _VisibilitySettingsViewState extends State<_VisibilitySettingsView> {
   late final Stream<List<Friend>> _friends;
+  late final Stream<FriendListCacheState> _friendListState;
+  bool _isLoadingMoreFriends = false;
 
   @override
   void initState() {
     super.initState();
-    _friends = context.read<IFriendsRepository>().watchFriends();
+    final friendsRepository = context.read<IFriendsRepository>();
+    _friends = friendsRepository.watchPaginatedFriends();
+    _friendListState = friendsRepository.watchFriendListState();
+  }
+
+  Future<void> _loadMoreFriendsIfNeeded(FriendListCacheState state) async {
+    if (_isLoadingMoreFriends || !state.hasMore) return;
+    setState(() => _isLoadingMoreFriends = true);
+    try {
+      await context.read<IFriendsRepository>().loadMoreFriends();
+    } catch (_) {
+      // Preserve the current offline cache; reaching the end later retries.
+    } finally {
+      if (mounted) setState(() => _isLoadingMoreFriends = false);
+    }
   }
 
   @override
@@ -80,57 +98,82 @@ class _VisibilitySettingsViewState extends State<_VisibilitySettingsView> {
               );
             }
             final isLoading = state.status == LocationVisibilityStatus.loading;
-            return ListView(
-              padding: EdgeInsets.fromLTRB(
-                0,
-                130,
-                0,
-                mediaQuery.padding.bottom + 24,
-              ),
-              children: [
-                SettingsToggleRow(
-                  icon: Icons.near_me_outlined,
-                  title: context.l10n.settingsShareLocation,
-                  value: settings.sharePreciseLocation,
-                  isLoading: isLoading,
-                  isSaving: state.isSaving,
-                  onChanged: isLoading
-                      ? null
-                      : (value) => context
-                            .read<LocationVisibilityCubit>()
-                            .setGlobal(sharePreciseLocation: value),
-                ),
-                SettingsToggleRow(
-                  icon: Icons.social_distance_outlined,
-                  title: context.l10n.settingsShareDistance,
-                  value: settings.shareDistance,
-                  isLoading: isLoading,
-                  isSaving: state.isSaving,
-                  onChanged: isLoading
-                      ? null
-                      : (value) => context
-                            .read<LocationVisibilityCubit>()
-                            .setGlobal(shareDistance: value),
-                ),
-                const SizedBox(height: 24),
-                StreamBuilder<List<Friend>>(
-                  stream: _friends,
-                  builder: (context, snapshot) => _FriendsVisibilityList(
-                    snapshot: snapshot,
-                    exactLocationEnabled: settings.sharePreciseLocation,
-                    excludedFriendIds: state.excludedFriendIds,
-                    isSaving: state.isSaving || isLoading,
-                  ),
-                ),
-                if (state.status == LocationVisibilityStatus.failure)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                    child: Text(
-                      context.l10n.settingsPrivacyLoadFailed,
-                      style: settingsValueStyle(context),
+            return StreamBuilder<FriendListCacheState>(
+              stream: _friendListState,
+              builder: (context, paginationSnapshot) {
+                final pagination =
+                    paginationSnapshot.data ?? const FriendListCacheState();
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification.metrics.extentAfter < 360) {
+                      unawaited(_loadMoreFriendsIfNeeded(pagination));
+                    }
+                    return false;
+                  },
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      0,
+                      130,
+                      0,
+                      mediaQuery.padding.bottom + 24,
                     ),
+                    children: [
+                      SettingsToggleRow(
+                        icon: Icons.near_me_outlined,
+                        title: context.l10n.settingsShareLocation,
+                        value: settings.sharePreciseLocation,
+                        isLoading: isLoading,
+                        isSaving: state.isSaving,
+                        onChanged: isLoading
+                            ? null
+                            : (value) => context
+                                  .read<LocationVisibilityCubit>()
+                                  .setGlobal(sharePreciseLocation: value),
+                      ),
+                      SettingsToggleRow(
+                        icon: Icons.social_distance_outlined,
+                        title: context.l10n.settingsShareDistance,
+                        value: settings.shareDistance,
+                        isLoading: isLoading,
+                        isSaving: state.isSaving,
+                        onChanged: isLoading
+                            ? null
+                            : (value) => context
+                                  .read<LocationVisibilityCubit>()
+                                  .setGlobal(shareDistance: value),
+                      ),
+                      const SizedBox(height: 24),
+                      StreamBuilder<List<Friend>>(
+                        stream: _friends,
+                        builder: (context, snapshot) => _FriendsVisibilityList(
+                          snapshot: snapshot,
+                          friendTotalCount: pagination.totalCount,
+                          exactLocationEnabled: settings.sharePreciseLocation,
+                          excludedFriendIds: state.excludedFriendIds,
+                          isSaving: state.isSaving || isLoading,
+                        ),
+                      ),
+                      if (_isLoadingMoreFriends)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: context.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      if (state.status == LocationVisibilityStatus.failure)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                          child: Text(
+                            context.l10n.settingsPrivacyLoadFailed,
+                            style: settingsValueStyle(context),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                );
+              },
             );
           },
         ),
@@ -142,12 +185,14 @@ class _VisibilitySettingsViewState extends State<_VisibilitySettingsView> {
 class _FriendsVisibilityList extends StatelessWidget {
   const _FriendsVisibilityList({
     required this.snapshot,
+    required this.friendTotalCount,
     required this.exactLocationEnabled,
     required this.excludedFriendIds,
     required this.isSaving,
   });
 
   final AsyncSnapshot<List<Friend>> snapshot;
+  final int friendTotalCount;
   final bool exactLocationEnabled;
   final Set<String> excludedFriendIds;
   final bool isSaving;
@@ -189,9 +234,10 @@ class _FriendsVisibilityList extends StatelessWidget {
       );
     }
     final visibleCount = exactLocationEnabled
-        ? friends
-              .where((friend) => !excludedFriendIds.contains(friend.id))
-              .length
+        ? (friendTotalCount - excludedFriendIds.length).clamp(
+            0,
+            friendTotalCount,
+          )
         : 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

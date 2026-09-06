@@ -220,6 +220,7 @@ class FriendsCacheDataSource {
           : FriendPageCursor(friendsSince: since.toLocal(), friendId: id),
       hasMore: row.hasMore,
       totalCount: row.totalCount,
+      isAuthoritative: true,
     );
   }
 
@@ -664,9 +665,14 @@ class FriendListCacheState {
     this.nextCursor,
     this.hasMore = false,
     this.totalCount = 0,
+    this.isAuthoritative = false,
   });
 
   final FriendPageCursor? nextCursor;
   final bool hasMore;
   final int totalCount;
+
+  /// False only for a best-effort state derived from a legacy cache that has
+  /// no cursor metadata yet. A persisted page response is authoritative.
+  final bool isAuthoritative;
 }

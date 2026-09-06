@@ -84,9 +84,6 @@ class MockFriendsRepository
   Stream<List<FriendRequest>> watchCachedRequests() => watchRequests();
 
   @override
-  Future<List<Friend>> getFriends() async => _friendsSnapshot;
-
-  @override
   Future<void> loadMoreFriends() async {}
 
   @override

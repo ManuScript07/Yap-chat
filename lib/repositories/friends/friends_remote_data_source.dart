@@ -50,19 +50,6 @@ class FriendsRemoteDataSource {
     return id;
   }
 
-  Future<List<Friend>> fetchFriends() async {
-    final response = await _client.rpc<List<dynamic>>('get_friends');
-    final rows = response
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList(growable: false);
-    _presenceStore?.recordAll({
-      for (final row in rows)
-        if (row['id'] is String && row['is_online'] is bool)
-          row['id'] as String: row['is_online'] as bool,
-    });
-    return rows.map(_mapFriend).toList(growable: false);
-  }
-
   Future<FriendPage> fetchFriendsPage({
     FriendPageCursor? after,
     int pageSize = 50,

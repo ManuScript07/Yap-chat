@@ -207,7 +207,7 @@ class ContactDiscoveryCubit extends Cubit<ContactDiscoveryState> {
   void clearActionError() => emit(state.copyWith(clearActionError: true));
 
   void _ensureFriendSubscription() {
-    _friendsSubscription ??= _friendsRepository.watchFriends().listen(
+    _friendsSubscription ??= _friendsRepository.watchPaginatedFriends().listen(
       _handleFriendsChanged,
     );
   }

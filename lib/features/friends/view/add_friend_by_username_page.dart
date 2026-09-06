@@ -115,7 +115,7 @@ class _AddFriendByUsernameViewState extends State<_AddFriendByUsernameView> {
     try {
       final friends = await context
           .read<IFriendsRepository>()
-          .watchFriends()
+          .watchCachedFriends()
           .first;
       if (!mounted ||
           generation != _localSearchGeneration ||
@@ -142,7 +142,7 @@ class _AddFriendByUsernameViewState extends State<_AddFriendByUsernameView> {
         );
       });
     } catch (_) {
-      // Ошибка локального кэша не должна прерывать существующий поиск по сети.
+      // A cache failure must not interrupt the existing server search.
     }
   }
 }

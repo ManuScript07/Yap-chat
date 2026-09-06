@@ -2,16 +2,17 @@ import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/friends/friends_cache_data_source.dart';
 
 abstract interface class IFriendsRepository {
-  /// The own-friends screen consumes this paged stream. Other established
-  /// consumers still use [watchFriends] because they need the complete set.
+  /// The own-friends screen consumes this cursor-backed stream.
   Stream<List<Friend>> watchPaginatedFriends();
+
+  /// Kept as an alias while older presentation code migrates to the explicit
+  /// paginated name. It never performs an unbounded server read.
   Stream<List<Friend>> watchFriends();
   Stream<FriendListCacheState> watchFriendListState();
   Stream<List<FriendRequest>> watchRequests();
   Stream<List<Friend>> watchCachedFriends();
   Stream<List<FriendRequest>> watchCachedRequests();
 
-  Future<List<Friend>> getFriends();
   Future<void> loadMoreFriends();
   Future<List<FriendRequest>> getRequests();
   Future<List<FriendCandidate>> searchUsers(String query);

@@ -22,20 +22,79 @@ class NewChatPage extends StatefulWidget {
 
 class _NewChatPageState extends State<NewChatPage> {
   late final Stream<List<Friend>> _friendsStream;
+  late final StreamSubscription<FriendListCacheState>
+  _friendListStateSubscription;
   final _searchController = TextEditingController();
   final _openingFriendIds = <String>{};
   String _query = '';
+  FriendListCacheState _friendListState = const FriendListCacheState();
+  Timer? _searchDebounce;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
-    _friendsStream = context.read<IFriendsRepository>().watchFriends();
+    final friendsRepository = context.read<IFriendsRepository>();
+    _friendsStream = friendsRepository.watchPaginatedFriends();
+    _friendListStateSubscription = friendsRepository
+        .watchFriendListState()
+        .listen((state) {
+          if (mounted) setState(() => _friendListState = state);
+        });
   }
 
   @override
   void dispose() {
+    _friendListStateSubscription.cancel();
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _query = value);
+    _searchDebounce?.cancel();
+    final normalized = value.trim().replaceFirst(RegExp(r'^@'), '');
+    if (normalized.length < 3) return;
+    _searchDebounce = Timer(const Duration(milliseconds: 375), () {
+      unawaited(_hydrateSearchedFriendIfNeeded(value));
+    });
+  }
+
+  Future<void> _hydrateSearchedFriendIfNeeded(String query) async {
+    final repository = context.read<IFriendsRepository>();
+    try {
+      final cachedFriends = await repository.watchCachedFriends().first;
+      if (!mounted ||
+          _query != query ||
+          _filterFriends(cachedFriends).isNotEmpty) {
+        return;
+      }
+      if (_friendListState.isAuthoritative && !_friendListState.hasMore) {
+        // A completed cursor list proves this account has no such friend.
+        return;
+      }
+      // Search is a cache-hydration path only when local pages did not match.
+      // It lets a friend outside them appear without downloading every page.
+      await repository.searchUsers(query);
+    } catch (_) {
+      // A failed optional lookup must not disturb the cached list or typing.
+    }
+  }
+
+  Future<void> _loadMoreIfNeeded() async {
+    if (_isLoadingMore || !_friendListState.hasMore || _query.isNotEmpty) {
+      return;
+    }
+    setState(() => _isLoadingMore = true);
+    try {
+      await context.read<IFriendsRepository>().loadMoreFriends();
+    } catch (_) {
+      // Keep the already cached list usable. The next reach to the end can
+      // retry the cursor page.
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
   }
 
   void _openAddFriendPage() {
@@ -156,25 +215,44 @@ class _NewChatPageState extends State<NewChatPage> {
                   );
                 }
 
-                return ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.only(top: listTop, bottom: listBottom),
-                  children: [
-                    _FindUserRow(onPressed: _openAddFriendPage),
-                    FriendsSectionTitle(
-                      title: context.l10n.friendsAll,
-                      count: friends.length,
-                    ),
-                    for (final friend in friends)
-                      _NewChatFriendItem(
-                        friend: friend,
-                        avatarLoader: () => context
-                            .read<IFriendsRepository>()
-                            .resolveFriendAvatar(friend),
-                        onTap: () => _openChat(friend),
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification.metrics.extentAfter < 360) {
+                      unawaited(_loadMoreIfNeeded());
+                    }
+                    return false;
+                  },
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.only(top: listTop, bottom: listBottom),
+                    children: [
+                      _FindUserRow(onPressed: _openAddFriendPage),
+                      FriendsSectionTitle(
+                        title: context.l10n.friendsAll,
+                        count: _query.trim().isEmpty
+                            ? _friendListState.totalCount
+                            : friends.length,
                       ),
-                  ],
+                      for (final friend in friends)
+                        _NewChatFriendItem(
+                          friend: friend,
+                          avatarLoader: () => context
+                              .read<IFriendsRepository>()
+                              .resolveFriendAvatar(friend),
+                          onTap: () => _openChat(friend),
+                        ),
+                      if (_isLoadingMore)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: context.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -193,7 +271,7 @@ class _NewChatPageState extends State<NewChatPage> {
               child: GlassSearchBar(
                 controller: _searchController,
                 hintText: context.l10n.friendsSearchHint,
-                onChanged: (value) => setState(() => _query = value),
+                onChanged: _onSearchChanged,
               ),
             ),
           ],

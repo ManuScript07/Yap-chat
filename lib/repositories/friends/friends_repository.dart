@@ -44,12 +44,10 @@ class FriendsRepository
   final Uuid _uuid = const Uuid();
   StreamSubscription<FriendChange>? _changesSubscription;
   AccountSessionSnapshot? _startedScope;
-  AccountSessionSnapshot? _completeSnapshotScope;
   Timer? _realtimeSyncTimer;
   final StreamController<String> _profileChangesController =
       StreamController<String>.broadcast();
   Future<void>? _activeSync;
-  Future<void>? _activeFullSync;
   Future<void>? _activePageLoad;
   final Map<String, ({DateTime cachedAt, List<FriendCandidate> results})>
   _searchCache = {};
@@ -75,7 +73,7 @@ class FriendsRepository
   @override
   Stream<List<Friend>> watchFriends() {
     final scope = _accountSessionController.capture();
-    unawaited(_ensureStarted(loadCompleteSnapshot: true));
+    unawaited(_ensureStarted());
     return _cache.watchFriends(ownerUserId: scope.userId);
   }
 
@@ -109,14 +107,6 @@ class FriendsRepository
   Stream<String> watchProfileChanges() {
     unawaited(_ensureStarted());
     return _profileChangesController.stream;
-  }
-
-  @override
-  Future<List<Friend>> getFriends() async {
-    final scope = _accountSessionController.capture();
-    await _synchronizeFull();
-    _accountSessionController.ensureCurrent(scope);
-    return _cache.readFriends(ownerUserId: scope.userId);
   }
 
   @override
@@ -873,7 +863,6 @@ class FriendsRepository
   @override
   Future<void> pauseRealtime() {
     _activeSync = null;
-    _activeFullSync = null;
     _activePageLoad = null;
     _searchCache.clear();
     _activeSearches.clear();
@@ -890,22 +879,14 @@ class FriendsRepository
     await _remote.resumeChanges();
   }
 
-  Future<void> _ensureStarted({
-    bool forceSync = false,
-    bool loadCompleteSnapshot = false,
-  }) async {
+  Future<void> _ensureStarted({bool forceSync = false}) async {
     final scope = _accountSessionController.capture();
     final startedScope = _startedScope;
     final isCurrentScope =
         startedScope != null &&
         startedScope.userId == scope.userId &&
         startedScope.generation == scope.generation;
-    if (isCurrentScope && !forceSync) {
-      if (loadCompleteSnapshot && !_hasCompleteSnapshot(scope)) {
-        await _synchronizeFull();
-      }
-      return;
-    }
+    if (isCurrentScope && !forceSync) return;
 
     _startedScope = scope;
     _changesSubscription ??= _remote.watchChanges().listen(
@@ -919,11 +900,7 @@ class FriendsRepository
       onError: (Object error, StackTrace stackTrace) =>
           _config.talker.handle(error, stackTrace, 'Friends stream failed'),
     );
-    if (loadCompleteSnapshot) {
-      await _synchronizeFullSafely();
-    } else {
-      await _synchronizeSafely();
-    }
+    await _synchronizeSafely();
   }
 
   void _handleRealtimeChange(FriendChange change) {
@@ -1001,8 +978,6 @@ class FriendsRepository
   }
 
   Future<void> _synchronize() {
-    final activeFull = _activeFullSync;
-    if (activeFull != null) return activeFull;
     final active = _activeSync;
     if (active != null) return active;
     final sync = _performSync();
@@ -1030,40 +1005,6 @@ class FriendsRepository
     });
   }
 
-  Future<void> _synchronizeFull() {
-    final active = _activeFullSync;
-    if (active != null) return active;
-    final sync = _performFullSync();
-    _activeFullSync = sync;
-    return sync.whenComplete(() {
-      if (identical(_activeFullSync, sync)) _activeFullSync = null;
-    });
-  }
-
-  Future<void> _performFullSync() async {
-    // Do not let a first-page write race a complete snapshot write. The
-    // latter is only requested by legacy consumers that genuinely need all
-    // friends (new chat and privacy settings).
-    final activePageSync = _activeSync;
-    if (activePageSync != null) await activePageSync;
-    final scope = _accountSessionController.capture();
-    final results = await Future.wait([
-      _remote.fetchFriends(),
-      _remote.fetchRequests(),
-    ]);
-    await _accountSessionController.commit(
-      scope,
-      () => _cache.replaceAll(
-        friends: results[0] as List<Friend>,
-        requests: results[1] as List<FriendRequest>,
-        ownerUserId: scope.userId,
-        markFriendsComplete: true,
-      ),
-    );
-    _accountSessionController.ensureCurrent(scope);
-    _completeSnapshotScope = scope;
-  }
-
   Future<void> _performLoadMoreFriends() async {
     final scope = _accountSessionController.capture();
     final state = await _cache.readFriendListState(ownerUserId: scope.userId);
@@ -1085,23 +1026,6 @@ class FriendsRepository
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Friends sync failed');
     }
-  }
-
-  Future<void> _synchronizeFullSafely() async {
-    try {
-      await _synchronizeFull();
-    } on StaleAccountSessionException {
-      return;
-    } catch (error, stackTrace) {
-      _config.talker.handle(error, stackTrace, 'Full friends sync failed');
-    }
-  }
-
-  bool _hasCompleteSnapshot(AccountSessionSnapshot scope) {
-    final completeScope = _completeSnapshotScope;
-    return completeScope != null &&
-        completeScope.userId == scope.userId &&
-        completeScope.generation == scope.generation;
   }
 
   Future<String?> _hydrateAvatar(String? storagePath, String? remoteUrl) async {

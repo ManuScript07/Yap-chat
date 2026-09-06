@@ -111,12 +111,12 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
       _syncProfileFromFriendChange,
       onError: (_, _) {},
     );
-    _friendsCacheSubscription ??= _friendsRepository.watchFriends().listen((
-      friends,
-    ) {
-      _friendsSnapshot = friends;
-      _syncRelationshipFromCache();
-    }, onError: (_, _) {});
+    _friendsCacheSubscription ??= _friendsRepository
+        .watchPaginatedFriends()
+        .listen((friends) {
+          _friendsSnapshot = friends;
+          _syncRelationshipFromCache();
+        }, onError: (_, _) {});
     _requestsCacheSubscription ??= _friendsRepository.watchRequests().listen((
       requests,
     ) {
