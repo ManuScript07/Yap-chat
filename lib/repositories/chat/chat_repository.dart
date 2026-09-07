@@ -8,12 +8,15 @@ import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
+import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
 import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 
 class ChatRepository implements IChatRepository {
+  static const _remoteOperationTimeout = Duration(seconds: 15);
+
   ChatRepository({
     required AppConfig config,
     required ChatCacheDataSource cache,
@@ -25,6 +28,7 @@ class ChatRepository implements IChatRepository {
     required ILocalMediaRepository localMediaRepository,
     required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
+    DateTime Function()? now,
   }) : _config = config,
        _cache = cache,
        _remote = remote,
@@ -34,9 +38,8 @@ class ChatRepository implements IChatRepository {
        _chatsCache = chatsCache,
        _localMediaRepository = localMediaRepository,
        _accountSessionController = accountSessionController,
-       _uuid = uuid;
-
-  static const _retryInterval = Duration(seconds: 20);
+       _uuid = uuid,
+       _now = now ?? DateTime.now;
 
   final AppConfig _config;
   final ChatCacheDataSource _cache;
@@ -48,9 +51,11 @@ class ChatRepository implements IChatRepository {
   final ILocalMediaRepository _localMediaRepository;
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
+  final DateTime Function() _now;
   final Set<String> _deliveringOperationIds = {};
-  Timer? _retryTimer;
-  Future<void>? _activePendingRetry;
+  final Set<String> _manualRetryOperationIds = {};
+  Timer? _pendingDeliveryTimer;
+  Future<void>? _activePendingDrain;
   bool _isNetworkPaused = false;
 
   @override
@@ -67,12 +72,11 @@ class ChatRepository implements IChatRepository {
         cacheSubscription = _cache
             .watchMessages(chatId, currentUserId: scope.userId)
             .listen(controller.add, onError: controller.addError);
-        _ensureRetryTimer();
+        _requestPendingProcessing(processDueNow: true);
         unawaited(_initializeChat(chatId, scope));
       },
       onCancel: () async {
         _syncService.closeConversation(chatId, session: streamScope);
-        _stopRetryTimerIfIdle();
         await cacheSubscription?.cancel();
       },
     );
@@ -83,7 +87,6 @@ class ChatRepository implements IChatRepository {
     String chatId,
     AccountSessionSnapshot scope,
   ) async {
-    await _retryPending(chatId, scope);
     try {
       _accountSessionController.ensureCurrent(scope);
       final messages = await _syncService.synchronizeRecent(chatId);
@@ -102,15 +105,15 @@ class ChatRepository implements IChatRepository {
     _isNetworkPaused = false;
     final scope = _accountSessionController.capture();
     final chatIds = _syncService.openConversationIds;
-    if (chatIds.isNotEmpty) _ensureRetryTimer();
+    _requestPendingProcessing(processDueNow: true);
     await Future.wait(chatIds.map((chatId) => _initializeChat(chatId, scope)));
   }
 
   @override
   Future<void> pauseNetwork() async {
     _isNetworkPaused = true;
-    _retryTimer?.cancel();
-    _retryTimer = null;
+    _pendingDeliveryTimer?.cancel();
+    _pendingDeliveryTimer = null;
   }
 
   @override
@@ -214,24 +217,39 @@ class ChatRepository implements IChatRepository {
   }
 
   @override
-  Future<void> retryImages(String chatId, ChatMessage message) async {
+  Future<void> retryMessage(String chatId, ChatMessage message) async {
+    if (!message.isMine || message.status != MessageStatus.error) return;
     final scope = _accountSessionController.capture();
-    final operations = await _cache.readPendingOperations(
-      ownerUserId: scope.userId,
-    );
-    final operation = operations
-        .where((item) => item.id == message.id && item.chatId == chatId)
-        .firstOrNull;
-    if (operation == null) return;
-    await _accountSessionController.commit(
-      scope,
-      () => _cache.markMessageStatus(
+    final retryKey = '${scope.generation}:${scope.userId}:${message.id}';
+    if (!_manualRetryOperationIds.add(retryKey)) return;
+    try {
+      final currentMessage = await _cache.readMessage(
         message.id,
-        MessageStatus.sending,
+        currentUserId: scope.userId,
+      );
+      if (currentMessage?.status != MessageStatus.error) return;
+      final operation = await _cache.readPendingOperation(
+        message.id,
         ownerUserId: scope.userId,
-      ),
-    );
-    await _deliver(operation, scope);
+      );
+      if (operation == null || operation.chatId != chatId) return;
+      await _accountSessionController.commit(scope, () async {
+        final requeued = await _cache.requeuePendingOperation(
+          message.id,
+          nextAttemptAt: _now().toUtc(),
+          ownerUserId: scope.userId,
+        );
+        if (requeued == null) return;
+        await _cache.markMessageStatus(
+          message.id,
+          MessageStatus.sending,
+          ownerUserId: scope.userId,
+        );
+      });
+      _requestPendingProcessing(processDueNow: true);
+    } finally {
+      _manualRetryOperationIds.remove(retryKey);
+    }
   }
 
   @override
@@ -311,7 +329,7 @@ class ChatRepository implements IChatRepository {
       chatId: chatId,
       senderId: scope.userId,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: _now(),
       isMine: true,
       status: localOnly ? MessageStatus.sent : MessageStatus.sending,
       type: type,
@@ -355,7 +373,7 @@ class ChatRepository implements IChatRepository {
         await _cache.putPendingOperation(operation, ownerUserId: scope.userId);
       }
     });
-    if (!localOnly) await _deliver(operation, scope);
+    if (!localOnly) _requestPendingProcessing(processDueNow: true);
   }
 
   Future<MessageReply?> _createReply(
@@ -377,57 +395,66 @@ class ChatRepository implements IChatRepository {
     );
   }
 
-  Future<void> _retryPending(
-    String chatId,
-    AccountSessionSnapshot scope,
-  ) async {
-    _accountSessionController.ensureCurrent(scope);
-    final operations = await _cache.readPendingOperations(
+  /// The durable outbox has one repository-owned scheduler. It outlives an
+  /// individual chat screen, so messages from closed conversations recover on
+  /// the next foreground session too.
+  void _requestPendingProcessing({required bool processDueNow}) {
+    if (_isNetworkPaused) return;
+    _pendingDeliveryTimer?.cancel();
+    _pendingDeliveryTimer = null;
+    if (processDueNow) {
+      unawaited(_drainDuePendingOperations());
+    } else {
+      unawaited(_armPendingDeliveryTimer());
+    }
+  }
+
+  Future<void> _drainDuePendingOperations() async {
+    if (_isNetworkPaused) return;
+    final active = _activePendingDrain;
+    if (active != null) return active;
+
+    final drain = _performDuePendingDrain();
+    _activePendingDrain = drain;
+    return drain.whenComplete(() {
+      if (identical(_activePendingDrain, drain)) {
+        _activePendingDrain = null;
+      }
+      _requestPendingProcessing(processDueNow: false);
+    });
+  }
+
+  Future<void> _performDuePendingDrain() async {
+    final scope = _accountSessionController.capture();
+    final operations = await _cache.readDuePendingOperations(
+      dueAt: _now().toUtc(),
       ownerUserId: scope.userId,
     );
-    for (final operation in operations.where((item) => item.chatId == chatId)) {
+    for (final operation in operations) {
+      if (_isNetworkPaused || !_accountSessionController.isCurrent(scope)) {
+        return;
+      }
       await _deliver(operation, scope);
     }
   }
 
-  /// A screen may have more than one listener (and transitions can briefly
-  /// overlap screens). Retrying per stream turns that into duplicate scans of
-  /// the same persistent outbox. Keep one repository-level clock instead.
-  void _ensureRetryTimer() {
-    if (_isNetworkPaused || _retryTimer != null) return;
-    _retryTimer = Timer.periodic(_retryInterval, (_) {
-      unawaited(_retryPendingForOpenChats());
-    });
-  }
-
-  void _stopRetryTimerIfIdle() {
-    if (_syncService.openConversationIds.isNotEmpty) return;
-    _retryTimer?.cancel();
-    _retryTimer = null;
-  }
-
-  Future<void> _retryPendingForOpenChats() async {
-    if (_isNetworkPaused) return;
-    final active = _activePendingRetry;
-    if (active != null) return active;
-
-    final retry = _performPendingRetryForOpenChats();
-    _activePendingRetry = retry;
-    return retry.whenComplete(() {
-      if (identical(_activePendingRetry, retry)) {
-        _activePendingRetry = null;
-      }
-    });
-  }
-
-  Future<void> _performPendingRetryForOpenChats() async {
+  Future<void> _armPendingDeliveryTimer() async {
+    if (_isNetworkPaused || _activePendingDrain != null) return;
     final scope = _accountSessionController.capture();
-    for (final chatId in _syncService.openConversationIds) {
-      if (_isNetworkPaused || !_accountSessionController.isCurrent(scope)) {
-        return;
-      }
-      await _retryPending(chatId, scope);
+    final nextAttemptAt = await _cache.readNextPendingAttemptAt(
+      ownerUserId: scope.userId,
+    );
+    if (_isNetworkPaused || !_accountSessionController.isCurrent(scope)) return;
+    if (nextAttemptAt == null) return;
+    final delay = nextAttemptAt.difference(_now().toUtc());
+    if (delay <= Duration.zero) {
+      unawaited(_drainDuePendingOperations());
+      return;
     }
+    _pendingDeliveryTimer = Timer(delay, () {
+      _pendingDeliveryTimer = null;
+      unawaited(_drainDuePendingOperations());
+    });
   }
 
   Future<void> _deliver(
@@ -445,6 +472,12 @@ class ChatRepository implements IChatRepository {
     if (!_deliveringOperationIds.add(deliveryKey)) return;
     try {
       _accountSessionController.ensureCurrent(scope);
+      final exists = await _cache.markPendingAttemptStarted(
+        operation.id,
+        attemptedAt: _now().toUtc(),
+        ownerUserId: scope.userId,
+      );
+      if (!exists) return;
       final type = MessageType.values.byName(operation.type);
       final payload = operation.payload;
       final attachments = switch (type) {
@@ -453,16 +486,18 @@ class ChatRepository implements IChatRepository {
         _ => const <Map<String, dynamic>>[],
       };
       _accountSessionController.ensureCurrent(scope);
-      await _remote.sendMessage(
-        id: operation.id,
-        chatId: operation.chatId,
-        type: type,
-        text: payload['text'] as String? ?? '',
-        latitude: (payload['latitude'] as num?)?.toDouble(),
-        longitude: (payload['longitude'] as num?)?.toDouble(),
-        replyToMessageId: payload['reply_to_message_id'] as String?,
-        attachments: attachments,
-      );
+      await _remote
+          .sendMessage(
+            id: operation.id,
+            chatId: operation.chatId,
+            type: type,
+            text: payload['text'] as String? ?? '',
+            latitude: (payload['latitude'] as num?)?.toDouble(),
+            longitude: (payload['longitude'] as num?)?.toDouble(),
+            replyToMessageId: payload['reply_to_message_id'] as String?,
+            attachments: attachments,
+          )
+          .timeout(_remoteOperationTimeout);
       await _accountSessionController.commit(scope, () async {
         await _cache.markMessageStatus(
           operation.id,
@@ -479,10 +514,12 @@ class ChatRepository implements IChatRepository {
           payload['audio_path'] as String?,
         );
       }
-      await _syncService.synchronizeRecent(
-        operation.chatId,
-        refreshAfterActive: true,
-      );
+      if (_syncService.isConversationOpen(operation.chatId)) {
+        await _syncService.synchronizeRecent(
+          operation.chatId,
+          refreshAfterActive: true,
+        );
+      }
       await _localMediaRepository.collectGarbage();
     } on StaleAccountSessionException {
       return;
@@ -493,19 +530,33 @@ class ChatRepository implements IChatRepository {
         return;
       }
       if (_accountSessionController.isCurrent(scope)) {
+        final attempts = operation.attempts + 1;
+        final exhausted =
+            attempts >= PendingMessageRetryPolicy.maxAutomaticAttempts;
+        final nextAttemptAt = exhausted
+            ? null
+            : _now().toUtc().add(
+                PendingMessageRetryPolicy.delayAfterFailure(
+                  attempts: attempts,
+                  operationId: operation.id,
+                  rateLimited: _isMessageRateLimitedError(error),
+                ),
+              );
         await _accountSessionController.commit(scope, () async {
-          if (operation.type == MessageType.image.name) {
+          final recorded = await _cache.markPendingFailure(
+            operation.id,
+            error,
+            attempts: attempts,
+            nextAttemptAt: nextAttemptAt,
+            ownerUserId: scope.userId,
+          );
+          if (recorded && exhausted) {
             await _cache.markMessageStatus(
               operation.id,
               MessageStatus.error,
               ownerUserId: scope.userId,
             );
           }
-          await _cache.markPendingFailure(
-            operation.id,
-            error,
-            ownerUserId: scope.userId,
-          );
         });
       }
       _config.talker.handle(error, stackTrace, 'Pending message upload failed');
@@ -519,6 +570,9 @@ class ChatRepository implements IChatRepository {
 
   bool _isConversationBlockedError(Object error) =>
       error.toString().contains('conversation_blocked');
+
+  bool _isMessageRateLimitedError(Object error) =>
+      error.toString().contains('chat_message_rate_limited');
 
   Future<void> _makeLocalOnly(
     PendingMessageOperation operation,
@@ -610,12 +664,14 @@ class ChatRepository implements IChatRepository {
         );
       }
     }
-    await _remote.upload(
-      bucket: 'chat-images',
-      storagePath: storagePath,
-      bytes: processed.bytes,
-      contentType: processed.mimeType,
-    );
+    await _remote
+        .upload(
+          bucket: 'chat-images',
+          storagePath: storagePath,
+          bytes: processed.bytes,
+          contentType: processed.mimeType,
+        )
+        .timeout(_remoteOperationTimeout);
     return {
       'id': _attachmentId(operation.id, index),
       'position': index,
@@ -640,12 +696,14 @@ class ChatRepository implements IChatRepository {
     final extension = mimeType == 'audio/webm' ? 'webm' : 'm4a';
     final attachmentId = _attachmentId(operation.id, 0);
     final storagePath = _storagePath(operation, '0.$extension', scope.userId);
-    await _remote.upload(
-      bucket: 'chat-audio',
-      storagePath: storagePath,
-      bytes: bytes,
-      contentType: mimeType,
-    );
+    await _remote
+        .upload(
+          bucket: 'chat-audio',
+          storagePath: storagePath,
+          bytes: bytes,
+          contentType: mimeType,
+        )
+        .timeout(_remoteOperationTimeout);
     try {
       await _mediaCache.storeFile(
         ownerUserId: scope.userId,

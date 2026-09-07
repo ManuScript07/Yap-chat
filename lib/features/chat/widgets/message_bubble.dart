@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/features/auth/bloc/bloc.dart';
+import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
@@ -135,70 +136,83 @@ class _MessageBubbleState extends State<MessageBubble>
           alignment: message.isMine
               ? Alignment.centerRight
               : Alignment.centerLeft,
-          child: GestureDetector(
-            onLongPress: widget.onLongPress == null
-                ? null
-                : () {
-                    HapticFeedback.mediumImpact();
-                    widget.onLongPress!(message);
-                  },
-            child: Container(
-              constraints: BoxConstraints(maxWidth: widget.maxWidth),
-              width: message.replyTo == null ? null : replyWidth,
-              padding: EdgeInsets.all(
-                isImage || isLocation || isAudio ? 3 : 12,
-              ),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: message.replyTo == null
-                    ? CrossAxisAlignment.start
-                    : CrossAxisAlignment.stretch,
-                children: [
-                  if (message.replyTo case final reply?) ...[
-                      Padding(
-                        padding: isImage || isLocation || isAudio
-                            ? const EdgeInsets.fromLTRB(9, 9, 9, 0)
-                            : EdgeInsets.zero,
-                      child: MessageReplyPreview(
-                        reply: reply,
-                        peerName: widget.peerName,
-                        isMessageMine: message.isMine,
-                        onTap: widget.onReplyTap,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  isImage
-                      ? _buildImageMessage(context, textColor)
-                      : isLocation
-                      ? _buildLocationMessage(context)
-                      : isAudio
-                      ? AudioMessageContent(message: message)
-                      : Stack(
-                          children: [
-                            _buildMessageContent(
-                              context,
-                              textColor,
-                              timeStatusWidth,
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: _buildTimeStatus(
-                                context,
-                                timeColor,
-                                iconColor,
-                              ),
-                            ),
-                          ],
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              GestureDetector(
+                onLongPress: widget.onLongPress == null
+                    ? null
+                    : () {
+                        HapticFeedback.mediumImpact();
+                        widget.onLongPress!(message);
+                      },
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: widget.maxWidth),
+                  width: message.replyTo == null ? null : replyWidth,
+                  padding: EdgeInsets.all(
+                    isImage || isLocation || isAudio ? 3 : 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: bubbleColor,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: message.replyTo == null
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.stretch,
+                    children: [
+                      if (message.replyTo case final reply?) ...[
+                        Padding(
+                          padding: isImage || isLocation || isAudio
+                              ? const EdgeInsets.fromLTRB(9, 9, 9, 0)
+                              : EdgeInsets.zero,
+                          child: MessageReplyPreview(
+                            reply: reply,
+                            peerName: widget.peerName,
+                            isMessageMine: message.isMine,
+                            onTap: widget.onReplyTap,
+                          ),
                         ),
-                ],
+                        const SizedBox(height: 8),
+                      ],
+                      isImage
+                          ? _buildImageMessage(context, textColor)
+                          : isLocation
+                          ? _buildLocationMessage(context)
+                          : isAudio
+                          ? AudioMessageContent(message: message)
+                          : Stack(
+                              children: [
+                                _buildMessageContent(
+                                  context,
+                                  textColor,
+                                  timeStatusWidth,
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: _buildTimeStatus(
+                                    context,
+                                    timeColor,
+                                    iconColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              if (_showsExternalRetry(message))
+                Positioned(
+                  left: -36,
+                  bottom: 0,
+                  child: _ExternalRetryButton(
+                    onPressed: () => _retryMessage(context, message),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -321,7 +335,9 @@ class _MessageBubbleState extends State<MessageBubble>
               senderAvatarUrl: message.isMine
                   ? ownAvatar.$1
                   : widget.peerAvatarUrl,
-              senderAvatarLoader: message.isMine ? null : widget.peerAvatarLoader,
+              senderAvatarLoader: message.isMine
+                  ? null
+                  : widget.peerAvatarLoader,
               senderAvatarImage: message.isMine && ownAvatar.$2 != null
                   ? MemoryImage(ownAvatar.$2!)
                   : null,
@@ -437,5 +453,46 @@ class _MessageBubbleState extends State<MessageBubble>
 
   Widget _buildStatusIcon(Color color) {
     return MessageStatusIcon(status: widget.message.status, color: color);
+  }
+
+  bool _showsExternalRetry(ChatMessage message) =>
+      message.isMine &&
+      message.status == MessageStatus.error &&
+      message.type != MessageType.image &&
+      message.type != MessageType.audio;
+
+  void _retryMessage(BuildContext context, ChatMessage message) {
+    HapticFeedback.selectionClick();
+    context.read<ChatBloc>().add(ChatMessageRetryRequested(message));
+  }
+}
+
+class _ExternalRetryButton extends StatelessWidget {
+  const _ExternalRetryButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Повторить отправку',
+      child: Material(
+        color: Colors.transparent,
+        child: InkResponse(
+          onTap: onPressed,
+          radius: 19,
+          containedInkWell: false,
+          child: Padding(
+            padding: const EdgeInsets.all(7),
+            child: Icon(
+              Icons.refresh_rounded,
+              size: 21,
+              color: context.colorScheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

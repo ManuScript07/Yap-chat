@@ -29,8 +29,8 @@ abstract interface class IChatRepository {
     String? replyToMessageId,
   });
 
-  /// Повторная отправка медиа-сообщения после ошибки.
-  Future<void> retryImages(String chatId, ChatMessage message);
+  /// Requeues a terminally failed outgoing message for a fresh delivery run.
+  Future<void> retryMessage(String chatId, ChatMessage message);
 
   Future<void> sendLocation(
     String chatId,

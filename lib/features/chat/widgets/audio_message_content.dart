@@ -53,11 +53,10 @@ class _AudioMessageView extends StatelessWidget {
             ? 0.0
             : state.playback.isCompleted && state.scrubPosition == null
             ? 0.0
-            : visiblePosition.inMilliseconds /
-                  effectiveDuration.inMilliseconds;
+            : visiblePosition.inMilliseconds / effectiveDuration.inMilliseconds;
         final displayedDuration =
-                (state.playback.isCompleted && state.scrubPosition == null) ||
-                    visiblePosition == Duration.zero
+            (state.playback.isCompleted && state.scrubPosition == null) ||
+                visiblePosition == Duration.zero
             ? messageDuration
             : visiblePosition;
 
@@ -69,11 +68,19 @@ class _AudioMessageView extends StatelessWidget {
               children: [
                 _AudioActionButton(
                   isLoading:
-                      state.isLoading || message.status == MessageStatus.sending,
+                      state.isLoading ||
+                      message.status == MessageStatus.sending,
+                  isRetry:
+                      message.isMine && message.status == MessageStatus.error,
                   isPlaying: state.playback.isPlaying,
                   foreground: foreground,
                   onTap: () {
                     context.read<AudioMessagePlayerCubit>().toggle(audioUrl);
+                  },
+                  onRetry: () {
+                    context.read<ChatBloc>().add(
+                      ChatMessageRetryRequested(message),
+                    );
                   },
                 ),
                 const SizedBox(width: 10),
@@ -95,7 +102,8 @@ class _AudioMessageView extends StatelessWidget {
                               : (value) {
                                   final position = Duration(
                                     milliseconds:
-                                        (effectiveDuration.inMilliseconds * value)
+                                        (effectiveDuration.inMilliseconds *
+                                                value)
                                             .round(),
                                   );
                                   context
@@ -105,8 +113,8 @@ class _AudioMessageView extends StatelessWidget {
                           onSeekEnd: message.status == MessageStatus.sending
                               ? null
                               : () => context
-                                  .read<AudioMessagePlayerCubit>()
-                                  .finishSeeking(audioUrl),
+                                    .read<AudioMessagePlayerCubit>()
+                                    .finishSeeking(audioUrl),
                         ),
                         const SizedBox(height: 5),
                         Row(
@@ -158,15 +166,19 @@ class _AudioMessageView extends StatelessWidget {
 class _AudioActionButton extends StatelessWidget {
   const _AudioActionButton({
     required this.isLoading,
+    required this.isRetry,
     required this.isPlaying,
     required this.foreground,
     required this.onTap,
+    required this.onRetry,
   });
 
   final bool isLoading;
+  final bool isRetry;
   final bool isPlaying;
   final Color foreground;
   final VoidCallback onTap;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -174,11 +186,13 @@ class _AudioActionButton extends StatelessWidget {
       width: 42,
       height: 42,
       child: Material(
-        color: foreground.withValues(alpha: 0.15),
+        color: isRetry
+            ? context.colorScheme.primary
+            : foreground.withValues(alpha: 0.15),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: isLoading ? null : onTap,
+          onTap: isLoading ? null : (isRetry ? onRetry : onTap),
           child: Center(
             child: isLoading
                 ? SizedBox(
@@ -190,8 +204,14 @@ class _AudioActionButton extends StatelessWidget {
                     ),
                   )
                 : Icon(
-                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: foreground,
+                    isRetry
+                        ? Icons.refresh_rounded
+                        : isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: isRetry
+                        ? context.scaffoldBackgroundColor
+                        : foreground,
                     size: 28,
                   ),
           ),

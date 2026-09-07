@@ -3,7 +3,6 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/chat_event.dart';
 import 'package:yap_chat/features/chat/bloc/chat_state.dart';
-import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chat/chat.dart';
 import 'package:yap_chat/repositories/chats/chats.dart';
@@ -143,13 +142,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatMessageRetryRequested event,
     Emitter<ChatState> emit,
   ) async {
-    if (event.message.type != MessageType.image ||
-        event.message.mediaUrls.isEmpty) {
-      return;
-    }
-
     try {
-      await _chatRepository.retryImages(state.chatId, event.message);
+      await _chatRepository.retryMessage(state.chatId, event.message);
     } catch (_) {
       emit(state.copyWith(status: ChatStatus.failure));
     }

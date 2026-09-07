@@ -229,7 +229,7 @@ class MockChatRepository implements IChatRepository {
   }
 
   @override
-  Future<void> retryImages(String chatId, ChatMessage message) async {
+  Future<void> retryMessage(String chatId, ChatMessage message) async {
     final index = _messages.indexWhere((item) => item.id == message.id);
     if (index == -1) return;
 

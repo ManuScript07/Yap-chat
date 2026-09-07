@@ -103,6 +103,13 @@ class PendingChatOperations extends Table {
   TextColumn get payloadJson => text()();
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
+
+  /// The next time a message operation may be retried. A null value marks an
+  /// operation that needs an explicit user retry after automatic attempts are
+  /// exhausted. Chat-deletion operations do not use the message scheduler and
+  /// deliberately keep this field null.
+  DateTimeColumn get nextAttemptAt => dateTime().nullable()();
+  DateTimeColumn get lastAttemptAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -324,7 +331,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -460,6 +467,25 @@ class AppDatabase extends _$AppDatabase {
       if (from < 23) {
         await migrator.createTable(cachedFriendListStates);
       }
+      if (from < 24) {
+        await migrator.addColumn(
+          pendingChatOperations,
+          pendingChatOperations.nextAttemptAt,
+        );
+        await migrator.addColumn(
+          pendingChatOperations,
+          pendingChatOperations.lastAttemptAt,
+        );
+        // Existing message operations used to be retried only while their
+        // conversation was open. Make them due once after the upgrade rather
+        // than silently leaving them in the old queue forever.
+        await customStatement('''
+          UPDATE pending_chat_operations
+          SET next_attempt_at = created_at
+          WHERE type IN ('text', 'image', 'audio', 'location')
+            AND next_attempt_at IS NULL
+        ''');
+      }
     },
     beforeOpen: (details) async {
       // Version 19 was briefly shipped while the blacklist cache schema was
@@ -503,6 +529,13 @@ class AppDatabase extends _$AppDatabase {
     await customStatement('''
       CREATE INDEX IF NOT EXISTS pending_chat_operations_owner_type_chat_idx
       ON pending_chat_operations (owner_user_id, type, chat_id, created_at ASC)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS pending_chat_operations_owner_due_idx
+      ON pending_chat_operations (
+        owner_user_id, type, next_attempt_at ASC, created_at ASC, id ASC
+      )
+      WHERE next_attempt_at IS NOT NULL
     ''');
   }
 

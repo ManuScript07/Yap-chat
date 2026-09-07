@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
 
 class ChatCacheDataSource {
   static const pendingChatDeletionType = 'hide_conversation';
@@ -190,11 +191,7 @@ class ChatCacheDataSource {
     return _database
         .into(_database.cachedMessages)
         .insertOnConflictUpdate(
-          _messageCompanion(
-            message,
-            owner,
-            isPending: isPending,
-          ),
+          _messageCompanion(message, owner, isPending: isPending),
         );
   }
 
@@ -241,6 +238,10 @@ class ChatCacheDataSource {
             payloadJson: jsonEncode(operation.payload),
             attempts: Value(operation.attempts),
             lastError: Value(operation.lastError),
+            nextAttemptAt: Value(
+              operation.nextAttemptAt ?? operation.createdAt,
+            ),
+            lastAttemptAt: Value(operation.lastAttemptAt),
             createdAt: operation.createdAt,
           ),
         );
@@ -268,33 +269,195 @@ class ChatCacheDataSource {
             ),
             attempts: row.attempts,
             lastError: row.lastError,
-            createdAt: row.createdAt,
+            nextAttemptAt: row.nextAttemptAt?.toUtc(),
+            lastAttemptAt: row.lastAttemptAt?.toUtc(),
+            createdAt: row.createdAt.toUtc(),
           ),
         )
         .toList(growable: false);
   }
 
-  Future<void> markPendingFailure(
-    String id,
-    Object error, {
+  /// Returns only operations which are both due and the oldest retryable
+  /// operation for their conversation. This preserves message order within a
+  /// chat without making an old offline chat block another chat's delivery.
+  Future<List<PendingMessageOperation>> readDuePendingOperations({
+    required DateTime dueAt,
+    String? ownerUserId,
+    int limit = 32,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final rows = await _database
+        .customSelect(
+          '''
+        SELECT candidate.*
+        FROM pending_chat_operations AS candidate
+        WHERE candidate.owner_user_id = ?
+          AND candidate.type IN ('text', 'image', 'audio', 'location')
+          AND candidate.next_attempt_at IS NOT NULL
+          AND candidate.next_attempt_at <= ?
+          AND candidate.attempts < ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pending_chat_operations AS predecessor
+            WHERE predecessor.owner_user_id = candidate.owner_user_id
+              AND predecessor.chat_id = candidate.chat_id
+              AND predecessor.type IN ('text', 'image', 'audio', 'location')
+              AND predecessor.next_attempt_at IS NOT NULL
+              AND (
+                predecessor.created_at < candidate.created_at
+                OR (
+                  predecessor.created_at = candidate.created_at
+                  AND predecessor.id < candidate.id
+                )
+              )
+          )
+        ORDER BY candidate.next_attempt_at ASC, candidate.created_at ASC,
+          candidate.id ASC
+        LIMIT ?
+      ''',
+          variables: [
+            Variable.withString(owner),
+            Variable.withDateTime(dueAt.toUtc()),
+            Variable.withInt(PendingMessageRetryPolicy.maxAutomaticAttempts),
+            Variable.withInt(limit),
+          ],
+          readsFrom: {_database.pendingChatOperations},
+        )
+        .get();
+    return rows.map(_mapPendingMessageOperationRow).toList(growable: false);
+  }
+
+  /// Returns the earliest retry time among the heads of all conversations.
+  Future<DateTime?> readNextPendingAttemptAt({String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final row = await _database
+        .customSelect(
+          '''
+        SELECT MIN(candidate.next_attempt_at) AS next_attempt_at
+        FROM pending_chat_operations AS candidate
+        WHERE candidate.owner_user_id = ?
+          AND candidate.type IN ('text', 'image', 'audio', 'location')
+          AND candidate.next_attempt_at IS NOT NULL
+          AND candidate.attempts < ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pending_chat_operations AS predecessor
+            WHERE predecessor.owner_user_id = candidate.owner_user_id
+              AND predecessor.chat_id = candidate.chat_id
+              AND predecessor.type IN ('text', 'image', 'audio', 'location')
+              AND predecessor.next_attempt_at IS NOT NULL
+              AND (
+                predecessor.created_at < candidate.created_at
+                OR (
+                  predecessor.created_at = candidate.created_at
+                  AND predecessor.id < candidate.id
+                )
+              )
+          )
+      ''',
+          variables: [
+            Variable.withString(owner),
+            Variable.withInt(PendingMessageRetryPolicy.maxAutomaticAttempts),
+          ],
+          readsFrom: {_database.pendingChatOperations},
+        )
+        .getSingle();
+    return row.readNullable<DateTime>('next_attempt_at')?.toUtc();
+  }
+
+  Future<PendingMessageOperation?> readPendingOperation(
+    String id, {
     String? ownerUserId,
   }) async {
     final owner = ownerUserId ?? _userIdProvider();
     final row =
         await (_database.select(_database.pendingChatOperations)..where(
-              (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
+              (table) =>
+                  table.ownerUserId.equals(owner) &
+                  table.id.equals(id) &
+                  table.type.isIn(MessageType.values.map((type) => type.name)),
             ))
             .getSingleOrNull();
-    if (row == null) return;
+    return row == null ? null : _mapPendingMessageOperation(row);
+  }
+
+  Future<bool> markPendingAttemptStarted(
+    String id, {
+    required DateTime attemptedAt,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final affected =
+        await (_database.update(_database.pendingChatOperations)..where(
+              (table) =>
+                  table.ownerUserId.equals(owner) &
+                  table.id.equals(id) &
+                  table.type.isIn(MessageType.values.map((type) => type.name)),
+            ))
+            .write(
+              PendingChatOperationsCompanion(
+                lastAttemptAt: Value(attemptedAt.toUtc()),
+              ),
+            );
+    return affected > 0;
+  }
+
+  /// Records one failed automatic delivery. A null [nextAttemptAt] makes the
+  /// operation manual-retry-only while preserving its payload and media.
+  Future<bool> markPendingFailure(
+    String id,
+    Object error, {
+    required int attempts,
+    required DateTime? nextAttemptAt,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final affected =
+        await (_database.update(_database.pendingChatOperations)..where(
+              (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
+            ))
+            .write(
+              PendingChatOperationsCompanion(
+                attempts: Value(attempts),
+                lastError: Value(error.toString()),
+                nextAttemptAt: Value(nextAttemptAt?.toUtc()),
+              ),
+            );
+    return affected > 0;
+  }
+
+  Future<PendingMessageOperation?> requeuePendingOperation(
+    String id, {
+    required DateTime nextAttemptAt,
+    String? ownerUserId,
+  }) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final row =
+        await (_database.select(_database.pendingChatOperations)..where(
+              (table) =>
+                  table.ownerUserId.equals(owner) &
+                  table.id.equals(id) &
+                  table.type.isIn(MessageType.values.map((type) => type.name)),
+            ))
+            .getSingleOrNull();
+    if (row == null) return null;
     await (_database.update(_database.pendingChatOperations)..where(
           (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .write(
           PendingChatOperationsCompanion(
-            attempts: Value(row.attempts + 1),
-            lastError: Value(error.toString()),
+            attempts: const Value(0),
+            lastError: const Value(null),
+            nextAttemptAt: Value(nextAttemptAt.toUtc()),
           ),
         );
+    return _mapPendingMessageOperation(
+      row.copyWith(
+        attempts: 0,
+        lastError: const Value(null),
+        nextAttemptAt: Value(nextAttemptAt.toUtc()),
+      ),
+    );
   }
 
   Future<void> removePendingOperation(String id, {String? ownerUserId}) async {
@@ -303,6 +466,38 @@ class ChatCacheDataSource {
           (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .go();
+  }
+
+  PendingMessageOperation _mapPendingMessageOperation(
+    PendingChatOperation row,
+  ) {
+    return PendingMessageOperation(
+      id: row.id,
+      chatId: row.chatId,
+      type: row.type,
+      payload: Map<String, dynamic>.from(jsonDecode(row.payloadJson) as Map),
+      attempts: row.attempts,
+      lastError: row.lastError,
+      nextAttemptAt: row.nextAttemptAt?.toUtc(),
+      lastAttemptAt: row.lastAttemptAt?.toUtc(),
+      createdAt: row.createdAt.toUtc(),
+    );
+  }
+
+  PendingMessageOperation _mapPendingMessageOperationRow(QueryRow row) {
+    return PendingMessageOperation(
+      id: row.read<String>('id'),
+      chatId: row.read<String>('chat_id'),
+      type: row.read<String>('type'),
+      payload: Map<String, dynamic>.from(
+        jsonDecode(row.read<String>('payload_json')) as Map,
+      ),
+      attempts: row.read<int>('attempts'),
+      lastError: row.readNullable<String>('last_error'),
+      nextAttemptAt: row.readNullable<DateTime>('next_attempt_at')?.toUtc(),
+      lastAttemptAt: row.readNullable<DateTime>('last_attempt_at')?.toUtc(),
+      createdAt: row.read<DateTime>('created_at').toUtc(),
+    );
   }
 
   Future<void> putPendingChatDeletion({
@@ -512,6 +707,8 @@ class PendingMessageOperation {
     required this.createdAt,
     this.attempts = 0,
     this.lastError,
+    this.nextAttemptAt,
+    this.lastAttemptAt,
   });
 
   final String id;
@@ -521,6 +718,8 @@ class PendingMessageOperation {
   final DateTime createdAt;
   final int attempts;
   final String? lastError;
+  final DateTime? nextAttemptAt;
+  final DateTime? lastAttemptAt;
 }
 
 class PendingChatDeletion {

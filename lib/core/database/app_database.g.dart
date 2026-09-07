@@ -3978,6 +3978,30 @@ class $PendingChatOperationsTable extends PendingChatOperations
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextAttemptAt =
+      GeneratedColumn<DateTime>(
+        'next_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastAttemptAtMeta = const VerificationMeta(
+    'lastAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAttemptAt =
+      GeneratedColumn<DateTime>(
+        'last_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3998,6 +4022,8 @@ class $PendingChatOperationsTable extends PendingChatOperations
     payloadJson,
     attempts,
     lastError,
+    nextAttemptAt,
+    lastAttemptAt,
     createdAt,
   ];
   @override
@@ -4067,6 +4093,24 @@ class $PendingChatOperationsTable extends PendingChatOperations
         lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
       );
     }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+        _lastAttemptAtMeta,
+        lastAttemptAt.isAcceptableOrUnknown(
+          data['last_attempt_at']!,
+          _lastAttemptAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4112,6 +4156,14 @@ class $PendingChatOperationsTable extends PendingChatOperations
         DriftSqlType.string,
         data['${effectivePrefix}last_error'],
       ),
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_attempt_at'],
+      ),
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_attempt_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4134,6 +4186,13 @@ class PendingChatOperation extends DataClass
   final String payloadJson;
   final int attempts;
   final String? lastError;
+
+  /// The next time a message operation may be retried. A null value marks an
+  /// operation that needs an explicit user retry after automatic attempts are
+  /// exhausted. Chat-deletion operations do not use the message scheduler and
+  /// deliberately keep this field null.
+  final DateTime? nextAttemptAt;
+  final DateTime? lastAttemptAt;
   final DateTime createdAt;
   const PendingChatOperation({
     required this.ownerUserId,
@@ -4143,6 +4202,8 @@ class PendingChatOperation extends DataClass
     required this.payloadJson,
     required this.attempts,
     this.lastError,
+    this.nextAttemptAt,
+    this.lastAttemptAt,
     required this.createdAt,
   });
   @override
@@ -4156,6 +4217,12 @@ class PendingChatOperation extends DataClass
     map['attempts'] = Variable<int>(attempts);
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || nextAttemptAt != null) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt);
+    }
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -4172,6 +4239,12 @@ class PendingChatOperation extends DataClass
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
           : Value(lastError),
+      nextAttemptAt: nextAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextAttemptAt),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
       createdAt: Value(createdAt),
     );
   }
@@ -4189,6 +4262,8 @@ class PendingChatOperation extends DataClass
       payloadJson: serializer.fromJson<String>(json['payloadJson']),
       attempts: serializer.fromJson<int>(json['attempts']),
       lastError: serializer.fromJson<String?>(json['lastError']),
+      nextAttemptAt: serializer.fromJson<DateTime?>(json['nextAttemptAt']),
+      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -4203,6 +4278,8 @@ class PendingChatOperation extends DataClass
       'payloadJson': serializer.toJson<String>(payloadJson),
       'attempts': serializer.toJson<int>(attempts),
       'lastError': serializer.toJson<String?>(lastError),
+      'nextAttemptAt': serializer.toJson<DateTime?>(nextAttemptAt),
+      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -4215,6 +4292,8 @@ class PendingChatOperation extends DataClass
     String? payloadJson,
     int? attempts,
     Value<String?> lastError = const Value.absent(),
+    Value<DateTime?> nextAttemptAt = const Value.absent(),
+    Value<DateTime?> lastAttemptAt = const Value.absent(),
     DateTime? createdAt,
   }) => PendingChatOperation(
     ownerUserId: ownerUserId ?? this.ownerUserId,
@@ -4224,6 +4303,12 @@ class PendingChatOperation extends DataClass
     payloadJson: payloadJson ?? this.payloadJson,
     attempts: attempts ?? this.attempts,
     lastError: lastError.present ? lastError.value : this.lastError,
+    nextAttemptAt: nextAttemptAt.present
+        ? nextAttemptAt.value
+        : this.nextAttemptAt,
+    lastAttemptAt: lastAttemptAt.present
+        ? lastAttemptAt.value
+        : this.lastAttemptAt,
     createdAt: createdAt ?? this.createdAt,
   );
   PendingChatOperation copyWithCompanion(PendingChatOperationsCompanion data) {
@@ -4239,6 +4324,12 @@ class PendingChatOperation extends DataClass
           : this.payloadJson,
       attempts: data.attempts.present ? data.attempts.value : this.attempts,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      nextAttemptAt: data.nextAttemptAt.present
+          ? data.nextAttemptAt.value
+          : this.nextAttemptAt,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4253,6 +4344,8 @@ class PendingChatOperation extends DataClass
           ..write('payloadJson: $payloadJson, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4267,6 +4360,8 @@ class PendingChatOperation extends DataClass
     payloadJson,
     attempts,
     lastError,
+    nextAttemptAt,
+    lastAttemptAt,
     createdAt,
   );
   @override
@@ -4280,6 +4375,8 @@ class PendingChatOperation extends DataClass
           other.payloadJson == this.payloadJson &&
           other.attempts == this.attempts &&
           other.lastError == this.lastError &&
+          other.nextAttemptAt == this.nextAttemptAt &&
+          other.lastAttemptAt == this.lastAttemptAt &&
           other.createdAt == this.createdAt);
 }
 
@@ -4292,6 +4389,8 @@ class PendingChatOperationsCompanion
   final Value<String> payloadJson;
   final Value<int> attempts;
   final Value<String?> lastError;
+  final Value<DateTime?> nextAttemptAt;
+  final Value<DateTime?> lastAttemptAt;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const PendingChatOperationsCompanion({
@@ -4302,6 +4401,8 @@ class PendingChatOperationsCompanion
     this.payloadJson = const Value.absent(),
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4313,6 +4414,8 @@ class PendingChatOperationsCompanion
     required String payloadJson,
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -4329,6 +4432,8 @@ class PendingChatOperationsCompanion
     Expression<String>? payloadJson,
     Expression<int>? attempts,
     Expression<String>? lastError,
+    Expression<DateTime>? nextAttemptAt,
+    Expression<DateTime>? lastAttemptAt,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -4340,6 +4445,8 @@ class PendingChatOperationsCompanion
       if (payloadJson != null) 'payload_json': payloadJson,
       if (attempts != null) 'attempts': attempts,
       if (lastError != null) 'last_error': lastError,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4353,6 +4460,8 @@ class PendingChatOperationsCompanion
     Value<String>? payloadJson,
     Value<int>? attempts,
     Value<String?>? lastError,
+    Value<DateTime?>? nextAttemptAt,
+    Value<DateTime?>? lastAttemptAt,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -4364,6 +4473,8 @@ class PendingChatOperationsCompanion
       payloadJson: payloadJson ?? this.payloadJson,
       attempts: attempts ?? this.attempts,
       lastError: lastError ?? this.lastError,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4393,6 +4504,12 @@ class PendingChatOperationsCompanion
     if (lastError.present) {
       map['last_error'] = Variable<String>(lastError.value);
     }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt.value);
+    }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4412,6 +4529,8 @@ class PendingChatOperationsCompanion
           ..write('payloadJson: $payloadJson, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -12591,6 +12710,8 @@ typedef $$PendingChatOperationsTableCreateCompanionBuilder =
       required String payloadJson,
       Value<int> attempts,
       Value<String?> lastError,
+      Value<DateTime?> nextAttemptAt,
+      Value<DateTime?> lastAttemptAt,
       required DateTime createdAt,
       Value<int> rowid,
     });
@@ -12603,6 +12724,8 @@ typedef $$PendingChatOperationsTableUpdateCompanionBuilder =
       Value<String> payloadJson,
       Value<int> attempts,
       Value<String?> lastError,
+      Value<DateTime?> nextAttemptAt,
+      Value<DateTime?> lastAttemptAt,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -12648,6 +12771,16 @@ class $$PendingChatOperationsTableFilterComposer
 
   ColumnFilters<String> get lastError => $composableBuilder(
     column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12701,6 +12834,16 @@ class $$PendingChatOperationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -12740,6 +12883,16 @@ class $$PendingChatOperationsTableAnnotationComposer
 
   GeneratedColumn<String> get lastError =>
       $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -12798,6 +12951,8 @@ class $$PendingChatOperationsTableTableManager
                 Value<String> payloadJson = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
+                Value<DateTime?> nextAttemptAt = const Value.absent(),
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingChatOperationsCompanion(
@@ -12808,6 +12963,8 @@ class $$PendingChatOperationsTableTableManager
                 payloadJson: payloadJson,
                 attempts: attempts,
                 lastError: lastError,
+                nextAttemptAt: nextAttemptAt,
+                lastAttemptAt: lastAttemptAt,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -12820,6 +12977,8 @@ class $$PendingChatOperationsTableTableManager
                 required String payloadJson,
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
+                Value<DateTime?> nextAttemptAt = const Value.absent(),
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => PendingChatOperationsCompanion.insert(
@@ -12830,6 +12989,8 @@ class $$PendingChatOperationsTableTableManager
                 payloadJson: payloadJson,
                 attempts: attempts,
                 lastError: lastError,
+                nextAttemptAt: nextAttemptAt,
+                lastAttemptAt: lastAttemptAt,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
