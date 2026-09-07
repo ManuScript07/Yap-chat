@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/core/services/reconnect_backoff.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 
 class UserConversationRealtimeEvent {
   const UserConversationRealtimeEvent({
@@ -30,8 +32,10 @@ class UserRealtimeDataSource {
   UserRealtimeDataSource({
     required SupabaseClient client,
     required Talker talker,
+    AppDiagnostics? diagnostics,
   }) : _client = client,
        _talker = talker,
+       _diagnostics = diagnostics,
        _backoff = ReconnectBackoff(
          onError: (error, stackTrace) =>
              talker.handle(error, stackTrace, 'User realtime retry failed'),
@@ -39,6 +43,7 @@ class UserRealtimeDataSource {
 
   final SupabaseClient _client;
   final Talker _talker;
+  final AppDiagnostics? _diagnostics;
   final ReconnectBackoff _backoff;
   final _conversationController =
       StreamController<UserConversationRealtimeEvent>.broadcast();
@@ -46,6 +51,8 @@ class UserRealtimeDataSource {
       StreamController<UserPresenceRealtimeEvent>.broadcast();
 
   RealtimeChannel? _channel;
+  RealtimeChannel? _diagnosticsChannel;
+  DiagnosticsLease? _channelLease;
   String? _channelUserId;
   Future<void> _operation = Future<void>.value();
   bool _paused = false;
@@ -108,6 +115,8 @@ class UserRealtimeDataSource {
           callback: (event) => _handlePresenceEvent(channel, event),
         );
     _channel = channel;
+    _diagnosticsChannel = channel;
+    _channelLease = _diagnostics?.trackRealtimeChannel('user-realtime');
     _channelUserId = userId;
     channel.subscribe((status, _) {
       if (!identical(_channel, channel) || _disposed) return;
@@ -163,6 +172,18 @@ class UserRealtimeDataSource {
   ) {
     if (!identical(_channel, channel) || _presenceController.isClosed) return;
     final payload = _payload(event);
+    // Diagnostics must never affect normal Realtime event delivery. Payloads
+    // from Supabase are JSON-compatible in practice, but keep this optional
+    // accounting isolated from the application path.
+    if (_diagnostics?.enabled ?? false) {
+      try {
+        _diagnostics?.recordPresenceEvent(
+          payloadBytes: utf8.encode(jsonEncode(payload)).length,
+        );
+      } catch (_) {
+        // Intentionally ignored: no payload is retained by diagnostics.
+      }
+    }
     final userId = payload['user_id'];
     final isOnline = payload['is_online'];
     if (userId is String && isOnline is bool) {
@@ -206,6 +227,11 @@ class UserRealtimeDataSource {
   }
 
   Future<void> _removeChannel(RealtimeChannel channel) async {
+    if (identical(_diagnosticsChannel, channel)) {
+      _diagnosticsChannel = null;
+      _channelLease?.dispose();
+      _channelLease = null;
+    }
     try {
       await _client.removeChannel(channel);
     } catch (error, stackTrace) {

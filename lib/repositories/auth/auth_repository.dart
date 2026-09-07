@@ -9,12 +9,12 @@ import 'package:yap_chat/repositories/auth/auth_account_access_cache_data_source
 import 'package:yap_chat/repositories/auth/oauth_attempt_coordinator.dart';
 
 typedef OAuthSignInLauncher =
-Future<bool> Function(
-    OAuthProvider provider, {
-    String? redirectTo,
-    String? scopes,
-    LaunchMode authScreenLaunchMode,
-    Map<String, String>? queryParams,
+    Future<bool> Function(
+      OAuthProvider provider, {
+      String? redirectTo,
+      String? scopes,
+      LaunchMode authScreenLaunchMode,
+      Map<String, String>? queryParams,
     });
 
 class AuthRepository implements IAuthRepository {
@@ -26,15 +26,16 @@ class AuthRepository implements IAuthRepository {
     OAuthAttemptCoordinator? oauthAttemptCoordinator,
     AccountSessionController? accountSessionController,
     AuthAccountAccessCacheDataSource? accountAccessCache,
-  })
-      : _client = client,
-        _redirectUrl = redirectUrl,
-        _useAnonymousSignIn = useAnonymousSignIn,
-        _oauthAttemptCoordinator = oauthAttemptCoordinator,
-        _accountSessionController = accountSessionController,
-        _accountAccessCache = accountAccessCache,
-        _oauthSignInLauncher =
-            oauthSignInLauncher ?? client.auth.signInWithOAuth;
+    AppDiagnostics? diagnostics,
+  }) : _client = client,
+       _redirectUrl = redirectUrl,
+       _useAnonymousSignIn = useAnonymousSignIn,
+       _oauthAttemptCoordinator = oauthAttemptCoordinator,
+       _accountSessionController = accountSessionController,
+       _accountAccessCache = accountAccessCache,
+       _diagnostics = diagnostics,
+       _oauthSignInLauncher =
+           oauthSignInLauncher ?? client.auth.signInWithOAuth;
 
   final SupabaseClient _client;
   final String _redirectUrl;
@@ -43,6 +44,7 @@ class AuthRepository implements IAuthRepository {
   final OAuthAttemptCoordinator? _oauthAttemptCoordinator;
   final AccountSessionController? _accountSessionController;
   final AuthAccountAccessCacheDataSource? _accountAccessCache;
+  final AppDiagnostics? _diagnostics;
 
   static const _yandexProvider = OAuthProvider('custom:yandex');
   static const _yandexQueryParams = <String, String>{'force_confirm': 'yes'};
@@ -61,36 +63,40 @@ class AuthRepository implements IAuthRepository {
 
     return _client.auth.onAuthStateChange
         .transform(
-      StreamTransformer<AuthState, AuthState>.fromHandlers(
-        handleData: (authState, sink) {
-          _accountSessionController?.setAuthenticatedUser(
-            authState.session?.user.id,
-          );
-          if (authState.session != null) {
-            unawaited(_oauthAttemptCoordinator?.completeAttempt());
-          }
-          sink.add(authState);
-        },
-        handleError: (error, stackTrace, sink) {
-          unawaited(_oauthAttemptCoordinator?.completeAttempt());
-          sink.addError(error, stackTrace);
-        },
-      ),
-    )
+          StreamTransformer<AuthState, AuthState>.fromHandlers(
+            handleData: (authState, sink) {
+              _accountSessionController?.setAuthenticatedUser(
+                authState.session?.user.id,
+              );
+              if (authState.session != null) {
+                unawaited(_oauthAttemptCoordinator?.completeAttempt());
+              }
+              sink.add(authState);
+            },
+            handleError: (error, stackTrace, sink) {
+              unawaited(_oauthAttemptCoordinator?.completeAttempt());
+              sink.addError(error, stackTrace);
+            },
+          ),
+        )
         .map((authState) => _mapSession(authState.session))
         .where((session) {
-      if (!initialEventSkipped && session == initialSession) {
-        initialEventSkipped = true;
-        return false;
-      }
-      return true;
-    })
+          if (!initialEventSkipped && session == initialSession) {
+            initialEventSkipped = true;
+            return false;
+          }
+          return true;
+        })
         .distinct();
   }
 
   @override
   Future<AuthAccountAccess> getAccountAccess() async {
-    final response = await _client.rpc<List<dynamic>>('get_my_account_access');
+    final response = await measureRpc(
+      _diagnostics,
+      'get_my_account_access',
+      () => _client.rpc<List<dynamic>>('get_my_account_access'),
+    );
     if (response.isEmpty) {
       throw StateError('The account access response is empty.');
     }
@@ -170,7 +176,7 @@ class AuthRepository implements IAuthRepository {
     return AuthSession(
       userId: user.id,
       email:
-      user.email ??
+          user.email ??
           _firstString(metadata, const ['email', 'default_email']),
       displayName: _firstString(metadata, const [
         'name',
@@ -190,9 +196,7 @@ class AuthRepository implements IAuthRepository {
   String? _firstString(Map<String, dynamic> metadata, List<String> keys) {
     for (final key in keys) {
       final value = metadata[key];
-      if (value is String && value
-          .trim()
-          .isNotEmpty) return value.trim();
+      if (value is String && value.trim().isNotEmpty) return value.trim();
     }
     return null;
   }

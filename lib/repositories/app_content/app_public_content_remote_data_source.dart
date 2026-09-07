@@ -1,13 +1,23 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 
 class AppPublicContentRemoteDataSource {
-  const AppPublicContentRemoteDataSource({required this._client});
+  const AppPublicContentRemoteDataSource({
+    required SupabaseClient client,
+    AppDiagnostics? diagnostics,
+  }) : _client = client,
+       _diagnostics = diagnostics;
 
   final SupabaseClient _client;
+  final AppDiagnostics? _diagnostics;
 
   Future<AppPublicContent?> fetch() async {
-    final response = await _client.rpc<List<dynamic>>('get_public_app_content');
+    final response = await measureRpc(
+      _diagnostics,
+      'get_public_app_content',
+      () => _client.rpc<List<dynamic>>('get_public_app_content'),
+    );
     if (response.isEmpty) return null;
     final row = Map<String, dynamic>.from(response.first as Map);
     return AppPublicContent(

@@ -26,6 +26,7 @@ class ProfileRepository
     required ViewedProfileCacheDataSource viewedProfileCache,
     required MediaCacheService mediaCache,
     PresenceStatusStore? presenceStore,
+    AppDiagnostics? diagnostics,
   }) : _client = client,
        _cache = cache,
        _avatarStorage = avatarStorage,
@@ -34,6 +35,7 @@ class ProfileRepository
        _viewedProfileCache = viewedProfileCache,
        _mediaCache = mediaCache,
        _presenceStore = presenceStore,
+       _diagnostics = diagnostics,
        _talker = talker;
 
   final SupabaseClient _client;
@@ -45,6 +47,7 @@ class ProfileRepository
   final ViewedProfileCacheDataSource _viewedProfileCache;
   final MediaCacheService _mediaCache;
   final PresenceStatusStore? _presenceStore;
+  final AppDiagnostics? _diagnostics;
   static const _viewedProfileFriendsPageSize = 30;
   static const _viewedProfileRequestTimeout = Duration(seconds: 10);
   static const _viewedProfileFriendsRequestTimeout = Duration(seconds: 10);
@@ -87,15 +90,19 @@ class ProfileRepository
     bool registerView,
     AccountSessionSnapshot scope,
   ) async {
-    final response = await _client
-        .rpc<List<dynamic>>(
-          'get_viewed_profile',
-          params: {
-            'target_user_id': userId,
-            'should_register_view': registerView,
-          },
-        )
-        .timeout(_viewedProfileRequestTimeout);
+    final response = await measureRpc(
+      _diagnostics,
+      'get_viewed_profile',
+      () => _client
+          .rpc<List<dynamic>>(
+            'get_viewed_profile',
+            params: {
+              'target_user_id': userId,
+              'should_register_view': registerView,
+            },
+          )
+          .timeout(_viewedProfileRequestTimeout),
+    );
     _accountSessionController.ensureCurrent(scope);
     if (response.isEmpty) throw const ProfileNotFoundException();
     final row = Map<String, dynamic>.from(response.first as Map);
@@ -271,17 +278,21 @@ class ProfileRepository
     AccountSessionSnapshot scope,
     ViewedProfileFriend? after,
   ) async {
-    final response = await _client
-        .rpc<List<dynamic>>(
-          'get_user_profile_friends',
-          params: {
-            'target_user_id': userId,
-            'after_display_name': after?.displayName,
-            'after_user_id': after?.id,
-            'page_size': _viewedProfileFriendsPageSize,
-          },
-        )
-        .timeout(_viewedProfileFriendsRequestTimeout);
+    final response = await measureRpc(
+      _diagnostics,
+      'get_user_profile_friends',
+      () => _client
+          .rpc<List<dynamic>>(
+            'get_user_profile_friends',
+            params: {
+              'target_user_id': userId,
+              'after_display_name': after?.displayName,
+              'after_user_id': after?.id,
+              'page_size': _viewedProfileFriendsPageSize,
+            },
+          )
+          .timeout(_viewedProfileFriendsRequestTimeout),
+    );
     _accountSessionController.ensureCurrent(scope);
     final friends = response
         .map((item) => _viewedFriend(Map<String, dynamic>.from(item as Map)))
@@ -338,9 +349,16 @@ class ProfileRepository
   @override
   Future<int> getProfileViewCount(String userId) async {
     final scope = _accountSessionController.capture();
-    final value = await _client
-        .rpc<num>('get_profile_view_count', params: {'target_user_id': userId})
-        .timeout(_viewedProfileRequestTimeout);
+    final value = await measureRpc(
+      _diagnostics,
+      'get_profile_view_count',
+      () => _client
+          .rpc<num>(
+            'get_profile_view_count',
+            params: {'target_user_id': userId},
+          )
+          .timeout(_viewedProfileRequestTimeout),
+    );
     _accountSessionController.ensureCurrent(scope);
     final count = value.toInt();
     await _accountSessionController.commit(
@@ -458,24 +476,28 @@ class ProfileRepository
       );
 
       _accountSessionController.ensureCurrent(scope);
-      final response = await _client.rpc<List<dynamic>>(
+      final response = await measureRpc(
+        _diagnostics,
         'save_own_profile',
-        params: {
-          'p_display_name': displayName.trim(),
-          'p_birth_date': birthDate.toIso8601String().split('T').first,
-          'p_gender': gender.databaseValue,
-          'p_username': username.trim().toLowerCase(),
-          'p_bio': bio.trim(),
-          'p_photos': savedPhotos
-              .map(
-                (photo) => {
-                  'avatar_url': photo.avatarUrl,
-                  'storage_path': photo.storagePath,
-                  'updated_at': photo.updatedAt?.toUtc().toIso8601String(),
-                },
-              )
-              .toList(growable: false),
-        },
+        () => _client.rpc<List<dynamic>>(
+          'save_own_profile',
+          params: {
+            'p_display_name': displayName.trim(),
+            'p_birth_date': birthDate.toIso8601String().split('T').first,
+            'p_gender': gender.databaseValue,
+            'p_username': username.trim().toLowerCase(),
+            'p_bio': bio.trim(),
+            'p_photos': savedPhotos
+                .map(
+                  (photo) => {
+                    'avatar_url': photo.avatarUrl,
+                    'storage_path': photo.storagePath,
+                    'updated_at': photo.updatedAt?.toUtc().toIso8601String(),
+                  },
+                )
+                .toList(growable: false),
+          },
+        ),
       );
       _accountSessionController.ensureCurrent(scope);
       if (response.isEmpty) throw const ProfileSaveException();
@@ -773,12 +795,16 @@ class ProfileRepository
           );
           try {
             _accountSessionController.ensureCurrent(scope);
-            final response = await _client.rpc<List<dynamic>>(
+            final response = await measureRpc(
+              _diagnostics,
               'adopt_imported_profile_avatar',
-              params: {
-                'p_storage_path': stored.path,
-                'p_updated_at': stored.updatedAt?.toUtc().toIso8601String(),
-              },
+              () => _client.rpc<List<dynamic>>(
+                'adopt_imported_profile_avatar',
+                params: {
+                  'p_storage_path': stored.path,
+                  'p_updated_at': stored.updatedAt?.toUtc().toIso8601String(),
+                },
+              ),
             );
             if (response.isEmpty) throw const ProfileSaveException();
           } catch (_) {

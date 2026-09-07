@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
@@ -20,15 +21,18 @@ class ChatsRemoteDataSource {
     required Talker talker,
     UserRealtimeDataSource? userRealtime,
     PresenceStatusStore? presenceStore,
+    AppDiagnostics? diagnostics,
   }) : _client = client,
        _userRealtime =
            userRealtime ??
            UserRealtimeDataSource(client: client, talker: talker),
-       _presenceStore = presenceStore;
+       _presenceStore = presenceStore,
+       _diagnostics = diagnostics;
 
   final SupabaseClient _client;
   final UserRealtimeDataSource _userRealtime;
   final PresenceStatusStore? _presenceStore;
+  final AppDiagnostics? _diagnostics;
 
   String get currentUserId {
     final id = _client.auth.currentUser?.id;
@@ -37,7 +41,11 @@ class ChatsRemoteDataSource {
   }
 
   Future<List<Chat>> fetchChats() async {
-    final response = await _client.rpc<List<dynamic>>('get_chat_summaries');
+    final response = await measureRpc(
+      _diagnostics,
+      'get_chat_summaries',
+      () => _client.rpc<List<dynamic>>('get_chat_summaries'),
+    );
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
@@ -99,27 +107,43 @@ class ChatsRemoteDataSource {
   Future<void> resumeChanges() => _userRealtime.resume();
 
   Future<void> hideChats(Set<String> ids, {required DateTime clearedAt}) =>
-      _client.rpc<void>(
+      measureRpc(
+        _diagnostics,
         'hide_conversations',
-        params: {
-          'conversation_ids': ids.toList(growable: false),
-          'cleared_before': clearedAt.toUtc().toIso8601String(),
-        },
+        () => _client.rpc<void>(
+          'hide_conversations',
+          params: {
+            'conversation_ids': ids.toList(growable: false),
+            'cleared_before': clearedAt.toUtc().toIso8601String(),
+          },
+        ),
       );
 
-  Future<void> markAsRead(Set<String> ids) => _client.rpc<void>(
+  Future<void> markAsRead(Set<String> ids) => measureRpc(
+    _diagnostics,
     'mark_conversations_read',
-    params: {'conversation_ids': ids.toList(growable: false)},
+    () => _client.rpc<void>(
+      'mark_conversations_read',
+      params: {'conversation_ids': ids.toList(growable: false)},
+    ),
   );
 
-  Future<void> toggleMute(Set<String> ids) => _client.rpc<void>(
+  Future<void> toggleMute(Set<String> ids) => measureRpc(
+    _diagnostics,
     'toggle_conversations_mute',
-    params: {'conversation_ids': ids.toList(growable: false)},
+    () => _client.rpc<void>(
+      'toggle_conversations_mute',
+      params: {'conversation_ids': ids.toList(growable: false)},
+    ),
   );
 
-  Future<String> createDirectConversation(String peerId) => _client.rpc<String>(
+  Future<String> createDirectConversation(String peerId) => measureRpc(
+    _diagnostics,
     'create_direct_conversation',
-    params: {'peer_user_id': peerId},
+    () => _client.rpc<String>(
+      'create_direct_conversation',
+      params: {'peer_user_id': peerId},
+    ),
   );
 
   ChatPreviewType _previewType(String? value) {

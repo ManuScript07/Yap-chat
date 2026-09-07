@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/core/services/reconnect_backoff.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
@@ -27,9 +28,11 @@ class FriendsRemoteDataSource {
     required SupabaseClient client,
     required Talker talker,
     PresenceStatusStore? presenceStore,
+    AppDiagnostics? diagnostics,
   }) : _client = client,
        _talker = talker,
        _presenceStore = presenceStore,
+       _diagnostics = diagnostics,
        _backoff = ReconnectBackoff(
          onError: (error, stackTrace) =>
              talker.handle(error, stackTrace, 'Friends realtime retry failed'),
@@ -39,8 +42,11 @@ class FriendsRemoteDataSource {
   final Talker _talker;
   final ReconnectBackoff _backoff;
   final PresenceStatusStore? _presenceStore;
+  final AppDiagnostics? _diagnostics;
   StreamController<FriendChange>? _changesController;
   RealtimeChannel? _channel;
+  RealtimeChannel? _diagnosticsChannel;
+  DiagnosticsLease? _channelLease;
   Future<void> _channelOperation = Future<void>.value();
   bool _paused = false;
 
@@ -54,13 +60,17 @@ class FriendsRemoteDataSource {
     FriendPageCursor? after,
     int pageSize = 50,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_friends_page',
-      params: {
-        'after_friends_since': after?.friendsSince.toUtc().toIso8601String(),
-        'after_friend_id': after?.friendId,
-        'page_size': pageSize,
-      },
+      () => _client.rpc<List<dynamic>>(
+        'get_friends_page',
+        params: {
+          'after_friends_since': after?.friendsSince.toUtc().toIso8601String(),
+          'after_friend_id': after?.friendId,
+          'page_size': pageSize,
+        },
+      ),
     );
     final rows = response
         .map((item) => Map<String, dynamic>.from(item as Map))
@@ -81,9 +91,13 @@ class FriendsRemoteDataSource {
   }
 
   Future<Friend?> fetchCurrentFriend(String friendId) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_current_friend',
-      params: {'target_friend_id': friendId},
+      () => _client.rpc<List<dynamic>>(
+        'get_current_friend',
+        params: {'target_friend_id': friendId},
+      ),
     );
     if (response.isEmpty) return null;
     final row = Map<String, dynamic>.from(response.first as Map);
@@ -97,9 +111,13 @@ class FriendsRemoteDataSource {
 
   Future<List<Friend>> fetchCurrentFriends(List<String> friendIds) async {
     if (friendIds.isEmpty) return const [];
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_current_friends',
-      params: {'target_friend_ids': friendIds},
+      () => _client.rpc<List<dynamic>>(
+        'get_current_friends',
+        params: {'target_friend_ids': friendIds},
+      ),
     );
     final rows = response
         .map((item) => Map<String, dynamic>.from(item as Map))
@@ -125,7 +143,11 @@ class FriendsRemoteDataSource {
   }
 
   Future<List<FriendRequest>> fetchRequests() async {
-    final response = await _client.rpc<List<dynamic>>('get_friend_requests');
+    final response = await measureRpc(
+      _diagnostics,
+      'get_friend_requests',
+      () => _client.rpc<List<dynamic>>('get_friend_requests'),
+    );
     return response
         .map((item) {
           final row = Map<String, dynamic>.from(item as Map);
@@ -152,9 +174,13 @@ class FriendsRemoteDataSource {
   }
 
   Future<List<FriendCandidate>> searchUsers(String query) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'search_friend_candidates',
-      params: {'search_query': query, 'result_limit': 10},
+      () => _client.rpc<List<dynamic>>(
+        'search_friend_candidates',
+        params: {'search_query': query, 'result_limit': 10},
+      ),
     );
     return response
         .map((item) {
@@ -182,9 +208,13 @@ class FriendsRemoteDataSource {
     List<String> phoneNumbers,
   ) async {
     if (phoneNumbers.isEmpty) return const {};
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'match_contact_phones',
-      params: {'phone_numbers': phoneNumbers},
+      () => _client.rpc<List<dynamic>>(
+        'match_contact_phones',
+        params: {'phone_numbers': phoneNumbers},
+      ),
     );
     return {
       for (final item in response)
@@ -199,9 +229,13 @@ class FriendsRemoteDataSource {
     List<String> friendIds,
   ) async {
     if (phoneNumbers.isEmpty || friendIds.isEmpty) return const {};
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'match_new_friend_contact_phones',
-      params: {'phone_numbers': phoneNumbers, 'friend_user_ids': friendIds},
+      () => _client.rpc<List<dynamic>>(
+        'match_new_friend_contact_phones',
+        params: {'phone_numbers': phoneNumbers, 'friend_user_ids': friendIds},
+      ),
     );
     return {
       for (final item in response)
@@ -227,26 +261,41 @@ class FriendsRemoteDataSource {
     );
   }
 
-  Future<String> sendRequest(String peerId) => _client.rpc<String>(
+  Future<String> sendRequest(String peerId) => measureRpc(
+    _diagnostics,
     'send_friend_request',
-    params: {'peer_user_id': peerId},
+    () => _client.rpc<String>(
+      'send_friend_request',
+      params: {'peer_user_id': peerId},
+    ),
   );
 
-  Future<void> cancelRequest(String requestId) => _client.rpc<void>(
+  Future<void> cancelRequest(String requestId) => measureRpc(
+    _diagnostics,
     'cancel_friend_request',
-    params: {'target_request_id': requestId},
+    () => _client.rpc<void>(
+      'cancel_friend_request',
+      params: {'target_request_id': requestId},
+    ),
   );
 
-  Future<void> respond(String requestId, {required bool accept}) =>
-      _client.rpc<void>(
-        'respond_friend_request',
-        params: {'target_request_id': requestId, 'accept_request': accept},
-      );
+  Future<void> respond(String requestId, {required bool accept}) => measureRpc(
+    _diagnostics,
+    'respond_friend_request',
+    () => _client.rpc<void>(
+      'respond_friend_request',
+      params: {'target_request_id': requestId, 'accept_request': accept},
+    ),
+  );
 
   Future<FriendLocationLookup> getFriendLocation(String friendId) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_friend_location_visibility',
-      params: {'friend_user_id': friendId},
+      () => _client.rpc<List<dynamic>>(
+        'get_friend_location_visibility',
+        params: {'friend_user_id': friendId},
+      ),
     );
     if (response.isEmpty) return const FriendLocationLookup.unavailable();
     final row = Map<String, dynamic>.from(response.first as Map);
@@ -272,9 +321,13 @@ class FriendsRemoteDataSource {
   }
 
   Future<UserDistance?> getUserDistance(String userId) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_user_distance',
-      params: {'target_user_id': userId},
+      () => _client.rpc<List<dynamic>>(
+        'get_user_distance',
+        params: {'target_user_id': userId},
+      ),
     );
     if (response.isEmpty) return null;
     final row = Map<String, dynamic>.from(response.first as Map);
@@ -291,8 +344,14 @@ class FriendsRemoteDataSource {
     );
   }
 
-  Future<void> removeFriend(String friendId) =>
-      _client.rpc<void>('remove_friend', params: {'friend_user_id': friendId});
+  Future<void> removeFriend(String friendId) => measureRpc(
+    _diagnostics,
+    'remove_friend',
+    () => _client.rpc<void>(
+      'remove_friend',
+      params: {'friend_user_id': friendId},
+    ),
+  );
 
   Stream<FriendChange> watchChanges() =>
       (_changesController ??= StreamController<FriendChange>.broadcast(
@@ -348,6 +407,8 @@ class FriendsRemoteDataSource {
           },
         );
     _channel = channel;
+    _diagnosticsChannel = channel;
+    _channelLease = _diagnostics?.trackRealtimeChannel('friends-realtime');
     channel.subscribe((status, _) {
       if (!identical(_channel, channel) || controller.isClosed) return;
       switch (status) {
@@ -384,6 +445,11 @@ class FriendsRemoteDataSource {
   }
 
   Future<void> _removeChannel(RealtimeChannel channel) async {
+    if (identical(_diagnosticsChannel, channel)) {
+      _diagnosticsChannel = null;
+      _channelLease?.dispose();
+      _channelLease = null;
+    }
     try {
       await _client.removeChannel(channel);
     } catch (error, stackTrace) {

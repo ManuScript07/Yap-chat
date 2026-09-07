@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/account_session_controller.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/core/services/chat_media_processor.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
@@ -62,6 +63,7 @@ class ChatRepository implements IChatRepository {
   Stream<List<ChatMessage>> getMessagesStream(String chatId) {
     late final StreamController<List<ChatMessage>> controller;
     StreamSubscription<List<ChatMessage>>? cacheSubscription;
+    DiagnosticsLease? cacheListenerLease;
     AccountSessionSnapshot? streamScope;
 
     controller = StreamController<List<ChatMessage>>(
@@ -72,12 +74,16 @@ class ChatRepository implements IChatRepository {
         cacheSubscription = _cache
             .watchMessages(chatId, currentUserId: scope.userId)
             .listen(controller.add, onError: controller.addError);
+        cacheListenerLease = _config.diagnostics?.trackLocalListener(
+          'chat-message-cache',
+        );
         _requestPendingProcessing(processDueNow: true);
         unawaited(_initializeChat(chatId, scope));
       },
       onCancel: () async {
         _syncService.closeConversation(chatId, session: streamScope);
         await cacheSubscription?.cancel();
+        cacheListenerLease?.dispose();
       },
     );
     return controller.stream;
@@ -223,6 +229,7 @@ class ChatRepository implements IChatRepository {
     final retryKey = '${scope.generation}:${scope.userId}:${message.id}';
     if (!_manualRetryOperationIds.add(retryKey)) return;
     try {
+      var requeuedSuccessfully = false;
       final currentMessage = await _cache.readMessage(
         message.id,
         currentUserId: scope.userId,
@@ -240,12 +247,15 @@ class ChatRepository implements IChatRepository {
           ownerUserId: scope.userId,
         );
         if (requeued == null) return;
+        requeuedSuccessfully = true;
         await _cache.markMessageStatus(
           message.id,
           MessageStatus.sending,
           ownerUserId: scope.userId,
         );
       });
+      if (!requeuedSuccessfully) return;
+      _config.diagnostics?.recordOutboxAttempt(manual: true);
       _requestPendingProcessing(processDueNow: true);
     } finally {
       _manualRetryOperationIds.remove(retryKey);
@@ -478,6 +488,7 @@ class ChatRepository implements IChatRepository {
         ownerUserId: scope.userId,
       );
       if (!exists) return;
+      _config.diagnostics?.recordOutboxAttempt(manual: false);
       final type = MessageType.values.byName(operation.type);
       final payload = operation.payload;
       final attachments = switch (type) {
@@ -521,6 +532,7 @@ class ChatRepository implements IChatRepository {
         );
       }
       await _localMediaRepository.collectGarbage();
+      _config.diagnostics?.recordOutboxSuccess();
     } on StaleAccountSessionException {
       return;
     } catch (error, stackTrace) {
@@ -556,6 +568,10 @@ class ChatRepository implements IChatRepository {
               MessageStatus.error,
               ownerUserId: scope.userId,
             );
+          }
+          if (recorded) {
+            _config.diagnostics?.recordOutboxError(terminal: exhausted);
+            if (!exhausted) _config.diagnostics?.recordOutboxRetry();
           }
         });
       }

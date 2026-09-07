@@ -53,6 +53,8 @@ class ChatsRepository implements IChatsRepository {
   StreamController<List<Chat>>? _watchController;
   StreamSubscription<List<Chat>>? _cacheSubscription;
   StreamSubscription<ConversationChange>? _realtimeSubscription;
+  DiagnosticsLease? _cacheListenerLease;
+  DiagnosticsLease? _realtimeListenerLease;
   Timer? _reconciliationTimer;
   Timer? _summarySyncTimer;
   AccountSessionSnapshot? _watchScope;
@@ -62,6 +64,7 @@ class ChatsRepository implements IChatsRepository {
   Stream<List<Chat>> watchChats() {
     return Stream.multi((listener) {
       StreamSubscription<List<Chat>>? subscription;
+      DiagnosticsLease? listenerLease;
       var cancelled = false;
 
       Future<void> subscribe() async {
@@ -69,6 +72,9 @@ class ChatsRepository implements IChatsRepository {
         subscription = controller.stream.listen(
           listener.add,
           onError: listener.addError,
+        );
+        listenerLease = _config.diagnostics?.trackLocalListener(
+          'chats-ui-stream',
         );
 
         // A broadcast stream does not replay. Give a late consumer the
@@ -85,6 +91,7 @@ class ChatsRepository implements IChatsRepository {
       listener.onCancel = () async {
         cancelled = true;
         await subscription?.cancel();
+        listenerLease?.dispose();
       };
     });
   }
@@ -121,6 +128,12 @@ class ChatsRepository implements IChatsRepository {
         _config.talker.handle(error, stackTrace, 'Chats realtime failed');
       },
     );
+    _cacheListenerLease = _config.diagnostics?.trackLocalListener(
+      'chats-cache',
+    );
+    _realtimeListenerLease = _config.diagnostics?.trackLocalListener(
+      'chats-realtime-events',
+    );
     unawaited(_initialize(scope));
     _reconciliationTimer = Timer.periodic(_reconciliationInterval, (_) {
       if (!_isRealtimePaused) _enqueueReconciliation();
@@ -145,6 +158,10 @@ class ChatsRepository implements IChatsRepository {
     _latestChats = null;
     await cacheSubscription?.cancel();
     await realtimeSubscription?.cancel();
+    _cacheListenerLease?.dispose();
+    _cacheListenerLease = null;
+    _realtimeListenerLease?.dispose();
+    _realtimeListenerLease = null;
   }
 
   @override
@@ -390,6 +407,10 @@ class ChatsRepository implements IChatsRepository {
     await _realtimeSubscription?.cancel();
     _cacheSubscription = null;
     _realtimeSubscription = null;
+    _cacheListenerLease?.dispose();
+    _cacheListenerLease = null;
+    _realtimeListenerLease?.dispose();
+    _realtimeListenerLease = null;
     _watchScope = null;
     _latestChats = null;
     final controller = _watchController;
@@ -565,7 +586,9 @@ class ChatsRepository implements IChatsRepository {
       await activeSync;
       return;
     }
-    final sync = _performSync();
+    final sync =
+        _config.diagnostics?.measureSync('chats', _performSync) ??
+        _performSync();
     _activeSync = sync;
     await sync.whenComplete(() {
       if (identical(_activeSync, sync)) _activeSync = null;
@@ -589,6 +612,7 @@ class ChatsRepository implements IChatsRepository {
       scope,
       () => _cache.replaceAll(reconciled, ownerUserId: scope.userId),
     );
+    _config.diagnostics?.recordSyncItems('chats', reconciled.length);
   }
 
   Future<void> _synchronizeConversation(String chatId) async {

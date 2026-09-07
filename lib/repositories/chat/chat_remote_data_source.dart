@@ -1,13 +1,18 @@
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 
 class ChatRemoteDataSource {
-  const ChatRemoteDataSource({required SupabaseClient client})
-    : _client = client;
+  const ChatRemoteDataSource({
+    required SupabaseClient client,
+    AppDiagnostics? diagnostics,
+  }) : _client = client,
+       _diagnostics = diagnostics;
 
   final SupabaseClient _client;
+  final AppDiagnostics? _diagnostics;
 
   String get currentUserId {
     final id = _client.auth.currentUser?.id;
@@ -21,14 +26,18 @@ class ChatRemoteDataSource {
     String? beforeMessageId,
     int pageSize = 60,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_conversation_messages',
-      params: {
-        'target_conversation_id': chatId,
-        'before_created_at': beforeTimestamp?.toUtc().toIso8601String(),
-        'before_message_id': beforeMessageId,
-        'page_size': pageSize,
-      },
+      () => _client.rpc<List<dynamic>>(
+        'get_conversation_messages',
+        params: {
+          'target_conversation_id': chatId,
+          'before_created_at': beforeTimestamp?.toUtc().toIso8601String(),
+          'before_message_id': beforeMessageId,
+          'page_size': pageSize,
+        },
+      ),
     );
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
@@ -72,37 +81,49 @@ class ChatRemoteDataSource {
     String? replyToMessageId,
     List<Map<String, dynamic>> attachments = const [],
   }) {
-    return _client.rpc<void>(
+    return measureRpc(
+      _diagnostics,
       'send_chat_message',
-      params: {
-        'message_id': id,
-        'target_conversation_id': chatId,
-        'message_type': type.name,
-        'message_text': text,
-        'message_latitude': latitude,
-        'message_longitude': longitude,
-        'reply_message_id': replyToMessageId,
-        'message_attachments': attachments,
-      },
+      () => _client.rpc<void>(
+        'send_chat_message',
+        params: {
+          'message_id': id,
+          'target_conversation_id': chatId,
+          'message_type': type.name,
+          'message_text': text,
+          'message_latitude': latitude,
+          'message_longitude': longitude,
+          'reply_message_id': replyToMessageId,
+          'message_attachments': attachments,
+        },
+      ),
     );
   }
 
-  Future<void> markAsRead(String chatId) => _client.rpc<void>(
+  Future<void> markAsRead(String chatId) => measureRpc(
+    _diagnostics,
     'mark_conversations_read',
-    params: {
-      'conversation_ids': [chatId],
-    },
+    () => _client.rpc<void>(
+      'mark_conversations_read',
+      params: {
+        'conversation_ids': [chatId],
+      },
+    ),
   );
 
   Future<void> deleteMessage(
     String messageId, {
     required bool deleteForEveryone,
-  }) => _client.rpc<void>(
+  }) => measureRpc(
+    _diagnostics,
     'soft_delete_message',
-    params: {
-      'target_message_id': messageId,
-      'delete_for_everyone': deleteForEveryone,
-    },
+    () => _client.rpc<void>(
+      'soft_delete_message',
+      params: {
+        'target_message_id': messageId,
+        'delete_for_everyone': deleteForEveryone,
+      },
+    ),
   );
 
   List<Map<String, dynamic>> _attachments(Map<String, dynamic> row) {

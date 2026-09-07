@@ -21,6 +21,7 @@ class AppConfig {
     required this.database,
     required this.accountSessionController,
     this.oauthAttemptCoordinator,
+    this.diagnostics,
     this.supabaseClient,
     this.firebaseMessaging,
   });
@@ -32,6 +33,7 @@ class AppConfig {
   final AppDatabase database;
   final AccountSessionController accountSessionController;
   final OAuthAttemptCoordinator? oauthAttemptCoordinator;
+  final AppDiagnostics? diagnostics;
   final SupabaseClient? supabaseClient;
   final FirebaseMessaging? firebaseMessaging;
 

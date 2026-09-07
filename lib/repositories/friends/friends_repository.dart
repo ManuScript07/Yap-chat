@@ -43,6 +43,7 @@ class FriendsRepository
   final DateTime Function() _clock;
   final Uuid _uuid = const Uuid();
   StreamSubscription<FriendChange>? _changesSubscription;
+  DiagnosticsLease? _changesListenerLease;
   AccountSessionSnapshot? _startedScope;
   Timer? _realtimeSyncTimer;
   final StreamController<String> _profileChangesController =
@@ -67,46 +68,82 @@ class FriendsRepository
   Stream<List<Friend>> watchPaginatedFriends() {
     final scope = _accountSessionController.capture();
     unawaited(_ensureStarted());
-    return _cache.watchFriends(ownerUserId: scope.userId);
+    return _trackLocalStream(
+      _cache.watchFriends(ownerUserId: scope.userId),
+      'friends-cache',
+    );
   }
 
   @override
   Stream<List<Friend>> watchFriends() {
     final scope = _accountSessionController.capture();
     unawaited(_ensureStarted());
-    return _cache.watchFriends(ownerUserId: scope.userId);
+    return _trackLocalStream(
+      _cache.watchFriends(ownerUserId: scope.userId),
+      'friends-cache',
+    );
   }
 
   @override
   Stream<FriendListCacheState> watchFriendListState() {
     final scope = _accountSessionController.capture();
     unawaited(_ensureStarted());
-    return _cache.watchFriendListState(ownerUserId: scope.userId);
+    return _trackLocalStream(
+      _cache.watchFriendListState(ownerUserId: scope.userId),
+      'friends-list-state-cache',
+    );
   }
 
   @override
   Stream<List<FriendRequest>> watchRequests() {
     final scope = _accountSessionController.capture();
     unawaited(_ensureStarted());
-    return _cache.watchRequests(ownerUserId: scope.userId);
+    return _trackLocalStream(
+      _cache.watchRequests(ownerUserId: scope.userId),
+      'friend-requests-cache',
+    );
   }
 
   @override
   Stream<List<Friend>> watchCachedFriends() {
     final scope = _accountSessionController.capture();
-    return _cache.watchFriends(ownerUserId: scope.userId);
+    return _trackLocalStream(
+      _cache.watchFriends(ownerUserId: scope.userId),
+      'friends-cache',
+    );
   }
 
   @override
   Stream<List<FriendRequest>> watchCachedRequests() {
     final scope = _accountSessionController.capture();
-    return _cache.watchRequests(ownerUserId: scope.userId);
+    return _trackLocalStream(
+      _cache.watchRequests(ownerUserId: scope.userId),
+      'friend-requests-cache',
+    );
   }
 
   @override
   Stream<String> watchProfileChanges() {
     unawaited(_ensureStarted());
-    return _profileChangesController.stream;
+    return _trackLocalStream(
+      _profileChangesController.stream,
+      'friend-profile-changes',
+    );
+  }
+
+  Stream<T> _trackLocalStream<T>(Stream<T> source, String owner) {
+    return Stream.multi((controller) {
+      final lease = _config.diagnostics?.trackLocalListener(owner);
+      final subscription = source.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = () async {
+        await subscription.cancel();
+        lease?.dispose();
+      };
+    });
   }
 
   @override
@@ -900,6 +937,9 @@ class FriendsRepository
       onError: (Object error, StackTrace stackTrace) =>
           _config.talker.handle(error, stackTrace, 'Friends stream failed'),
     );
+    _changesListenerLease ??= _config.diagnostics?.trackLocalListener(
+      'friends-realtime-events',
+    );
     await _synchronizeSafely();
   }
 
@@ -980,7 +1020,9 @@ class FriendsRepository
   Future<void> _synchronize() {
     final active = _activeSync;
     if (active != null) return active;
-    final sync = _performSync();
+    final sync =
+        _config.diagnostics?.measureSync('friends', _performSync) ??
+        _performSync();
     _activeSync = sync;
     return sync.whenComplete(() {
       if (identical(_activeSync, sync)) _activeSync = null;
@@ -1003,6 +1045,11 @@ class FriendsRepository
         ownerUserId: scope.userId,
       );
     });
+    _config.diagnostics?.recordSyncItems(
+      'friends',
+      (results[0] as FriendPage).friends.length +
+          (results[1] as List<FriendRequest>).length,
+    );
   }
 
   Future<void> _performLoadMoreFriends() async {
@@ -1011,11 +1058,17 @@ class FriendsRepository
     _accountSessionController.ensureCurrent(scope);
     final cursor = state.nextCursor;
     if (!state.hasMore || cursor == null) return;
-    final page = await _remote.fetchFriendsPage(after: cursor);
+    final page =
+        await (_config.diagnostics?.measureSync(
+              'friends-page',
+              () => _remote.fetchFriendsPage(after: cursor),
+            ) ??
+            _remote.fetchFriendsPage(after: cursor));
     await _accountSessionController.commit(
       scope,
       () => _cache.appendFriendPage(page, ownerUserId: scope.userId),
     );
+    _config.diagnostics?.recordSyncItems('friends-page', page.friends.length);
   }
 
   Future<void> _synchronizeSafely() async {

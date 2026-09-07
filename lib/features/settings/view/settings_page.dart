@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/settings/view/privacy_settings_page.dart';
+import 'package:yap_chat/features/settings/view/app_diagnostics_page.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/features/settings/view/settings_routes.dart';
@@ -91,6 +94,16 @@ class _SettingsPage extends StatelessWidget {
                       icon: Icons.info_outline_rounded,
                       title: context.l10n.settingsAbout,
                       onTap: () => showAboutSheet(context),
+                      onLongPress:
+                          kDebugMode &&
+                              (context.read<AppConfig>().diagnostics?.enabled ??
+                                  false)
+                          ? () => Navigator.of(context).push<void>(
+                              settingsSlideRightRoute<void>(
+                                const AppDiagnosticsPage(),
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 34),
                     Padding(

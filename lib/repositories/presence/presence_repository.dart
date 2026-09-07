@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/repositories/presence/abstract_presence_repository.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
 
@@ -16,6 +17,7 @@ class PresenceRepository
     required Talker talker,
     UserRealtimeDataSource? userRealtime,
     PresenceStatusStore? statusStore,
+    AppDiagnostics? diagnostics,
     Uuid uuid = const Uuid(),
   }) : _client = client,
        _talker = talker,
@@ -23,6 +25,7 @@ class PresenceRepository
            userRealtime ??
            UserRealtimeDataSource(client: client, talker: talker),
        _statusStore = statusStore ?? PresenceStatusStore(),
+       _diagnostics = diagnostics,
        _uuid = uuid;
 
   static const _heartbeatInterval = Duration(seconds: 30);
@@ -34,12 +37,14 @@ class PresenceRepository
   final Talker _talker;
   final UserRealtimeDataSource _userRealtime;
   final PresenceStatusStore _statusStore;
+  final AppDiagnostics? _diagnostics;
   final Uuid _uuid;
   final Map<String, Set<String>> _watchScopes = {};
   final Map<String, Future<bool>> _scopeSyncs = {};
   final Set<String> _dirtyScopes = {};
 
   StreamSubscription<UserPresenceRealtimeEvent>? _eventSubscription;
+  DiagnosticsLease? _eventListenerLease;
   Timer? _heartbeatTimer;
   Future<void> _operation = Future<void>.value();
   String? _connectedUserId;
@@ -50,7 +55,20 @@ class PresenceRepository
   bool _shouldBeConnected = false;
 
   @override
-  Stream<Set<String>> watchOnlineUserIds() => _statusStore.watch();
+  Stream<Set<String>> watchOnlineUserIds() {
+    return Stream.multi((controller) {
+      final lease = _diagnostics?.trackLocalListener('presence-status-store');
+      final subscription = _statusStore.watch().listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = () async {
+        await subscription.cancel();
+        lease?.dispose();
+      };
+    });
+  }
 
   @override
   Future<void> connect(String userId) {
@@ -79,6 +97,9 @@ class PresenceRepository
       onError: (Object error, StackTrace stackTrace) =>
           _talker.handle(error, stackTrace, 'Presence events failed'),
     );
+    _eventListenerLease = _diagnostics?.trackLocalListener(
+      'presence-realtime-events',
+    );
     await _userRealtime.resume();
     await _heartbeat();
     if (!_shouldBeConnected || _connectedUserId != userId) return;
@@ -105,6 +126,8 @@ class PresenceRepository
     final subscription = _eventSubscription;
     _eventSubscription = null;
     await subscription?.cancel();
+    _eventListenerLease?.dispose();
+    _eventListenerLease = null;
 
     final sessionId = _sessionId;
     _sessionId = null;
@@ -113,12 +136,16 @@ class PresenceRepository
     _connectedUserId = null;
     if (closeRemoteSession && sessionId != null) {
       try {
-        await _client
-            .rpc<void>(
-              'close_my_presence_session',
-              params: {'target_session_id': sessionId},
-            )
-            .timeout(const Duration(seconds: 3));
+        await measureRpc(
+          _diagnostics,
+          'close_my_presence_session',
+          () => _client
+              .rpc<void>(
+                'close_my_presence_session',
+                params: {'target_session_id': sessionId},
+              )
+              .timeout(const Duration(seconds: 3)),
+        );
       } catch (_) {
         // The server lease expires automatically after an abrupt disconnect.
       }
@@ -132,12 +159,16 @@ class PresenceRepository
     final userId = _connectedUserId;
     if (!_shouldBeConnected || sessionId == null || userId == null) return;
     try {
-      await _client
-          .rpc<void>(
-            'touch_my_presence_session',
-            params: {'target_session_id': sessionId},
-          )
-          .timeout(_requestTimeout);
+      await measureRpc(
+        _diagnostics,
+        'touch_my_presence_session',
+        () => _client
+            .rpc<void>(
+              'touch_my_presence_session',
+              params: {'target_session_id': sessionId},
+            )
+            .timeout(_requestTimeout),
+      );
       final mustRestoreScopes = !_sessionConfirmed;
       _sessionConfirmed = true;
       _lastHeartbeatSucceededAt = DateTime.now().toUtc();
@@ -217,16 +248,20 @@ class PresenceRepository
     Set<String> userIds,
   ) async {
     try {
-      final response = await _client
-          .rpc<List<dynamic>>(
-            'set_my_presence_watch_scope',
-            params: {
-              'target_session_id': sessionId,
-              'scope_key': scopeId,
-              'target_user_ids': userIds.toList(growable: false),
-            },
-          )
-          .timeout(_requestTimeout);
+      final response = await measureRpc(
+        _diagnostics,
+        'set_my_presence_watch_scope',
+        () => _client
+            .rpc<List<dynamic>>(
+              'set_my_presence_watch_scope',
+              params: {
+                'target_session_id': sessionId,
+                'scope_key': scopeId,
+                'target_user_ids': userIds.toList(growable: false),
+              },
+            )
+            .timeout(_requestTimeout),
+      );
       if (_sessionId != sessionId) return false;
       _statusStore.recordAll({
         for (final item in response)

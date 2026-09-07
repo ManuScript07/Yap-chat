@@ -57,17 +57,20 @@ class RepositoryContainer {
     final userRealtime = UserRealtimeDataSource(
       client: client,
       talker: config.talker,
+      diagnostics: config.diagnostics,
     );
     final chatsRemote = ChatsRemoteDataSource(
       client: client,
       talker: config.talker,
       userRealtime: userRealtime,
       presenceStore: presenceStore,
+      diagnostics: config.diagnostics,
     );
     final friendsRemote = FriendsRemoteDataSource(
       client: client,
       talker: config.talker,
       presenceStore: presenceStore,
+      diagnostics: config.diagnostics,
     );
     final friendsCache = FriendsCacheDataSource(
       database: config.database,
@@ -80,7 +83,10 @@ class RepositoryContainer {
     );
     final settingsRepository = SettingsRepository(
       cache: SettingsCacheDataSource(database: config.database),
-      remote: SettingsRemoteDataSource(client: client),
+      remote: SettingsRemoteDataSource(
+        client: client,
+        diagnostics: config.diagnostics,
+      ),
       accountSessionController: config.accountSessionController,
     );
     final nearbyRepository = NearbyRepository(
@@ -91,6 +97,7 @@ class RepositoryContainer {
       remote: NearbyRemoteDataSource(
         client: client,
         presenceStore: presenceStore,
+        diagnostics: config.diagnostics,
       ),
       mediaCache: mediaCache,
       accountSessionController: config.accountSessionController,
@@ -101,7 +108,10 @@ class RepositoryContainer {
       database: config.database,
       profileCache: profileCache,
     );
-    final chatRemote = ChatRemoteDataSource(client: client);
+    final chatRemote = ChatRemoteDataSource(
+      client: client,
+      diagnostics: config.diagnostics,
+    );
     final messageHydrator = ChatMessageHydrator(
       config: config,
       remote: chatRemote,
@@ -113,6 +123,7 @@ class RepositoryContainer {
       hydrator: messageHydrator,
       chatsCache: chatsCache,
       accountSessionController: config.accountSessionController,
+      diagnostics: config.diagnostics,
     );
     return RepositoryContainer(
       mediaCache: mediaCache,
@@ -141,6 +152,7 @@ class RepositoryContainer {
       locationRepository: LocationRepository(
         preferences: config.preferences,
         client: client,
+        diagnostics: config.diagnostics,
       ),
       audioRecorderRepository: AudioRecorderRepository(),
       audioPlayerRepository: AudioPlayerRepository(),
@@ -150,6 +162,7 @@ class RepositoryContainer {
         useAnonymousSignIn: config.isLocal,
         oauthAttemptCoordinator: config.oauthAttemptCoordinator,
         accountSessionController: config.accountSessionController,
+        diagnostics: config.diagnostics,
         accountAccessCache: AuthAccountAccessCacheDataSource(
           preferences: config.preferences,
           environment: config.environment.name,
@@ -172,12 +185,14 @@ class RepositoryContainer {
         ),
         accountSessionController: config.accountSessionController,
         presenceStore: presenceStore,
+        diagnostics: config.diagnostics,
       ),
       presenceRepository: PresenceRepository(
         client: client,
         talker: config.talker,
         userRealtime: userRealtime,
         statusStore: presenceStore,
+        diagnostics: config.diagnostics,
       ),
       pushNotificationsRepository:
           config.isLocal || config.firebaseMessaging == null
@@ -188,6 +203,7 @@ class RepositoryContainer {
               preferences: config.preferences,
               talker: config.talker,
               accountSessionController: config.accountSessionController,
+              diagnostics: config.diagnostics,
             ),
       friendsRepository: FriendsRepository(
         config: config,
@@ -203,11 +219,17 @@ class RepositoryContainer {
           preferences: config.preferences,
           namespace: config.environment.name,
         ),
-        remote: BlocklistRemoteDataSource(client: client),
+        remote: BlocklistRemoteDataSource(
+          client: client,
+          diagnostics: config.diagnostics,
+        ),
         accountSessionController: config.accountSessionController,
       ),
       userReportsRepository: UserReportsRepository(
-        remote: UserReportsRemoteDataSource(client: client),
+        remote: UserReportsRemoteDataSource(
+          client: client,
+          diagnostics: config.diagnostics,
+        ),
         cache: UserReportsCacheDataSource(
           preferences: config.preferences,
           environment: config.environment.name,

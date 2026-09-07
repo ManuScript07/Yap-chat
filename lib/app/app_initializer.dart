@@ -53,6 +53,7 @@ class _AppInitializerState extends State<AppInitializer> {
             ),
             remote: AppPublicContentRemoteDataSource(
               client: widget.config.requireSupabaseClient(),
+              diagnostics: widget.config.diagnostics,
             ),
           );
     _connectionCoordinator = AppConnectionCoordinator(
@@ -101,6 +102,10 @@ class _AppInitializerState extends State<AppInitializer> {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppConfig>.value(value: widget.config),
+        if (widget.config.diagnostics != null)
+          RepositoryProvider<AppDiagnostics>.value(
+            value: widget.config.diagnostics!,
+          ),
         RepositoryProvider<AccountSessionController>.value(
           value: widget.config.accountSessionController,
         ),

@@ -44,6 +44,7 @@ class SettingsRow extends StatelessWidget {
     required this.icon,
     required this.title,
     this.onTap,
+    this.onLongPress,
     this.trailing,
     this.showChevron = true,
   });
@@ -51,6 +52,7 @@ class SettingsRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Widget? trailing;
   final bool showChevron;
 
@@ -61,6 +63,7 @@ class SettingsRow extends StatelessWidget {
       color: colorScheme.surface.withValues(alpha: 0),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.zero,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
@@ -165,7 +168,9 @@ class SettingsToggleRow extends StatelessWidget {
                   onChanged: onChanged,
                   activeTrackColor: colorScheme.primary,
                   activeThumbColor: colorScheme.onPrimary,
-                  inactiveTrackColor: colorScheme.surface.withValues(alpha: .18),
+                  inactiveTrackColor: colorScheme.surface.withValues(
+                    alpha: .18,
+                  ),
                   inactiveThumbColor: colorScheme.onSurfaceVariant,
                   trackOutlineColor: WidgetStatePropertyAll(
                     colorScheme.surface.withValues(alpha: 0),

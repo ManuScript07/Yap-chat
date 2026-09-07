@@ -116,6 +116,12 @@ Future<void> main() async {
     env: Map.unmodifiable(dotenv.env),
     database: database,
     accountSessionController: accountSessionController,
+    // Do not even wire diagnostics into normal or release builds. This keeps
+    // the instrumentation fully opt-in and prevents an accidental define in a
+    // release pipeline from enabling it.
+    diagnostics: kDebugMode && const bool.fromEnvironment('ENABLE_DIAGNOSTICS')
+        ? AppDiagnostics(enabled: true)
+        : null,
     oauthAttemptCoordinator: oauthAttemptCoordinator,
     supabaseClient: supabaseClient,
     firebaseMessaging: firebaseMessaging,

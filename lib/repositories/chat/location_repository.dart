@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 
 typedef LocationPositionGetter =
@@ -39,6 +40,7 @@ class LocationRepository implements ILocationRepository {
     String? Function()? currentUserId,
     double Function(double, double, double, double)? distanceBetween,
     Duration locationPublishTimeout = defaultLocationPublishTimeout,
+    AppDiagnostics? diagnostics,
   }) : _preferences = preferences,
        _client = client,
        _isLocationServiceEnabled =
@@ -53,7 +55,8 @@ class LocationRepository implements ILocationRepository {
        _publishLocationMetadata = publishLocationMetadata,
        _currentUserId = currentUserId ?? (() => client?.auth.currentUser?.id),
        _distanceBetween = distanceBetween ?? Geolocator.distanceBetween,
-       _locationPublishTimeout = locationPublishTimeout;
+       _locationPublishTimeout = locationPublishTimeout,
+       _diagnostics = diagnostics;
 
   static const minimumMovementMeters = 100.0;
   static const maximumUnchangedAge = Duration(hours: 12);
@@ -71,6 +74,7 @@ class LocationRepository implements ILocationRepository {
   final String? Function() _currentUserId;
   final double Function(double, double, double, double) _distanceBetween;
   final Duration _locationPublishTimeout;
+  final AppDiagnostics? _diagnostics;
 
   @override
   Future<Position> getCurrentPosition() async {
@@ -314,9 +318,13 @@ class LocationRepository implements ILocationRepository {
         updatedAt: didUpdate ? DateTime.now().toUtc() : null,
       );
     }
-    final response = await _client!.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'update_my_location_with_metadata',
-      params: {'new_latitude': latitude, 'new_longitude': longitude},
+      () => _client!.rpc<List<dynamic>>(
+        'update_my_location_with_metadata',
+        params: {'new_latitude': latitude, 'new_longitude': longitude},
+      ),
     );
     if (response.isEmpty || response.first is! Map) {
       throw StateError('Location metadata response is missing.');

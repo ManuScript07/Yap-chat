@@ -1,22 +1,35 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 
 class SettingsRemoteDataSource {
-  const SettingsRemoteDataSource({required SupabaseClient client})
-    : _client = client;
+  const SettingsRemoteDataSource({
+    required SupabaseClient client,
+    AppDiagnostics? diagnostics,
+  }) : _client = client,
+       _diagnostics = diagnostics;
 
   final SupabaseClient _client;
+  final AppDiagnostics? _diagnostics;
 
   Future<AppLanguage?> fetchAppLanguage() async {
-    final response = await _client.rpc<List<dynamic>>('get_my_app_language');
+    final response = await measureRpc(
+      _diagnostics,
+      'get_my_app_language',
+      () => _client.rpc<List<dynamic>>('get_my_app_language'),
+    );
     if (response.isEmpty) return null;
     return AppLanguage.tryParse((response.first as Map)['language_code']);
   }
 
   Future<AppLanguage> updateAppLanguage(AppLanguage language) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'set_my_app_language',
-      params: {'language_code': language.code},
+      () => _client.rpc<List<dynamic>>(
+        'set_my_app_language',
+        params: {'language_code': language.code},
+      ),
     );
     if (response.isEmpty) {
       throw StateError('Supabase returned no updated app language');
@@ -31,8 +44,10 @@ class SettingsRemoteDataSource {
   }
 
   Future<SearchPrivacySettings> fetchSearchPrivacySettings() async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_my_search_privacy_settings',
+      () => _client.rpc<List<dynamic>>('get_my_search_privacy_settings'),
     );
     if (response.isEmpty) return const SearchPrivacySettings();
     return _map(response.first);
@@ -42,9 +57,13 @@ class SettingsRemoteDataSource {
     SearchPrivacySettingKey key,
     bool value,
   ) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'set_my_search_privacy_setting',
-      params: {'setting_key': key.name, 'is_enabled': value},
+      () => _client.rpc<List<dynamic>>(
+        'set_my_search_privacy_setting',
+        params: {'setting_key': key.name, 'is_enabled': value},
+      ),
     );
     if (response.isEmpty) {
       throw StateError('Supabase returned no updated search privacy settings');
@@ -55,9 +74,13 @@ class SettingsRemoteDataSource {
   Future<SearchPrivacySettings> updateLastSeenVisibility(
     LastSeenVisibility visibility,
   ) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'set_my_last_seen_visibility',
-      params: {'visibility': visibility.name},
+      () => _client.rpc<List<dynamic>>(
+        'set_my_last_seen_visibility',
+        params: {'visibility': visibility.name},
+      ),
     );
     if (response.isEmpty) {
       throw StateError('Supabase returned no updated privacy settings');
@@ -85,12 +108,16 @@ class SettingsRemoteDataSource {
     required bool sharePreciseLocation,
     required bool shareDistance,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'set_my_location_visibility',
-      params: {
-        'is_precise_location_shared': sharePreciseLocation,
-        'is_distance_shared': shareDistance,
-      },
+      () => _client.rpc<List<dynamic>>(
+        'set_my_location_visibility',
+        params: {
+          'is_precise_location_shared': sharePreciseLocation,
+          'is_distance_shared': shareDistance,
+        },
+      ),
     );
     if (response.isEmpty) {
       throw StateError('Supabase returned no privacy settings');
@@ -99,8 +126,10 @@ class SettingsRemoteDataSource {
   }
 
   Future<Set<String>> fetchPreciseLocationExclusions() async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'get_my_precise_location_exclusions',
+      () => _client.rpc<List<dynamic>>('get_my_precise_location_exclusions'),
     );
     return response
         .map((row) => (row as Map)['viewer_user_id'] as String)
@@ -111,9 +140,13 @@ class SettingsRemoteDataSource {
     String friendUserId, {
     required bool excluded,
   }) async {
-    final response = await _client.rpc<List<dynamic>>(
+    final response = await measureRpc(
+      _diagnostics,
       'set_precise_location_excluded',
-      params: {'friend_user_id': friendUserId, 'is_excluded': excluded},
+      () => _client.rpc<List<dynamic>>(
+        'set_precise_location_excluded',
+        params: {'friend_user_id': friendUserId, 'is_excluded': excluded},
+      ),
     );
     return response
         .map((row) => (row as Map)['viewer_user_id'] as String)

@@ -1,5 +1,6 @@
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/services/account_session_controller.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/chat_message_hydrator.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
@@ -12,11 +13,13 @@ class ConversationSyncService {
     required ChatMessageHydrator hydrator,
     required ChatsCacheDataSource chatsCache,
     required AccountSessionController accountSessionController,
+    AppDiagnostics? diagnostics,
   }) : _cache = cache,
        _remote = remote,
        _hydrator = hydrator,
        _chatsCache = chatsCache,
-       _accountSessionController = accountSessionController;
+       _accountSessionController = accountSessionController,
+       _diagnostics = diagnostics;
 
   static const pageSize = 60;
 
@@ -25,6 +28,7 @@ class ConversationSyncService {
   final ChatMessageHydrator _hydrator;
   final ChatsCacheDataSource _chatsCache;
   final AccountSessionController _accountSessionController;
+  final AppDiagnostics? _diagnostics;
   final Map<String, Future<List<ChatMessage>>> _activeSyncs = {};
   final Map<String, int> _openConversationCounts = {};
   String? _openConversationPrefix;
@@ -91,7 +95,12 @@ class ConversationSyncService {
       }
     }
 
-    final sync = _performSync(chatId, scope);
+    final sync =
+        _diagnostics?.measureSync(
+          'conversation',
+          () => _performSync(chatId, scope),
+        ) ??
+        _performSync(chatId, scope);
     _activeSyncs[operationKey] = sync;
     return sync.whenComplete(() {
       if (identical(_activeSyncs[operationKey], sync)) {
@@ -138,6 +147,7 @@ class ConversationSyncService {
       );
       await refreshLocalPreview(chatId, ownerUserId: scope.userId);
     });
+    _diagnostics?.recordSyncItems('conversation', hydrated.length);
     return hydrated;
   }
 

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:permission_handler/permission_handler.dart' as permissions;
 import 'package:yap_chat/core/services/account_session_controller.dart';
+import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/features/notifications/data/data.dart';
 import 'package:yap_chat/repositories/notifications/abstract_push_notifications_repository.dart';
 import 'package:yap_chat/repositories/notifications/android_notification_service.dart';
@@ -20,11 +21,13 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
     required Talker talker,
     required AccountSessionController accountSessionController,
     AndroidNotificationService? notificationService,
+    AppDiagnostics? diagnostics,
   }) : _client = client,
        _messaging = messaging,
        _preferences = preferences,
        _talker = talker,
        _accountSessionController = accountSessionController,
+       _diagnostics = diagnostics,
        _notificationService =
            notificationService ?? AndroidNotificationService();
 
@@ -36,6 +39,7 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
   final SharedPreferences _preferences;
   final Talker _talker;
   final AccountSessionController _accountSessionController;
+  final AppDiagnostics? _diagnostics;
   final AndroidNotificationService _notificationService;
   final StreamController<String> _openedConversationController =
       StreamController.broadcast(sync: true);
@@ -139,9 +143,13 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
           token != null &&
           token.isNotEmpty &&
           _client.auth.currentUser?.id == userId) {
-        await _client.rpc(
+        await measureRpc(
+          _diagnostics,
           'unregister_push_device',
-          params: {'device_token': token},
+          () => _client.rpc(
+            'unregister_push_device',
+            params: {'device_token': token},
+          ),
         );
       }
     } catch (error, stackTrace) {
@@ -257,13 +265,17 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
       // The database upsert moves a token from a previous account to this one
       // in one transaction. Guarding the snapshot keeps an old async token
       // callback from ever issuing that transfer after an account switch.
-      await _client.rpc(
+      await measureRpc(
+        _diagnostics,
         'register_push_device',
-        params: {
-          'device_token': token,
-          'device_locale': _deviceLanguageCode,
-          'device_app_version': null,
-        },
+        () => _client.rpc(
+          'register_push_device',
+          params: {
+            'device_token': token,
+            'device_locale': _deviceLanguageCode,
+            'device_app_version': null,
+          },
+        ),
       );
     } catch (error, stackTrace) {
       _talker.handle(error, stackTrace, 'Push token registration failed');
