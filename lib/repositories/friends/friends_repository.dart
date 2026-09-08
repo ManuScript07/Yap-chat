@@ -11,7 +11,8 @@ import 'package:yap_chat/repositories/friends/friends_remote_data_source.dart';
 
 class FriendsRepository
     implements IFriendsRepository, IProfileFriendsRepository {
-  static const _locationCacheTtl = Duration(minutes: 10);
+  static const _friendLocationCacheTtl = Duration(minutes: 4);
+  static const _distanceCacheTtl = Duration(minutes: 10);
   static const _realtimeSyncDebounce = Duration(milliseconds: 250);
 
   FriendsRepository({
@@ -701,10 +702,14 @@ class FriendsRepository
       ownerUserId: scope.userId,
     );
     _accountSessionController.ensureCurrent(scope);
-    if (cached != null && _isLocationTimestampCurrent(cached.updatedAt)) {
+    final visibilityHidden =
+        cached != null && _isLocationVisibilityHidden(scope, friendId);
+    if (cached != null &&
+        (!visibilityHidden ||
+            _isRestrictedLocationTimestampCurrent(cached.updatedAt))) {
       final isFresh = await _cache.hasFreshLocation(
         friendId,
-        maxAge: _locationCacheTtl,
+        maxAge: _friendLocationCacheTtl,
         ownerUserId: scope.userId,
       );
       if (!isFresh) {
@@ -713,10 +718,10 @@ class FriendsRepository
       return FriendLocationLookup.current(cached);
     }
     if (cached != null) {
-      await _accountSessionController.commit(
-        scope,
-        () => _cache.removeLocation(friendId, ownerUserId: scope.userId),
-      );
+      await _accountSessionController.commit(scope, () async {
+        await _cache.removeLocation(friendId, ownerUserId: scope.userId);
+        await _setLocationVisibilityHidden(scope, friendId, false);
+      });
     }
     return _refreshFriendLocation(friendId, scope);
   }
@@ -729,13 +734,17 @@ class FriendsRepository
       ownerUserId: scope.userId,
     );
     _accountSessionController.ensureCurrent(scope);
-    if (cached == null || _isLocationTimestampCurrent(cached.updatedAt)) {
+    final visibilityHidden =
+        cached != null && _isLocationVisibilityHidden(scope, friendId);
+    if (cached == null ||
+        !visibilityHidden ||
+        _isRestrictedLocationTimestampCurrent(cached.updatedAt)) {
       return cached;
     }
-    await _accountSessionController.commit(
-      scope,
-      () => _cache.removeLocation(friendId, ownerUserId: scope.userId),
-    );
+    await _accountSessionController.commit(scope, () async {
+      await _cache.removeLocation(friendId, ownerUserId: scope.userId);
+      await _setLocationVisibilityHidden(scope, friendId, false);
+    });
     return null;
   }
 
@@ -744,7 +753,7 @@ class FriendsRepository
     final scope = _accountSessionController.capture();
     final cached = await _cache.readDistance(userId, ownerUserId: scope.userId);
     _accountSessionController.ensureCurrent(scope);
-    if (cached == null || _isLocationTimestampCurrent(cached.updatedAt)) {
+    if (cached == null || _isDistanceTimestampCurrent(cached.updatedAt)) {
       return cached;
     }
     await _accountSessionController.commit(
@@ -761,7 +770,7 @@ class FriendsRepository
     if (cached == null) return false;
     return _cache.hasFreshDistance(
       userId,
-      maxAge: _locationCacheTtl,
+      maxAge: _distanceCacheTtl,
       ownerUserId: scope.userId,
     );
   }
@@ -790,10 +799,10 @@ class FriendsRepository
     final cached = await _cache.readDistance(userId, ownerUserId: scope.userId);
     _accountSessionController.ensureCurrent(scope);
     if (cached != null &&
-        _isLocationTimestampCurrent(cached.updatedAt) &&
+        _isDistanceTimestampCurrent(cached.updatedAt) &&
         await _cache.hasFreshDistance(
           userId,
-          maxAge: _locationCacheTtl,
+          maxAge: _distanceCacheTtl,
           ownerUserId: scope.userId,
         )) {
       return cached;
@@ -818,7 +827,7 @@ class FriendsRepository
         userId,
         ownerUserId: scope.userId,
       );
-      if (fallback != null && _isLocationTimestampCurrent(fallback.updatedAt)) {
+      if (fallback != null && _isDistanceTimestampCurrent(fallback.updatedAt)) {
         return fallback;
       }
       rethrow;
@@ -867,12 +876,16 @@ class FriendsRepository
         final location = lookup.location;
         if (lookup.availability == FriendLocationAvailability.unavailable) {
           await _cache.removeLocation(friendId, ownerUserId: scope.userId);
+          await _setLocationVisibilityHidden(scope, friendId, false);
+        } else if (lookup.availability == FriendLocationAvailability.hidden) {
+          await _setLocationVisibilityHidden(scope, friendId, true);
         } else if (location != null) {
           await _cache.writeLocation(
             friendId,
             location,
             ownerUserId: scope.userId,
           );
+          await _setLocationVisibilityHidden(scope, friendId, false);
         }
       });
       return lookup;
@@ -900,10 +913,40 @@ class FriendsRepository
     }
   }
 
-  bool _isLocationTimestampCurrent(DateTime updatedAt) {
+  bool _isDistanceTimestampCurrent(DateTime updatedAt) {
     final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
     return !age.isNegative && age < const Duration(hours: 24);
   }
+
+  bool _isRestrictedLocationTimestampCurrent(DateTime updatedAt) {
+    final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
+    return !age.isNegative && age < const Duration(hours: 24);
+  }
+
+  bool _isLocationVisibilityHidden(
+    AccountSessionSnapshot scope,
+    String friendId,
+  ) =>
+      _config.preferences.getBool(_locationVisibilityKey(scope, friendId)) ??
+      false;
+
+  Future<void> _setLocationVisibilityHidden(
+    AccountSessionSnapshot scope,
+    String friendId,
+    bool value,
+  ) async {
+    final key = _locationVisibilityKey(scope, friendId);
+    if (value) {
+      await _config.preferences.setBool(key, true);
+    } else {
+      await _config.preferences.remove(key);
+    }
+  }
+
+  String _locationVisibilityKey(
+    AccountSessionSnapshot scope,
+    String friendId,
+  ) => 'friend_location_visibility.${scope.userId}.$friendId.hidden';
 
   @override
   Future<void> pauseRealtime() {

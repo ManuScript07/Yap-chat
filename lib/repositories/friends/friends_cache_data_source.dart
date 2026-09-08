@@ -116,7 +116,6 @@ class FriendsCacheDataSource {
         hasMore: hasMore,
         totalCount: page.totalCount,
       );
-      await _removeExpiredLocations(owner);
     });
   }
 
@@ -168,7 +167,6 @@ class FriendsCacheDataSource {
         hasMore: cachedCount < page.totalCount && page.hasMore,
         totalCount: page.totalCount,
       );
-      await _removeExpiredLocations(owner);
     });
   }
 
@@ -432,7 +430,6 @@ class FriendsCacheDataSource {
           totalCount: friends.length,
         );
       }
-      await _removeExpiredLocations(owner);
       return false;
     }
 
@@ -483,7 +480,6 @@ class FriendsCacheDataSource {
           totalCount: friends.length,
         );
       }
-      await _removeExpiredLocations(owner);
     });
     return true;
   }
@@ -558,41 +554,6 @@ class FriendsCacheDataSource {
   bool _sameSecond(DateTime first, DateTime second) =>
       first.millisecondsSinceEpoch ~/ 1000 ==
       second.millisecondsSinceEpoch ~/ 1000;
-
-  Future<void> _removeExpiredLocations(String owner) async {
-    final cachedLocations = await (_database.select(
-      _database.cachedFriendLocations,
-    )..where((table) => table.ownerUserId.equals(owner))).get();
-    final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 24));
-    final expiredLocationIds = cachedLocations
-        .where(
-          (row) => DateTime.fromMillisecondsSinceEpoch(
-            row.locationUpdatedAtMs,
-            isUtc: true,
-          ).isBefore(cutoff),
-        )
-        .map((row) => row.friendUserId)
-        .toList(growable: false);
-    const deleteBatchSize = 500;
-    for (
-      var offset = 0;
-      offset < expiredLocationIds.length;
-      offset += deleteBatchSize
-    ) {
-      final end = (offset + deleteBatchSize).clamp(
-        0,
-        expiredLocationIds.length,
-      );
-      await (_database.delete(_database.cachedFriendLocations)..where(
-            (table) =>
-                table.ownerUserId.equals(owner) &
-                table.friendUserId.isIn(
-                  expiredLocationIds.sublist(offset, end),
-                ),
-          ))
-          .go();
-    }
-  }
 
   Future<void> addRequest(FriendRequest request, {String? ownerUserId}) =>
       _database

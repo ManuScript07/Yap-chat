@@ -11,7 +11,7 @@ class LocationTrackingCoordinator {
   LocationTrackingCoordinator({
     required ILocationRepository locationRepository,
     required Talker talker,
-    this.refreshInterval = const Duration(minutes: 10),
+    this.refreshInterval = const Duration(minutes: 4),
   }) : _locationRepository = locationRepository,
        _talker = talker;
 
