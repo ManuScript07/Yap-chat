@@ -11,6 +11,7 @@ class AppPublicContent extends Equatable {
     this.privacyPolicyUrlRu,
     this.privacyPolicyUrlEn,
     this.telegramUrl,
+    this.githubUrl,
     this.updatedAt,
   });
 
@@ -20,6 +21,7 @@ class AppPublicContent extends Equatable {
   final String? privacyPolicyUrlRu;
   final String? privacyPolicyUrlEn;
   final String? telegramUrl;
+  final String? githubUrl;
   final DateTime? updatedAt;
 
   String? legalUrl(LegalDocument document, String languageCode) {
@@ -41,21 +43,28 @@ class AppPublicContent extends Equatable {
     'privacyPolicyUrlRu': privacyPolicyUrlRu,
     'privacyPolicyUrlEn': privacyPolicyUrlEn,
     'telegramUrl': telegramUrl,
+    'githubUrl': githubUrl,
     'updatedAt': updatedAt?.toUtc().toIso8601String(),
   };
 
   factory AppPublicContent.fromJson(Map<String, dynamic> json) =>
       AppPublicContent(
-        supportEmail: json['supportEmail'] as String?,
-        termsUrlRu: json['termsUrlRu'] as String?,
-        termsUrlEn: json['termsUrlEn'] as String?,
-        privacyPolicyUrlRu: json['privacyPolicyUrlRu'] as String?,
-        privacyPolicyUrlEn: json['privacyPolicyUrlEn'] as String?,
-        telegramUrl: json['telegramUrl'] as String?,
+        supportEmail: _optionalString(json['supportEmail']),
+        termsUrlRu: _optionalString(json['termsUrlRu']),
+        termsUrlEn: _optionalString(json['termsUrlEn']),
+        privacyPolicyUrlRu: _optionalString(json['privacyPolicyUrlRu']),
+        privacyPolicyUrlEn: _optionalString(json['privacyPolicyUrlEn']),
+        telegramUrl: _optionalString(json['telegramUrl']),
+        githubUrl: _optionalString(json['githubUrl']),
         updatedAt: DateTime.tryParse(
-          json['updatedAt'] as String? ?? '',
+          _optionalString(json['updatedAt']) ?? '',
         )?.toUtc(),
       );
+
+  static String? _optionalString(Object? value) {
+    final result = value is String ? value.trim() : '';
+    return result.isEmpty ? null : result;
+  }
 
   @override
   List<Object?> get props => [
@@ -65,6 +74,7 @@ class AppPublicContent extends Equatable {
     privacyPolicyUrlRu,
     privacyPolicyUrlEn,
     telegramUrl,
+    githubUrl,
     updatedAt,
   ];
 }

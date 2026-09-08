@@ -297,7 +297,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsComingSoon => 'скоро';
 
   @override
-  String get settingsTerms => 'условия обслуживания';
+  String get settingsTerms => 'пользовательское соглашение';
 
   @override
   String get settingsPrivacyPolicy => 'политика конфиденциальности';
@@ -442,7 +442,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'При первом входе мы перенесём доступные данные профиля из Яндекс ID.';
 
   @override
-  String get authConsentPrefix => 'При входе и регистрации вы принимаете наши';
+  String get authConsentPrefix => 'При входе или регистрации вы принимаете';
 
   @override
   String get authSignInFailed =>
@@ -532,7 +532,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authAcceptDocuments => 'Я принимаю условия использования сервиса';
 
   @override
-  String get authTermsOfService => 'Условия обслуживания';
+  String get authTermsOfService => 'Пользовательское соглашение';
 
   @override
   String get authDocumentsAnd => 'и';

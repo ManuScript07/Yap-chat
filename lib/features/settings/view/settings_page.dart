@@ -30,7 +30,7 @@ class _SettingsPage extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     return BlocListener<AppLanguageCubit, AppLanguageState>(
       listenWhen: (previous, current) =>
-          previous.feedbackId != current.feedbackId &&
+      previous.feedbackId != current.feedbackId &&
           current.feedback == AppLanguageFeedback.failure,
       listener: (context, state) {
         showAppSnackBar(
@@ -40,147 +40,152 @@ class _SettingsPage extends StatelessWidget {
         );
       },
       child: BlocBuilder<AppLanguageCubit, AppLanguageState>(
-        builder: (context, languageState) => Scaffold(
-          backgroundColor: context.scaffoldBackgroundColor,
-          extendBodyBehindAppBar: true,
-          appBar: SettingsPageAppBar(title: context.l10n.settingsTitle),
-          body: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.only(top: 130),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    SettingsRow(
-                      icon: Icons.privacy_tip_outlined,
-                      title: context.l10n.settingsPrivacy,
-                      onTap: () => Navigator.of(context).push<void>(
-                        settingsSlideRightRoute<void>(
-                          const PrivacySettingsPage(),
-                        ),
-                      ),
-                    ),
-                    SettingsRow(
-                      icon: Icons.visibility_outlined,
-                      title: context.l10n.settingsVisibility,
-                      onTap: () => Navigator.of(context).push<void>(
-                        settingsSlideRightRoute<void>(
-                          const VisibilitySettingsPage(),
-                        ),
-                      ),
-                    ),
-                    SettingsRow(
-                      icon: Icons.language_rounded,
-                      title: context.l10n.settingsLanguage,
-                      onTap: () async {
-                        final saved = await showLanguageSheet(context);
-                        if (!context.mounted || saved != true) return;
-                        showAppSnackBar(
-                          context,
-                          message: context.l10n.settingsLanguageSaved,
-                          type: SnackBarType.success,
-                        );
-                      },
-                      trailing: Text(
-                        _languageLabel(context, languageState.language),
-                        style: settingsValueStyle(context),
-                      ),
-                    ),
-                    SettingsRow(
-                      icon: Icons.help_outline_rounded,
-                      title: context.l10n.settingsHelp,
-                      onTap: () => showHelpSheet(context),
-                    ),
-                    SettingsRow(
-                      icon: Icons.info_outline_rounded,
-                      title: context.l10n.settingsAbout,
-                      onTap: () => showAboutSheet(context),
-                      onLongPress:
-                          kDebugMode &&
-                              (context.read<AppConfig>().diagnostics?.enabled ??
-                                  false)
-                          ? () => Navigator.of(context).push<void>(
-                              settingsSlideRightRoute<void>(
-                                const AppDiagnosticsPage(),
+        builder: (context, languageState) =>
+            Scaffold(
+              backgroundColor: context.scaffoldBackgroundColor,
+              extendBodyBehindAppBar: true,
+              appBar: SettingsPageAppBar(title: context.l10n.settingsTitle),
+              body: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.only(top: 130),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        SettingsRow(
+                          icon: Icons.privacy_tip_outlined,
+                          title: context.l10n.settingsPrivacy,
+                          onTap: () =>
+                              Navigator.of(context).push<void>(
+                                settingsSlideRightRoute<void>(
+                                  const PrivacySettingsPage(),
+                                ),
                               ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: 34),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16 + mediaQuery.padding.left,
-                        0,
-                        16 + mediaQuery.padding.right,
-                        0,
-                      ),
-                      child: Text(
-                        context.l10n.settingsSocial.toLowerCase(),
-                        style: settingsValueStyle(context),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    BlocBuilder<AppPublicContentCubit, AppPublicContentState>(
-                      builder: (context, contentState) {
-                        final telegramUrl = contentState.content?.telegramUrl;
-                        return Padding(
+                        ),
+                        SettingsRow(
+                          icon: Icons.visibility_outlined,
+                          title: context.l10n.settingsVisibility,
+                          onTap: () =>
+                              Navigator.of(context).push<void>(
+                                settingsSlideRightRoute<void>(
+                                  const VisibilitySettingsPage(),
+                                ),
+                              ),
+                        ),
+                        SettingsRow(
+                          icon: Icons.language_rounded,
+                          title: context.l10n.settingsLanguage,
+                          onTap: () async {
+                            final saved = await showLanguageSheet(context);
+                            if (!context.mounted || saved != true) return;
+                            showAppSnackBar(
+                              context,
+                              message: context.l10n.settingsLanguageSaved,
+                              type: SnackBarType.success,
+                            );
+                          },
+                          trailing: Text(
+                            _languageLabel(context, languageState.language),
+                            style: settingsValueStyle(context),
+                          ),
+                        ),
+                        SettingsRow(
+                          icon: Icons.help_outline_rounded,
+                          title: context.l10n.settingsHelp,
+                          onTap: () => showHelpSheet(context),
+                        ),
+                        SettingsRow(
+                          icon: Icons.info_outline_rounded,
+                          title: context.l10n.settingsAbout,
+                          onTap: () => showAboutSheet(context),
+                          onLongPress:
+                          kDebugMode &&
+                              (context
+                                  .read<AppConfig>()
+                                  .diagnostics
+                                  ?.enabled ??
+                                  false)
+                              ? () =>
+                              Navigator.of(context).push<void>(
+                                settingsSlideRightRoute<void>(
+                                  const AppDiagnosticsPage(),
+                                ),
+                              )
+                              : null,
+                        ),
+                        const SizedBox(height: 34),
+                        Padding(
                           padding: EdgeInsets.fromLTRB(
                             16 + mediaQuery.padding.left,
                             0,
                             16 + mediaQuery.padding.right,
                             0,
                           ),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Semantics(
-                              button: telegramUrl != null,
-                              label: 'Telegram',
-                              child: GestureDetector(
-                                onTap: telegramUrl == null
-                                    ? null
-                                    : () => _openTelegram(telegramUrl),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: SvgPicture.asset(
-                                    'assets/logo/telegram_logo.svg',
-                                    width: 34,
-                                    height: 34,
-                                    colorFilter: ColorFilter.mode(
-                                      context.colorScheme.onSurfaceVariant,
-                                      BlendMode.srcIn,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                          child: Text(
+                            context.l10n.settingsSocial.toLowerCase(),
+                            style: settingsValueStyle(context),
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 14),
+                        BlocBuilder<AppPublicContentCubit,
+                            AppPublicContentState>(
+                          builder: (context, contentState) {
+                            final telegramUrl = contentState.content
+                                ?.telegramUrl;
+                            final githubUrl = contentState.content?.githubUrl;
+                            return Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                16 + mediaQuery.padding.left,
+                                0,
+                                16 + mediaQuery.padding.right,
+                                0,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _SocialLinkIcon(
+                                    label: 'Telegram',
+                                    assetPath: 'assets/logo/telegram_logo.svg',
+                                    url: telegramUrl,
+                                    onOpen: _openExternalUrl,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  _SocialLinkIcon(
+                                    label: 'GitHub',
+                                    assetPath: 'assets/logo/github.svg',
+                                    url: githubUrl,
+                                    onOpen: _openExternalUrl,
+                                    size: 40,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 44),
+                      ]),
                     ),
-                    const SizedBox(height: 44),
-                  ]),
-                ),
+                  ),
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Spacer(),
+                        _SettingsTextAction(
+                          title: context.l10n.settingsLogout,
+                          onTap: () => _confirmLogout(context),
+                        ),
+                        _SettingsTextAction(
+                          title: context.l10n.settingsDeleteAccount,
+                          onTap: () => _showComingSoon(context),
+                        ),
+                        SizedBox(height: mediaQuery.padding.bottom + 24),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Spacer(),
-                    _SettingsTextAction(
-                      title: context.l10n.settingsLogout,
-                      onTap: () => _confirmLogout(context),
-                    ),
-                    _SettingsTextAction(
-                      title: context.l10n.settingsDeleteAccount,
-                      onTap: () => _showComingSoon(context),
-                    ),
-                    SizedBox(height: mediaQuery.padding.bottom + 24),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
       ),
     );
   }
@@ -192,7 +197,7 @@ class _SettingsPage extends StatelessWidget {
     };
   }
 
-  Future<void> _openTelegram(String rawUrl) async {
+  Future<void> _openExternalUrl(String rawUrl) async {
     final url = Uri.tryParse(rawUrl);
     if (url == null || url.scheme != 'https' || url.host.isEmpty) return;
     try {
@@ -222,6 +227,44 @@ class _SettingsPage extends StatelessWidget {
   }
 }
 
+class _SocialLinkIcon extends StatelessWidget {
+  const _SocialLinkIcon({
+    required this.label,
+    required this.assetPath,
+    required this.url,
+    required this.onOpen,
+    this.size = 34,
+  });
+
+  final String label;
+  final String assetPath;
+  final String? url;
+  final Future<void> Function(String url) onOpen;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) =>
+      Semantics(
+        button: url != null,
+        label: label,
+        child: GestureDetector(
+          onTap: url == null ? null : () => onOpen(url!),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: SvgPicture.asset(
+              assetPath,
+              width: size,
+              height: size,
+              colorFilter: ColorFilter.mode(
+                context.colorScheme.onSurfaceVariant,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
 class _SettingsTextAction extends StatelessWidget {
   const _SettingsTextAction({required this.title, required this.onTap});
 
@@ -235,9 +278,13 @@ class _SettingsTextAction extends StatelessWidget {
       borderRadius: BorderRadius.zero,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          16 + MediaQuery.paddingOf(context).left,
+          16 + MediaQuery
+              .paddingOf(context)
+              .left,
           10,
-          16 + MediaQuery.paddingOf(context).right,
+          16 + MediaQuery
+              .paddingOf(context)
+              .right,
           10,
         ),
         child: Text(title.toLowerCase(), style: settingsValueStyle(context)),

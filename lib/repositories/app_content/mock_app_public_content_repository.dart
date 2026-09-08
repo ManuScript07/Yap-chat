@@ -5,7 +5,7 @@ class MockAppPublicContentRepository implements IAppPublicContentRepository {
   const MockAppPublicContentRepository();
 
   @override
-  Future<AppPublicContent?> readCached() async => null;
+  Future<CachedAppPublicContent?> readCached() async => null;
 
   @override
   Future<AppPublicContent?> refresh() async => null;

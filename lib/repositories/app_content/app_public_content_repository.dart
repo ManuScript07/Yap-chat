@@ -13,12 +13,14 @@ class AppPublicContentRepository implements IAppPublicContentRepository {
   final AppPublicContentRemoteDataSource _remote;
 
   @override
-  Future<AppPublicContent?> readCached() => _cache.read();
+  Future<CachedAppPublicContent?> readCached() => _cache.read();
 
   @override
   Future<AppPublicContent?> refresh() async {
     final content = await _remote.fetch();
-    if (content != null) await _cache.write(content);
+    if (content != null) {
+      await _cache.write(content, fetchedAt: DateTime.now().toUtc());
+    }
     return content;
   }
 }

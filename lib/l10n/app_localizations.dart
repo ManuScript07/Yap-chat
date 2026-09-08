@@ -557,7 +557,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsTerms.
   ///
   /// In ru, this message translates to:
-  /// **'условия обслуживания'**
+  /// **'пользовательское соглашение'**
   String get settingsTerms;
 
   /// No description provided for @settingsPrivacyPolicy.
@@ -809,7 +809,7 @@ abstract class AppLocalizations {
   /// No description provided for @authConsentPrefix.
   ///
   /// In ru, this message translates to:
-  /// **'При входе и регистрации вы принимаете наши'**
+  /// **'При входе или регистрации вы принимаете'**
   String get authConsentPrefix;
 
   /// No description provided for @authSignInFailed.
@@ -983,7 +983,7 @@ abstract class AppLocalizations {
   /// No description provided for @authTermsOfService.
   ///
   /// In ru, this message translates to:
-  /// **'Условия обслуживания'**
+  /// **'Пользовательское соглашение'**
   String get authTermsOfService;
 
   /// No description provided for @authDocumentsAnd.

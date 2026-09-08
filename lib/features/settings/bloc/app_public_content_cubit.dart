@@ -30,6 +30,7 @@ class AppPublicContentCubit extends Cubit<AppPublicContentState> {
     : super(const AppPublicContentState());
 
   final IAppPublicContentRepository _repository;
+  static const _cacheTtl = Duration(hours: 6);
   Future<void>? _activeLoad;
 
   Future<void> load() => _activeLoad ??= _load();
@@ -48,14 +49,17 @@ class AppPublicContentCubit extends Cubit<AppPublicContentState> {
   }
 
   Future<void> _load() async {
-    AppPublicContent? cached;
+    CachedAppPublicContent? cached;
     try {
       cached = await _repository.readCached();
       if (!isClosed && cached != null) {
-        emit(state.copyWith(content: cached));
+        emit(state.copyWith(content: cached.content));
       }
     } catch (_) {
       // A remote refresh can still restore public links after cache damage.
+    }
+    if (cached?.isFresh(now: DateTime.now(), maxAge: _cacheTtl) ?? false) {
+      return;
     }
     if (!isClosed) emit(state.copyWith(isLoading: cached == null));
     try {

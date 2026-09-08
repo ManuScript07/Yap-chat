@@ -435,7 +435,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authConsentPrefix =>
-      'By signing in and registering, you accept our';
+      'By signing in or registering, you agree to the';
 
   @override
   String get authSignInFailed =>
@@ -522,10 +522,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authBirthDatePlaceholder => 'Select a date';
 
   @override
-  String get authAcceptDocuments => 'I accept the terms of service';
+  String get authAcceptDocuments => 'I accept the terms of use';
 
   @override
-  String get authTermsOfService => 'Terms of Service';
+  String get authTermsOfService => 'Terms of Use';
 
   @override
   String get authDocumentsAnd => 'and';
@@ -551,7 +551,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authDocumentsRequired =>
-      'You must accept the Terms of Service and Privacy Policy';
+      'You must accept the Terms of Use and Privacy Policy';
 
   @override
   String get authUsernameTaken => 'This username is already taken';

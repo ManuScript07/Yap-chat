@@ -53,7 +53,6 @@ class _AppInitializerState extends State<AppInitializer> {
             ),
             remote: AppPublicContentRemoteDataSource(
               client: widget.config.requireSupabaseClient(),
-              diagnostics: widget.config.diagnostics,
             ),
           );
     _connectionCoordinator = AppConnectionCoordinator(
