@@ -427,6 +427,7 @@ class _FriendsListState extends State<_FriendsList> {
                         context,
                         searchState,
                         state.friends.map((friend) => friend.id).toSet(),
+                        state.requests,
                       ),
                     ],
                   ],
@@ -441,6 +442,7 @@ class _FriendsListState extends State<_FriendsList> {
     BuildContext context,
     FriendSearchState state,
     Set<String> cachedFriendIds,
+    List<FriendRequest> requests,
   ) {
     final widgets = <Widget>[];
     if (state.status == FriendSearchStatus.loading) {
@@ -462,7 +464,20 @@ class _FriendsListState extends State<_FriendsList> {
       );
       return widgets;
     }
-    if (state.status == FriendSearchStatus.success && state.results.isEmpty) {
+    final candidates = _reconcileGlobalSearchCandidates(
+      state.results,
+      friends: cachedFriendIds,
+      requests: requests,
+    );
+    final visibleCandidates = candidates
+        .where(
+          (candidate) =>
+              candidate.relationship != FriendRelationship.friend ||
+              !cachedFriendIds.contains(candidate.id),
+        )
+        .toList(growable: false);
+    if (state.status == FriendSearchStatus.success &&
+        visibleCandidates.isEmpty) {
       widgets.add(
         SizedBox(
           height: 150,
@@ -477,33 +492,58 @@ class _FriendsListState extends State<_FriendsList> {
     final repository = context.read<IFriendsRepository>();
     final cubit = context.read<FriendSearchCubit>();
     widgets.addAll(
-      state.results
-          .where(
-            (candidate) =>
-                candidate.relationship != FriendRelationship.friend ||
-                !cachedFriendIds.contains(candidate.id),
-          )
-          .map(
-            (candidate) => FriendCandidateItem(
-              key: ValueKey('global:${candidate.id}'),
-              candidate: candidate,
-              friendsLabel: context.l10n.friendsCount,
-              relationshipLabel: (relationship) => switch (relationship) {
-                FriendRelationship.friend => context.l10n.friendsAlreadyAdded,
-                FriendRelationship.outgoing => context.l10n.friendsRequestSent,
-                FriendRelationship.incoming =>
-                  context.l10n.friendsRequestIncoming,
-                FriendRelationship.none => '',
-              },
-              avatarLoader: () => repository.resolveCandidateAvatar(candidate),
-              onAdd: () => cubit.sendRequest(candidate),
-              onTap: () => openViewedProfile(context, userId: candidate.id),
-              onAccept: () => cubit.respondToIncoming(candidate, accept: true),
-              onReject: () => cubit.respondToIncoming(candidate, accept: false),
-            ),
-          ),
+      visibleCandidates.map(
+        (candidate) => FriendCandidateItem(
+          key: ValueKey('global:${candidate.id}'),
+          candidate: candidate,
+          friendsLabel: context.l10n.friendsCount,
+          relationshipLabel: (relationship) => switch (relationship) {
+            FriendRelationship.friend => context.l10n.friendsAlreadyAdded,
+            FriendRelationship.outgoing => context.l10n.friendsRequestSent,
+            FriendRelationship.incoming => context.l10n.friendsRequestIncoming,
+            FriendRelationship.none => '',
+          },
+          avatarLoader: () => repository.resolveCandidateAvatar(candidate),
+          onAdd: () => cubit.sendRequest(candidate),
+          onTap: () => openViewedProfile(context, userId: candidate.id),
+          onAccept: () => cubit.respondToIncoming(candidate, accept: true),
+          onReject: () => cubit.respondToIncoming(candidate, accept: false),
+        ),
+      ),
     );
     return widgets;
+  }
+
+  List<FriendCandidate> _reconcileGlobalSearchCandidates(
+    List<FriendCandidate> candidates, {
+    required Set<String> friends,
+    required List<FriendRequest> requests,
+  }) {
+    final requestsByPeerId = {
+      for (final request in requests) request.peerId: request,
+    };
+    return candidates
+        .map((candidate) {
+          // A returned search state intentionally stays stable while the user is
+          // viewing a profile. The friend/request cache is newer when a realtime
+          // update arrives in that interval, so prefer its relationship without
+          // issuing another search request.
+          if (friends.contains(candidate.id)) {
+            return candidate.copyWith(
+              relationship: FriendRelationship.friend,
+              clearRequestId: true,
+            );
+          }
+          final request = requestsByPeerId[candidate.id];
+          if (request == null) return candidate;
+          return candidate.copyWith(
+            relationship: request.direction == FriendRequestDirection.incoming
+                ? FriendRelationship.incoming
+                : FriendRelationship.outgoing,
+            requestId: request.id,
+          );
+        })
+        .toList(growable: false);
   }
 
   Widget _globalMessage(BuildContext context, String message) {
