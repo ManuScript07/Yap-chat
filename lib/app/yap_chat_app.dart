@@ -68,6 +68,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   late final ProfileNavigationCoordinator _profileNavigator;
   bool _dependenciesInitialized = false;
   String? _activeUserId;
+  String? _servicesStartedForUserId;
   String? _blocklistHydratedUserId;
   final Set<String> _openingNotificationChatIds = <String>{};
   final Set<String> _openingNotificationProfileIds = <String>{};
@@ -132,18 +133,71 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       onError: talker.handle,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _hydrateBlocklistForCurrentAuthState();
+      if (mounted) _restoreAuthenticatedServicesForCurrentAuthState();
     });
   }
 
-  void _hydrateBlocklistForCurrentAuthState() {
+  /// [AuthBloc] can restore a cached authenticated state before this widget's
+  /// listener is mounted (most noticeably on a cold start). In that case no
+  /// state transition reaches the listener below, so bootstrap the same
+  /// account-scoped services from the current state after the first frame.
+  ///
+  /// The normal listener also uses [_startAuthenticatedServices]. Its user-id
+  /// guard deliberately makes the two paths one idempotent operation rather
+  /// than two independent startup sequences.
+  void _restoreAuthenticatedServicesForCurrentAuthState() {
     final authState = context.read<AuthBloc>().state;
     final userId = authState.session?.userId;
     if (authState.status != AuthStatus.authenticated || userId == null) {
       return;
     }
+    _startAuthenticatedServices(userId);
+  }
+
+  void _startAuthenticatedServices(String userId) {
+    if (_servicesStartedForUserId == userId) return;
+    _servicesStartedForUserId = userId;
+
     context.read<AccountSessionController>().setAuthenticatedUser(userId);
     _hydrateBlocklistForUser(userId);
+    unawaited(
+      context.read<AppConnectionCoordinator>().setAuthenticatedUser(userId),
+    );
+    unawaited(
+      context.read<LocationTrackingCoordinator>().setAuthenticatedUser(userId),
+    );
+    unawaited(_initializeNotificationsAndReminder(userId));
+    unawaited(_restoreForegroundAfterAuthentication(userId));
+  }
+
+  /// Android may deliver the OAuth deep link while the previous activity is
+  /// still transitioning out of the browser. In that narrow window the auth
+  /// session is already available, but the regular `resumed` callback can be
+  /// delivered before this widget observes it. The connection coordinator then
+  /// remains paused until the user backgrounds the app once more.
+  ///
+  /// This is only a lifecycle reconciliation: it never forces foreground work
+  /// while Android reports the app as paused or hidden, and all delegates are
+  /// idempotent. Consequently it creates no duplicate Realtime channel or
+  /// network synchronization on a normal sign-in.
+  Future<void> _restoreForegroundAfterAuthentication(String userId) async {
+    for (var attempt = 0; attempt < 15; attempt++) {
+      if (!mounted ||
+          context.read<AuthBloc>().state.status != AuthStatus.authenticated ||
+          context.read<AuthBloc>().state.session?.userId != userId) {
+        return;
+      }
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        _isForeground = true;
+        await Future.wait([
+          context.read<AppConnectionCoordinator>().setForeground(true),
+          context.read<LocationTrackingCoordinator>().setForeground(true),
+          context.read<NotificationsCubit>().setAppForeground(true),
+        ]);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
   }
 
   void _hydrateBlocklistForUser(String userId) {
@@ -430,23 +484,13 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               context.read<AppLanguageCubit>().setAuthenticatedUser(userId),
             );
             if (state.status == AuthStatus.authenticated && userId != null) {
-              _hydrateBlocklistForUser(userId);
-              unawaited(
-                context.read<AppConnectionCoordinator>().setAuthenticatedUser(
-                  userId,
-                ),
-              );
-              unawaited(
-                context
-                    .read<LocationTrackingCoordinator>()
-                    .setAuthenticatedUser(userId),
-              );
-              unawaited(_initializeNotificationsAndReminder(userId));
+              _startAuthenticatedServices(userId);
             } else if (state.status == AuthStatus.unauthenticated ||
                 state.status == AuthStatus.profileIncomplete ||
                 state.status == AuthStatus.banned ||
                 state.status == AuthStatus.failure) {
               _blocklistHydratedUserId = null;
+              _servicesStartedForUserId = null;
               unawaited(
                 context.read<AppConnectionCoordinator>().setAuthenticatedUser(
                   null,

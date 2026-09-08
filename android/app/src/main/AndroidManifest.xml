@@ -27,10 +27,14 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification" />
+        <!-- OAuth returns from a Custom Tab while MainActivity is usually
+             below it in the task. singleTop would create a second Flutter
+             activity/engine in that case; FlutterActivity already forwards
+             the resulting onNewIntent deep link to Supabase. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"

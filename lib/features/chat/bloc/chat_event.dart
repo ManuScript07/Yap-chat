@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chats/data/data.dart';
 
 abstract class ChatEvent extends Equatable {
   const ChatEvent();
@@ -14,6 +15,16 @@ class ChatStarted extends ChatEvent {
 
   @override
   List<Object?> get props => [chatId];
+}
+
+class ChatDraftResolved extends ChatEvent {
+  const ChatDraftResolved({required this.peerId, required this.chat});
+
+  final String peerId;
+  final Chat chat;
+
+  @override
+  List<Object?> get props => [peerId, chat];
 }
 
 class ChatMessageSent extends ChatEvent {

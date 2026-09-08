@@ -111,7 +111,7 @@
   "settingsPrivacyPolicy": "политика конфиденциальности",
   "photoHasBeenSavedToGallery": "фото сохранено в галерею",
   "failedToSavePhoto": "Не удалось сохранить фото",
-  "repeat": "Пповторить",
+  "repeat": "повторить",
   "locationConfirmation": "Вы точно хотите отправить своё местоположение пользователю {name}?",
   "locationConfirmationDescription": "Поделиться местоположением?",
   "locationShare": "Отправить",

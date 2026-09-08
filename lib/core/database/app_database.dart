@@ -468,14 +468,28 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(cachedFriendListStates);
       }
       if (from < 24) {
-        await migrator.addColumn(
-          pendingChatOperations,
-          pendingChatOperations.nextAttemptAt,
-        );
-        await migrator.addColumn(
-          pendingChatOperations,
-          pendingChatOperations.lastAttemptAt,
-        );
+        // Some development builds already carried the outbox columns before
+        // the schema version was advanced. Inspect the physical table so an
+        // upgrade from one of those builds remains idempotent instead of
+        // failing before the application can open its local cache.
+        final columns = await customSelect(
+          'PRAGMA table_info(pending_chat_operations)',
+        ).get();
+        final names = columns
+            .map((column) => column.read<String>('name'))
+            .toSet();
+        if (!names.contains('next_attempt_at')) {
+          await migrator.addColumn(
+            pendingChatOperations,
+            pendingChatOperations.nextAttemptAt,
+          );
+        }
+        if (!names.contains('last_attempt_at')) {
+          await migrator.addColumn(
+            pendingChatOperations,
+            pendingChatOperations.lastAttemptAt,
+          );
+        }
         // Existing message operations used to be retried only while their
         // conversation was open. Make them due once after the upgrade rather
         // than silently leaving them in the old queue forever.

@@ -13,6 +13,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   String? _draftPeerId;
   Future<Chat>? _directChatFuture;
   StreamSubscription? _messagesSubscription;
+  StreamSubscription<List<Chat>>? _draftChatSubscription;
 
   ChatBloc({
     required IChatRepository chatRepository,
@@ -31,6 +32,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
          ),
        ) {
     on<ChatStarted>(_onStarted);
+    on<ChatDraftResolved>(_onDraftResolved, transformer: droppable());
     on<ChatMessageSent>(_onMessageSent);
     on<ChatMessageImagesSent>(_onImagesSent);
     on<ChatMessageAudioSent>(_onAudioSent);
@@ -55,11 +57,44 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           hasMoreMessages: false,
         ),
       );
+      _watchForDraftResolution(_draftPeerId!);
       return;
     }
 
     emit(state.copyWith(status: ChatStatus.loading, chatId: event.chatId));
     await _subscribeToMessages(event.chatId);
+  }
+
+  void _watchForDraftResolution(String peerId) {
+    unawaited(_draftChatSubscription?.cancel());
+    _draftChatSubscription = _chatsRepository.watchChats().listen((chats) {
+      if (_draftPeerId != peerId) return;
+      for (final chat in chats) {
+        if (chat.peerId == peerId) {
+          add(ChatDraftResolved(peerId: peerId, chat: chat));
+          return;
+        }
+      }
+    });
+  }
+
+  Future<void> _onDraftResolved(
+    ChatDraftResolved event,
+    Emitter<ChatState> emit,
+  ) async {
+    if (_draftPeerId != event.peerId) return;
+    _draftPeerId = null;
+    await _draftChatSubscription?.cancel();
+    _draftChatSubscription = null;
+    emit(
+      state.copyWith(
+        status: ChatStatus.loading,
+        chatId: event.chat.id,
+        hasMoreMessages: true,
+        resolvedChat: event.chat,
+      ),
+    );
+    await _subscribeToMessages(event.chat.id);
   }
 
   Future<void> _subscribeToMessages(String chatId) async {
@@ -73,24 +108,28 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final peerId = _draftPeerId;
     if (peerId == null) return state.chatId;
 
+    _draftPeerId = null;
+    await _draftChatSubscription?.cancel();
+    _draftChatSubscription = null;
     final pending = _directChatFuture ??= _chatsRepository.ensureDirectChat(
       peerId,
     );
     try {
       final chat = await pending;
-      if (_draftPeerId != null) {
-        _draftPeerId = null;
-        emit(
-          state.copyWith(
-            status: ChatStatus.loading,
-            chatId: chat.id,
-            hasMoreMessages: true,
-            resolvedChat: chat,
-          ),
-        );
-        await _subscribeToMessages(chat.id);
-      }
+      emit(
+        state.copyWith(
+          status: ChatStatus.loading,
+          chatId: chat.id,
+          hasMoreMessages: true,
+          resolvedChat: chat,
+        ),
+      );
+      await _subscribeToMessages(chat.id);
       return chat.id;
+    } catch (_) {
+      _draftPeerId = peerId;
+      _watchForDraftResolution(peerId);
+      rethrow;
     } finally {
       if (identical(_directChatFuture, pending)) {
         _directChatFuture = null;
@@ -249,6 +288,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   @override
   Future<void> close() {
+    _draftChatSubscription?.cancel();
     _messagesSubscription?.cancel();
     return super.close();
   }

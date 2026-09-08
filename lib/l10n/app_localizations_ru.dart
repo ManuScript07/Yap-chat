@@ -309,7 +309,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get failedToSavePhoto => 'Не удалось сохранить фото';
 
   @override
-  String get repeat => 'Пповторить';
+  String get repeat => 'повторить';
 
   @override
   String locationConfirmation(Object name) {

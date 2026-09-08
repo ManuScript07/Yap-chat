@@ -374,20 +374,33 @@ class ProfileRepository
     if (scope.userId != session.userId) {
       throw const StaleAccountSessionException();
     }
-    final existing = await _client
-        .from('profiles')
-        .select()
-        .eq('id', session.userId)
-        .maybeSingle();
+    // Keep the OAuth bootstrap behind one RPC. A direct PostgREST read of
+    // `profiles` made this first authenticated request depend on the table
+    // privileges of every deployed schema revision. The RPC is SECURITY
+    // INVOKER, so own-row RLS (including the global-account-ban policy) still
+    // governs the operation.
+    final response = await measureRpc(
+      _diagnostics,
+      'get_or_create_my_profile',
+      () => _client.rpc<List<dynamic>>(
+        'get_or_create_my_profile',
+        params: {
+          'p_display_name': session.displayName,
+          'p_birth_date': session.birthDate
+              ?.toIso8601String()
+              .split('T')
+              .first,
+          'p_avatar_url': session.avatarUrl,
+        },
+      ),
+    );
     _accountSessionController.ensureCurrent(scope);
-
-    final remoteProfile = existing == null
-        ? await _createProfile(session, scope)
-        : await _fillMissingYandexData(
-            UserProfile.fromMap(existing),
-            session,
-            scope,
-          );
+    if (response.isEmpty) {
+      throw StateError('Profile bootstrap returned no profile');
+    }
+    final remoteProfile = UserProfile.fromMap(
+      Map<String, dynamic>.from(response.first as Map),
+    );
     _accountSessionController.ensureCurrent(scope);
     final remotePhotos = await _loadRemotePhotos(remoteProfile);
     _accountSessionController.ensureCurrent(scope);
@@ -544,84 +557,6 @@ class ProfileRepository
       );
       rethrow;
     }
-  }
-
-  Future<UserProfile> _createProfile(
-    AuthSession session,
-    AccountSessionSnapshot scope,
-  ) async {
-    _accountSessionController.ensureCurrent(scope);
-    try {
-      final acceptedAt = DateTime.now().toUtc().toIso8601String();
-      final created = await _client
-          .from('profiles')
-          .insert({
-            'id': session.userId,
-            'display_name': session.displayName ?? '',
-            'birth_date': session.birthDate?.toIso8601String().split('T').first,
-            'avatar_url': session.avatarUrl,
-            'terms_accepted_at': acceptedAt,
-            'privacy_accepted_at': acceptedAt,
-          })
-          .select()
-          .single();
-      return UserProfile.fromMap(created);
-    } on PostgrestException catch (error) {
-      if (error.code != '23505') rethrow;
-      _accountSessionController.ensureCurrent(scope);
-      final profile = await _client
-          .from('profiles')
-          .select()
-          .eq('id', session.userId)
-          .single();
-      return _fillMissingYandexData(
-        UserProfile.fromMap(profile),
-        session,
-        scope,
-      );
-    }
-  }
-
-  Future<UserProfile> _fillMissingYandexData(
-    UserProfile profile,
-    AuthSession session,
-    AccountSessionSnapshot scope,
-  ) async {
-    final update = <String, dynamic>{};
-    if (profile.displayName.isEmpty && session.displayName != null) {
-      update['display_name'] = session.displayName;
-    }
-    if (profile.birthDate == null && session.birthDate != null) {
-      update['birth_date'] = session.birthDate!
-          .toIso8601String()
-          .split('T')
-          .first;
-    }
-    if (!profile.yandexAvatarDisabled &&
-        profile.avatarUrl == null &&
-        profile.avatarStoragePath == null &&
-        session.avatarUrl != null) {
-      update['avatar_url'] = session.avatarUrl;
-    }
-    if (profile.termsAcceptedAt == null || profile.privacyAcceptedAt == null) {
-      final acceptedAt = DateTime.now().toUtc().toIso8601String();
-      if (profile.termsAcceptedAt == null) {
-        update['terms_accepted_at'] = acceptedAt;
-      }
-      if (profile.privacyAcceptedAt == null) {
-        update['privacy_accepted_at'] = acceptedAt;
-      }
-    }
-    if (update.isEmpty) return profile;
-
-    _accountSessionController.ensureCurrent(scope);
-    final updated = await _client
-        .from('profiles')
-        .update(update)
-        .eq('id', session.userId)
-        .select()
-        .single();
-    return UserProfile.fromMap(updated);
   }
 
   List<ProfilePhoto> _photoRows(Object? value) {

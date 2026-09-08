@@ -245,20 +245,10 @@ class ChatsRepository implements IChatsRepository {
     );
     if (cachedChat != null) return cachedChat;
 
-    try {
-      await _synchronize();
-      final synchronizedChat = await _cache.readByPeerId(
-        normalizedPeerId,
-        ownerUserId: scope.userId,
-      );
-      if (synchronizedChat != null) return synchronizedChat;
-    } catch (error, stackTrace) {
-      _config.talker.handle(
-        error,
-        stackTrace,
-        'Direct chat lookup failed; opening a local draft',
-      );
-    }
+    // A slow first summary request must not prevent navigation. The shared
+    // cache sync continues in the background and an open draft is promoted
+    // once the existing conversation appears there.
+    unawaited(_synchronizeSafely(scope));
 
     return Chat.directDraft(
       peerId: normalizedPeerId,
@@ -597,6 +587,10 @@ class ChatsRepository implements IChatsRepository {
 
   Future<void> _performSync() async {
     final scope = _accountSessionController.capture();
+    // The first request after an OAuth return may need to establish a fresh
+    // mobile connection and can legitimately take longer than a UI deadline.
+    // This shared startup synchronization must eventually populate the cache;
+    // navigation is independently protected by direct drafts.
     final chats = await _remote.fetchChats();
     _accountSessionController.ensureCurrent(scope);
     final pendingChatIds = (await _chatCache.readPendingChatDeletions(

@@ -581,7 +581,7 @@ abstract class AppLocalizations {
   /// No description provided for @repeat.
   ///
   /// In ru, this message translates to:
-  /// **'Пповторить'**
+  /// **'повторить'**
   String get repeat;
 
   /// No description provided for @locationConfirmation.
