@@ -43,6 +43,7 @@ class _UserAvatarState extends State<UserAvatar> {
   String? _resolvedAvatarPath;
   int _loadGeneration = 0;
   bool _isAvatarLoading = false;
+  bool _isMissingFileReloadScheduled = false;
 
   @override
   void initState() {
@@ -64,11 +65,12 @@ class _UserAvatarState extends State<UserAvatar> {
     final generation = ++_loadGeneration;
     final cacheKey = widget.avatarRevision ?? widget.avatarUrl;
     final cachedPath = cacheKey == null ? null : _resolvedAvatarPaths[cacheKey];
-    if (cachedPath != null) {
+    if (cachedPath != null && _isExistingLocalFile(cachedPath)) {
       _resolvedAvatarPath = cachedPath;
       _isAvatarLoading = false;
       return;
     }
+    if (cachedPath != null) _resolvedAvatarPaths.remove(cacheKey);
     if (loader == null) {
       _resolvedAvatarPath = null;
       _isAvatarLoading = false;
@@ -159,13 +161,13 @@ class _UserAvatarState extends State<UserAvatar> {
             ? null
             : widget.avatarUrl);
     if (value == null || value.isEmpty) {
-      if (_isAvatarLoading) return const SizedBox.expand();
       return Icon(Icons.person, color: iconColor, size: widget.size * 0.65);
     }
     return _image(
       _provider(value),
       targetWidth: targetWidth,
       iconColor: iconColor,
+      renderedValue: value,
     );
   }
 
@@ -173,15 +175,56 @@ class _UserAvatarState extends State<UserAvatar> {
     ImageProvider provider, {
     required int targetWidth,
     required Color iconColor,
+    String? renderedValue,
   }) => Image(
     image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
     fit: BoxFit.cover,
     gaplessPlayback: true,
     frameBuilder: _revealImageFrame,
-    errorBuilder: (_, _, _) => Center(
-      child: Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
-    ),
+    errorBuilder: (_, _, _) {
+      if (renderedValue != null) _reloadMissingCachedFile(renderedValue);
+      return Center(
+        child: Icon(Icons.person, color: iconColor, size: widget.size * 0.65),
+      );
+    },
   );
+
+  bool _isExistingLocalFile(String path) {
+    try {
+      return File(path).existsSync();
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  void _reloadMissingCachedFile(String renderedValue) {
+    if (_isMissingFileReloadScheduled ||
+        !_canReloadMissingCachedFile(renderedValue)) {
+      return;
+    }
+    _isMissingFileReloadScheduled = true;
+
+    // An Image.errorBuilder can run while this widget is building.  Delay the
+    // state update so that a cache eviction never causes a setState-during-
+    // build exception, and coalesce repeated image error callbacks.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isMissingFileReloadScheduled = false;
+      if (!mounted || !_canReloadMissingCachedFile(renderedValue)) return;
+
+      final cacheKey = widget.avatarRevision ?? widget.avatarUrl;
+      if (cacheKey != null && _resolvedAvatarPaths[cacheKey] == renderedValue) {
+        _resolvedAvatarPaths.remove(cacheKey);
+      }
+      setState(() => _resolvedAvatarPath = null);
+      _loadAvatar();
+    });
+  }
+
+  bool _canReloadMissingCachedFile(String renderedValue) =>
+      !_isAvatarLoading &&
+      widget.avatarLoader != null &&
+      _resolvedAvatarPath == renderedValue &&
+      !_isExistingLocalFile(renderedValue);
 
   ImageProvider _provider(String value) {
     final uri = Uri.tryParse(value);

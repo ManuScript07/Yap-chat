@@ -89,6 +89,16 @@ class FriendsCacheDataSource {
     final previousCount = previousFriends.length;
 
     await _database.transaction(() async {
+      // A first cursor page is authoritative for its own range. Preserve
+      // cached rows behind that range for offline pagination, but remove a
+      // locally optimistic row when the server proves it cannot be there.
+      // Without this reconciliation, a failed concurrent request acceptance
+      // could leave a non-existent newest friend in the local list forever.
+      await _removeFriendsAbsentFromAuthoritativeHead(
+        owner: owner,
+        cachedFriends: previousFriends,
+        page: page,
+      );
       await _upsertFriends(page.friends, owner);
       final cachedCount = await _countFriends(owner);
       final hasOnlyHeadPage = previousCount <= page.friends.length;
@@ -108,6 +118,43 @@ class FriendsCacheDataSource {
       );
       await _removeExpiredLocations(owner);
     });
+  }
+
+  Future<void> _removeFriendsAbsentFromAuthoritativeHead({
+    required String owner,
+    required List<Friend> cachedFriends,
+    required FriendPage page,
+  }) async {
+    if (cachedFriends.isEmpty) return;
+    final incomingIds = page.friends.map((friend) => friend.id).toSet();
+
+    // A short first page is the entire authoritative list. This also covers
+    // the empty result where a successful RPC has no row to carry total_count.
+    final completeSnapshot = page.friends.length >= page.totalCount;
+    final headBoundary = page.friends.lastOrNull;
+    final staleIds = cachedFriends
+        .where(
+          (friend) =>
+              !incomingIds.contains(friend.id) &&
+              (completeSnapshot ||
+                  (headBoundary != null &&
+                      _isAtOrAheadOfHead(friend, headBoundary))),
+        )
+        .map((friend) => friend.id)
+        .toList(growable: false);
+    if (staleIds.isEmpty) return;
+
+    await (_database.delete(_database.cachedFriends)..where(
+          (table) =>
+              table.ownerUserId.equals(owner) & table.userId.isIn(staleIds),
+        ))
+        .go();
+  }
+
+  bool _isAtOrAheadOfHead(Friend candidate, Friend boundary) {
+    final byTimestamp = candidate.friendsSince.compareTo(boundary.friendsSince);
+    if (byTimestamp != 0) return byTimestamp > 0;
+    return candidate.id.compareTo(boundary.id) >= 0;
   }
 
   Future<void> appendFriendPage(FriendPage page, {String? ownerUserId}) async {

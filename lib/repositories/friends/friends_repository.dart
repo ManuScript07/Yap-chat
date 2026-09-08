@@ -675,10 +675,18 @@ class FriendsRepository
       return;
     } catch (_) {
       if (request != null) {
-        await _accountSessionController.commit(
-          scope,
-          () => _cache.addRequest(request, ownerUserId: scope.userId),
-        );
+        await _accountSessionController.commit(scope, () async {
+          // Acceptance is optimistic. If a concurrent cancellation won on
+          // the server, restoring only the request would retain a fake friend
+          // in a cursor cache. Roll back both sides before reconciliation.
+          if (accept) {
+            await _cache.removeFriend(
+              request.peerId,
+              ownerUserId: scope.userId,
+            );
+          }
+          await _cache.addRequest(request, ownerUserId: scope.userId);
+        });
       }
       await _synchronizeSafely();
       rethrow;
