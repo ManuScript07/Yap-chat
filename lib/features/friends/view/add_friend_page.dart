@@ -105,9 +105,15 @@ class _AddFriendBodyState extends State<_AddFriendBody> {
     try {
       final username = context.read<AuthBloc>().state.profile?.username;
       final normalized = username?.trim();
-      final text = normalized == null || normalized.isEmpty
+      final invitation = normalized == null || normalized.isEmpty
           ? context.l10n.friendsContactsInviteTextWithoutUsername
           : context.l10n.friendsContactsInviteText(normalized);
+      final text = normalized == null || normalized.isEmpty
+          ? invitation
+          : ProfileShareLink.invitationText(
+              invitation: invitation,
+              username: normalized,
+            );
       await context.read<IContactsRepository>().shareInvitation(text);
     } catch (_) {
       if (mounted) {

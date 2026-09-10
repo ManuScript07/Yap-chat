@@ -31,6 +31,16 @@ class MockProfileRepository
   }
 
   @override
+  Future<String?> resolveSharedProfileUsername(String username) async {
+    final profile = _preferences.getString(_storageKey);
+    if (profile == null) return null;
+    final parsed = _profileFromJson(profile);
+    return parsed.username.toLowerCase() == username.trim().toLowerCase()
+        ? parsed.id
+        : null;
+  }
+
+  @override
   Future<ViewedProfile?> getCachedViewedProfile(String userId) async => null;
 
   @override

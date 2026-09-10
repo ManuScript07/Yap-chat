@@ -60,6 +60,27 @@ class ProfileRepository
   Future<UserProfile?> getCachedProfile(String userId) => _cache.read(userId);
 
   @override
+  Future<String?> resolveSharedProfileUsername(String username) async {
+    final normalized = username.trim().toLowerCase();
+    if (!RegExp(r'^[a-z0-9_]{3,24}$').hasMatch(normalized)) return null;
+    final scope = _accountSessionController.capture();
+    final response = await measureRpc(
+      _diagnostics,
+      'resolve_shared_profile_username',
+      () => _client
+          .rpc<dynamic>(
+            'resolve_shared_profile_username',
+            params: {'shared_username': normalized},
+          )
+          .timeout(_viewedProfileRequestTimeout),
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return response is String && response.trim().isNotEmpty
+        ? response.trim()
+        : null;
+  }
+
+  @override
   Future<ViewedProfile?> getCachedViewedProfile(String userId) {
     final scope = _accountSessionController.capture();
     return _viewedProfileCache.read(scope.userId, userId);

@@ -4,6 +4,7 @@ export 'image_aspect_ratio_resolver.dart';
 export 'media_service.dart';
 export 'media_cache_service.dart';
 export 'phone_number_normalizer.dart';
+export 'profile_share_link.dart';
 export 'reconnect_backoff.dart';
 export 'account_session_controller.dart';
 export 'app_diagnostics.dart';

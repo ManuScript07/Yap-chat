@@ -4,6 +4,10 @@ import 'package:yap_chat/features/profile/data/data.dart';
 abstract interface class IProfileRepository {
   Future<UserProfile?> getCachedProfile(String userId);
 
+  /// Resolves an explicitly shared public username to its current profile id.
+  /// Returns null when the link no longer points to an available profile.
+  Future<String?> resolveSharedProfileUsername(String username);
+
   Future<UserProfile> getOrCreateProfile(AuthSession session);
 
   Future<UserProfile> saveOwnProfile({

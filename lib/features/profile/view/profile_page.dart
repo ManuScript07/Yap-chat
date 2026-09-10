@@ -141,7 +141,10 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isSharing = true);
     try {
       await context.read<IContactsRepository>().shareInvitation(
-        context.l10n.friendsContactsInviteText(profile.username),
+        ProfileShareLink.invitationText(
+          invitation: context.l10n.friendsContactsInviteText(profile.username),
+          username: profile.username,
+        ),
       );
     } catch (_) {
       if (mounted) {

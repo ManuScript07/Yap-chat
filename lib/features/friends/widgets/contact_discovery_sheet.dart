@@ -285,8 +285,14 @@ class _ContactDiscoveryBody extends StatelessWidget {
 
   String _invitationText(BuildContext context) {
     final normalized = username?.trim();
-    return normalized == null || normalized.isEmpty
+    final invitation = normalized == null || normalized.isEmpty
         ? context.l10n.friendsContactsInviteTextWithoutUsername
         : context.l10n.friendsContactsInviteText(normalized);
+    return normalized == null || normalized.isEmpty
+        ? invitation
+        : ProfileShareLink.invitationText(
+            invitation: invitation,
+            username: normalized,
+          );
   }
 }

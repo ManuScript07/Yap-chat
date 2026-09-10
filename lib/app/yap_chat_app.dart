@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:yap_chat/app/chat_navigation_coordinator.dart';
 import 'package:yap_chat/app/profile_navigation_coordinator.dart';
+import 'package:yap_chat/app/profile_share_link_coordinator.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/app/app_initializer.dart';
@@ -66,6 +68,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _isForeground = true;
   late final ChatNavigationCoordinator _chatNavigator;
   late final ProfileNavigationCoordinator _profileNavigator;
+  late final ProfileShareLinkCoordinator _profileShareLinkCoordinator;
   bool _dependenciesInitialized = false;
   String? _activeUserId;
   String? _servicesStartedForUserId;
@@ -132,9 +135,41 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       isActive: () => mounted,
       onError: talker.handle,
     );
+    final appLinks = AppLinks();
+    _profileShareLinkCoordinator = ProfileShareLinkCoordinator(
+      preferences: context.read<AppConfig>().preferences,
+      initialUri: appLinks.getInitialLink,
+      uriStream: appLinks.uriLinkStream,
+      isAuthenticated: () =>
+          mounted &&
+          context.read<AuthBloc>().state.status == AuthStatus.authenticated,
+      resolveUserId: context
+          .read<IProfileRepository>()
+          .resolveSharedProfileUsername,
+      openProfile: _openSharedProfile,
+      onError: talker.handle,
+    );
+    unawaited(_profileShareLinkCoordinator.start());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _restoreAuthenticatedServicesForCurrentAuthState();
     });
+  }
+
+  Future<bool> _openSharedProfile(String userId) async {
+    // The authenticated router is created by AuthGate a frame after the auth
+    // state. Do not discard a valid browser link during that small interval.
+    for (var attempt = 0; attempt < 20; attempt++) {
+      if (!mounted ||
+          context.read<AuthBloc>().state.status != AuthStatus.authenticated) {
+        return false;
+      }
+      if (await _authenticatedRouter != null) {
+        await _profileNavigator.open(userId);
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return false;
   }
 
   /// [AuthBloc] can restore a cached authenticated state before this widget's
@@ -157,6 +192,8 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   void _startAuthenticatedServices(String userId) {
     if (_servicesStartedForUserId == userId) return;
     _servicesStartedForUserId = userId;
+
+    _profileShareLinkCoordinator.onAuthenticationOrForegroundChanged();
 
     context.read<AccountSessionController>().setAuthenticatedUser(userId);
     _hydrateBlocklistForUser(userId);
@@ -209,6 +246,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_profileShareLinkCoordinator.dispose());
     super.dispose();
   }
 
@@ -222,6 +260,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       unawaited(connections.setForeground(true));
       unawaited(locationTracking.setForeground(true));
       unawaited(notifications.setAppForeground(true));
+      _profileShareLinkCoordinator.onAuthenticationOrForegroundChanged();
       return;
     }
     if (state == AppLifecycleState.inactive) {
