@@ -96,12 +96,15 @@ class _MessageInputBarState extends State<MessageInputBar> {
 
     final mainColor = colorScheme.onSurface;
     final primaryColor = colorScheme.primary;
-    final systemPadding = MediaQuery.paddingOf(context);
+    final systemPadding = MediaQuery.viewPaddingOf(context);
 
     return SafeArea(
       top: false,
       left: false,
       right: false,
+      // Keep the navigation-bar inset while the IME is animating.  The chat
+      // page converts the keyboard inset into a matching outer offset.
+      maintainBottomViewPadding: true,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           systemPadding.left + 16,

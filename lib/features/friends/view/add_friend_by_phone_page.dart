@@ -41,6 +41,18 @@ class _AddFriendByPhoneViewState extends State<_AddFriendByPhoneView> {
   String? _submittedPhone;
 
   @override
+  void initState() {
+    super.initState();
+    final callingCode = _phoneNormalizer.localCountryCallingCode;
+    if (callingCode != null) {
+      _phoneController.value = TextEditingValue(
+        text: '+$callingCode',
+        selection: TextSelection.collapsed(offset: callingCode.length + 1),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _phoneController.dispose();
     super.dispose();
@@ -86,9 +98,7 @@ class _AddFriendByPhoneViewState extends State<_AddFriendByPhoneView> {
   }
 
   void _onPhoneChanged(String value) {
-    final normalizedPhone = _phoneNormalizer.normalizeLocalNationalNumber(
-      value,
-    );
+    final normalizedPhone = _normalizePhoneInput(_phoneNormalizer, value);
     setState(() {
       if (_submittedPhone != null && normalizedPhone != _submittedPhone) {
         _submittedPhone = null;
@@ -97,7 +107,8 @@ class _AddFriendByPhoneViewState extends State<_AddFriendByPhoneView> {
   }
 
   void _submitSearch() {
-    final normalizedPhone = _phoneNormalizer.normalizeLocalNationalNumber(
+    final normalizedPhone = _normalizePhoneInput(
+      _phoneNormalizer,
       _phoneController.text,
     );
     if (normalizedPhone == null) return;
@@ -171,9 +182,7 @@ class _PhoneSearchBody extends StatelessWidget {
                                 _ => null,
                               };
                         final isValid =
-                            normalizer.normalizeLocalNationalNumber(
-                              controller.text,
-                            ) !=
+                            _normalizePhoneInput(normalizer, controller.text) !=
                             null;
                         final errorText =
                             _hasInvalidPhoneCharacters(controller.text)
@@ -196,9 +205,6 @@ class _PhoneSearchBody extends StatelessWidget {
                               textInputAction: TextInputAction.search,
                               keyboardType: TextInputType.phone,
                               autocorrect: false,
-                              prefixText: callingCode == null
-                                  ? null
-                                  : '+$callingCode',
                               inputFormatters: callingCode == null
                                   ? null
                                   : [
@@ -209,7 +215,10 @@ class _PhoneSearchBody extends StatelessWidget {
                                             maximumNationalDigits,
                                       ),
                                     ],
-                              lengthResolver: _phoneDigitCount,
+                              lengthResolver: (value) => _phoneDigitCount(
+                                value,
+                                callingCode: callingCode,
+                              ),
                               onChanged: onChanged,
                               onSubmitted: (_) => onSubmitted(),
                             ),
@@ -333,7 +342,30 @@ class _PhoneSearchBody extends StatelessWidget {
 bool _hasInvalidPhoneCharacters(String value) =>
     value.isNotEmpty && !RegExp(r'^[0-9+().\-\s]*$').hasMatch(value);
 
-int _phoneDigitCount(String value) => RegExp(r'[0-9]').allMatches(value).length;
+String? _normalizePhoneInput(
+  PhoneNumberNormalizer normalizer,
+  String value,
+) {
+  final callingCode = normalizer.localCountryCallingCode;
+  if (callingCode == null) return normalizer.normalize(value);
+
+  final digits = _digitsOnly(value);
+  final nationalDigits =
+      value.trimLeft().startsWith('+') && digits.startsWith(callingCode)
+      ? digits.substring(callingCode.length)
+      : digits;
+  return normalizer.normalizeLocalNationalNumber(nationalDigits);
+}
+
+int _phoneDigitCount(String value, {String? callingCode}) {
+  final digits = _digitsOnly(value);
+  if (callingCode != null &&
+      value.trimLeft().startsWith('+') &&
+      digits.startsWith(callingCode)) {
+    return digits.length - callingCode.length;
+  }
+  return digits.length;
+}
 
 class _LocalPhoneNumberFormatter extends TextInputFormatter {
   const _LocalPhoneNumberFormatter({
@@ -359,23 +391,40 @@ class _LocalPhoneNumberFormatter extends TextInputFormatter {
       rawText.substring(0, selectionEnd),
     ).length;
 
-    final containsPastedCallingCode =
-        rawText.trimLeft().startsWith('+') && digits.startsWith(callingCode);
-    if (containsPastedCallingCode) {
-      digits = digits.substring(callingCode.length);
-      digitsBeforeSelection =
-          (digitsBeforeSelection - callingCode.length).clamp(0, digits.length)
-              as int;
-    }
-    if (digits.length > maxNationalDigits) {
-      digits = digits.substring(0, maxNationalDigits);
+    final hasLeadingPlus =
+        rawText.trimLeft().startsWith('+') ||
+        oldValue.text.trimLeft().startsWith('+');
+    final hasCallingCode = hasLeadingPlus && digits.startsWith(callingCode);
+    final nationalDigits = hasCallingCode
+        ? digits.substring(callingCode.length)
+        : digits;
+    final nationalDigitsBeforeSelection = hasCallingCode
+        ? (digitsBeforeSelection - callingCode.length)
+              .clamp(0, nationalDigits.length) as int
+        : digitsBeforeSelection.clamp(0, nationalDigits.length) as int;
+    var limitedNationalDigits = nationalDigits;
+    if (limitedNationalDigits.length > maxNationalDigits) {
+      limitedNationalDigits = limitedNationalDigits.substring(
+        0,
+        maxNationalDigits,
+      );
     }
 
-    final formatted = normalizer.formatLocalNationalNumber(digits);
-    final cursorOffset = _offsetAfterDigits(
-      formatted,
-      digitsBeforeSelection.clamp(0, digits.length) as int,
+    final formattedNational = normalizer.formatLocalNationalNumber(
+      limitedNationalDigits,
     );
+    final prefix = hasLeadingPlus
+        ? '+${hasCallingCode ? callingCode : ''}${hasCallingCode && formattedNational.isNotEmpty ? ' ' : ''}'
+        : '';
+    final formatted = '$prefix$formattedNational';
+    final cursorOffset = prefix.length +
+        _offsetAfterDigits(
+          formattedNational,
+          nationalDigitsBeforeSelection.clamp(
+            0,
+            limitedNationalDigits.length,
+          ) as int,
+        );
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: cursorOffset),

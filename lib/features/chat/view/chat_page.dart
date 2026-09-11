@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:auto_route/auto_route.dart';
@@ -71,18 +72,15 @@ class _ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<_ChatView>
-    with AutoRouteAwareStateMixin<_ChatView>, WidgetsBindingObserver {
+    with AutoRouteAwareStateMixin<_ChatView> {
   late final ScrollController _scrollController;
   NotificationsCubit? _notificationsCubit;
   late DateTime? _lastSeenAt;
-  double? _composerHeight;
-  double _lastKeyboardInset = 0;
-  bool _hasKeyboardInset = false;
+  double? _composerContentHeight;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController();
     _lastSeenAt = widget.chat.lastSeenAt;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -93,10 +91,6 @@ class _ChatViewState extends State<_ChatView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_hasKeyboardInset) {
-      _lastKeyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-      _hasKeyboardInset = true;
-    }
     _notificationsCubit ??= context.read<NotificationsCubit>();
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit!.setActiveConversation(widget.chat.id));
@@ -118,22 +112,6 @@ class _ChatViewState extends State<_ChatView>
     }
     if (oldWidget.chat.lastSeenAt != widget.chat.lastSeenAt) {
       _lastSeenAt = widget.chat.lastSeenAt;
-    }
-  }
-
-  @override
-  void didChangeMetrics() {
-    if (!mounted) return;
-
-    final view = View.maybeOf(context);
-    if (view == null) return;
-
-    final keyboardInset = MediaQueryData.fromView(view).viewInsets.bottom;
-    final wasKeyboardOpen = _lastKeyboardInset > 0;
-    _lastKeyboardInset = keyboardInset;
-
-    if (wasKeyboardOpen && keyboardInset <= 0) {
-      FocusManager.instance.primaryFocus?.unfocus();
     }
   }
 
@@ -160,7 +138,6 @@ class _ChatViewState extends State<_ChatView>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     }
@@ -181,11 +158,17 @@ class _ChatViewState extends State<_ChatView>
   }
 
   void _onComposerHeightChanged(double height) {
-    if ((_composerHeight == null ? height : _composerHeight! - height).abs() <
-        0.5) {
+    final contentHeight = math.max(
+      0.0,
+      height - MediaQuery.viewPaddingOf(context).bottom,
+    );
+    if ((_composerContentHeight == null
+            ? contentHeight
+            : _composerContentHeight! - contentHeight)
+        .abs() < 0.5) {
       return;
     }
-    setState(() => _composerHeight = height);
+    setState(() => _composerContentHeight = contentHeight);
   }
 
   Future<void> _showMessageActions(ChatMessage message) async {
@@ -233,8 +216,18 @@ class _ChatViewState extends State<_ChatView>
 
     const inputContentHeight = 66.0;
 
-    final inputBarHeight = inputContentHeight + mediaQuery.padding.bottom;
-    final composerHeight = _composerHeight ?? inputBarHeight;
+    // `padding.bottom` is reduced while Android replaces the navigation-bar
+    // inset with the IME inset.  The composer itself must keep a stable height
+    // throughout that hand-off; otherwise its bottom part is briefly covered
+    // by the keyboard.
+    final persistentBottomInset = mediaQuery.viewPadding.bottom;
+    final keyboardAvoidanceOffset = math.max(
+      0.0,
+      mediaQuery.viewInsets.bottom - persistentBottomInset,
+    );
+    final composerHeight =
+        (_composerContentHeight ?? inputContentHeight) +
+        persistentBottomInset;
 
     final headerHeight = 64.0 + topSafeArea;
 
@@ -292,6 +285,10 @@ class _ChatViewState extends State<_ChatView>
             voiceState: voiceState,
             child: Scaffold(
               backgroundColor: backgroundColor,
+              // The stack owns IME avoidance.  This keeps the keyboard offset
+              // and the stable SafeArea height in the same coordinate system.
+              // Letting Scaffold resize this route as well reintroduces the
+              // transient, partially covered composer on Android.
               resizeToAvoidBottomInset: false,
               body: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -305,6 +302,7 @@ class _ChatViewState extends State<_ChatView>
                       chat: widget.chat,
                       headerHeight: headerHeight,
                       composerHeight: composerHeight,
+                      keyboardAvoidanceOffset: keyboardAvoidanceOffset,
                       canOpenMessageMenu:
                           voiceState.status != VoiceRecorderStatus.recording,
                       onMessageLongPress: _showMessageActions,
@@ -318,6 +316,7 @@ class _ChatViewState extends State<_ChatView>
                       height: composerHeight + 20,
                       isTop: false,
                       backgroundColor: backgroundColor,
+                      bottomOffset: keyboardAvoidanceOffset,
                     ),
                     Positioned(
                       top: 0,
@@ -370,6 +369,7 @@ class _ChatViewState extends State<_ChatView>
                       isBlockActionPending: blocklistState.isPending(
                         widget.chat.peerId,
                       ),
+                      keyboardAvoidanceOffset: keyboardAvoidanceOffset,
                       onMessageSent: _scrollToBottom,
                       onHeightChanged: _onComposerHeightChanged,
                     ),
@@ -393,6 +393,7 @@ class _KeyboardAwareInput extends StatelessWidget {
     required this.peerIsGloballyBanned,
     required this.peerIsDeleted,
     required this.isBlockActionPending,
+    required this.keyboardAvoidanceOffset,
     required this.onMessageSent,
     required this.onHeightChanged,
   });
@@ -404,6 +405,7 @@ class _KeyboardAwareInput extends StatelessWidget {
   final bool peerIsGloballyBanned;
   final bool peerIsDeleted;
   final bool isBlockActionPending;
+  final double keyboardAvoidanceOffset;
   final VoidCallback onMessageSent;
   final ValueChanged<double> onHeightChanged;
 
@@ -439,147 +441,172 @@ class _KeyboardAwareInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
-    final systemPadding = MediaQuery.paddingOf(context);
+    final systemPadding = MediaQuery.viewPaddingOf(context);
+    final composerMediaQuery = MediaQuery.of(context).copyWith(
+      viewInsets: EdgeInsets.zero,
+    );
 
     return Positioned(
       left: 0,
       right: 0,
-      bottom: 0,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: keyboardHeight),
+      bottom: keyboardAvoidanceOffset,
+      child: MediaQuery(
+        data: composerMediaQuery,
         child: BlocBuilder<ChatBloc, ChatState>(
           buildWhen: (previous, current) =>
               previous.replyToMessage != current.replyToMessage,
           builder: (context, chatState) {
-            if (peerIsGloballyBanned) {
+          if (peerIsGloballyBanned) {
+            return SizeReporter(
+              onSizeChanged: (size) => onHeightChanged(size.height),
+              child: const _GloballyBannedComposer(),
+            );
+          }
+          if (peerIsDeleted) {
+            return SizeReporter(
+              onSizeChanged: (size) => onHeightChanged(size.height),
+              child: _DeletedAccountComposer(chatId: chatId),
+            );
+          }
+          if (blockedByMe) {
+            return SizeReporter(
+              onSizeChanged: (size) => onHeightChanged(size.height),
+              child: _UnblockComposer(
+                peerName: peerName,
+                peerId: peerId,
+                isPending: isBlockActionPending,
+              ),
+            );
+          }
+          return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+            builder: (context, state) {
               return SizeReporter(
                 onSizeChanged: (size) => onHeightChanged(size.height),
-                child: const _GloballyBannedComposer(),
-              );
-            }
-            if (peerIsDeleted) {
-              return SizeReporter(
-                onSizeChanged: (size) => onHeightChanged(size.height),
-                child: _DeletedAccountComposer(chatId: chatId),
-              );
-            }
-            if (blockedByMe) {
-              return SizeReporter(
-                onSizeChanged: (size) => onHeightChanged(size.height),
-                child: _UnblockComposer(
-                  peerName: peerName,
-                  peerId: peerId,
-                  isPending: isBlockActionPending,
-                ),
-              );
-            }
-            return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-              builder: (context, state) {
-                return SizeReporter(
-                  onSizeChanged: (size) => onHeightChanged(size.height),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (chatState.replyToMessage case final reply?) ...[
-                        Padding(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      reverseDuration: const Duration(milliseconds: 180),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SizeTransition(
+                          sizeFactor: animation,
+                          axisAlignment: -1,
+                          child: child,
+                        ),
+                      ),
+                      child: switch (chatState.replyToMessage) {
+                        final reply? => Padding(
+                          key: ValueKey('reply_${reply.id}'),
                           padding: EdgeInsets.only(
                             left: systemPadding.left + 16,
                             right: systemPadding.right + 16,
                           ),
-                          child: ReplyComposerPreview(
-                            message: reply,
-                            peerName: peerName,
-                            onClear: () {
-                              context.read<ChatBloc>().add(
-                                const ChatReplyCleared(),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                      ],
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        reverseDuration: const Duration(milliseconds: 180),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SizeTransition(
-                            sizeFactor: animation,
-                            alignment: Alignment.topCenter,
-                            child: child,
-                          ),
-                        ),
-                        child: state.hasPendingRecording
-                            ? VoiceRecorderBar(
-                                key: const ValueKey('voice_recorder_bar'),
-                                state: state,
-                                onDiscard: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .discardRecording();
-                                },
-                                onStop: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .stopRecording();
-                                },
-                                onTogglePreview: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .togglePreviewPlayback();
-                                },
-                                onSeekUpdate: (position) {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .previewSeek(position);
-                                },
-                                onSeekEnd: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .finishPreviewSeeking();
-                                },
-                                onSend: () async {
-                                  final audio = await context
-                                      .read<VoiceRecorderCubit>()
-                                      .takeRecordingForSending();
-                                  if (audio == null || !context.mounted) return;
-
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ReplyComposerPreview(
+                                message: reply,
+                                peerName: peerName,
+                                onClear: () {
                                   context.read<ChatBloc>().add(
-                                    ChatMessageAudioSent(
-                                      audioPath: audio.path,
-                                      duration: audio.duration,
-                                      waveform: audio.waveform,
-                                    ),
+                                    const ChatReplyCleared(),
                                   );
-                                  onMessageSent();
-                                },
-                              )
-                            : MessageInputBar(
-                                key: const ValueKey('message_input_bar'),
-                                replyToMessageId: chatState.replyToMessage?.id,
-                                onSend: (text) {
-                                  context.read<ChatBloc>().add(
-                                    ChatMessageSent(text),
-                                  );
-                                  onMessageSent();
-                                },
-                                onAddPhoto: () => _openAttachmentSheet(context),
-                                onVoiceRecord: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .startRecording();
                                 },
                               ),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
+                        ),
+                        null => const SizedBox(
+                          key: ValueKey('reply_empty'),
+                        ),
+                      },
+                    ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      reverseDuration: const Duration(milliseconds: 180),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SizeTransition(
+                          sizeFactor: animation,
+                          alignment: Alignment.topCenter,
+                          child: child,
+                        ),
                       ),
-                    ],
-                  ),
-                );
-              },
-            );
+                      child: state.hasPendingRecording
+                          ? VoiceRecorderBar(
+                              key: const ValueKey('voice_recorder_bar'),
+                              state: state,
+                              onDiscard: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .discardRecording();
+                              },
+                              onStop: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .stopRecording();
+                              },
+                              onTogglePreview: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .togglePreviewPlayback();
+                              },
+                              onSeekUpdate: (position) {
+                                context.read<VoiceRecorderCubit>().previewSeek(
+                                  position,
+                                );
+                              },
+                              onSeekEnd: () {
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .finishPreviewSeeking();
+                              },
+                              onSend: () async {
+                                final audio = await context
+                                    .read<VoiceRecorderCubit>()
+                                    .takeRecordingForSending();
+                                if (audio == null || !context.mounted) return;
+
+                                context.read<ChatBloc>().add(
+                                  ChatMessageAudioSent(
+                                    audioPath: audio.path,
+                                    duration: audio.duration,
+                                    waveform: audio.waveform,
+                                  ),
+                                );
+                                onMessageSent();
+                              },
+                            )
+                          : MessageInputBar(
+                              key: const ValueKey('message_input_bar'),
+                              replyToMessageId: chatState.replyToMessage?.id,
+                              onSend: (text) {
+                                context.read<ChatBloc>().add(
+                                  ChatMessageSent(text),
+                                );
+                                onMessageSent();
+                              },
+                              onAddPhoto: () => _openAttachmentSheet(context),
+                              onVoiceRecord: () {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                context
+                                    .read<VoiceRecorderCubit>()
+                                    .startRecording();
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
           },
         ),
       ),
@@ -600,7 +627,7 @@ class _UnblockComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final mainColor = context.colorScheme.onSurface;
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -701,7 +728,7 @@ class _DeletedAccountComposerState extends State<_DeletedAccountComposer> {
 
   @override
   Widget build(BuildContext context) {
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final mainColor = context.colorScheme.onSurface;
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -784,7 +811,7 @@ class _GloballyBannedComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final mainColor = context.colorScheme.onSurface;
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -872,6 +899,7 @@ class _ChatMessages extends StatefulWidget {
     required this.chat,
     required this.headerHeight,
     required this.composerHeight,
+    required this.keyboardAvoidanceOffset,
     required this.canOpenMessageMenu,
     required this.onMessageLongPress,
   });
@@ -880,6 +908,7 @@ class _ChatMessages extends StatefulWidget {
   final Chat chat;
   final double headerHeight;
   final double composerHeight;
+  final double keyboardAvoidanceOffset;
   final bool canOpenMessageMenu;
   final ValueChanged<ChatMessage> onMessageLongPress;
 
@@ -1106,9 +1135,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
               padding: EdgeInsets.only(
                 top: widget.headerHeight + 12,
                 bottom:
-                    widget.composerHeight +
-                    MediaQuery.viewInsetsOf(context).bottom +
-                    12,
+                    widget.composerHeight + widget.keyboardAvoidanceOffset + 12,
               ),
               child: EmptyChatState(message: context.l10n.noMessages),
             );
@@ -1131,6 +1158,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
                 initialMessageIds: state.initialMessageIds,
                 headerHeight: widget.headerHeight,
                 composerHeight: widget.composerHeight,
+                keyboardAvoidanceOffset: widget.keyboardAvoidanceOffset,
                 messageKeyBuilder: _messageKey,
                 highlightedMessageId: _highlightedMessageId,
                 onReplyTap: _jumpToMessage,
@@ -1144,9 +1172,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
                 curve: Curves.easeOutCubic,
                 right: 16 + MediaQuery.paddingOf(context).right,
                 bottom:
-                    widget.composerHeight +
-                    MediaQuery.viewInsetsOf(context).bottom +
-                    20,
+                    widget.composerHeight + widget.keyboardAvoidanceOffset + 20,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   reverseDuration: const Duration(milliseconds: 180),
@@ -1193,6 +1219,7 @@ class _MessagesList extends StatelessWidget {
     required this.initialMessageIds,
     required this.headerHeight,
     required this.composerHeight,
+    required this.keyboardAvoidanceOffset,
     required this.messageKeyBuilder,
     required this.highlightedMessageId,
     required this.onReplyTap,
@@ -1206,6 +1233,7 @@ class _MessagesList extends StatelessWidget {
 
   final double headerHeight;
   final double composerHeight;
+  final double keyboardAvoidanceOffset;
   final GlobalKey Function(String messageId) messageKeyBuilder;
   final String? highlightedMessageId;
   final ValueChanged<String> onReplyTap;
@@ -1215,8 +1243,6 @@ class _MessagesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final systemPadding = MediaQuery.paddingOf(context);
-
-    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
 
     final items = <ChatListItemElement>[];
     final itemIndexByKey = <String, int>{};
@@ -1260,7 +1286,7 @@ class _MessagesList extends StatelessWidget {
       }
     }
 
-    final bottomPadding = composerHeight + keyboardHeight + 12.0;
+    final bottomPadding = composerHeight + keyboardAvoidanceOffset + 12.0;
 
     return ListView.builder(
       controller: controller,

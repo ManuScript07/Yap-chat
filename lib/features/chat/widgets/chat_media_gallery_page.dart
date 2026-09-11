@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/chat_media_hero.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -12,6 +13,7 @@ class ChatMediaGalleryPage extends StatefulWidget {
     required this.heroTags,
     required this.initialIndex,
     required this.senderName,
+    required this.sentAt,
     this.initialThumbnailCacheWidth,
     this.senderAvatarUrl,
     this.senderAvatarLoader,
@@ -24,6 +26,7 @@ class ChatMediaGalleryPage extends StatefulWidget {
   final int initialIndex;
   final int? initialThumbnailCacheWidth;
   final String senderName;
+  final DateTime sentAt;
   final String? senderAvatarUrl;
   final Future<String?> Function()? senderAvatarLoader;
   final ImageProvider? senderAvatarImage;
@@ -98,6 +101,7 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
     final systemPadding = MediaQuery.paddingOf(context);
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
+    final sentAt = widget.sentAt.toLocal();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _overlayStyle,
@@ -179,15 +183,38 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            widget.senderName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.senderName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                DateFormat(
+                                  'd MMMM yyyy',
+                                  Localizations.localeOf(
+                                    context,
+                                  ).toString(),
+                                ).format(sentAt),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: .68),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: .2,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),

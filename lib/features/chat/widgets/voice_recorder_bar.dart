@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
@@ -43,16 +41,16 @@ class VoiceRecorderBar extends StatelessWidget {
         ? 0.0
         : state.playback.isCompleted && state.scrubPosition == null
         ? 0.0
-            : visiblePosition.inMilliseconds /
-              playbackDuration.inMilliseconds;
+        : visiblePosition.inMilliseconds / playbackDuration.inMilliseconds;
     final foreground = context.colorScheme.onSurface;
     final canFinish = !isRecording || state.canFinishRecording;
-    final systemPadding = MediaQuery.paddingOf(context);
+    final systemPadding = MediaQuery.viewPaddingOf(context);
 
     return SafeArea(
       top: false,
       left: false,
       right: false,
+      maintainBottomViewPadding: true,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           systemPadding.left + 16,
@@ -65,64 +63,65 @@ class VoiceRecorderBar extends StatelessWidget {
           children: [
             Row(
               children: [
-            GlassIconButton(
-              icon: Icons.delete_outline_rounded,
-              onTap: onDiscard,
-              width: 50,
-              height: 50,
-              borderRadius: 20,
-              iconSize: 28,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _formatDuration(displayedDuration),
-              style: TextStyle(
-                color: foreground,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: AudioWaveform(
-                values: state.amplitudes,
-                activeColor: context.colorScheme.primary,
-                inactiveColor: foreground.withValues(alpha: 0.25),
-                progress: isRecording ? null : progress,
-                fillFromRight: isRecording,
-                showLatestSamples: isRecording,
-                onSeekUpdate: isRecording
-                    ? null
-                    : (value) => onSeekUpdate(
-                        Duration(
-                          milliseconds: (duration.inMilliseconds * value).round(),
-                        ),
-                      ),
-                onSeekEnd: isRecording ? null : onSeekEnd,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Opacity(
-              opacity: canFinish ? 1 : 0.45,
-              child: IgnorePointer(
-                ignoring: !canFinish,
-                child: GlassIconButton(
-                  icon: isRecording
-                      ? Icons.stop_rounded
-                      : state.playback.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  onTap: isRecording ? onStop : onTogglePreview,
+                GlassIconButton(
+                  icon: Icons.delete_outline_rounded,
+                  onTap: onDiscard,
                   width: 50,
                   height: 50,
                   borderRadius: 20,
                   iconSize: 28,
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _SendVoiceButton(onTap: onSend, enabled: canFinish),
+                const SizedBox(width: 8),
+                Text(
+                  _formatDuration(displayedDuration),
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AudioWaveform(
+                    values: state.amplitudes,
+                    activeColor: context.colorScheme.primary,
+                    inactiveColor: foreground.withValues(alpha: 0.25),
+                    progress: isRecording ? null : progress,
+                    fillFromRight: isRecording,
+                    showLatestSamples: isRecording,
+                    onSeekUpdate: isRecording
+                        ? null
+                        : (value) => onSeekUpdate(
+                            Duration(
+                              milliseconds: (duration.inMilliseconds * value)
+                                  .round(),
+                            ),
+                          ),
+                    onSeekEnd: isRecording ? null : onSeekEnd,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Opacity(
+                  opacity: canFinish ? 1 : 0.45,
+                  child: IgnorePointer(
+                    ignoring: !canFinish,
+                    child: GlassIconButton(
+                      icon: isRecording
+                          ? Icons.stop_rounded
+                          : state.playback.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      onTap: isRecording ? onStop : onTogglePreview,
+                      width: 50,
+                      height: 50,
+                      borderRadius: 20,
+                      iconSize: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _SendVoiceButton(onTap: onSend, enabled: canFinish),
               ],
             ),
           ],
@@ -137,10 +136,7 @@ class VoiceRecorderBar extends StatelessWidget {
     return '$minutes:$seconds';
   }
 
-  Duration _displayPlaybackDuration(
-    Duration position,
-    Duration totalDuration,
-  ) {
+  Duration _displayPlaybackDuration(Duration position, Duration totalDuration) {
     return position == Duration.zero ? totalDuration : position;
   }
 }

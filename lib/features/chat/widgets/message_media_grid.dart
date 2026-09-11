@@ -269,6 +269,7 @@ class _MediaAlbum extends StatelessWidget {
           initialIndex: index,
           initialThumbnailCacheWidth: thumbnailCacheWidth,
           senderName: senderName,
+          sentAt: message.timestamp,
           senderAvatarUrl: senderAvatarUrl,
           senderAvatarLoader: senderAvatarLoader,
           senderAvatarImage: senderAvatarImage,

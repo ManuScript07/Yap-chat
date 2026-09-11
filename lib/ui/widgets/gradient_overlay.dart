@@ -6,17 +6,19 @@ class GradientOverlay extends StatelessWidget {
     required this.height,
     required this.isTop,
     required this.backgroundColor,
+    this.bottomOffset = 0,
   });
 
   final double height;
   final bool isTop;
   final Color backgroundColor;
+  final double bottomOffset;
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
       top: isTop ? 0 : null,
-      bottom: isTop ? null : 0,
+      bottom: isTop ? null : bottomOffset,
       left: 0,
       right: 0,
       height: height,

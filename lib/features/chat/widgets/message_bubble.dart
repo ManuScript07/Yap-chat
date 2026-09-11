@@ -314,9 +314,18 @@ class _MessageBubbleState extends State<MessageBubble>
     final message = widget.message;
     final ownAvatar = context.select<AuthBloc, (String?, Uint8List?)>((bloc) {
       final profile = bloc.state.profile;
+      final primaryPhoto = profile?.primaryPhoto;
+      final avatarUrl = primaryPhoto?.avatarUrl ?? profile?.avatarUrl;
+      final avatarBytes = primaryPhoto?.bytes ?? profile?.avatarBytes;
+      final hasOwnAvatar =
+          (avatarUrl?.isNotEmpty ?? false) || avatarBytes != null;
+      final fallbackAvatarUrl =
+          !hasOwnAvatar && profile?.yandexAvatarDisabled != true
+          ? bloc.state.session?.avatarUrl
+          : null;
       return (
-        profile?.avatarUrl ?? bloc.state.session?.avatarUrl,
-        profile?.primaryPhoto?.bytes ?? profile?.avatarBytes,
+        avatarUrl ?? fallbackAvatarUrl,
+        avatarBytes,
       );
     });
 

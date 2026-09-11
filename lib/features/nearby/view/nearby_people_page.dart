@@ -15,6 +15,7 @@ import 'package:yap_chat/features/nearby/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/features/profile/view/viewed_profile_navigation.dart';
+import 'package:yap_chat/features/profile/widgets/profile_avatar_hero.dart';
 import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 import 'package:yap_chat/repositories/nearby/nearby.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -631,16 +632,21 @@ class _NearbyPersonTile extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      UserAvatar(
+                      ProfileAvatarHero(
+                        profileId: person.id,
                         avatarUrl: person.avatarUrl,
-                        avatarLoader: () => context
-                            .read<INearbyRepository>()
-                            .resolveAvatar(person),
-                        preferAvatarLoader: true,
-                        avatarRevision:
-                            person.avatarStoragePath ?? person.avatarUrl,
-                        size: constraints.maxWidth,
-                        borderRadius: 0,
+                        avatarStoragePath: person.avatarStoragePath,
+                        child: UserAvatar(
+                          avatarUrl: person.avatarUrl,
+                          avatarLoader: () => context
+                              .read<INearbyRepository>()
+                              .resolveAvatar(person),
+                          preferAvatarLoader: true,
+                          avatarRevision:
+                              person.avatarStoragePath ?? person.avatarUrl,
+                          size: constraints.maxWidth,
+                          borderRadius: 8,
+                        ),
                       ),
                       Positioned(
                         left: 8,
