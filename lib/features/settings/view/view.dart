@@ -1,4 +1,5 @@
 export 'app_diagnostics_page.dart';
+export 'account_deletion_survey_page.dart';
 export 'privacy_settings_page.dart';
 export 'settings_page.dart';
 export 'visibility_settings_page.dart';

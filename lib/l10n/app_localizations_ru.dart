@@ -335,6 +335,64 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось начать удаление аккаунта. Проверьте интернет и попробуйте ещё раз.';
 
   @override
+  String get accountDeletionSurveyTitle => 'Удаление аккаунта';
+
+  @override
+  String get accountDeletionSurveyDescription =>
+      'Помогите нам понять, что можно улучшить.';
+
+  @override
+  String get accountDeletionSurveyReasonsTitle =>
+      'Почему вы хотите удалить аккаунт?';
+
+  @override
+  String get accountDeletionSurveyReasonsRequired =>
+      'Выберите хотя бы одну причину';
+
+  @override
+  String get accountDeletionReasonAds => 'Много рекламы';
+
+  @override
+  String get accountDeletionReasonNewAccount => 'Хочу создать новый аккаунт';
+
+  @override
+  String get accountDeletionReasonSafety => 'Безопасность';
+
+  @override
+  String get accountDeletionReasonFewPeople => 'Мало людей';
+
+  @override
+  String get accountDeletionReasonNoLongerChat => 'Больше не хочу общаться';
+
+  @override
+  String get accountDeletionReasonTechnicalProblems => 'Технические проблемы';
+
+  @override
+  String get accountDeletionReasonOther => 'Другое';
+
+  @override
+  String get accountDeletionSurveyFeedbackLabel => 'Расскажите почему';
+
+  @override
+  String get accountDeletionSurveyFeedbackHint => 'Необязательно';
+
+  @override
+  String get accountDeletionSurveyCancel => 'отменить';
+
+  @override
+  String get accountDeletionSurveyContinue => 'продолжить';
+
+  @override
+  String get accountDeletionConfirmationTitle => 'Удалить аккаунт?';
+
+  @override
+  String get accountDeletionConfirmationDescription =>
+      'Аккаунт сразу станет недоступен и исчезнет из поиска. В течение 30 дней его можно восстановить, после этого профиль и личные данные будут окончательно удалены.';
+
+  @override
+  String get accountDeletionConfirmationDelete => 'удалить';
+
+  @override
   String get settingsTerms => 'пользовательское соглашение';
 
   @override

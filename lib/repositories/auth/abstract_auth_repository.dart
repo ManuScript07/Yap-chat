@@ -21,7 +21,7 @@ abstract interface class IAuthRepository {
   Future<void> cancelPendingSignIn();
 
   /// Starts the reversible thirty-day deletion window for the signed-in user.
-  Future<DateTime?> requestAccountDeletion();
+  Future<DateTime?> requestAccountDeletion(AccountDeletionSurvey survey);
 
   /// Restores the signed-in account while its deletion window is still open.
   Future<void> restoreAccountDeletion();

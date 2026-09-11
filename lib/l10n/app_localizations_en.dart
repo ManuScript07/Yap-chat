@@ -327,6 +327,65 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not start account deletion. Check your connection and try again.';
 
   @override
+  String get accountDeletionSurveyTitle => 'Delete account';
+
+  @override
+  String get accountDeletionSurveyDescription =>
+      'Help us understand what we can improve.';
+
+  @override
+  String get accountDeletionSurveyReasonsTitle =>
+      'Why do you want to delete your account?';
+
+  @override
+  String get accountDeletionSurveyReasonsRequired =>
+      'Choose at least one reason';
+
+  @override
+  String get accountDeletionReasonAds => 'Too many ads';
+
+  @override
+  String get accountDeletionReasonNewAccount =>
+      'I want to create a new account';
+
+  @override
+  String get accountDeletionReasonSafety => 'Safety';
+
+  @override
+  String get accountDeletionReasonFewPeople => 'Too few people';
+
+  @override
+  String get accountDeletionReasonNoLongerChat => 'I no longer want to chat';
+
+  @override
+  String get accountDeletionReasonTechnicalProblems => 'Technical problems';
+
+  @override
+  String get accountDeletionReasonOther => 'Other';
+
+  @override
+  String get accountDeletionSurveyFeedbackLabel => 'Tell us why';
+
+  @override
+  String get accountDeletionSurveyFeedbackHint => 'Optional';
+
+  @override
+  String get accountDeletionSurveyCancel => 'cancel';
+
+  @override
+  String get accountDeletionSurveyContinue => 'continue';
+
+  @override
+  String get accountDeletionConfirmationTitle => 'Delete account?';
+
+  @override
+  String get accountDeletionConfirmationDescription =>
+      'Your account will immediately become unavailable and disappear from search. You can restore it within 30 days; after that, your profile and personal data will be permanently deleted.';
+
+  @override
+  String get accountDeletionConfirmationDelete => 'delete';
+
+  @override
   String get settingsTerms => 'Terms of service';
 
   @override

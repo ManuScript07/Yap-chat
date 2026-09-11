@@ -74,9 +74,25 @@ reset role;
 -- This is the exact SQL bridge used by the authenticated Edge Function.
 -- The trigger must make the account unusable immediately.
 set local role service_role;
+do $$
+begin
+  begin
+    perform public.request_account_deletion_from_service(
+      '30000000-0000-0000-0000-000000000002',
+      'self',
+      array[]::text[],
+      null
+    );
+    raise exception 'Self-deletion request without a survey was allowed';
+  exception when sqlstate '22023' then
+    if sqlerrm <> 'account_deletion_survey_invalid' then raise; end if;
+  end;
+end;
+$$;
 select * from public.request_account_deletion_from_service(
   '30000000-0000-0000-0000-000000000002',
   'self',
+  array['technical_problems'],
   'lifecycle test'
 );
 reset role;
@@ -99,6 +115,15 @@ begin
       and profile.account_deletion_requested_at is not null
   ) then
     raise exception 'Administrator insert did not mark the profile';
+  end if;
+  if not exists (
+    select 1
+    from private.account_deletion_requests request
+    where request.target_user_id = '30000000-0000-0000-0000-000000000002'
+      and request.deletion_reasons = array['technical_problems']
+      and request.deletion_feedback = 'lifecycle test'
+  ) then
+    raise exception 'Self-deletion survey was not recorded';
   end if;
 end;
 $$;
@@ -252,7 +277,10 @@ reset role;
 -- account. The access response must therefore hide the restore action.
 set local role service_role;
 select * from public.request_account_deletion_from_service(
-  '30000000-0000-0000-0000-000000000002', 'self', 'expiry test'
+  '30000000-0000-0000-0000-000000000002',
+  'self',
+  array['other'],
+  'expiry test'
 );
 reset role;
 update private.account_deletion_requests

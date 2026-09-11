@@ -8,6 +8,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/settings/view/privacy_settings_page.dart';
 import 'package:yap_chat/features/settings/view/app_diagnostics_page.dart';
+import 'package:yap_chat/features/settings/view/account_deletion_survey_page.dart';
 import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/features/settings/view/settings_routes.dart';
@@ -237,7 +238,9 @@ class _SettingsPage extends StatelessWidget {
       confirmLabel: context.l10n.settingsDeleteAccountConfirm,
     );
     if (!context.mounted || confirmed != true) return;
-    context.read<AuthBloc>().add(const AuthAccountDeletionRequested());
+    await Navigator.of(context).push<void>(
+      settingsSlideRightRoute<void>(const AccountDeletionSurveyPage()),
+    );
   }
 }
 

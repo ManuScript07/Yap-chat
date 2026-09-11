@@ -165,8 +165,14 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<DateTime?> requestAccountDeletion() async {
-    final response = await _client.functions.invoke('request-account-deletion');
+  Future<DateTime?> requestAccountDeletion(AccountDeletionSurvey survey) async {
+    final response = await _client.functions.invoke(
+      'request-account-deletion',
+      body: {
+        'reasons': survey.apiReasons,
+        'feedback': survey.feedback,
+      },
+    );
     final data = Map<String, dynamic>.from(response.data as Map);
     return DateTime.tryParse(data['scheduled_for'] as String? ?? '')?.toUtc();
   }

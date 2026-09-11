@@ -69,7 +69,7 @@ class MockAuthRepository implements IAuthRepository {
   Future<void> cancelPendingSignIn() async {}
 
   @override
-  Future<DateTime?> requestAccountDeletion() async => null;
+  Future<DateTime?> requestAccountDeletion(AccountDeletionSurvey survey) async => null;
 
   @override
   Future<void> restoreAccountDeletion() async {}

@@ -95,7 +95,12 @@ final class AuthSignOutRequested extends AuthEvent {
 }
 
 final class AuthAccountDeletionRequested extends AuthEvent {
-  const AuthAccountDeletionRequested();
+  const AuthAccountDeletionRequested(this.survey);
+
+  final AccountDeletionSurvey survey;
+
+  @override
+  List<Object?> get props => [survey.reasons, survey.feedback];
 }
 
 final class AuthAccountRestoreRequested extends AuthEvent {

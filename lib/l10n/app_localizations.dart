@@ -620,6 +620,114 @@ abstract class AppLocalizations {
   /// **'Не удалось начать удаление аккаунта. Проверьте интернет и попробуйте ещё раз.'**
   String get accountDeletionRequestFailed;
 
+  /// No description provided for @accountDeletionSurveyTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удаление аккаунта'**
+  String get accountDeletionSurveyTitle;
+
+  /// No description provided for @accountDeletionSurveyDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Помогите нам понять, что можно улучшить.'**
+  String get accountDeletionSurveyDescription;
+
+  /// No description provided for @accountDeletionSurveyReasonsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Почему вы хотите удалить аккаунт?'**
+  String get accountDeletionSurveyReasonsTitle;
+
+  /// No description provided for @accountDeletionSurveyReasonsRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите хотя бы одну причину'**
+  String get accountDeletionSurveyReasonsRequired;
+
+  /// No description provided for @accountDeletionReasonAds.
+  ///
+  /// In ru, this message translates to:
+  /// **'Много рекламы'**
+  String get accountDeletionReasonAds;
+
+  /// No description provided for @accountDeletionReasonNewAccount.
+  ///
+  /// In ru, this message translates to:
+  /// **'Хочу создать новый аккаунт'**
+  String get accountDeletionReasonNewAccount;
+
+  /// No description provided for @accountDeletionReasonSafety.
+  ///
+  /// In ru, this message translates to:
+  /// **'Безопасность'**
+  String get accountDeletionReasonSafety;
+
+  /// No description provided for @accountDeletionReasonFewPeople.
+  ///
+  /// In ru, this message translates to:
+  /// **'Мало людей'**
+  String get accountDeletionReasonFewPeople;
+
+  /// No description provided for @accountDeletionReasonNoLongerChat.
+  ///
+  /// In ru, this message translates to:
+  /// **'Больше не хочу общаться'**
+  String get accountDeletionReasonNoLongerChat;
+
+  /// No description provided for @accountDeletionReasonTechnicalProblems.
+  ///
+  /// In ru, this message translates to:
+  /// **'Технические проблемы'**
+  String get accountDeletionReasonTechnicalProblems;
+
+  /// No description provided for @accountDeletionReasonOther.
+  ///
+  /// In ru, this message translates to:
+  /// **'Другое'**
+  String get accountDeletionReasonOther;
+
+  /// No description provided for @accountDeletionSurveyFeedbackLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Расскажите почему'**
+  String get accountDeletionSurveyFeedbackLabel;
+
+  /// No description provided for @accountDeletionSurveyFeedbackHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Необязательно'**
+  String get accountDeletionSurveyFeedbackHint;
+
+  /// No description provided for @accountDeletionSurveyCancel.
+  ///
+  /// In ru, this message translates to:
+  /// **'отменить'**
+  String get accountDeletionSurveyCancel;
+
+  /// No description provided for @accountDeletionSurveyContinue.
+  ///
+  /// In ru, this message translates to:
+  /// **'продолжить'**
+  String get accountDeletionSurveyContinue;
+
+  /// No description provided for @accountDeletionConfirmationTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить аккаунт?'**
+  String get accountDeletionConfirmationTitle;
+
+  /// No description provided for @accountDeletionConfirmationDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Аккаунт сразу станет недоступен и исчезнет из поиска. В течение 30 дней его можно восстановить, после этого профиль и личные данные будут окончательно удалены.'**
+  String get accountDeletionConfirmationDescription;
+
+  /// No description provided for @accountDeletionConfirmationDelete.
+  ///
+  /// In ru, this message translates to:
+  /// **'удалить'**
+  String get accountDeletionConfirmationDelete;
+
   /// No description provided for @settingsTerms.
   ///
   /// In ru, this message translates to:

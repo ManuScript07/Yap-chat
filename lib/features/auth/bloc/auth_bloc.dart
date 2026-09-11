@@ -599,7 +599,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(isSubmitting: true, clearFailure: true));
     try {
       final scheduledFor = await _authRepository
-          .requestAccountDeletion()
+          .requestAccountDeletion(event.survey)
           .timeout(const Duration(seconds: 15));
       await _cacheAccountAccess(
         userId,
