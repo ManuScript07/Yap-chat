@@ -179,97 +179,140 @@ class _AccountDeletionSurveyPageState extends State<AccountDeletionSurveyPage> {
     if (_feedbackController.text.length > _feedbackMaxLength) return;
     FocusManager.instance.primaryFocus?.unfocus();
     final feedback = _feedbackController.text.trim();
+    final survey = AccountDeletionSurvey(
+      reasons: _selectedReasons.toList(growable: false),
+      feedback: feedback.isEmpty ? null : feedback,
+    );
     setState(() => _isProceeding = true);
     final confirmed = await Navigator.of(context).push<bool>(
-      settingsSlideRightRoute<bool>(const _AccountDeletionConfirmationPage()),
+      settingsSlideRightRoute<bool>(
+        _AccountDeletionConfirmationPage(survey: survey),
+      ),
     );
     if (!mounted) return;
     setState(() => _isProceeding = false);
-    if (confirmed != true) {
+    if (confirmed == false) {
       Navigator.of(context).pop();
-      return;
     }
-    context.read<AuthBloc>().add(
-      AuthAccountDeletionRequested(
-        AccountDeletionSurvey(
-          reasons: _selectedReasons.toList(growable: false),
-          feedback: feedback.isEmpty ? null : feedback,
+  }
+}
+
+class _AccountDeletionConfirmationPage extends StatefulWidget {
+  const _AccountDeletionConfirmationPage({required this.survey});
+
+  final AccountDeletionSurvey survey;
+
+  @override
+  State<_AccountDeletionConfirmationPage> createState() =>
+      _AccountDeletionConfirmationPageState();
+}
+
+class _AccountDeletionConfirmationPageState
+    extends State<_AccountDeletionConfirmationPage> {
+  var _isSubmittingRequest = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSubmitting =
+        _isSubmittingRequest || context.watch<AuthBloc>().state.isSubmitting;
+    return BlocListener<AuthBloc, AuthState>(
+      listenWhen: (previous, current) =>
+          _isSubmittingRequest &&
+          previous.failure != current.failure &&
+          current.failure == AuthFailure.accountDeletion,
+      listener: (context, state) =>
+          setState(() => _isSubmittingRequest = false),
+      child: PopScope(
+        canPop: !isSubmitting,
+        child: Scaffold(
+          backgroundColor: context.scaffoldBackgroundColor,
+          extendBodyBehindAppBar: true,
+          appBar: SettingsPageAppBar(
+            title: context.l10n.accountDeletionConfirmationTitle,
+          ),
+          body: AbsorbPointer(
+            absorbing: isSubmitting,
+            child: SafeArea(
+              top: false,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final mediaQuery = MediaQuery.of(context);
+                  final isLandscape =
+                      mediaQuery.orientation == Orientation.landscape;
+                  final horizontalPadding =
+                      16.0 + (isLandscape ? 0.0 : mediaQuery.padding.left);
+                  final verticalPadding = isLandscape
+                      ? 24.0
+                      : math.max(24.0, mediaQuery.padding.bottom + 16);
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          112.0,
+                          16.0 + (isLandscape ? 0.0 : mediaQuery.padding.right),
+                          verticalPadding,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: math.max(
+                              0.0,
+                              constraints.maxHeight - 112.0 - verticalPadding,
+                            ),
+                          ),
+                          child: IntrinsicHeight(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  context
+                                      .l10n
+                                      .accountDeletionConfirmationDescription,
+                                  style: settingsValueStyle(context).copyWith(
+                                    fontSize: 18,
+                                    color: context.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const Spacer(),
+                                _PrimaryActionButton(
+                                  label:
+                                      context.l10n.accountDeletionSurveyCancel,
+                                  onPressed: isSubmitting
+                                      ? null
+                                      : () => Navigator.of(context).pop(false),
+                                ),
+                                const SizedBox(height: 12),
+                                _OutlinedActionButton(
+                                  label: context
+                                      .l10n
+                                      .accountDeletionConfirmationDelete,
+                                  isLoading: isSubmitting,
+                                  onPressed: isSubmitting
+                                      ? null
+                                      : _requestDeletion,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
-}
 
-class _AccountDeletionConfirmationPage extends StatelessWidget {
-  const _AccountDeletionConfirmationPage();
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: context.scaffoldBackgroundColor,
-    extendBodyBehindAppBar: true,
-    appBar: SettingsPageAppBar(
-      title: context.l10n.accountDeletionConfirmationTitle,
-    ),
-    body: SafeArea(
-      top: false,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final mediaQuery = MediaQuery.of(context);
-          final isLandscape = mediaQuery.orientation == Orientation.landscape;
-          final horizontalPadding =
-              16.0 + (isLandscape ? 0.0 : mediaQuery.padding.left);
-          final verticalPadding = isLandscape
-              ? 24.0
-              : math.max(24.0, mediaQuery.padding.bottom + 16);
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  112.0,
-                  16.0 + (isLandscape ? 0.0 : mediaQuery.padding.right),
-                  verticalPadding,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: math.max(
-                      0.0,
-                      constraints.maxHeight - 112.0 - verticalPadding,
-                    ),
-                  ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          context.l10n.accountDeletionConfirmationDescription,
-                          style: settingsValueStyle(context).copyWith(
-                            fontSize: 18,
-                            color: context.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const Spacer(),
-                        _PrimaryActionButton(
-                          label: context.l10n.accountDeletionSurveyCancel,
-                          onPressed: () => Navigator.of(context).pop(false),
-                        ),
-                        const SizedBox(height: 12),
-                        _OutlinedActionButton(
-                          label: context.l10n.accountDeletionConfirmationDelete,
-                          onPressed: () => Navigator.of(context).pop(true),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    ),
-  );
+  void _requestDeletion() {
+    if (_isSubmittingRequest) return;
+    setState(() => _isSubmittingRequest = true);
+    context.read<AuthBloc>().add(AuthAccountDeletionRequested(widget.survey));
+  }
 }
 
 class _ReasonChoice extends StatelessWidget {
