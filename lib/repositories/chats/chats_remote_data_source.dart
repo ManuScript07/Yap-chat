@@ -88,6 +88,7 @@ class ChatsRemoteDataSource {
             blockedByPeer: row['blocked_by_peer'] as bool? ?? false,
             peerIsGloballyBanned:
                 row['peer_is_globally_banned'] as bool? ?? false,
+            peerIsDeleted: row['peer_is_deleted'] as bool? ?? false,
           );
         })
         .toList(growable: false);

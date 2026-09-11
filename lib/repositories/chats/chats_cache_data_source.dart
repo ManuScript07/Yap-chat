@@ -4,6 +4,7 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 
 class ChatsCacheDataSource {
+  static const _deletedAccountDisplayName = 'Удалённый пользователь';
   const ChatsCacheDataSource({
     required AppDatabase database,
     required String Function() userIdProvider,
@@ -41,20 +42,19 @@ class ChatsCacheDataSource {
     return row == null ? null : _mapRow(row);
   }
 
-  Future<bool> isDeliveryBlocked(
-    String chatId, {
-    String? ownerUserId,
-  }) async {
+  Future<bool> isDeliveryBlocked(String chatId, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
-    final row = await (_database.select(_database.cachedChats)..where(
-          (table) =>
-              table.ownerUserId.equals(owner) & table.id.equals(chatId),
-        ))
-        .getSingleOrNull();
+    final row =
+        await (_database.select(_database.cachedChats)..where(
+              (table) =>
+                  table.ownerUserId.equals(owner) & table.id.equals(chatId),
+            ))
+            .getSingleOrNull();
     // Global bans deliberately remain server-authoritative: an administrator
     // may revoke one while this device is offline. Personal blocks, however,
     // are cached explicitly so a blocked sender never emits a network request.
-    return row != null && (row.blockedByMe || row.blockedByPeer);
+    return row != null &&
+        (row.blockedByMe || row.blockedByPeer || _isDeletedAccountRow(row));
   }
 
   Future<bool> replaceAll(List<Chat> chats, {String? ownerUserId}) async {
@@ -113,7 +113,8 @@ class ChatsCacheDataSource {
         left.isMuted == right.isMuted &&
         left.blockedByMe == right.blockedByMe &&
         left.blockedByPeer == right.blockedByPeer &&
-        left.peerIsGloballyBanned == right.peerIsGloballyBanned;
+        left.peerIsGloballyBanned == right.peerIsGloballyBanned &&
+        left.peerIsDeleted == right.peerIsDeleted;
   }
 
   Future<void> remove(Set<String> ids, {String? ownerUserId}) async {
@@ -194,6 +195,7 @@ class ChatsCacheDataSource {
       blockedByMe: row.blockedByMe,
       blockedByPeer: row.blockedByPeer,
       peerIsGloballyBanned: row.peerIsGloballyBanned,
+      peerIsDeleted: _isDeletedAccountRow(row),
     );
   }
 
@@ -231,4 +233,9 @@ class ChatsCacheDataSource {
     };
   }
 
+  bool _isDeletedAccountRow(CachedChat row) =>
+      row.peerDisplayName == _deletedAccountDisplayName &&
+      row.peerUsername.isEmpty &&
+      row.peerAvatarUrl == null &&
+      row.peerAvatarStoragePath == null;
 }

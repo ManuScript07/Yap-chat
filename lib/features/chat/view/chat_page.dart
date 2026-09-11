@@ -240,13 +240,17 @@ class _ChatViewState extends State<_ChatView>
 
     final backgroundColor = context.scaffoldBackgroundColor;
     final presence = context.watch<PresenceCubit>().state;
-    final isOnline = widget.chat.blockedByPeer || widget.chat.peerIsGloballyBanned
+    final isOnline =
+        widget.chat.blockedByPeer ||
+            widget.chat.peerIsGloballyBanned ||
+            widget.chat.peerIsDeleted
         ? false
         : widget.chat.peerId.isEmpty
         ? widget.chat.isOnline
         : presence.isOnline(widget.chat.peerId);
     final blocklistState = context.watch<BlocklistCubit>().state;
-    final blockedByMe = widget.chat.peerId.isNotEmpty &&
+    final blockedByMe =
+        widget.chat.peerId.isNotEmpty &&
         (blocklistState.blocks(widget.chat.peerId) ||
             (!blocklistState.isLoaded && widget.chat.blockedByMe));
 
@@ -326,10 +330,13 @@ class _ChatViewState extends State<_ChatView>
                         showsLastSeen:
                             !widget.chat.blockedByPeer &&
                             !widget.chat.peerIsGloballyBanned &&
+                            !widget.chat.peerIsDeleted &&
                             widget.chat.showsLastSeen,
                         avatarUrl: widget.chat.avatarUrl,
-                        avatarLoader: widget.chat.blockedByPeer ||
-                                widget.chat.peerIsGloballyBanned
+                        avatarLoader:
+                            widget.chat.blockedByPeer ||
+                                widget.chat.peerIsGloballyBanned ||
+                                widget.chat.peerIsDeleted
                             ? null
                             : () => context
                                   .read<IChatsRepository>()
@@ -342,7 +349,9 @@ class _ChatViewState extends State<_ChatView>
                         onBack: () {
                           Navigator.of(context).maybePop();
                         },
-                        onProfileTap: widget.chat.peerId.isEmpty
+                        onProfileTap:
+                            widget.chat.peerId.isEmpty ||
+                                widget.chat.peerIsDeleted
                             ? null
                             : () => openViewedProfile(
                                 context,
@@ -357,6 +366,7 @@ class _ChatViewState extends State<_ChatView>
                       peerId: widget.chat.peerId,
                       blockedByMe: blockedByMe,
                       peerIsGloballyBanned: widget.chat.peerIsGloballyBanned,
+                      peerIsDeleted: widget.chat.peerIsDeleted,
                       isBlockActionPending: blocklistState.isPending(
                         widget.chat.peerId,
                       ),
@@ -381,6 +391,7 @@ class _KeyboardAwareInput extends StatelessWidget {
     required this.peerId,
     required this.blockedByMe,
     required this.peerIsGloballyBanned,
+    required this.peerIsDeleted,
     required this.isBlockActionPending,
     required this.onMessageSent,
     required this.onHeightChanged,
@@ -391,6 +402,7 @@ class _KeyboardAwareInput extends StatelessWidget {
   final String peerId;
   final bool blockedByMe;
   final bool peerIsGloballyBanned;
+  final bool peerIsDeleted;
   final bool isBlockActionPending;
   final VoidCallback onMessageSent;
   final ValueChanged<double> onHeightChanged;
@@ -444,6 +456,12 @@ class _KeyboardAwareInput extends StatelessWidget {
               return SizeReporter(
                 onSizeChanged: (size) => onHeightChanged(size.height),
                 child: const _GloballyBannedComposer(),
+              );
+            }
+            if (peerIsDeleted) {
+              return SizeReporter(
+                onSizeChanged: (size) => onHeightChanged(size.height),
+                child: _DeletedAccountComposer(chatId: chatId),
               );
             }
             if (blockedByMe) {
@@ -661,6 +679,99 @@ class _UnblockComposer extends StatelessWidget {
           type: SnackBarType.error,
         );
       }
+    }
+  }
+}
+
+/// A global account ban is administered outside the chat.  Keeping this
+/// visually identical to the personal-unblock composer avoids a jarring
+/// layout jump, while intentionally exposing no action to the viewer.
+class _DeletedAccountComposer extends StatefulWidget {
+  const _DeletedAccountComposer({required this.chatId});
+
+  final String chatId;
+
+  @override
+  State<_DeletedAccountComposer> createState() =>
+      _DeletedAccountComposerState();
+}
+
+class _DeletedAccountComposerState extends State<_DeletedAccountComposer> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    final mainColor = context.colorScheme.onSurface;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        padding.left + 16,
+        8,
+        padding.right + 16,
+        padding.bottom + 8,
+      ),
+      child: SizedBox(
+        height: 50,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: mainColor.withValues(alpha: .4),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(32),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: Material(
+                color: mainColor.withValues(alpha: .15),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(32),
+                  onTap: _isDeleting ? null : _confirmDeletion,
+                  child: Center(
+                    child: _isDeleting
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: mainColor,
+                            ),
+                          )
+                        : Text(
+                            context.l10n.chatsDeleteAccountChat,
+                            style: TextStyle(
+                              color: mainColor.withValues(alpha: .6),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: .15,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeletion() async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: context.l10n.chatsDeleteTitle(1),
+      content: context.l10n.chatsDeleteConfirmation(1),
+      confirmLabel: context.l10n.chatsDeleteAccountChat,
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() => _isDeleting = true);
+    try {
+      await context.read<IChatsRepository>().deleteChats({widget.chatId});
+      if (mounted) Navigator.of(context).maybePop();
+    } catch (_) {
+      if (mounted) setState(() => _isDeleting = false);
     }
   }
 }

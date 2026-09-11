@@ -200,6 +200,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{История удалится только у вас.} other{История выбранных чатов удалится только у вас.}}'**
   String chatsDeleteConfirmation(int count);
 
+  /// No description provided for @chatsDeleteAccountChat.
+  ///
+  /// In ru, this message translates to:
+  /// **'удалить чат'**
+  String get chatsDeleteAccountChat;
+
   /// No description provided for @chatInputHint.
   ///
   /// In ru, this message translates to:
@@ -380,6 +386,24 @@ abstract class AppLocalizations {
   /// **'удалить аккаунт'**
   String get settingsDeleteAccount;
 
+  /// No description provided for @settingsDeleteAccountConfirmationTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить аккаунт?'**
+  String get settingsDeleteAccountConfirmationTitle;
+
+  /// No description provided for @settingsDeleteAccountConfirmationContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Аккаунт сразу станет недоступен и исчезнет из поиска. В течение 30 дней его можно восстановить, после этого профиль и личные данные будут окончательно удалены.'**
+  String get settingsDeleteAccountConfirmationContent;
+
+  /// No description provided for @settingsDeleteAccountConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'удалить'**
+  String get settingsDeleteAccountConfirm;
+
   /// No description provided for @settingsBlacklist.
   ///
   /// In ru, this message translates to:
@@ -553,6 +577,48 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'скоро'**
   String get settingsComingSoon;
+
+  /// No description provided for @accountDeletionPendingTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Аккаунт удаляется'**
+  String get accountDeletionPendingTitle;
+
+  /// No description provided for @accountDeletionPendingDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Вы запросили удаление аккаунта. Его можно восстановить в течение 30 дней.'**
+  String get accountDeletionPendingDescription;
+
+  /// No description provided for @accountDeletionExpiredTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Срок восстановления истёк'**
+  String get accountDeletionExpiredTitle;
+
+  /// No description provided for @accountDeletionExpiredDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Период восстановления завершён. Аккаунт скоро будет удалён без возможности восстановления.'**
+  String get accountDeletionExpiredDescription;
+
+  /// No description provided for @accountDeletionRestore.
+  ///
+  /// In ru, this message translates to:
+  /// **'восстановить аккаунт'**
+  String get accountDeletionRestore;
+
+  /// No description provided for @accountDeletionRestoreFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось восстановить аккаунт. Попробуйте ещё раз.'**
+  String get accountDeletionRestoreFailed;
+
+  /// No description provided for @accountDeletionRequestFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось начать удаление аккаунта. Проверьте интернет и попробуйте ещё раз.'**
+  String get accountDeletionRequestFailed;
 
   /// No description provided for @settingsTerms.
   ///
@@ -1451,7 +1517,7 @@ abstract class AppLocalizations {
   /// No description provided for @friendsContactsInviteText.
   ///
   /// In ru, this message translates to:
-  /// **'Я в Пуньк как @{username}. Присоединяйся!'**
+  /// **'Я тебя пунькну! Пуньк-пунькну в Пуньк! Никнейм @{username} Жми!'**
   String friendsContactsInviteText(String username);
 
   /// No description provided for @friendsContactsInviteTextWithoutUsername.

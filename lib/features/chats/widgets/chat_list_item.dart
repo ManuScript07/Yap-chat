@@ -27,7 +27,8 @@ class ChatListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
     final systemPadding = MediaQuery.paddingOf(context);
-    final isOnline = chat.blockedByPeer || chat.peerIsGloballyBanned
+    final isOnline =
+        chat.blockedByPeer || chat.peerIsGloballyBanned || chat.peerIsDeleted
         ? false
         : chat.peerId.isEmpty
         ? chat.isOnline
@@ -55,7 +56,7 @@ class ChatListItem extends StatelessWidget {
                 avatarStoragePath: chat.avatarStoragePath,
                 child: UserAvatar(
                   avatarUrl: chat.avatarUrl,
-                  avatarLoader: chat.peerIsGloballyBanned
+                  avatarLoader: chat.peerIsGloballyBanned || chat.peerIsDeleted
                       ? null
                       : avatarLoader,
                   avatarRevision: chat.avatarStoragePath ?? chat.avatarUrl,
@@ -99,7 +100,7 @@ class ChatListItem extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (!chat.peerIsGloballyBanned)
+        if (!chat.peerIsGloballyBanned && !chat.peerIsDeleted)
           AnimatedStatusSwitcher(
             child: Text(
               '$messagePrefix$preview',
@@ -116,7 +117,9 @@ class ChatListItem extends StatelessWidget {
   }
 
   Widget _buildMetadata(BuildContext context) {
-    if (chat.peerIsGloballyBanned) return const SizedBox.shrink();
+    if (chat.peerIsGloballyBanned || chat.peerIsDeleted) {
+      return const SizedBox.shrink();
+    }
     final secondaryTextColor = context.colorScheme.onSurfaceVariant;
     final badgeColor = chat.isMuted
         ? context.colorScheme.onSurfaceVariant

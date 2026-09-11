@@ -508,7 +508,9 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               previous.status != current.status ||
               previous.session?.userId != current.session?.userId,
           listener: (context, state) {
-            final userId = state.status == AuthStatus.banned
+            final userId =
+                state.status == AuthStatus.banned ||
+                    state.status == AuthStatus.deletionPending
                 ? null
                 : state.session?.userId;
             if (_activeUserId != userId) {
@@ -527,6 +529,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
             } else if (state.status == AuthStatus.unauthenticated ||
                 state.status == AuthStatus.profileIncomplete ||
                 state.status == AuthStatus.banned ||
+                state.status == AuthStatus.deletionPending ||
                 state.status == AuthStatus.failure) {
               _blocklistHydratedUserId = null;
               _servicesStartedForUserId = null;

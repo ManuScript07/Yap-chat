@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/features/auth/data/data.dart';
 
-/// Persists only a confirmed global-ban state so that an account which has
-/// already reached the restriction screen remains restricted offline.
+/// Persists only a confirmed restricted-account state so that a confirmed
+/// global ban or pending deletion remains restricted offline.
 class AuthAccountAccessCacheDataSource {
   AuthAccountAccessCacheDataSource({
     required SharedPreferences preferences,
@@ -20,11 +20,20 @@ class AuthAccountAccessCacheDataSource {
     if (raw == null) return null;
     try {
       final value = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      if (value['isBanned'] != true) return null;
+      final isBanned = value['isBanned'] == true;
+      final isDeletionPending = value['isDeletionPending'] == true;
+      final isDeletionExpired = value['isDeletionExpired'] == true;
+      if (!isBanned && !isDeletionPending && !isDeletionExpired) return null;
       final username = (value['username'] as String?)?.trim();
       final supportEmail = (value['supportEmail'] as String?)?.trim();
+      final scheduledFor = DateTime.tryParse(
+        value['deletionScheduledFor'] as String? ?? '',
+      )?.toUtc();
       return AuthAccountAccess(
-        isBanned: true,
+        isBanned: isBanned,
+        isDeletionPending: isDeletionPending,
+        isDeletionExpired: isDeletionExpired,
+        deletionScheduledFor: scheduledFor,
         username: username == null || username.isEmpty ? null : username,
         supportEmail: supportEmail == null || supportEmail.isEmpty
             ? null
@@ -37,11 +46,20 @@ class AuthAccountAccessCacheDataSource {
   }
 
   Future<void> write(String userId, AuthAccountAccess access) {
-    if (!access.isBanned) return clear(userId);
+    if (!access.isBanned &&
+        !access.isDeletionPending &&
+        !access.isDeletionExpired) {
+      return clear(userId);
+    }
     return _preferences.setString(
       _key(userId),
       jsonEncode({
-        'isBanned': true,
+        'isBanned': access.isBanned,
+        'isDeletionPending': access.isDeletionPending,
+        'isDeletionExpired': access.isDeletionExpired,
+        'deletionScheduledFor': access.deletionScheduledFor
+            ?.toUtc()
+            .toIso8601String(),
         'username': access.username,
         'supportEmail': access.supportEmail,
       }),

@@ -38,6 +38,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthProfileSubmitted>(_onProfileSubmitted, transformer: droppable());
     on<AuthProfileUpdated>(_onProfileUpdated);
     on<AuthSignOutRequested>(_onSignOutRequested, transformer: droppable());
+    on<AuthAccountDeletionRequested>(
+      _onAccountDeletionRequested,
+      transformer: droppable(),
+    );
+    on<AuthAccountRestoreRequested>(
+      _onAccountRestoreRequested,
+      transformer: droppable(),
+    );
     on<AuthRetryRequested>(_onRetryRequested);
     on<AuthFailureCleared>(_onFailureCleared);
   }
@@ -243,16 +251,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     var accessChecked = false;
     if (cachedAccess?.isBanned ?? false) {
+      final bannedCachedAccess = cachedAccess!;
       _emitBanned(
         emit,
         session: session,
-        username: cachedAccess!.username ?? cachedProfile?.username,
-        supportEmail: cachedAccess!.supportEmail,
+        username: bannedCachedAccess.username ?? cachedProfile?.username,
+        supportEmail: bannedCachedAccess.supportEmail,
       );
       try {
-        final access = await _authRepository
-            .getAccountAccess()
-            .timeout(const Duration(seconds: 3));
+        final access = await _authRepository.getAccountAccess().timeout(
+          const Duration(seconds: 3),
+        );
         await _cacheAccountAccess(session.userId, access);
         if (access.isBanned) {
           _emitBanned(
@@ -271,6 +280,50 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
     }
+    final cachedDeletionExpired =
+        cachedAccess != null && _isDeletionExpired(cachedAccess);
+    if ((cachedAccess?.isDeletionPending ?? false) || cachedDeletionExpired) {
+      final pendingCachedAccess = cachedAccess!;
+      _emitDeletionPending(
+        emit,
+        session: session,
+        username: pendingCachedAccess.username ?? cachedProfile?.username,
+        supportEmail: pendingCachedAccess.supportEmail,
+        expired: cachedDeletionExpired,
+        scheduledFor: pendingCachedAccess.deletionScheduledFor,
+      );
+      try {
+        final access = await _authRepository.getAccountAccess().timeout(
+          const Duration(seconds: 3),
+        );
+        await _cacheAccountAccess(session.userId, access);
+        if (access.isBanned) {
+          _emitBanned(
+            emit,
+            session: session,
+            username: access.username ?? cachedProfile?.username,
+            supportEmail: access.supportEmail,
+          );
+          return;
+        }
+        if (access.isDeletionPending || _isDeletionExpired(access)) {
+          _emitDeletionPending(
+            emit,
+            session: session,
+            username: access.username ?? cachedProfile?.username,
+            supportEmail: access.supportEmail,
+            expired: _isDeletionExpired(access),
+            scheduledFor: access.deletionScheduledFor,
+          );
+          return;
+        }
+        accessChecked = true;
+        _accountSessionController?.setAuthenticatedUser(session.userId);
+      } catch (_) {
+        // A confirmed pending deletion stays restricted without a connection.
+        return;
+      }
+    }
 
     // Preserve the original offline start behaviour: the local profile is
     // available immediately and is never held behind an account-access RPC.
@@ -283,15 +336,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           isSubmitting: false,
           clearBannedUsername: true,
           clearBannedSupportEmail: true,
+          clearDeletionExpired: true,
+          clearDeletionScheduledFor: true,
         ),
       );
     }
 
     if (!accessChecked) {
       try {
-        final access = await _authRepository
-            .getAccountAccess()
-            .timeout(const Duration(seconds: 3));
+        final access = await _authRepository.getAccountAccess().timeout(
+          const Duration(seconds: 3),
+        );
         await _cacheAccountAccess(session.userId, access);
         if (access.isBanned) {
           _emitBanned(
@@ -299,6 +354,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             session: session,
             username: access.username ?? cachedProfile?.username,
             supportEmail: access.supportEmail,
+          );
+          return;
+        }
+        if (access.isDeletionPending || _isDeletionExpired(access)) {
+          _emitDeletionPending(
+            emit,
+            session: session,
+            username: access.username ?? cachedProfile?.username,
+            supportEmail: access.supportEmail,
+            expired: _isDeletionExpired(access),
+            scheduledFor: access.deletionScheduledFor,
           );
           return;
         }
@@ -317,18 +383,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           session: session,
           profile: profile,
           isSubmitting: false,
+          clearDeletionExpired: true,
+          clearDeletionScheduledFor: true,
         ),
       );
     } catch (error) {
       if (_isGlobalBanFailure(error)) {
         await _cacheAccountAccess(
           session.userId,
+          AuthAccountAccess(isBanned: true, username: cachedProfile?.username),
+        );
+        _emitBanned(emit, session: session, username: cachedProfile?.username);
+        return;
+      }
+      if (_isPendingDeletionFailure(error)) {
+        await _cacheAccountAccess(
+          session.userId,
           AuthAccountAccess(
-            isBanned: true,
+            isBanned: false,
+            isDeletionPending: true,
             username: cachedProfile?.username,
           ),
         );
-        _emitBanned(
+        _emitDeletionPending(
           emit,
           session: session,
           username: cachedProfile?.username,
@@ -456,7 +533,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Repository/push shutdown must not make the account impossible to exit.
       }
       try {
-        await _authRepository.signOut().timeout(const Duration(seconds: 12));
+        await _authRepository
+            .signOut(preserveAccountAccess: event.preserveAccountAccess)
+            .timeout(const Duration(seconds: 12));
       } catch (_) {
         // The local SDK session may already be cleared even if remote logout
         // failed, so the final state is decided from currentSession below.
@@ -510,6 +589,69 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
+  Future<void> _onAccountDeletionRequested(
+    AuthAccountDeletionRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final userId = state.session?.userId;
+    if (userId == null || state.isSubmitting) return;
+
+    emit(state.copyWith(isSubmitting: true, clearFailure: true));
+    try {
+      final scheduledFor = await _authRepository
+          .requestAccountDeletion()
+          .timeout(const Duration(seconds: 15));
+      await _cacheAccountAccess(
+        userId,
+        AuthAccountAccess(
+          isBanned: false,
+          isDeletionPending: true,
+          deletionScheduledFor: scheduledFor,
+          username: state.profile?.username,
+        ),
+      );
+      // The server has already closed every data API path.  Reuse the normal
+      // durable sign-out cleanup so no deleted-account data stays on device.
+      emit(state.copyWith(isSubmitting: false));
+      add(const AuthSignOutRequested(preserveAccountAccess: true));
+    } catch (_) {
+      emit(
+        state.copyWith(
+          failure: AuthFailure.accountDeletion,
+          isSubmitting: false,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onAccountRestoreRequested(
+    AuthAccountRestoreRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final session = state.session;
+    if (session == null || state.isSubmitting) return;
+
+    emit(state.copyWith(isSubmitting: true, clearFailure: true));
+    try {
+      await _authRepository.restoreAccountDeletion().timeout(
+        const Duration(seconds: 15),
+      );
+      await _cacheAccountAccess(
+        session.userId,
+        const AuthAccountAccess(isBanned: false),
+      );
+      emit(state.copyWith(isSubmitting: false));
+      add(AuthSessionChanged(session));
+    } catch (_) {
+      emit(
+        state.copyWith(
+          failure: AuthFailure.accountRestore,
+          isSubmitting: false,
+        ),
+      );
+    }
+  }
+
   void _onRetryRequested(AuthRetryRequested event, Emitter<AuthState> emit) {
     add(const AuthStarted());
   }
@@ -526,6 +668,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   bool _isGlobalBanFailure(Object error) =>
       error.toString().contains('account_globally_banned');
+
+  bool _isPendingDeletionFailure(Object error) =>
+      error.toString().contains('account_pending_deletion');
+
+  bool _isDeletionExpired(AuthAccountAccess access) {
+    final scheduledFor = access.deletionScheduledFor;
+    return access.isDeletionExpired ||
+        (scheduledFor != null && !scheduledFor.isAfter(DateTime.now().toUtc()));
+  }
 
   Future<void> _cacheAccountAccess(
     String userId,
@@ -553,6 +704,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         bannedUsername: username,
         bannedSupportEmail: supportEmail,
         clearProfile: true,
+        clearDeletionExpired: true,
+        clearDeletionScheduledFor: true,
+        isSubmitting: false,
+        isCompletingSignIn: false,
+        clearFailure: true,
+      ),
+    );
+  }
+
+  void _emitDeletionPending(
+    Emitter<AuthState> emit, {
+    required AuthSession session,
+    String? username,
+    String? supportEmail,
+    bool expired = false,
+    DateTime? scheduledFor,
+  }) {
+    _accountSessionController?.setAuthenticatedUser(null);
+    emit(
+      state.copyWith(
+        status: AuthStatus.deletionPending,
+        session: session,
+        clearProfile: true,
+        bannedUsername: username,
+        bannedSupportEmail: supportEmail,
+        isDeletionExpired: expired,
+        deletionScheduledFor: scheduledFor,
+        clearDeletionScheduledFor: scheduledFor == null,
         isSubmitting: false,
         isCompletingSignIn: false,
         clearFailure: true,

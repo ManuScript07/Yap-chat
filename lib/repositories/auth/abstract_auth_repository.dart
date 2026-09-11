@@ -14,14 +14,17 @@ abstract interface class IAuthRepository {
 
   Future<AuthAccountAccess?> getCachedAccountAccess(String userId);
 
-  Future<void> cacheAccountAccess(
-    String userId,
-    AuthAccountAccess access,
-  );
+  Future<void> cacheAccountAccess(String userId, AuthAccountAccess access);
 
   Future<void> signInWithYandex();
 
   Future<void> cancelPendingSignIn();
 
-  Future<void> signOut();
+  /// Starts the reversible thirty-day deletion window for the signed-in user.
+  Future<DateTime?> requestAccountDeletion();
+
+  /// Restores the signed-in account while its deletion window is still open.
+  Future<void> restoreAccountDeletion();
+
+  Future<void> signOut({bool preserveAccountAccess = false});
 }

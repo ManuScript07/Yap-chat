@@ -9,6 +9,7 @@ enum AuthStatus {
   profileIncomplete,
   authenticated,
   banned,
+  deletionPending,
   failure,
 }
 
@@ -20,6 +21,8 @@ enum AuthFailure {
   usernameTaken,
   invalidUsername,
   invalidDisplayName,
+  accountDeletion,
+  accountRestore,
   signOut,
 }
 
@@ -31,6 +34,8 @@ class AuthState extends Equatable {
     this.failure,
     this.bannedUsername,
     this.bannedSupportEmail,
+    this.isDeletionExpired = false,
+    this.deletionScheduledFor,
     this.isSubmitting = false,
     this.isCompletingSignIn = false,
   });
@@ -41,6 +46,8 @@ class AuthState extends Equatable {
   final AuthFailure? failure;
   final String? bannedUsername;
   final String? bannedSupportEmail;
+  final bool isDeletionExpired;
+  final DateTime? deletionScheduledFor;
   final bool isSubmitting;
   final bool isCompletingSignIn;
 
@@ -51,6 +58,8 @@ class AuthState extends Equatable {
     AuthFailure? failure,
     String? bannedUsername,
     String? bannedSupportEmail,
+    bool? isDeletionExpired,
+    DateTime? deletionScheduledFor,
     bool? isSubmitting,
     bool? isCompletingSignIn,
     bool clearSession = false,
@@ -58,6 +67,8 @@ class AuthState extends Equatable {
     bool clearFailure = false,
     bool clearBannedUsername = false,
     bool clearBannedSupportEmail = false,
+    bool clearDeletionExpired = false,
+    bool clearDeletionScheduledFor = false,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -70,6 +81,12 @@ class AuthState extends Equatable {
       bannedSupportEmail: clearBannedSupportEmail
           ? null
           : bannedSupportEmail ?? this.bannedSupportEmail,
+      isDeletionExpired: clearDeletionExpired
+          ? false
+          : isDeletionExpired ?? this.isDeletionExpired,
+      deletionScheduledFor: clearDeletionScheduledFor
+          ? null
+          : deletionScheduledFor ?? this.deletionScheduledFor,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isCompletingSignIn: isCompletingSignIn ?? this.isCompletingSignIn,
     );
@@ -83,6 +100,8 @@ class AuthState extends Equatable {
     failure,
     bannedUsername,
     bannedSupportEmail,
+    isDeletionExpired,
+    deletionScheduledFor,
     isSubmitting,
     isCompletingSignIn,
   ];

@@ -91,6 +91,7 @@ class _AuthGatePageState extends State<AuthGatePage> {
       AuthStatus.profileIncomplete => const ProfileSetupRoute(),
       AuthStatus.authenticated => const MainRoute(),
       AuthStatus.banned => const BannedAccountRoute(),
+      AuthStatus.deletionPending => const BannedAccountRoute(),
       AuthStatus.failure => const AuthFailureRoute(),
       AuthStatus.initial || AuthStatus.loading => const SplashRoute(),
     };

@@ -23,6 +23,7 @@ class MockAuthRepository implements IAuthRepository {
 
   final SharedPreferences _preferences;
   final _sessionController = StreamController<AuthSession?>.broadcast();
+  final _accountAccessCache = <String, AuthAccountAccess>{};
   AuthSession? _currentSession;
 
   @override
@@ -39,13 +40,22 @@ class MockAuthRepository implements IAuthRepository {
       const AuthAccountAccess(isBanned: false, username: 'mock_user');
 
   @override
-  Future<AuthAccountAccess?> getCachedAccountAccess(String userId) async => null;
+  Future<AuthAccountAccess?> getCachedAccountAccess(String userId) async =>
+      _accountAccessCache[userId];
 
   @override
   Future<void> cacheAccountAccess(
     String userId,
     AuthAccountAccess access,
-  ) async {}
+  ) async {
+    if (!access.isBanned &&
+        !access.isDeletionPending &&
+        !access.isDeletionExpired) {
+      _accountAccessCache.remove(userId);
+      return;
+    }
+    _accountAccessCache[userId] = access;
+  }
 
   @override
   Future<void> signInWithYandex() async {
@@ -59,7 +69,13 @@ class MockAuthRepository implements IAuthRepository {
   Future<void> cancelPendingSignIn() async {}
 
   @override
-  Future<void> signOut() async {
+  Future<DateTime?> requestAccountDeletion() async => null;
+
+  @override
+  Future<void> restoreAccountDeletion() async {}
+
+  @override
+  Future<void> signOut({bool preserveAccountAccess = false}) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     _currentSession = null;
     await _preferences.remove(signedInPreferenceKey);

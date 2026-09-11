@@ -32,6 +32,7 @@
       }
     }
   },
+  "chatsDeleteAccountChat": "удалить чат",
   "chatInputHint": "введите сообщение",
   "chatUserBlocked": "пользователь заблокирован",
   "chatOnlineStatus": "в сети",
@@ -78,6 +79,9 @@
   "settingsLogoutConfirmationContent": "вы уверены, что хотите выйти из аккаунта?",
   "settingsLogoutConfirm": "выйти",
   "settingsDeleteAccount": "удалить аккаунт",
+  "settingsDeleteAccountConfirmationTitle": "Удалить аккаунт?",
+  "settingsDeleteAccountConfirmationContent": "Аккаунт сразу станет недоступен и исчезнет из поиска. В течение 30 дней его можно восстановить, после этого профиль и личные данные будут окончательно удалены.",
+  "settingsDeleteAccountConfirm": "удалить",
   "settingsBlacklist": "чёрный список",
   "settingsSearchByUsername": "искать по никнейму",
   "settingsSearchByPhone": "искать по номеру",
@@ -107,6 +111,13 @@
   "settingsNobodyHere": "тут никого нет",
   "settingsBlacklistLoadFailed": "не удалось загрузить черный список",
   "settingsComingSoon": "скоро",
+  "accountDeletionPendingTitle": "Аккаунт удаляется",
+  "accountDeletionPendingDescription": "Вы запросили удаление аккаунта. Его можно восстановить в течение 30 дней.",
+  "accountDeletionExpiredTitle": "Срок восстановления истёк",
+  "accountDeletionExpiredDescription": "Период восстановления завершён. Аккаунт скоро будет удалён без возможности восстановления.",
+  "accountDeletionRestore": "восстановить аккаунт",
+  "accountDeletionRestoreFailed": "Не удалось восстановить аккаунт. Попробуйте ещё раз.",
+  "accountDeletionRequestFailed": "Не удалось начать удаление аккаунта. Проверьте интернет и попробуйте ещё раз.",
   "settingsTerms": "пользовательское соглашение",
   "settingsPrivacyPolicy": "политика конфиденциальности",
   "photoHasBeenSavedToGallery": "фото сохранено в галерею",
@@ -291,7 +302,7 @@
   "friendsContactsInvite": "пригласить",
   "friendsContactsPermissionTitle": "Нет доступа к контактам",
   "friendsContactsPermissionDescription": "Разрешите доступ к контактам в настройках приложения.",
-  "friendsContactsInviteText": "Я в Пуньк как @{username}. Присоединяйся!",
+  "friendsContactsInviteText": "Я тебя пунькну! Пуньк-пунькну в Пуньк! Никнейм @{username} Жми!",
   "@friendsContactsInviteText": {
     "placeholders": {
       "username": {

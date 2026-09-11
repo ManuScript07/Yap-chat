@@ -103,8 +103,14 @@ class AuthRepository implements IAuthRepository {
     final row = Map<String, dynamic>.from(response.first as Map);
     final username = (row['username'] as String?)?.trim();
     final supportEmail = (row['support_email'] as String?)?.trim();
+    final scheduledFor = DateTime.tryParse(
+      row['deletion_scheduled_for'] as String? ?? '',
+    )?.toUtc();
     return AuthAccountAccess(
       isBanned: row['is_banned'] as bool? ?? false,
+      isDeletionPending: row['is_deletion_pending'] as bool? ?? false,
+      isDeletionExpired: row['is_deletion_expired'] as bool? ?? false,
+      deletionScheduledFor: scheduledFor,
       username: username == null || username.isEmpty ? null : username,
       supportEmail: supportEmail == null || supportEmail.isEmpty
           ? null
@@ -159,12 +165,26 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> signOut() async {
+  Future<DateTime?> requestAccountDeletion() async {
+    final response = await _client.functions.invoke('request-account-deletion');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return DateTime.tryParse(data['scheduled_for'] as String? ?? '')?.toUtc();
+  }
+
+  @override
+  Future<void> restoreAccountDeletion() async {
+    await _client.functions.invoke('restore-account-deletion');
+  }
+
+  @override
+  Future<void> signOut({bool preserveAccountAccess = false}) async {
     final userId = currentSession?.userId;
     try {
       await _client.auth.signOut();
     } finally {
-      if (userId != null) await _accountAccessCache?.clear(userId);
+      if (userId != null && !preserveAccountAccess) {
+        await _accountAccessCache?.clear(userId);
+      }
     }
   }
 

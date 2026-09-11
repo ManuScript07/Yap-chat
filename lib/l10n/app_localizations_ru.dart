@@ -106,6 +106,9 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get chatsDeleteAccountChat => 'удалить чат';
+
+  @override
   String get chatInputHint => 'введите сообщение';
 
   @override
@@ -206,6 +209,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsDeleteAccount => 'удалить аккаунт';
 
   @override
+  String get settingsDeleteAccountConfirmationTitle => 'Удалить аккаунт?';
+
+  @override
+  String get settingsDeleteAccountConfirmationContent =>
+      'Аккаунт сразу станет недоступен и исчезнет из поиска. В течение 30 дней его можно восстановить, после этого профиль и личные данные будут окончательно удалены.';
+
+  @override
+  String get settingsDeleteAccountConfirm => 'удалить';
+
+  @override
   String get settingsBlacklist => 'чёрный список';
 
   @override
@@ -295,6 +308,31 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get settingsComingSoon => 'скоро';
+
+  @override
+  String get accountDeletionPendingTitle => 'Аккаунт удаляется';
+
+  @override
+  String get accountDeletionPendingDescription =>
+      'Вы запросили удаление аккаунта. Его можно восстановить в течение 30 дней.';
+
+  @override
+  String get accountDeletionExpiredTitle => 'Срок восстановления истёк';
+
+  @override
+  String get accountDeletionExpiredDescription =>
+      'Период восстановления завершён. Аккаунт скоро будет удалён без возможности восстановления.';
+
+  @override
+  String get accountDeletionRestore => 'восстановить аккаунт';
+
+  @override
+  String get accountDeletionRestoreFailed =>
+      'Не удалось восстановить аккаунт. Попробуйте ещё раз.';
+
+  @override
+  String get accountDeletionRequestFailed =>
+      'Не удалось начать удаление аккаунта. Проверьте интернет и попробуйте ещё раз.';
 
   @override
   String get settingsTerms => 'пользовательское соглашение';
@@ -787,7 +825,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String friendsContactsInviteText(String username) {
-    return 'Я в Пуньк как @$username. Присоединяйся!';
+    return 'Я тебя пунькну! Пуньк-пунькну в Пуньк! Никнейм @$username Жми!';
   }
 
   @override

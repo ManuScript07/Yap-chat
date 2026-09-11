@@ -100,6 +100,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatsDeleteAccountChat => 'delete chat';
+
+  @override
   String get chatInputHint => 'Type a message';
 
   @override
@@ -200,6 +203,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDeleteAccount => 'Delete account';
 
   @override
+  String get settingsDeleteAccountConfirmationTitle => 'Delete account?';
+
+  @override
+  String get settingsDeleteAccountConfirmationContent =>
+      'Your account will immediately become unavailable and disappear from search. You can restore it within 30 days; after that, your profile and personal data will be permanently deleted.';
+
+  @override
+  String get settingsDeleteAccountConfirm => 'delete';
+
+  @override
   String get settingsBlacklist => 'Blocked users';
 
   @override
@@ -287,6 +300,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsComingSoon => 'coming soon';
+
+  @override
+  String get accountDeletionPendingTitle => 'Account deletion in progress';
+
+  @override
+  String get accountDeletionPendingDescription =>
+      'You requested account deletion. You can restore the account within 30 days.';
+
+  @override
+  String get accountDeletionExpiredTitle => 'Account deletion period ended';
+
+  @override
+  String get accountDeletionExpiredDescription =>
+      'The recovery period has ended. Your account will be permanently deleted soon.';
+
+  @override
+  String get accountDeletionRestore => 'restore account';
+
+  @override
+  String get accountDeletionRestoreFailed =>
+      'Could not restore the account. Try again.';
+
+  @override
+  String get accountDeletionRequestFailed =>
+      'Could not start account deletion. Check your connection and try again.';
 
   @override
   String get settingsTerms => 'Terms of service';

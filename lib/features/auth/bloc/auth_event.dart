@@ -84,7 +84,22 @@ final class AuthProfileUpdated extends AuthEvent {
 }
 
 final class AuthSignOutRequested extends AuthEvent {
-  const AuthSignOutRequested();
+  const AuthSignOutRequested({this.preserveAccountAccess = false});
+
+  /// Retains only the cached pending-deletion marker through sign-out. This
+  /// prevents a persisted SDK session from opening the app while offline.
+  final bool preserveAccountAccess;
+
+  @override
+  List<Object?> get props => [preserveAccountAccess];
+}
+
+final class AuthAccountDeletionRequested extends AuthEvent {
+  const AuthAccountDeletionRequested();
+}
+
+final class AuthAccountRestoreRequested extends AuthEvent {
+  const AuthAccountRestoreRequested();
 }
 
 final class AuthRetryRequested extends AuthEvent {
