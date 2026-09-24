@@ -174,11 +174,6 @@ class RepositoryContainer {
         viewedProfileCache: viewedProfileCache,
         mediaCache: mediaCache,
         talker: config.talker,
-        avatarDeletionQueue: AvatarDeletionQueue(
-          preferences: config.preferences,
-          environment: config.environment.name,
-          talker: config.talker,
-        ),
         avatarStorage: AvatarStorageDataSource(
           client: client,
           imageProcessor: const AvatarImageProcessor(),

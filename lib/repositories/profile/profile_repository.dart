@@ -8,7 +8,6 @@ import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/profile/abstract_profile_repository.dart';
 import 'package:yap_chat/repositories/profile/avatar_storage_data_source.dart';
-import 'package:yap_chat/repositories/profile/avatar_deletion_queue.dart';
 import 'package:yap_chat/repositories/profile/profile_cache_data_source.dart';
 import 'package:yap_chat/repositories/profile/profile_change_detector.dart';
 import 'package:yap_chat/repositories/profile/viewed_profile_cache_data_source.dart';
@@ -20,7 +19,6 @@ class ProfileRepository
     required SupabaseClient client,
     required ProfileCacheDataSource cache,
     required AvatarStorageDataSource avatarStorage,
-    required AvatarDeletionQueue avatarDeletionQueue,
     required Talker talker,
     required AccountSessionController accountSessionController,
     required ViewedProfileCacheDataSource viewedProfileCache,
@@ -30,7 +28,6 @@ class ProfileRepository
   }) : _client = client,
        _cache = cache,
        _avatarStorage = avatarStorage,
-       _avatarDeletionQueue = avatarDeletionQueue,
        _accountSessionController = accountSessionController,
        _viewedProfileCache = viewedProfileCache,
        _mediaCache = mediaCache,
@@ -41,7 +38,6 @@ class ProfileRepository
   final SupabaseClient _client;
   final ProfileCacheDataSource _cache;
   final AvatarStorageDataSource _avatarStorage;
-  final AvatarDeletionQueue _avatarDeletionQueue;
   final Talker _talker;
   final AccountSessionController _accountSessionController;
   final ViewedProfileCacheDataSource _viewedProfileCache;
@@ -434,7 +430,6 @@ class ProfileRepository
       scope,
       () => _writeCacheBestEffort(profile),
     );
-    unawaited(_reconcileAvatarDeletions(profile));
     return profile;
   }
 
@@ -483,12 +478,6 @@ class ProfileRepository
             userId: userId,
             sourceBytes: photo.bytes!,
           );
-          try {
-            await _avatarDeletionQueue.enqueue(userId, [uploaded.path]);
-          } catch (_) {
-            await _deleteAvatarBestEffort(uploaded.path);
-            rethrow;
-          }
           savedPhotos.add(
             ProfilePhoto(
               position: index,
@@ -501,13 +490,6 @@ class ProfileRepository
           savedPhotos.add(photo.copyWith(position: index));
         }
       }
-
-      await _avatarDeletionQueue.enqueue(
-        userId,
-        currentProfile.effectivePhotos
-            .map((photo) => photo.storagePath)
-            .whereType<String>(),
-      );
 
       _accountSessionController.ensureCurrent(scope);
       final response = await measureRpc(
@@ -549,7 +531,6 @@ class ProfileRepository
         () => _writeCacheBestEffort(profile),
       );
 
-      unawaited(_reconcileAvatarDeletions(profile));
       _talker.info(
         'Profile save completed: durationMs=${stopwatch.elapsedMilliseconds}, '
         'photos=${hydratedPhotos.length}, uploads=$uploadCount',
@@ -764,7 +745,6 @@ class ProfileRepository
             );
             if (response.isEmpty) throw const ProfileSaveException();
           } catch (_) {
-            await _deleteAvatarBestEffort(stored.path);
             rethrow;
           }
           hydrated.add(
@@ -861,25 +841,6 @@ class ProfileRepository
       }
     }
     return null;
-  }
-
-  Future<void> _deleteAvatarBestEffort(String storagePath) async {
-    try {
-      await _avatarStorage.delete(storagePath);
-    } catch (_) {
-      // Удаление старого файла не должно откатывать успешно сохранённый профиль.
-    }
-  }
-
-  Future<void> _reconcileAvatarDeletions(UserProfile profile) {
-    return _avatarDeletionQueue.reconcile(
-      ownerUserId: profile.id,
-      referencedPaths: profile.effectivePhotos
-          .map((photo) => photo.storagePath)
-          .whereType<String>()
-          .toSet(),
-      delete: _avatarStorage.delete,
-    );
   }
 
   Future<UserProfile?> _readCacheBestEffort(String userId) async {

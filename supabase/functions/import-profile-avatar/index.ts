@@ -65,15 +65,6 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: 'avatar_size_invalid' }, 413);
   }
 
-  const { data: currentProfile } = await admin
-    .from('profiles')
-    .select('avatar_storage_path')
-    .eq('id', user.id)
-    .maybeSingle();
-  const previousPath = currentProfile?.avatar_storage_path as
-    | string
-    | null
-    | undefined;
   const path = `${user.id}/${Date.now()}_${crypto.randomUUID()}.jpg`;
   const { error: uploadError } = await admin.storage
     .from(bucketName)
@@ -97,10 +88,6 @@ Deno.serve(async (request) => {
   if (profileError) {
     await admin.storage.from(bucketName).remove([path]);
     return jsonResponse({ error: 'profile_update_failed' }, 500);
-  }
-
-  if (previousPath && previousPath !== path) {
-    await admin.storage.from(bucketName).remove([previousPath]);
   }
 
   return jsonResponse({ path, updated_at: updatedAt });

@@ -235,6 +235,7 @@ class PushNotificationsRepository implements IPushNotificationsRepository {
         AuthorizationStatus.authorized => PushPermissionStatus.authorized,
         AuthorizationStatus.provisional => PushPermissionStatus.provisional,
         AuthorizationStatus.denied => PushPermissionStatus.denied,
+        AuthorizationStatus.deniedPermanently => PushPermissionStatus.denied,
         AuthorizationStatus.notDetermined => PushPermissionStatus.notDetermined,
       };
 
