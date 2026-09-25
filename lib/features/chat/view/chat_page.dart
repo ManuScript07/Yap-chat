@@ -3,14 +3,17 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/view/focused_history_window_cache.dart';
+import 'package:yap_chat/features/chat/view/focused_history_reconciliation.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
@@ -924,12 +927,16 @@ class _ChatMessagesState extends State<_ChatMessages> {
   bool _bottomJumpScheduled = false;
   bool _bottomJumpPending = false;
   int _bottomJumpSerial = 0;
+  bool _blankViewportWarningLogged = false;
+  int _userScrollGeneration = 0;
 
   int _lastVisibleIndex = 0;
   bool _isAnimatingToBottom = false;
   bool _isNavigating = false;
   bool _focusLoading = false;
+  bool _focusRecheckRunning = false;
   bool _focusRecheckPending = false;
+  int _focusRecheckSerial = 0;
   bool _focusPageLoading = false;
   bool _focusHasOlder = true;
   bool _focusHasNewer = true;
@@ -938,6 +945,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
   List<ChatMessage>? _focusMessages;
   List<ChatListItemElement> _displayedItems = const [];
   String? _highlightedMessageId;
+  int _highlightSerial = 0;
   StreamSubscription<ChatHistoryChange>? _historyChangesSubscription;
   final Map<String, Future<ChatMessage>> _focusedMedia = {};
   final Set<String> _deletedFocusIds = {};
@@ -962,7 +970,10 @@ class _ChatMessagesState extends State<_ChatMessages> {
             _removeFocusedMessage(deletedId);
           } else if (change.reconnected) {
             _windowCache.clear();
-            if (_focusLoading) {
+            if (_focusLoading ||
+                _focusPageLoading ||
+                _focusRecheckRunning ||
+                _isNavigating) {
               _focusRecheckPending = true;
             } else if (_focusMessages != null) {
               unawaited(_refreshFocusedWindow());
@@ -1004,12 +1015,98 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _focusMessages = remaining;
       if (_highlightedMessageId == messageId) {
         _highlightedMessageId = null;
+        _highlightSerial++;
       }
     });
   }
 
   Future<void> _refreshFocusedWindow() async {
-    if (_focusMessages == null || _focusLoading) return;
+    if (_focusMessages == null ||
+        _focusLoading ||
+        _focusPageLoading ||
+        _focusRecheckRunning ||
+        _isNavigating) {
+      return;
+    }
+    final anchor = _visibleFocusedAnchor();
+    if (anchor == null) return;
+    final generation = _navigationGeneration;
+    final userScrollGeneration = _userScrollGeneration;
+    final recheckSerial = ++_focusRecheckSerial;
+    _focusRecheckRunning = true;
+    try {
+      final window = await context.read<IChatRepository>().loadMessageWindow(
+        widget.chat.id,
+        anchor.messageId,
+      );
+      if (!mounted || generation != _navigationGeneration) return;
+      // A drag during the request must not pull the user back to an old
+      // viewport. Recheck on the next subscription instead.
+      final currentAnchor = _visibleFocusedAnchor();
+      if (currentAnchor?.messageId != anchor.messageId ||
+          userScrollGeneration != _userScrollGeneration) {
+        return;
+      }
+      final current = window
+          .where((message) => !_deletedFocusIds.contains(message.id))
+          .toList(growable: false);
+      if (!current.any((message) => message.id == anchor.messageId)) {
+        scrollToBottom();
+        return;
+      }
+      final previous = _focusMessages;
+      if (previous == null) return;
+      _windowCache.remember(anchor.messageId, current);
+      final reconciled = reconcileFocusedHistory(previous, current);
+      if (reconciled == null) return;
+      final reconciledById = {
+        for (final message in reconciled) message.id: message,
+      };
+      for (final message in previous) {
+        final updated = reconciledById[message.id];
+        if (updated == null || !sameFocusedMediaSource(message, updated)) {
+          _focusedMedia.remove(message.id);
+        }
+      }
+      setState(() {
+        _focusMessages = reconciled;
+      });
+      if (reconciled.length == previous.length) return;
+      await WidgetsBinding.instance.endOfFrame;
+      if (userScrollGeneration != _userScrollGeneration) return;
+      await _showMessage(
+        anchor.messageId,
+        generation: generation,
+        animate: false,
+        alignment: currentAnchor!.alignment,
+        highlight: false,
+      );
+    } catch (_) {
+      // Keep the current window if reconnection happened before the API works.
+    } finally {
+      if (mounted && recheckSerial == _focusRecheckSerial) {
+        _focusRecheckRunning = false;
+        _runPendingFocusRecheck();
+      }
+    }
+  }
+
+  void _runPendingFocusRecheck() {
+    if (!_focusRecheckPending ||
+        _focusMessages == null ||
+        _focusLoading ||
+        _focusPageLoading ||
+        _focusRecheckRunning ||
+        _isNavigating) {
+      return;
+    }
+    _focusRecheckPending = false;
+    unawaited(_refreshFocusedWindow());
+  }
+
+  ({String messageId, double alignment})? _visibleFocusedAnchor() {
+    final focused = _focusMessages;
+    if (focused == null || focused.isEmpty) return null;
     final visible =
         _itemPositionsListener.itemPositions.value
             .where(
@@ -1018,59 +1115,18 @@ class _ChatMessagesState extends State<_ChatMessages> {
             )
             .toList(growable: false)
           ..sort((a, b) => a.index.compareTo(b.index));
-    String? anchorId;
     for (final position in visible) {
       if (position.index >= _displayedItems.length) continue;
       final item = _displayedItems[position.index];
       if (item is MessageItemElement &&
-          _focusMessages!.any((message) => message.id == item.message.id)) {
-        anchorId = item.message.id;
-        break;
+          focused.any((message) => message.id == item.message.id)) {
+        return (
+          messageId: item.message.id,
+          alignment: position.itemLeadingEdge,
+        );
       }
     }
-    anchorId ??= _focusMessages!.firstOrNull?.id;
-    if (anchorId == null) return;
-    final generation = ++_navigationGeneration;
-    setState(() => _focusLoading = true);
-    try {
-      final window = await context.read<IChatRepository>().loadMessageWindow(
-        widget.chat.id,
-        anchorId,
-      );
-      if (!mounted || generation != _navigationGeneration) return;
-      final current = window
-          .where((message) => !_deletedFocusIds.contains(message.id))
-          .toList(growable: false);
-      if (!current.any((message) => message.id == anchorId)) {
-        scrollToBottom();
-        return;
-      }
-      _focusedMedia.clear();
-      _windowCache.remember(anchorId, current);
-      setState(() {
-        _focusMessages = current;
-        _focusHasOlder = true;
-        _focusHasNewer = true;
-        _focusPaginationArmed = false;
-        _showScrollToBottom = false;
-        _focusPageLoading = false;
-      });
-      await WidgetsBinding.instance.endOfFrame;
-      await _showMessage(anchorId, generation: generation, animate: false);
-    } catch (_) {
-      // Keep the current window if reconnection happened before the API works.
-    } finally {
-      if (mounted && generation == _navigationGeneration) {
-        setState(() => _focusLoading = false);
-        _runPendingFocusRecheck();
-      }
-    }
-  }
-
-  void _runPendingFocusRecheck() {
-    if (!_focusRecheckPending || _focusMessages == null) return;
-    _focusRecheckPending = false;
-    unawaited(_refreshFocusedWindow());
+    return null;
   }
 
   Future<ChatMessage> _hydrateFocusedMedia(ChatMessage message) =>
@@ -1106,14 +1162,19 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _windowCache.clear();
       _deletedFocusIds.clear();
       _focusLoading = false;
+      _focusRecheckRunning = false;
       _focusRecheckPending = false;
+      _focusRecheckSerial++;
       _focusPageLoading = false;
       _focusPaginationArmed = false;
       _highlightedMessageId = null;
+      _highlightSerial++;
       _knownMessageIds = {};
       _initialMessagesLoaded = false;
       _newMessageAnimations.clear();
       _lastVisibleIndex = 0;
+      _blankViewportWarningLogged = false;
+      _userScrollGeneration = 0;
     }
   }
 
@@ -1175,6 +1236,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
   }
 
   void _handleMessagesChanged(List<ChatMessage> messages) {
+    _diagnoseBlankTimeline('messages_changed');
     final currentIds = messages.map((message) => message.id).toSet();
 
     // An empty cache can be emitted before the first server page arrives.
@@ -1343,10 +1405,13 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _focusedMedia.clear();
     _deletedFocusIds.clear();
     _focusRecheckPending = false;
+    _focusRecheckRunning = false;
+    _focusRecheckSerial++;
     setState(() {
       _focusMessages = null;
       _focusPaginationArmed = false;
       _highlightedMessageId = null;
+      _highlightSerial++;
       _newMessagesCount = 0;
       _showScrollToBottom = false;
       _focusLoading = false;
@@ -1354,6 +1419,42 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _lastVisibleIndex = 0;
     });
     _jumpToBottomAfterBuild();
+    _diagnoseBlankTimeline('focus_exit');
+  }
+
+  void _diagnoseBlankTimeline(String source) {
+    if (!kDebugMode) return;
+    final generation = _navigationGeneration;
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted ||
+          generation != _navigationGeneration ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      final messages = context.read<ChatBloc>().state.messages;
+      if (messages.isEmpty && _focusMessages == null) return;
+      final visibleCount = _itemPositionsListener.itemPositions.value
+          .where(
+            (position) =>
+                position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
+          )
+          .length;
+      if (_displayedItems.isNotEmpty && visibleCount > 0) {
+        _blankViewportWarningLogged = false;
+        return;
+      }
+      if (_blankViewportWarningLogged) return;
+      _blankViewportWarningLogged = true;
+      context.read<AppConfig>().talker.warning(
+        'Chat timeline has no visible items ($source): '
+        'messages=${messages.length}, focus=${_focusMessages?.length}, '
+        'items=${_displayedItems.length}, '
+        'hidden=$_newMessagesCount, visible=$visibleCount, '
+        'attached=${_itemScrollController.isAttached}, '
+        'bottomPending=$_bottomJumpPending, navigating=$_isNavigating',
+      );
+    });
   }
 
   int? _indexForMessage(String messageId) {
@@ -1366,6 +1467,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
 
   Future<void> _jumpToMessage(String messageId) async {
     if (_focusLoading) return;
+    _focusRecheckRunning = false;
+    _focusRecheckSerial++;
+    _focusRecheckPending = false;
     final generation = ++_navigationGeneration;
     _isAnimatingToBottom = false;
     final recentMessages = context.read<ChatBloc>().state.messages;
@@ -1423,6 +1527,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
         _newMessagesCount = 0;
         _showScrollToBottom = false;
       });
+      _diagnoseBlankTimeline('focus_entry');
       await WidgetsBinding.instance.endOfFrame;
       await _showMessage(messageId, generation: generation, animate: false);
     } catch (_) {
@@ -1447,6 +1552,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
     String messageId, {
     required int generation,
     bool animate = true,
+    double alignment = 0.5,
+    bool highlight = true,
   }) async {
     if (!mounted || generation != _navigationGeneration) return;
     final index = _indexForMessage(messageId);
@@ -1456,17 +1563,18 @@ class _ChatMessagesState extends State<_ChatMessages> {
       if (animate) {
         await _itemScrollController.scrollTo(
           index: index,
-          alignment: 0.5,
+          alignment: alignment,
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeOutCubic,
         );
       } else {
-        _itemScrollController.jumpTo(index: index, alignment: 0.5);
+        _itemScrollController.jumpTo(index: index, alignment: alignment);
       }
     } finally {
       await WidgetsBinding.instance.endOfFrame;
       if (mounted && generation == _navigationGeneration) {
         _isNavigating = false;
+        _runPendingFocusRecheck();
       }
     }
     if (!mounted || generation != _navigationGeneration) return;
@@ -1479,10 +1587,12 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _lastVisibleIndex = visibleIndices.isEmpty
         ? index
         : visibleIndices.reduce(math.min);
+    if (!highlight) return;
+    final highlightSerial = ++_highlightSerial;
     setState(() => _highlightedMessageId = messageId);
     Future<void>.delayed(const Duration(milliseconds: 900), () {
       if (mounted &&
-          generation == _navigationGeneration &&
+          highlightSerial == _highlightSerial &&
           _highlightedMessageId == messageId) {
         setState(() => _highlightedMessageId = null);
       }
@@ -1524,7 +1634,10 @@ class _ChatMessagesState extends State<_ChatMessages> {
     } catch (_) {
       // Keep the cursor intact: the next scroll can retry the same page.
     } finally {
-      if (generation == _navigationGeneration) _focusPageLoading = false;
+      if (generation == _navigationGeneration) {
+        _focusPageLoading = false;
+        _runPendingFocusRecheck();
+      }
     }
   }
 
@@ -1600,7 +1713,10 @@ class _ChatMessagesState extends State<_ChatMessages> {
     } catch (_) {
       // Keep the cursor intact: the next scroll can retry the same page.
     } finally {
-      if (generation == _navigationGeneration) _focusPageLoading = false;
+      if (generation == _navigationGeneration) {
+        _focusPageLoading = false;
+        _runPendingFocusRecheck();
+      }
     }
   }
 
@@ -1646,7 +1762,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
               _focusMessages ?? state.messages;
           if (_focusMessages == null &&
               _newMessagesCount > 0 &&
-              state.messages.length >= _newMessagesCount) {
+              state.messages.length > _newMessagesCount) {
             displayedMessages = state.messages.skip(_newMessagesCount).toList();
           }
           _displayedItems = _buildChatTimelineItems(displayedMessages);
@@ -1661,6 +1777,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
                   }
                   if (notification is ScrollStartNotification &&
                       notification.dragDetails != null) {
+                    _userScrollGeneration++;
                     _focusPaginationArmed = true;
                   } else if (notification is ScrollUpdateNotification &&
                       notification.dragDetails != null &&
@@ -1844,7 +1961,7 @@ class _MessagesList extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done &&
             snapshot.hasData) {
-          return bubble(snapshot.data!);
+          return bubble(withFocusedCachedMedia(message, snapshot.data!));
         }
         return _FocusedMediaPlaceholder(
           message: message,
