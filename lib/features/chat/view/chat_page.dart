@@ -1199,7 +1199,20 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _knownMessageIds = currentIds;
     _latestKnownTimestamp = messages.firstOrNull?.timestamp;
 
-    if (newMessages.isEmpty || _focusMessages != null) return;
+    if (newMessages.isEmpty) return;
+
+    if (_focusMessages != null) {
+      final incomingCount = newMessages
+          .where((message) => !message.isMine)
+          .length;
+      if (incomingCount > 0) {
+        setState(() {
+          _showScrollToBottom = true;
+          _newMessagesCount += incomingCount;
+        });
+      }
+      return;
+    }
 
     final now = DateTime.now();
     _newMessageAnimations.removeWhere(
@@ -1274,7 +1287,10 @@ class _ChatMessagesState extends State<_ChatMessages> {
     final generation = ++_navigationGeneration;
     final wasFocused = _focusMessages != null;
     if (wasFocused) {
-      unawaited(_animateFocusedWindowToBottom(generation, animate: animate));
+      // The focused window can be many pages away from the recent timeline.
+      // Animating to its own index zero and then replacing the list causes a
+      // second, visible jump (and can briefly display an empty viewport).
+      _leaveFocusedWindow();
       return;
     }
     if (_newMessagesCount != 0 ||
@@ -1321,27 +1337,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
             position.itemLeadingEdge <= _bottomAlignment + 0.02,
       );
 
-  Future<void> _animateFocusedWindowToBottom(
-    int generation, {
-    required bool animate,
-  }) async {
-    _isAnimatingToBottom = true;
-    try {
-      if (animate &&
-          _itemScrollController.isAttached &&
-          _focusMessages!.isNotEmpty) {
-        await _itemScrollController.scrollTo(
-          index: 0,
-          alignment: _bottomAlignment,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    } catch (_) {
-      // Still return to the recent timeline if the list was interrupted.
-    }
-    if (!mounted || generation != _navigationGeneration) return;
+  void _leaveFocusedWindow() {
     _isAnimatingToBottom = false;
+    _isNavigating = false;
     _focusedMedia.clear();
     _deletedFocusIds.clear();
     _focusRecheckPending = false;
@@ -1682,6 +1680,11 @@ class _ChatMessagesState extends State<_ChatMessages> {
                   return false;
                 },
                 child: _MessagesList(
+                  key: ValueKey(
+                    _focusMessages == null
+                        ? 'recent_messages'
+                        : 'focus_messages',
+                  ),
                   itemScrollController: _itemScrollController,
                   itemPositionsListener: _itemPositionsListener,
                   chat: widget.chat,
@@ -1780,6 +1783,7 @@ List<ChatListItemElement> _buildChatTimelineItems(List<ChatMessage> messages) {
 
 class _MessagesList extends StatelessWidget {
   const _MessagesList({
+    super.key,
     required this.itemScrollController,
     required this.itemPositionsListener,
     required this.chat,
