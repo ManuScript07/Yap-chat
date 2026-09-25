@@ -45,6 +45,33 @@ class ChatRemoteDataSource {
     return rows.map(_mapMessage).toList(growable: false);
   }
 
+  /// The server applies the same membership, clear-boundary and hidden-message
+  /// rules as get_conversation_messages. A distant window is kept out of Drift.
+  Future<List<ChatMessage>> fetchMessageWindow(
+    String chatId, {
+    String? targetMessageId,
+    DateTime? afterTimestamp,
+    String? afterMessageId,
+  }) async {
+    final response = await measureRpc(
+      _diagnostics,
+      'get_conversation_message_window',
+      () => _client.rpc<List<dynamic>>(
+        'get_conversation_message_window',
+        params: {
+          'target_conversation_id': chatId,
+          'target_message_id': targetMessageId,
+          'after_created_at': afterTimestamp?.toUtc().toIso8601String(),
+          'after_message_id': afterMessageId,
+          'page_size': 60,
+        },
+      ),
+    );
+    return response
+        .map((row) => _mapMessage(Map<String, dynamic>.from(row as Map)))
+        .toList(growable: false);
+  }
+
   Future<void> upload({
     required String bucket,
     required String storagePath,

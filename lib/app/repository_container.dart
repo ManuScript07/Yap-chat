@@ -139,6 +139,7 @@ class RepositoryContainer {
       ),
       chatRepository: ChatRepository(
         config: config,
+        userRealtime: userRealtime,
         cache: chatCache,
         remote: chatRemote,
         mediaProcessor: const ChatMediaProcessor(),

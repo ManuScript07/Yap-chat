@@ -17,7 +17,7 @@ class MessageBubble extends StatefulWidget {
   const MessageBubble({
     super.key,
     required this.message,
-    required this.isNew,
+    required this.initialAnimationProgress,
     required this.maxWidth,
     required this.peerName,
     this.peerAvatarUrl,
@@ -27,7 +27,7 @@ class MessageBubble extends StatefulWidget {
   });
 
   final ChatMessage message;
-  final bool isNew;
+  final double initialAnimationProgress;
   final double maxWidth;
   final String peerName;
   final String? peerAvatarUrl;
@@ -45,7 +45,6 @@ class _MessageBubbleState extends State<MessageBubble>
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
 
-  final bool _hasAnimated = false;
   static final _timeFormat = DateFormat('HH:mm');
 
   @override
@@ -67,19 +66,20 @@ class _MessageBubbleState extends State<MessageBubble>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
-    if (widget.isNew) {
-      _controller.forward();
-    } else {
-      _controller.value = 1.0;
-    }
+    _startEntrance(widget.initialAnimationProgress);
+  }
+
+  void _startEntrance(double progress) {
+    _controller.value = progress.clamp(0.0, 1.0);
+    if (_controller.value < 1.0) _controller.forward();
   }
 
   @override
   void didUpdateWidget(covariant MessageBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (_hasAnimated || !widget.isNew) {
-      _controller.value = 1.0;
+    if (oldWidget.message.id != widget.message.id) {
+      _startEntrance(widget.initialAnimationProgress);
     }
   }
 
@@ -323,10 +323,7 @@ class _MessageBubbleState extends State<MessageBubble>
           !hasOwnAvatar && profile?.yandexAvatarDisabled != true
           ? bloc.state.session?.avatarUrl
           : null;
-      return (
-        avatarUrl ?? fallbackAvatarUrl,
-        avatarBytes,
-      );
+      return (avatarUrl ?? fallbackAvatarUrl, avatarBytes);
     });
 
     return Column(

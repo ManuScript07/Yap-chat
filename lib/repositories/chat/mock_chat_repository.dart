@@ -105,6 +105,31 @@ class MockChatRepository implements IChatRepository {
   Future<bool> loadMoreMessages(String chatId) async => false;
 
   @override
+  Future<ChatMessage> hydrateWindowMedia(ChatMessage message) async => message;
+
+  @override
+  Stream<ChatHistoryChange> watchHistoryChanges(String chatId) =>
+      const Stream.empty();
+
+  @override
+  Future<List<ChatMessage>> loadMessageWindow(
+    String chatId,
+    String messageId,
+  ) async => const [];
+
+  @override
+  Future<List<ChatMessage>> loadWindowOlder(
+    String chatId,
+    ChatMessage oldest,
+  ) async => const [];
+
+  @override
+  Future<List<ChatMessage>> loadWindowNewer(
+    String chatId,
+    ChatMessage newest,
+  ) async => const [];
+
+  @override
   Future<void> sendMessage(
     String chatId,
     String text, {

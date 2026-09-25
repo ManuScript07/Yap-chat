@@ -1190,4 +1190,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nearbyRateLimited => 'Too many updates. Try again in a minute.';
+
+  @override
+  String get messageNotAvailable => 'This message is no longer available.';
+
+  @override
+  String get messageJumpFailed => 'Couldn\'t open this message. Try again.';
 }

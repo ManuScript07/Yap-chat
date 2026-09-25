@@ -2173,6 +2173,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Слишком много обновлений. Попробуйте через минуту.'**
   String get nearbyRateLimited;
+
+  /// No description provided for @messageNotAvailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Это сообщение больше недоступно.'**
+  String get messageNotAvailable;
+
+  /// No description provided for @messageJumpFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось открыть сообщение. Попробуйте ещё раз.'**
+  String get messageJumpFailed;
 }
 
 class _AppLocalizationsDelegate

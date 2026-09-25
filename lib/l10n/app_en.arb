@@ -485,5 +485,7 @@
   "nearbyLocationUpdate": "update location",
   "nearbyLocationUpdateShort": "update",
   "nearbyLocationUnavailable": "Couldn't get your location. Try again.",
-  "nearbyRateLimited": "Too many updates. Try again in a minute."
+  "nearbyRateLimited": "Too many updates. Try again in a minute.",
+  "messageNotAvailable": "This message is no longer available.",
+  "messageJumpFailed": "Couldn't open this message. Try again."
 }

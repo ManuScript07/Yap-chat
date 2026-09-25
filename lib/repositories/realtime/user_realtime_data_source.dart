@@ -10,10 +10,12 @@ class UserConversationRealtimeEvent {
   const UserConversationRealtimeEvent({
     required this.conversationId,
     required this.reason,
+    this.messageId,
   });
 
   final String? conversationId;
   final String reason;
+  final String? messageId;
 }
 
 class UserPresenceRealtimeEvent {
@@ -153,6 +155,9 @@ class UserRealtimeDataSource {
         UserConversationRealtimeEvent(
           conversationId: conversationId,
           reason: reason,
+          messageId: payload['message_id'] is String
+              ? payload['message_id'] as String
+              : null,
         ),
       );
     }

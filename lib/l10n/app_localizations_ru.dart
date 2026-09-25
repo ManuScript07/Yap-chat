@@ -1204,4 +1204,11 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get nearbyRateLimited =>
       'Слишком много обновлений. Попробуйте через минуту.';
+
+  @override
+  String get messageNotAvailable => 'Это сообщение больше недоступно.';
+
+  @override
+  String get messageJumpFailed =>
+      'Не удалось открыть сообщение. Попробуйте ещё раз.';
 }

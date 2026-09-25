@@ -485,5 +485,7 @@
   "nearbyLocationUpdate": "обновить геолокацию",
   "nearbyLocationUpdateShort": "обновить",
   "nearbyLocationUnavailable": "Не удалось получить геолокацию. Попробуйте ещё раз.",
-  "nearbyRateLimited": "Слишком много обновлений. Попробуйте через минуту."
+  "nearbyRateLimited": "Слишком много обновлений. Попробуйте через минуту.",
+  "messageNotAvailable": "Это сообщение больше недоступно.",
+  "messageJumpFailed": "Не удалось открыть сообщение. Попробуйте ещё раз."
 }

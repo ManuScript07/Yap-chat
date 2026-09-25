@@ -14,6 +14,15 @@ import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
+import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
+
+class _LocalMessageDeletion {
+  const _LocalMessageDeletion(this.chatId, this.messageId, this.ownerUserId);
+
+  final String chatId;
+  final String messageId;
+  final String ownerUserId;
+}
 
 class ChatRepository implements IChatRepository {
   static const _remoteOperationTimeout = Duration(seconds: 15);
@@ -28,6 +37,7 @@ class ChatRepository implements IChatRepository {
     required ChatsCacheDataSource chatsCache,
     required ILocalMediaRepository localMediaRepository,
     required AccountSessionController accountSessionController,
+    UserRealtimeDataSource? userRealtime,
     Uuid uuid = const Uuid(),
     DateTime Function()? now,
   }) : _config = config,
@@ -39,6 +49,7 @@ class ChatRepository implements IChatRepository {
        _chatsCache = chatsCache,
        _localMediaRepository = localMediaRepository,
        _accountSessionController = accountSessionController,
+       _userRealtime = userRealtime,
        _uuid = uuid,
        _now = now ?? DateTime.now;
 
@@ -51,6 +62,8 @@ class ChatRepository implements IChatRepository {
   final ChatsCacheDataSource _chatsCache;
   final ILocalMediaRepository _localMediaRepository;
   final AccountSessionController _accountSessionController;
+  final UserRealtimeDataSource? _userRealtime;
+  final _localDeletions = StreamController<_LocalMessageDeletion>.broadcast();
   final Uuid _uuid;
   final DateTime Function() _now;
   final Set<String> _deliveringOperationIds = {};
@@ -150,6 +163,94 @@ class ChatRepository implements IChatRepository {
       () => _cache.upsertMessages(hydrated, ownerUserId: scope.userId),
     );
     return page.length == ConversationSyncService.pageSize;
+  }
+
+  @override
+  Future<List<ChatMessage>> loadMessageWindow(
+    String chatId,
+    String messageId,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final messages = await _remote.fetchMessageWindow(
+      chatId,
+      targetMessageId: messageId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return messages;
+  }
+
+  @override
+  Future<List<ChatMessage>> loadWindowOlder(
+    String chatId,
+    ChatMessage oldest,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final messages = await _remote.fetchMessages(
+      chatId,
+      beforeTimestamp: oldest.timestamp,
+      beforeMessageId: oldest.id,
+      pageSize: ConversationSyncService.pageSize,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return messages;
+  }
+
+  @override
+  Future<List<ChatMessage>> loadWindowNewer(
+    String chatId,
+    ChatMessage newest,
+  ) async {
+    final scope = _accountSessionController.capture();
+    final messages = await _remote.fetchMessageWindow(
+      chatId,
+      afterTimestamp: newest.timestamp,
+      afterMessageId: newest.id,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return messages;
+  }
+
+  @override
+  Future<ChatMessage> hydrateWindowMedia(ChatMessage message) async {
+    final scope = _accountSessionController.capture();
+    final hydrated = (await _syncService.hydrateAll([
+      message,
+    ], ownerUserId: scope.userId)).single;
+    _accountSessionController.ensureCurrent(scope);
+    return hydrated;
+  }
+
+  @override
+  Stream<ChatHistoryChange> watchHistoryChanges(String chatId) {
+    return Stream.multi((listener) {
+      final scope = _accountSessionController.capture();
+      final local = _localDeletions.stream.listen((event) {
+        if (_accountSessionController.isCurrent(scope) &&
+            event.ownerUserId == scope.userId &&
+            event.chatId == chatId) {
+          listener.add(ChatHistoryChange.deleted(event.messageId));
+        }
+      });
+      final remote = _userRealtime?.watchConversationEvents().listen((event) {
+        if (!_accountSessionController.isCurrent(scope)) return;
+        if (event.reason == 'subscribed') {
+          listener.add(const ChatHistoryChange.reconnected());
+        } else if (event.conversationId == chatId &&
+            event.reason == 'deleted' &&
+            event.messageId != null) {
+          listener.add(ChatHistoryChange.deleted(event.messageId!));
+        } else if (event.conversationId == chatId &&
+            event.reason == 'deleted') {
+          // Older clients and per-user hides broadcast no message id. Recheck
+          // only the active history window, not the entire conversation.
+          listener.add(const ChatHistoryChange.reconnected());
+        }
+      });
+      listener.onCancel = () async {
+        await local.cancel();
+        await remote?.cancel();
+      };
+    });
   }
 
   @override
@@ -282,6 +383,7 @@ class ChatRepository implements IChatRepository {
         );
       });
       await _localMediaRepository.collectGarbage();
+      _notifyLocalDeletion(scope, chatId, messageId);
       return;
     }
     final pending = (await _cache.readPendingOperations(
@@ -300,6 +402,7 @@ class ChatRepository implements IChatRepository {
         );
       });
       await _localMediaRepository.collectGarbage();
+      _notifyLocalDeletion(scope, chatId, messageId);
       return;
     }
     _accountSessionController.ensureCurrent(scope);
@@ -311,7 +414,20 @@ class ChatRepository implements IChatRepository {
       scope,
       () => _cache.removeMessage(messageId, ownerUserId: scope.userId),
     );
+    _notifyLocalDeletion(scope, chatId, messageId);
     await _syncService.synchronizeRecent(chatId, refreshAfterActive: true);
+  }
+
+  void _notifyLocalDeletion(
+    AccountSessionSnapshot scope,
+    String chatId,
+    String messageId,
+  ) {
+    if (_accountSessionController.isCurrent(scope)) {
+      _localDeletions.add(
+        _LocalMessageDeletion(chatId, messageId, scope.userId),
+      );
+    }
   }
 
   Future<void> _enqueue({

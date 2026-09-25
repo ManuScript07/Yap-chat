@@ -6,9 +6,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chat/view/focused_history_window_cache.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
@@ -73,7 +75,8 @@ class _ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<_ChatView>
     with AutoRouteAwareStateMixin<_ChatView> {
-  late final ScrollController _scrollController;
+  final GlobalKey<_ChatMessagesState> _messagesKey =
+      GlobalKey<_ChatMessagesState>();
   NotificationsCubit? _notificationsCubit;
   late DateTime? _lastSeenAt;
   double? _composerContentHeight;
@@ -81,7 +84,6 @@ class _ChatViewState extends State<_ChatView>
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
     _lastSeenAt = widget.chat.lastSeenAt;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreLostAttachment();
@@ -141,19 +143,12 @@ class _ChatViewState extends State<_ChatView>
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     }
-    _scrollController.dispose();
     super.dispose();
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-      );
+      _messagesKey.currentState?.scrollToBottom();
     });
   }
 
@@ -163,9 +158,10 @@ class _ChatViewState extends State<_ChatView>
       height - MediaQuery.viewPaddingOf(context).bottom,
     );
     if ((_composerContentHeight == null
-            ? contentHeight
-            : _composerContentHeight! - contentHeight)
-        .abs() < 0.5) {
+                ? contentHeight
+                : _composerContentHeight! - contentHeight)
+            .abs() <
+        0.5) {
       return;
     }
     setState(() => _composerContentHeight = contentHeight);
@@ -226,8 +222,7 @@ class _ChatViewState extends State<_ChatView>
       mediaQuery.viewInsets.bottom - persistentBottomInset,
     );
     final composerHeight =
-        (_composerContentHeight ?? inputContentHeight) +
-        persistentBottomInset;
+        (_composerContentHeight ?? inputContentHeight) + persistentBottomInset;
 
     final headerHeight = 64.0 + topSafeArea;
 
@@ -297,15 +292,17 @@ class _ChatViewState extends State<_ChatView>
                 },
                 child: Stack(
                   children: [
-                    _ChatMessages(
-                      controller: _scrollController,
-                      chat: widget.chat,
-                      headerHeight: headerHeight,
-                      composerHeight: composerHeight,
-                      keyboardAvoidanceOffset: keyboardAvoidanceOffset,
-                      canOpenMessageMenu:
-                          voiceState.status != VoiceRecorderStatus.recording,
-                      onMessageLongPress: _showMessageActions,
+                    Positioned.fill(
+                      child: _ChatMessages(
+                        key: _messagesKey,
+                        chat: widget.chat,
+                        headerHeight: headerHeight,
+                        composerHeight: composerHeight,
+                        keyboardAvoidanceOffset: keyboardAvoidanceOffset,
+                        canOpenMessageMenu:
+                            voiceState.status != VoiceRecorderStatus.recording,
+                        onMessageLongPress: _showMessageActions,
+                      ),
                     ),
                     GradientOverlay(
                       height: headerHeight + 20,
@@ -442,9 +439,9 @@ class _KeyboardAwareInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final systemPadding = MediaQuery.viewPaddingOf(context);
-    final composerMediaQuery = MediaQuery.of(context).copyWith(
-      viewInsets: EdgeInsets.zero,
-    );
+    final composerMediaQuery = MediaQuery.of(
+      context,
+    ).copyWith(viewInsets: EdgeInsets.zero);
 
     return Positioned(
       left: 0,
@@ -456,157 +453,155 @@ class _KeyboardAwareInput extends StatelessWidget {
           buildWhen: (previous, current) =>
               previous.replyToMessage != current.replyToMessage,
           builder: (context, chatState) {
-          if (peerIsGloballyBanned) {
-            return SizeReporter(
-              onSizeChanged: (size) => onHeightChanged(size.height),
-              child: const _GloballyBannedComposer(),
-            );
-          }
-          if (peerIsDeleted) {
-            return SizeReporter(
-              onSizeChanged: (size) => onHeightChanged(size.height),
-              child: _DeletedAccountComposer(chatId: chatId),
-            );
-          }
-          if (blockedByMe) {
-            return SizeReporter(
-              onSizeChanged: (size) => onHeightChanged(size.height),
-              child: _UnblockComposer(
-                peerName: peerName,
-                peerId: peerId,
-                isPending: isBlockActionPending,
-              ),
-            );
-          }
-          return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-            builder: (context, state) {
+            if (peerIsGloballyBanned) {
               return SizeReporter(
                 onSizeChanged: (size) => onHeightChanged(size.height),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      reverseDuration: const Duration(milliseconds: 180),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SizeTransition(
-                          sizeFactor: animation,
-                          axisAlignment: -1,
-                          child: child,
-                        ),
-                      ),
-                      child: switch (chatState.replyToMessage) {
-                        final reply? => Padding(
-                          key: ValueKey('reply_${reply.id}'),
-                          padding: EdgeInsets.only(
-                            left: systemPadding.left + 16,
-                            right: systemPadding.right + 16,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ReplyComposerPreview(
-                                message: reply,
-                                peerName: peerName,
-                                onClear: () {
-                                  context.read<ChatBloc>().add(
-                                    const ChatReplyCleared(),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 4),
-                            ],
-                          ),
-                        ),
-                        null => const SizedBox(
-                          key: ValueKey('reply_empty'),
-                        ),
-                      },
-                    ),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      reverseDuration: const Duration(milliseconds: 180),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SizeTransition(
-                          sizeFactor: animation,
-                          alignment: Alignment.topCenter,
-                          child: child,
-                        ),
-                      ),
-                      child: state.hasPendingRecording
-                          ? VoiceRecorderBar(
-                              key: const ValueKey('voice_recorder_bar'),
-                              state: state,
-                              onDiscard: () {
-                                context
-                                    .read<VoiceRecorderCubit>()
-                                    .discardRecording();
-                              },
-                              onStop: () {
-                                context
-                                    .read<VoiceRecorderCubit>()
-                                    .stopRecording();
-                              },
-                              onTogglePreview: () {
-                                context
-                                    .read<VoiceRecorderCubit>()
-                                    .togglePreviewPlayback();
-                              },
-                              onSeekUpdate: (position) {
-                                context.read<VoiceRecorderCubit>().previewSeek(
-                                  position,
-                                );
-                              },
-                              onSeekEnd: () {
-                                context
-                                    .read<VoiceRecorderCubit>()
-                                    .finishPreviewSeeking();
-                              },
-                              onSend: () async {
-                                final audio = await context
-                                    .read<VoiceRecorderCubit>()
-                                    .takeRecordingForSending();
-                                if (audio == null || !context.mounted) return;
-
-                                context.read<ChatBloc>().add(
-                                  ChatMessageAudioSent(
-                                    audioPath: audio.path,
-                                    duration: audio.duration,
-                                    waveform: audio.waveform,
-                                  ),
-                                );
-                                onMessageSent();
-                              },
-                            )
-                          : MessageInputBar(
-                              key: const ValueKey('message_input_bar'),
-                              replyToMessageId: chatState.replyToMessage?.id,
-                              onSend: (text) {
-                                context.read<ChatBloc>().add(
-                                  ChatMessageSent(text),
-                                );
-                                onMessageSent();
-                              },
-                              onAddPhoto: () => _openAttachmentSheet(context),
-                              onVoiceRecord: () {
-                                FocusManager.instance.primaryFocus?.unfocus();
-                                context
-                                    .read<VoiceRecorderCubit>()
-                                    .startRecording();
-                              },
-                            ),
-                    ),
-                  ],
+                child: const _GloballyBannedComposer(),
+              );
+            }
+            if (peerIsDeleted) {
+              return SizeReporter(
+                onSizeChanged: (size) => onHeightChanged(size.height),
+                child: _DeletedAccountComposer(chatId: chatId),
+              );
+            }
+            if (blockedByMe) {
+              return SizeReporter(
+                onSizeChanged: (size) => onHeightChanged(size.height),
+                child: _UnblockComposer(
+                  peerName: peerName,
+                  peerId: peerId,
+                  isPending: isBlockActionPending,
                 ),
               );
-            },
-          );
+            }
+            return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+              builder: (context, state) {
+                return SizeReporter(
+                  onSizeChanged: (size) => onHeightChanged(size.height),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        reverseDuration: const Duration(milliseconds: 180),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SizeTransition(
+                            sizeFactor: animation,
+                            axisAlignment: -1,
+                            child: child,
+                          ),
+                        ),
+                        child: switch (chatState.replyToMessage) {
+                          final reply? => Padding(
+                            key: ValueKey('reply_${reply.id}'),
+                            padding: EdgeInsets.only(
+                              left: systemPadding.left + 16,
+                              right: systemPadding.right + 16,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ReplyComposerPreview(
+                                  message: reply,
+                                  peerName: peerName,
+                                  onClear: () {
+                                    context.read<ChatBloc>().add(
+                                      const ChatReplyCleared(),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 4),
+                              ],
+                            ),
+                          ),
+                          null => const SizedBox(key: ValueKey('reply_empty')),
+                        },
+                      ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        reverseDuration: const Duration(milliseconds: 180),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SizeTransition(
+                            sizeFactor: animation,
+                            alignment: Alignment.topCenter,
+                            child: child,
+                          ),
+                        ),
+                        child: state.hasPendingRecording
+                            ? VoiceRecorderBar(
+                                key: const ValueKey('voice_recorder_bar'),
+                                state: state,
+                                onDiscard: () {
+                                  context
+                                      .read<VoiceRecorderCubit>()
+                                      .discardRecording();
+                                },
+                                onStop: () {
+                                  context
+                                      .read<VoiceRecorderCubit>()
+                                      .stopRecording();
+                                },
+                                onTogglePreview: () {
+                                  context
+                                      .read<VoiceRecorderCubit>()
+                                      .togglePreviewPlayback();
+                                },
+                                onSeekUpdate: (position) {
+                                  context
+                                      .read<VoiceRecorderCubit>()
+                                      .previewSeek(position);
+                                },
+                                onSeekEnd: () {
+                                  context
+                                      .read<VoiceRecorderCubit>()
+                                      .finishPreviewSeeking();
+                                },
+                                onSend: () async {
+                                  final audio = await context
+                                      .read<VoiceRecorderCubit>()
+                                      .takeRecordingForSending();
+                                  if (audio == null || !context.mounted) return;
+
+                                  context.read<ChatBloc>().add(
+                                    ChatMessageAudioSent(
+                                      audioPath: audio.path,
+                                      duration: audio.duration,
+                                      waveform: audio.waveform,
+                                    ),
+                                  );
+                                  onMessageSent();
+                                },
+                              )
+                            : MessageInputBar(
+                                key: const ValueKey('message_input_bar'),
+                                replyToMessageId: chatState.replyToMessage?.id,
+                                onSend: (text) {
+                                  context.read<ChatBloc>().add(
+                                    ChatMessageSent(text),
+                                  );
+                                  onMessageSent();
+                                },
+                                onAddPhoto: () => _openAttachmentSheet(context),
+                                onVoiceRecord: () {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  context
+                                      .read<VoiceRecorderCubit>()
+                                      .startRecording();
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
           },
         ),
       ),
@@ -895,7 +890,7 @@ class _ChatPopScope extends StatelessWidget {
 
 class _ChatMessages extends StatefulWidget {
   const _ChatMessages({
-    required this.controller,
+    super.key,
     required this.chat,
     required this.headerHeight,
     required this.composerHeight,
@@ -904,7 +899,6 @@ class _ChatMessages extends StatefulWidget {
     required this.onMessageLongPress,
   });
 
-  final ScrollController controller;
   final Chat chat;
   final double headerHeight;
   final double composerHeight;
@@ -917,86 +911,278 @@ class _ChatMessages extends StatefulWidget {
 }
 
 class _ChatMessagesState extends State<_ChatMessages> {
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener =
+      ItemPositionsListener.create();
   bool _showScrollToBottom = false;
   int _newMessagesCount = 0;
 
   Set<String> _knownMessageIds = {};
   bool _initialMessagesLoaded = false;
   DateTime? _latestKnownTimestamp;
+  final Map<String, DateTime> _newMessageAnimations = {};
+  bool _bottomJumpScheduled = false;
+  bool _bottomJumpPending = false;
+  int _bottomJumpSerial = 0;
 
-  // Для отслеживания направления скролла
-  double _lastOffset = 0.0;
+  int _lastVisibleIndex = 0;
   bool _isAnimatingToBottom = false;
-  final Map<String, GlobalKey> _messageKeys = {};
-  final Map<String, int> _messageIndexes = {};
+  bool _isNavigating = false;
+  bool _focusLoading = false;
+  bool _focusRecheckPending = false;
+  bool _focusPageLoading = false;
+  bool _focusHasOlder = true;
+  bool _focusHasNewer = true;
+  bool _focusPaginationArmed = false;
+  int _navigationGeneration = 0;
+  List<ChatMessage>? _focusMessages;
+  List<ChatListItemElement> _displayedItems = const [];
   String? _highlightedMessageId;
+  StreamSubscription<ChatHistoryChange>? _historyChangesSubscription;
+  final Map<String, Future<ChatMessage>> _focusedMedia = {};
+  final Set<String> _deletedFocusIds = {};
+  final FocusedHistoryWindowCache _windowCache = FocusedHistoryWindowCache();
 
   @override
   void initState() {
     super.initState();
-    widget.controller.addListener(_handleScroll);
+    _itemPositionsListener.itemPositions.addListener(_handleScroll);
+    _listenToHistoryChanges();
   }
+
+  void _listenToHistoryChanges() {
+    final chatId = widget.chat.id;
+    _historyChangesSubscription = context
+        .read<IChatRepository>()
+        .watchHistoryChanges(chatId)
+        .listen((change) {
+          if (!mounted || widget.chat.id != chatId) return;
+          final deletedId = change.deletedMessageId;
+          if (deletedId != null) {
+            _removeFocusedMessage(deletedId);
+          } else if (change.reconnected) {
+            _windowCache.clear();
+            if (_focusLoading) {
+              _focusRecheckPending = true;
+            } else if (_focusMessages != null) {
+              unawaited(_refreshFocusedWindow());
+            }
+          }
+        });
+  }
+
+  void _removeFocusedMessage(String messageId) {
+    _windowCache.clear();
+    _deletedFocusIds.add(messageId);
+    final current = _focusMessages;
+    if (current == null) return;
+    _focusedMedia.remove(messageId);
+    if (!current.any(
+      (message) =>
+          message.id == messageId || message.replyTo?.messageId == messageId,
+    )) {
+      return;
+    }
+    for (final message in current) {
+      if (message.replyTo?.messageId == messageId) {
+        _focusedMedia.remove(message.id);
+      }
+    }
+    final remaining = current
+        .where((message) => message.id != messageId)
+        .map(
+          (message) => message.replyTo?.messageId == messageId
+              ? message.copyWith(clearReplyTo: true)
+              : message,
+        )
+        .toList(growable: false);
+    if (remaining.isEmpty) {
+      scrollToBottom(animate: false);
+      return;
+    }
+    setState(() {
+      _focusMessages = remaining;
+      if (_highlightedMessageId == messageId) {
+        _highlightedMessageId = null;
+      }
+    });
+  }
+
+  Future<void> _refreshFocusedWindow() async {
+    if (_focusMessages == null || _focusLoading) return;
+    final visible =
+        _itemPositionsListener.itemPositions.value
+            .where(
+              (position) =>
+                  position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
+            )
+            .toList(growable: false)
+          ..sort((a, b) => a.index.compareTo(b.index));
+    String? anchorId;
+    for (final position in visible) {
+      if (position.index >= _displayedItems.length) continue;
+      final item = _displayedItems[position.index];
+      if (item is MessageItemElement &&
+          _focusMessages!.any((message) => message.id == item.message.id)) {
+        anchorId = item.message.id;
+        break;
+      }
+    }
+    anchorId ??= _focusMessages!.firstOrNull?.id;
+    if (anchorId == null) return;
+    final generation = ++_navigationGeneration;
+    setState(() => _focusLoading = true);
+    try {
+      final window = await context.read<IChatRepository>().loadMessageWindow(
+        widget.chat.id,
+        anchorId,
+      );
+      if (!mounted || generation != _navigationGeneration) return;
+      final current = window
+          .where((message) => !_deletedFocusIds.contains(message.id))
+          .toList(growable: false);
+      if (!current.any((message) => message.id == anchorId)) {
+        scrollToBottom();
+        return;
+      }
+      _focusedMedia.clear();
+      _windowCache.remember(anchorId, current);
+      setState(() {
+        _focusMessages = current;
+        _focusHasOlder = true;
+        _focusHasNewer = true;
+        _focusPaginationArmed = false;
+        _showScrollToBottom = false;
+        _focusPageLoading = false;
+      });
+      await WidgetsBinding.instance.endOfFrame;
+      await _showMessage(anchorId, generation: generation, animate: false);
+    } catch (_) {
+      // Keep the current window if reconnection happened before the API works.
+    } finally {
+      if (mounted && generation == _navigationGeneration) {
+        setState(() => _focusLoading = false);
+        _runPendingFocusRecheck();
+      }
+    }
+  }
+
+  void _runPendingFocusRecheck() {
+    if (!_focusRecheckPending || _focusMessages == null) return;
+    _focusRecheckPending = false;
+    unawaited(_refreshFocusedWindow());
+  }
+
+  Future<ChatMessage> _hydrateFocusedMedia(ChatMessage message) =>
+      _focusedMedia.putIfAbsent(message.id, () async {
+        try {
+          return await context.read<IChatRepository>().hydrateWindowMedia(
+            message,
+          );
+        } catch (_) {
+          _focusedMedia.remove(message.id);
+          rethrow;
+        }
+      });
 
   @override
   void dispose() {
-    widget.controller.removeListener(_handleScroll);
+    _itemPositionsListener.itemPositions.removeListener(_handleScroll);
+    final subscription = _historyChangesSubscription;
+    if (subscription != null) unawaited(subscription.cancel());
     super.dispose();
   }
 
-  void _handleScroll() {
-    // Если мы сейчас программно скроллим вниз — игнорируем события,
-    // чтобы кнопка не появлялась случайно в процессе анимации.
-    if (!widget.controller.hasClients || _isAnimatingToBottom) return;
-
-    final offset = widget.controller.offset;
-    if (offset >= widget.controller.position.maxScrollExtent - 320) {
-      context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
+  @override
+  void didUpdateWidget(covariant _ChatMessages oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chat.id != widget.chat.id) {
+      final subscription = _historyChangesSubscription;
+      if (subscription != null) unawaited(subscription.cancel());
+      _listenToHistoryChanges();
+      _navigationGeneration++;
+      _focusMessages = null;
+      _focusedMedia.clear();
+      _windowCache.clear();
+      _deletedFocusIds.clear();
+      _focusLoading = false;
+      _focusRecheckPending = false;
+      _focusPageLoading = false;
+      _focusPaginationArmed = false;
+      _highlightedMessageId = null;
+      _knownMessageIds = {};
+      _initialMessagesLoaded = false;
+      _newMessageAnimations.clear();
+      _lastVisibleIndex = 0;
     }
-    final isAtBottom = offset <= 20;
+  }
 
-    // Если достигли низа — всегда прячем кнопку и сбрасываем счетчик
-    if (isAtBottom) {
+  void _handleScroll() {
+    if (_isAnimatingToBottom || _isNavigating || _bottomJumpPending) return;
+    final visible = _itemPositionsListener.itemPositions.value
+        .where(
+          (position) =>
+              position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
+        )
+        .toList(growable: false);
+    if (visible.isEmpty || _displayedItems.isEmpty) return;
+    final first = visible.map((position) => position.index).reduce(math.min);
+    final last = visible.map((position) => position.index).reduce(math.max);
+
+    if (last >= _displayedItems.length - 4) {
+      if (_focusMessages == null) {
+        context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
+      } else if (_focusPaginationArmed) {
+        unawaited(_loadFocusOlder());
+      }
+    }
+    if (_focusMessages != null) {
+      if (_focusPaginationArmed && first <= 3) {
+        unawaited(_loadFocusNewer());
+      }
+      if (_focusPaginationArmed &&
+          _isFocusedWindowAtBottom &&
+          !_focusHasNewer &&
+          !_focusPageLoading) {
+        scrollToBottom(animate: false);
+        return;
+      }
+      _lastVisibleIndex = first;
+      return;
+    }
+
+    if (first == 0) {
       if (_showScrollToBottom || _newMessagesCount != 0) {
         setState(() {
           _showScrollToBottom = false;
           _newMessagesCount = 0;
         });
       }
-      _lastOffset = offset;
+      _lastVisibleIndex = first;
       return;
     }
 
-    // Вычисляем разницу:
-    // delta > 0 значит offset растет (мы листаем ВВЕРХ к истории)
-    // delta < 0 значит offset падает (мы листаем ВНИЗ к новым сообщениям)
-    final delta = offset - _lastOffset;
-
-    if (delta > 2.0) {
-      // Пользователь скроллит ВВЕРХ — прячем кнопку
+    if (first > _lastVisibleIndex) {
       if (_showScrollToBottom) {
-        setState(() {
-          _showScrollToBottom = false;
-        });
+        setState(() => _showScrollToBottom = false);
       }
-    } else if (delta < -2.0) {
-      // Пользователь скроллит ВНИЗ — показываем кнопку
+    } else if (first < _lastVisibleIndex) {
       if (!_showScrollToBottom) {
-        setState(() {
-          _showScrollToBottom = true;
-        });
+        setState(() => _showScrollToBottom = true);
       }
     }
-
-    _lastOffset = offset;
+    _lastVisibleIndex = first;
   }
 
   void _handleMessagesChanged(List<ChatMessage> messages) {
     final currentIds = messages.map((message) => message.id).toSet();
 
-    if (!_initialMessagesLoaded) {
+    // An empty cache can be emitted before the first server page arrives.
+    // Treat that first populated page as history, not as new animations.
+    if (!_initialMessagesLoaded || _knownMessageIds.isEmpty) {
       _knownMessageIds = currentIds;
       _latestKnownTimestamp = messages.firstOrNull?.timestamp;
-      _initialMessagesLoaded = true;
+      _initialMessagesLoaded = messages.isNotEmpty;
       return;
     }
 
@@ -1013,14 +1199,22 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _knownMessageIds = currentIds;
     _latestKnownTimestamp = messages.firstOrNull?.timestamp;
 
-    if (newMessages.isEmpty) return;
+    if (newMessages.isEmpty || _focusMessages != null) return;
+
+    final now = DateTime.now();
+    _newMessageAnimations.removeWhere(
+      (_, started) =>
+          now.difference(started) >= const Duration(milliseconds: 250),
+    );
+    for (final message in newMessages) {
+      _newMessageAnimations[message.id] = now;
+    }
 
     final hasMine = newMessages.any((m) => m.isMine);
-    final isAtBottom =
-        !widget.controller.hasClients || widget.controller.offset <= 20;
+    final isAtBottom = _lastVisibleIndex == 0;
 
     if (hasMine) {
-      _scrollToBottom();
+      _jumpToBottomAfterBuild();
     } else if (!isAtBottom) {
       // Пришло чужое сообщение, а мы находимся высоко в истории.
       // ВСЕГДА показываем кнопку и увеличиваем счетчик.
@@ -1029,76 +1223,387 @@ class _ChatMessagesState extends State<_ChatMessages> {
         _newMessagesCount += newMessages.length;
       });
     } else {
-      _scrollToBottom();
+      _jumpToBottomAfterBuild();
     }
   }
 
-  void _scrollToBottom() {
-    if (_newMessagesCount != 0 || _showScrollToBottom) {
+  double _animationProgressFor(String messageId) {
+    final started = _newMessageAnimations[messageId];
+    if (started == null) return 1;
+    final elapsed = DateTime.now().difference(started).inMicroseconds;
+    return (elapsed / const Duration(milliseconds: 250).inMicroseconds).clamp(
+      0.0,
+      1.0,
+    );
+  }
+
+  void _jumpToBottomAfterBuild() {
+    if (_bottomJumpScheduled) return;
+    _bottomJumpScheduled = true;
+    _bottomJumpPending = true;
+    final serial = ++_bottomJumpSerial;
+    final generation = _navigationGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bottomJumpScheduled = false;
+      if (mounted &&
+          generation == _navigationGeneration &&
+          _focusMessages == null &&
+          _itemScrollController.isAttached) {
+        _itemScrollController.jumpTo(index: 0);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (serial != _bottomJumpSerial) return;
+        _bottomJumpPending = false;
+        if (!mounted ||
+            generation != _navigationGeneration ||
+            _focusMessages != null) {
+          return;
+        }
+        _lastVisibleIndex = 0;
+        if (_showScrollToBottom || _newMessagesCount != 0) {
+          setState(() {
+            _showScrollToBottom = false;
+            _newMessagesCount = 0;
+          });
+        }
+      });
+    });
+  }
+
+  void scrollToBottom({bool animate = true}) {
+    final generation = ++_navigationGeneration;
+    final wasFocused = _focusMessages != null;
+    if (wasFocused) {
+      unawaited(_animateFocusedWindowToBottom(generation, animate: animate));
+      return;
+    }
+    if (_newMessagesCount != 0 ||
+        _showScrollToBottom ||
+        _focusLoading ||
+        _focusPageLoading) {
       setState(() {
         _newMessagesCount = 0;
         _showScrollToBottom = false;
+        _focusLoading = false;
+        _focusPageLoading = false;
       });
     }
-
-    if (!widget.controller.hasClients) return;
-
-    // Включаем блокировку, чтобы _handleScroll не мешал
+    if (!_itemScrollController.isAttached) return;
     _isAnimatingToBottom = true;
-
-    widget.controller
-        .animateTo(
-          0,
+    _itemScrollController
+        .scrollTo(
+          index: 0,
+          alignment: _bottomAlignment,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
         )
-        .then((_) {
-          // Снимаем блокировку по завершении анимации
-          _isAnimatingToBottom = false;
+        .whenComplete(() {
+          if (mounted && generation == _navigationGeneration) {
+            _isAnimatingToBottom = false;
+            _lastVisibleIndex = 0;
+          }
         });
   }
 
-  GlobalKey _messageKey(String messageId) {
-    return _messageKeys.putIfAbsent(messageId, GlobalKey.new);
+  double get _bottomAlignment {
+    final height = context.size?.height ?? MediaQuery.sizeOf(context).height;
+    if (height <= 0) return 0;
+    final bottomPadding =
+        widget.composerHeight + widget.keyboardAvoidanceOffset + 12;
+    return (bottomPadding / height).clamp(0.0, 1.0);
+  }
+
+  bool get _isFocusedWindowAtBottom =>
+      _itemPositionsListener.itemPositions.value.any(
+        (position) =>
+            position.index == 0 &&
+            position.itemTrailingEdge > 0 &&
+            position.itemLeadingEdge <= _bottomAlignment + 0.02,
+      );
+
+  Future<void> _animateFocusedWindowToBottom(
+    int generation, {
+    required bool animate,
+  }) async {
+    _isAnimatingToBottom = true;
+    try {
+      if (animate &&
+          _itemScrollController.isAttached &&
+          _focusMessages!.isNotEmpty) {
+        await _itemScrollController.scrollTo(
+          index: 0,
+          alignment: _bottomAlignment,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } catch (_) {
+      // Still return to the recent timeline if the list was interrupted.
+    }
+    if (!mounted || generation != _navigationGeneration) return;
+    _isAnimatingToBottom = false;
+    _focusedMedia.clear();
+    _deletedFocusIds.clear();
+    _focusRecheckPending = false;
+    setState(() {
+      _focusMessages = null;
+      _focusPaginationArmed = false;
+      _highlightedMessageId = null;
+      _newMessagesCount = 0;
+      _showScrollToBottom = false;
+      _focusLoading = false;
+      _focusPageLoading = false;
+      _lastVisibleIndex = 0;
+    });
+    _jumpToBottomAfterBuild();
+  }
+
+  int? _indexForMessage(String messageId) {
+    for (var i = 0; i < _displayedItems.length; i++) {
+      final item = _displayedItems[i];
+      if (item is MessageItemElement && item.message.id == messageId) return i;
+    }
+    return null;
   }
 
   Future<void> _jumpToMessage(String messageId) async {
-    if (_messageKeys[messageId]?.currentContext == null &&
-        widget.controller.hasClients) {
-      final messageIndex = _messageIndexes[messageId];
-      if (messageIndex != null) {
-        final targetOffset = (messageIndex * 120.0)
-            .clamp(0.0, widget.controller.position.maxScrollExtent)
-            .toDouble();
-        await widget.controller.animateTo(
-          targetOffset,
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 16));
-      }
+    if (_focusLoading) return;
+    final generation = ++_navigationGeneration;
+    _isAnimatingToBottom = false;
+    final recentMessages = context.read<ChatBloc>().state.messages;
+    if (_focusMessages?.any((message) => message.id == messageId) == true) {
+      setState(() {
+        _focusPaginationArmed = false;
+        _showScrollToBottom = false;
+      });
+      await _showMessage(messageId, generation: generation);
+      return;
+    }
+    if (recentMessages.any((message) => message.id == messageId)) {
+      _focusedMedia.clear();
+      _deletedFocusIds.clear();
+      setState(() {
+        _focusMessages = null;
+        _focusPaginationArmed = false;
+        _showScrollToBottom = false;
+        _newMessagesCount = 0;
+        _focusPageLoading = false;
+      });
+      await WidgetsBinding.instance.endOfFrame;
+      await _showMessage(messageId, generation: generation);
+      return;
     }
 
-    await _ensureMessageVisible(messageId);
-    if (!mounted) return;
-
-    setState(() => _highlightedMessageId = messageId);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (mounted && _highlightedMessageId == messageId) {
-      setState(() => _highlightedMessageId = null);
+    _deletedFocusIds.clear();
+    final cachedWindow = _windowCache.find(messageId);
+    if (cachedWindow == null) setState(() => _focusLoading = true);
+    try {
+      final window =
+          cachedWindow ??
+          await context.read<IChatRepository>().loadMessageWindow(
+            widget.chat.id,
+            messageId,
+          );
+      if (!mounted || generation != _navigationGeneration) return;
+      final visibleWindow = window
+          .where((message) => !_deletedFocusIds.contains(message.id))
+          .toList(growable: false);
+      if (!visibleWindow.any((message) => message.id == messageId)) {
+        showAppSnackBar(context, message: context.l10n.messageNotAvailable);
+        return;
+      }
+      if (cachedWindow == null) {
+        _windowCache.remember(messageId, visibleWindow);
+      }
+      _focusedMedia.clear();
+      setState(() {
+        _focusMessages = visibleWindow;
+        _focusHasOlder = true;
+        _focusHasNewer = true;
+        _focusPaginationArmed = false;
+        _focusPageLoading = false;
+        _newMessagesCount = 0;
+        _showScrollToBottom = false;
+      });
+      await WidgetsBinding.instance.endOfFrame;
+      await _showMessage(messageId, generation: generation, animate: false);
+    } catch (_) {
+      if (mounted && generation == _navigationGeneration) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.messageJumpFailed,
+          type: SnackBarType.error,
+        );
+      }
+    } finally {
+      if (cachedWindow == null &&
+          mounted &&
+          generation == _navigationGeneration) {
+        setState(() => _focusLoading = false);
+        _runPendingFocusRecheck();
+      }
     }
   }
 
-  Future<void> _ensureMessageVisible(String messageId) {
-    final targetContext = _messageKeys[messageId]?.currentContext;
-    if (targetContext == null) return Future<void>.value();
+  Future<void> _showMessage(
+    String messageId, {
+    required int generation,
+    bool animate = true,
+  }) async {
+    if (!mounted || generation != _navigationGeneration) return;
+    final index = _indexForMessage(messageId);
+    if (index == null || !_itemScrollController.isAttached) return;
+    _isNavigating = true;
+    try {
+      if (animate) {
+        await _itemScrollController.scrollTo(
+          index: index,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _itemScrollController.jumpTo(index: index, alignment: 0.5);
+      }
+    } finally {
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted && generation == _navigationGeneration) {
+        _isNavigating = false;
+      }
+    }
+    if (!mounted || generation != _navigationGeneration) return;
+    final visibleIndices = _itemPositionsListener.itemPositions.value
+        .where(
+          (position) =>
+              position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
+        )
+        .map((position) => position.index);
+    _lastVisibleIndex = visibleIndices.isEmpty
+        ? index
+        : visibleIndices.reduce(math.min);
+    setState(() => _highlightedMessageId = messageId);
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted &&
+          generation == _navigationGeneration &&
+          _highlightedMessageId == messageId) {
+        setState(() => _highlightedMessageId = null);
+      }
+    });
+  }
 
-    return Scrollable.ensureVisible(
-      targetContext,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      alignment: 0.5,
-    );
+  Future<void> _loadFocusOlder() async {
+    final messages = _focusMessages;
+    if (messages == null ||
+        messages.isEmpty ||
+        _focusPageLoading ||
+        !_focusHasOlder) {
+      return;
+    }
+    _focusPageLoading = true;
+    final generation = _navigationGeneration;
+    try {
+      final page = await context.read<IChatRepository>().loadWindowOlder(
+        widget.chat.id,
+        messages.last,
+      );
+      if (!mounted ||
+          generation != _navigationGeneration ||
+          _focusMessages == null) {
+        return;
+      }
+      final existing = _focusMessages!.map((message) => message.id).toSet();
+      setState(() {
+        _focusMessages = [
+          ..._focusMessages!,
+          ...page.where(
+            (message) =>
+                !existing.contains(message.id) &&
+                !_deletedFocusIds.contains(message.id),
+          ),
+        ];
+        _focusHasOlder = page.length == 60;
+      });
+    } catch (_) {
+      // Keep the cursor intact: the next scroll can retry the same page.
+    } finally {
+      if (generation == _navigationGeneration) _focusPageLoading = false;
+    }
+  }
+
+  Future<void> _loadFocusNewer() async {
+    final messages = _focusMessages;
+    if (messages == null ||
+        messages.isEmpty ||
+        _focusPageLoading ||
+        !_focusHasNewer) {
+      return;
+    }
+    _focusPageLoading = true;
+    final generation = _navigationGeneration;
+    final visible =
+        _itemPositionsListener.itemPositions.value
+            .where(
+              (position) =>
+                  position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
+            )
+            .toList(growable: false)
+          ..sort((a, b) => a.index.compareTo(b.index));
+    final anchor = visible.firstOrNull;
+    final anchorItem = anchor == null || anchor.index >= _displayedItems.length
+        ? null
+        : _displayedItems[anchor.index];
+    final anchorId = anchorItem is MessageItemElement
+        ? anchorItem.message.id
+        : null;
+    try {
+      final page = await context.read<IChatRepository>().loadWindowNewer(
+        widget.chat.id,
+        messages.first,
+      );
+      if (!mounted ||
+          generation != _navigationGeneration ||
+          _focusMessages == null) {
+        return;
+      }
+      final existing = _focusMessages!.map((message) => message.id).toSet();
+      setState(() {
+        _focusMessages = [
+          ...page.where(
+            (message) =>
+                !existing.contains(message.id) &&
+                !_deletedFocusIds.contains(message.id),
+          ),
+          ..._focusMessages!,
+        ];
+        _focusHasNewer = page.length == 60;
+      });
+      if (page.isNotEmpty && anchorId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              generation != _navigationGeneration ||
+              !_itemScrollController.isAttached) {
+            return;
+          }
+          final index = _indexForMessage(anchorId);
+          if (index != null) {
+            _itemScrollController.jumpTo(
+              index: index,
+              alignment: anchor!.itemLeadingEdge.clamp(0.0, 1.0),
+            );
+          }
+        });
+      }
+      if (!_focusHasNewer && page.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || generation != _navigationGeneration) return;
+          if (_isFocusedWindowAtBottom) scrollToBottom(animate: false);
+        });
+      }
+    } catch (_) {
+      // Keep the cursor intact: the next scroll can retry the same page.
+    } finally {
+      if (generation == _navigationGeneration) _focusPageLoading = false;
+    }
   }
 
   @override
@@ -1116,11 +1621,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
               previous.replyToMessage != current.replyToMessage;
         },
         builder: (context, state) {
-          _messageIndexes.clear();
-          for (var index = 0; index < state.messages.length; index++) {
-            _messageIndexes[state.messages[index].id] = index;
-          }
-          if (state.status == ChatStatus.loading) {
+          if (state.status == ChatStatus.loading && _focusMessages == null) {
             return Center(
               child: CircularProgressIndicator(
                 color: context.colorScheme.primary,
@@ -1128,7 +1629,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
             );
           }
 
-          if (state.messages.isEmpty) {
+          if (state.messages.isEmpty && _focusMessages == null) {
             return AnimatedPadding(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutQuad,
@@ -1143,29 +1644,79 @@ class _ChatMessagesState extends State<_ChatMessages> {
 
           // Отрезаем новые сообщения из отрисовки, пока не проскроллим вниз,
           // чтобы интерфейс не дергался
-          List<ChatMessage> displayedMessages = state.messages;
-          if (_newMessagesCount > 0 &&
+          List<ChatMessage> displayedMessages =
+              _focusMessages ?? state.messages;
+          if (_focusMessages == null &&
+              _newMessagesCount > 0 &&
               state.messages.length >= _newMessagesCount) {
             displayedMessages = state.messages.skip(_newMessagesCount).toList();
           }
-
+          _displayedItems = _buildChatTimelineItems(displayedMessages);
           return Stack(
             children: [
-              _MessagesList(
-                controller: widget.controller,
-                chat: widget.chat,
-                messages: displayedMessages,
-                initialMessageIds: state.initialMessageIds,
-                headerHeight: widget.headerHeight,
-                composerHeight: widget.composerHeight,
-                keyboardAvoidanceOffset: widget.keyboardAvoidanceOffset,
-                messageKeyBuilder: _messageKey,
-                highlightedMessageId: _highlightedMessageId,
-                onReplyTap: _jumpToMessage,
-                onMessageLongPress: widget.canOpenMessageMenu
-                    ? widget.onMessageLongPress
-                    : null,
+              NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (_focusMessages == null ||
+                      notification.metrics.axis != Axis.vertical ||
+                      notification.depth != 0) {
+                    return false;
+                  }
+                  if (notification is ScrollStartNotification &&
+                      notification.dragDetails != null) {
+                    _focusPaginationArmed = true;
+                  } else if (notification is ScrollUpdateNotification &&
+                      notification.dragDetails != null &&
+                      (notification.scrollDelta ?? 0) < 0 &&
+                      !_showScrollToBottom) {
+                    _focusPaginationArmed = true;
+                    final generation = _navigationGeneration;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted &&
+                          generation == _navigationGeneration &&
+                          _focusMessages != null &&
+                          !_showScrollToBottom) {
+                        setState(() => _showScrollToBottom = true);
+                      }
+                    });
+                  }
+                  return false;
+                },
+                child: _MessagesList(
+                  itemScrollController: _itemScrollController,
+                  itemPositionsListener: _itemPositionsListener,
+                  chat: widget.chat,
+                  items: _displayedItems,
+                  animationProgressFor: _animationProgressFor,
+                  headerHeight: widget.headerHeight,
+                  bottomPadding:
+                      widget.composerHeight +
+                      widget.keyboardAvoidanceOffset +
+                      12,
+                  highlightedMessageId: _highlightedMessageId,
+                  hydrateFocusedMedia: _focusMessages == null
+                      ? null
+                      : _hydrateFocusedMedia,
+                  retryFocusedMedia: () => setState(() {}),
+                  onReplyTap: _jumpToMessage,
+                  onMessageLongPress: widget.canOpenMessageMenu
+                      ? widget.onMessageLongPress
+                      : null,
+                ),
               ),
+
+              if (_focusLoading)
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: context.scaffoldBackgroundColor.withValues(
+                      alpha: 0.25,
+                    ),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: context.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
 
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 180),
@@ -1194,7 +1745,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
                       ? _ScrollToBottomButton(
                           key: const ValueKey('scroll_to_bottom'),
                           newMessagesCount: _newMessagesCount,
-                          onPressed: _scrollToBottom,
+                          onPressed: scrollToBottom,
                         )
                       : const SizedBox(
                           key: ValueKey('scroll_to_bottom_hidden'),
@@ -1211,97 +1762,111 @@ class _ChatMessagesState extends State<_ChatMessages> {
   }
 }
 
+List<ChatListItemElement> _buildChatTimelineItems(List<ChatMessage> messages) {
+  final items = <ChatListItemElement>[];
+  for (var index = 0; index < messages.length; index++) {
+    final message = messages[index];
+    items.add(MessageItemElement(message));
+    final next = index + 1 < messages.length ? messages[index + 1] : null;
+    if (next == null ||
+        message.timestamp.year != next.timestamp.year ||
+        message.timestamp.month != next.timestamp.month ||
+        message.timestamp.day != next.timestamp.day) {
+      items.add(DateSeparatorElement(message.timestamp));
+    }
+  }
+  return items;
+}
+
 class _MessagesList extends StatelessWidget {
   const _MessagesList({
-    required this.controller,
+    required this.itemScrollController,
+    required this.itemPositionsListener,
     required this.chat,
-    required this.messages,
-    required this.initialMessageIds,
+    required this.items,
+    required this.animationProgressFor,
     required this.headerHeight,
-    required this.composerHeight,
-    required this.keyboardAvoidanceOffset,
-    required this.messageKeyBuilder,
+    required this.bottomPadding,
     required this.highlightedMessageId,
     required this.onReplyTap,
+    required this.hydrateFocusedMedia,
+    required this.retryFocusedMedia,
     this.onMessageLongPress,
   });
 
-  final ScrollController controller;
+  final ItemScrollController itemScrollController;
+  final ItemPositionsListener itemPositionsListener;
   final Chat chat;
-  final List<ChatMessage> messages;
-  final Set<String> initialMessageIds;
+  final List<ChatListItemElement> items;
+  final double Function(String messageId) animationProgressFor;
 
   final double headerHeight;
-  final double composerHeight;
-  final double keyboardAvoidanceOffset;
-  final GlobalKey Function(String messageId) messageKeyBuilder;
+  final double bottomPadding;
   final String? highlightedMessageId;
   final ValueChanged<String> onReplyTap;
+  final Future<ChatMessage> Function(ChatMessage)? hydrateFocusedMedia;
+  final VoidCallback retryFocusedMedia;
   final ValueChanged<ChatMessage>? onMessageLongPress;
+
+  Widget _buildMessage(
+    BuildContext context,
+    ChatMessage message,
+    double maxWidth,
+  ) {
+    Widget bubble(ChatMessage displayMessage) => MessageBubble(
+      message: displayMessage,
+      initialAnimationProgress: hydrateFocusedMedia == null
+          ? animationProgressFor(displayMessage.id)
+          : 1,
+      maxWidth: maxWidth,
+      peerName: chat.userName,
+      peerAvatarUrl: chat.avatarUrl,
+      peerAvatarLoader: () =>
+          context.read<IChatsRepository>().resolveAvatar(chat),
+      onLongPress: onMessageLongPress,
+      onReplyTap: displayMessage.replyTo == null
+          ? null
+          : () => onReplyTap(displayMessage.replyTo!.messageId),
+    );
+
+    final loader = hydrateFocusedMedia;
+    final needsMedia =
+        message.type == MessageType.image &&
+            message.mediaStoragePaths.isNotEmpty ||
+        message.type == MessageType.audio && message.audioStoragePath != null;
+    if (loader == null || !needsMedia) return bubble(message);
+    return FutureBuilder<ChatMessage>(
+      future: loader(message),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          return bubble(snapshot.data!);
+        }
+        return _FocusedMediaPlaceholder(
+          message: message,
+          maxWidth: maxWidth,
+          hasError: snapshot.hasError,
+          onRetry: retryFocusedMedia,
+          onLongPress: onMessageLongPress == null
+              ? null
+              : () => onMessageLongPress!(message),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final systemPadding = MediaQuery.paddingOf(context);
 
-    final items = <ChatListItemElement>[];
-    final itemIndexByKey = <String, int>{};
-
-    for (var i = 0; i < messages.length; i++) {
-      final message = messages[i];
-
-      final messageItem = MessageItemElement(message);
-
-      itemIndexByKey['msg_${message.id}'] = items.length;
-      items.add(messageItem);
-
-      final isLast = i == messages.length - 1;
-
-      if (isLast) {
-        final separator = DateSeparatorElement(message.timestamp);
-
-        itemIndexByKey['date_${message.timestamp.millisecondsSinceEpoch}'] =
-            items.length;
-
-        items.add(separator);
-
-        continue;
-      }
-
-      final current = message.timestamp;
-      final next = messages[i + 1].timestamp;
-
-      final sameDay =
-          current.year == next.year &&
-          current.month == next.month &&
-          current.day == next.day;
-
-      if (!sameDay) {
-        final separator = DateSeparatorElement(message.timestamp);
-
-        itemIndexByKey['date_${message.timestamp.millisecondsSinceEpoch}'] =
-            items.length;
-
-        items.add(separator);
-      }
-    }
-
-    final bottomPadding = composerHeight + keyboardAvoidanceOffset + 12.0;
-
-    return ListView.builder(
-      controller: controller,
+    return ScrollablePositionedList.builder(
+      itemScrollController: itemScrollController,
+      itemPositionsListener: itemPositionsListener,
       reverse: true,
       padding: EdgeInsets.only(top: headerHeight + 12.0, bottom: bottomPadding),
 
       itemCount: items.length,
-
-      findChildIndexCallback: (Key key) {
-        if (key is ValueKey<String>) {
-          return itemIndexByKey[key.value];
-        }
-
-        return null;
-      },
 
       itemBuilder: (context, index) {
         final item = items[index];
@@ -1321,9 +1886,7 @@ class _MessagesList extends StatelessWidget {
             highlightedMessageId == item.message.id;
 
         return AnimatedContainer(
-          key: item is MessageItemElement
-              ? messageKeyBuilder(item.message.id)
-              : key,
+          key: key,
           duration: const Duration(milliseconds: 180),
           color: isHighlighted
               ? context.colorScheme.primary.withValues(alpha: 0.42)
@@ -1335,24 +1898,72 @@ class _MessagesList extends StatelessWidget {
             bottom: 4,
           ),
           child: switch (item) {
-            MessageItemElement(:final message) => MessageBubble(
-              message: message,
-              isNew: !initialMessageIds.contains(message.id),
-              maxWidth: screenWidth * 0.8,
-              peerName: chat.userName,
-              peerAvatarUrl: chat.avatarUrl,
-              peerAvatarLoader: () =>
-                  context.read<IChatsRepository>().resolveAvatar(chat),
-              onLongPress: onMessageLongPress,
-              onReplyTap: message.replyTo == null
-                  ? null
-                  : () => onReplyTap(message.replyTo!.messageId),
+            MessageItemElement(:final message) => _buildMessage(
+              context,
+              message,
+              screenWidth * 0.8,
             ),
 
             DateSeparatorElement(:final date) => DateSeparator(date: date),
           },
         );
       },
+    );
+  }
+}
+
+class _FocusedMediaPlaceholder extends StatelessWidget {
+  const _FocusedMediaPlaceholder({
+    required this.message,
+    required this.maxWidth,
+    required this.hasError,
+    required this.onRetry,
+    required this.onLongPress,
+  });
+
+  final ChatMessage message;
+  final double maxWidth;
+  final bool hasError;
+  final VoidCallback onRetry;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final isImage = message.type == MessageType.image;
+    return Align(
+      alignment: message.isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: GestureDetector(
+        onLongPress: onLongPress,
+        onTap: hasError ? onRetry : null,
+        child: Container(
+          width: isImage
+              ? maxWidth.clamp(160.0, 300.0)
+              : maxWidth.clamp(160.0, 286.0),
+          height: isImage ? 190 : 64,
+          decoration: BoxDecoration(
+            color: message.isMine
+                ? context.colorScheme.primary
+                : AppColors.incomingBubble,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          alignment: Alignment.center,
+          child: hasError
+              ? Icon(
+                  Icons.refresh_rounded,
+                  color: context.colorScheme.onPrimary,
+                )
+              : SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: message.isMine
+                        ? context.colorScheme.onPrimary
+                        : context.colorScheme.primary,
+                  ),
+                ),
+        ),
+      ),
     );
   }
 }
