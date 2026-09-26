@@ -14,6 +14,8 @@ import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/view/focused_history_window_cache.dart';
 import 'package:yap_chat/features/chat/view/focused_history_reconciliation.dart';
+import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
+import 'package:yap_chat/features/chat/view/visible_chat_read_selection.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
@@ -931,6 +933,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
   int _userScrollGeneration = 0;
 
   int _lastVisibleIndex = 0;
+  int _recentInitialIndex = 0;
+  double _recentInitialAlignment = 0;
   bool _isAnimatingToBottom = false;
   bool _isNavigating = false;
   bool _focusLoading = false;
@@ -938,6 +942,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
   bool _focusRecheckPending = false;
   int _focusRecheckSerial = 0;
   bool _focusPageLoading = false;
+  bool _returnToRecentWhenReady = false;
   bool _focusHasOlder = true;
   bool _focusHasNewer = true;
   bool _focusPaginationArmed = false;
@@ -950,6 +955,10 @@ class _ChatMessagesState extends State<_ChatMessages> {
   final Map<String, Future<ChatMessage>> _focusedMedia = {};
   final Set<String> _deletedFocusIds = {};
   final FocusedHistoryWindowCache _windowCache = FocusedHistoryWindowCache();
+  Timer? _visibleReadTimer;
+  final Set<String> _acknowledgedVisibleReads = {};
+  bool _visibleReadInFlight = false;
+  DateTime? _visibleReadFailureAt;
 
   @override
   void initState() {
@@ -1143,6 +1152,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
 
   @override
   void dispose() {
+    _visibleReadTimer?.cancel();
     _itemPositionsListener.itemPositions.removeListener(_handleScroll);
     final subscription = _historyChangesSubscription;
     if (subscription != null) unawaited(subscription.cancel());
@@ -1153,6 +1163,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
   void didUpdateWidget(covariant _ChatMessages oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.chat.id != widget.chat.id) {
+      _visibleReadTimer?.cancel();
+      _acknowledgedVisibleReads.clear();
+      _visibleReadFailureAt = null;
       final subscription = _historyChangesSubscription;
       if (subscription != null) unawaited(subscription.cancel());
       _listenToHistoryChanges();
@@ -1166,6 +1179,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _focusRecheckPending = false;
       _focusRecheckSerial++;
       _focusPageLoading = false;
+      _returnToRecentWhenReady = false;
       _focusPaginationArmed = false;
       _highlightedMessageId = null;
       _highlightSerial++;
@@ -1173,12 +1187,15 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _initialMessagesLoaded = false;
       _newMessageAnimations.clear();
       _lastVisibleIndex = 0;
+      _recentInitialIndex = 0;
+      _recentInitialAlignment = 0;
       _blankViewportWarningLogged = false;
       _userScrollGeneration = 0;
     }
   }
 
   void _handleScroll() {
+    _scheduleVisibleRead();
     if (_isAnimatingToBottom || _isNavigating || _bottomJumpPending) return;
     final visible = _itemPositionsListener.itemPositions.value
         .where(
@@ -1198,6 +1215,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
       }
     }
     if (_focusMessages != null) {
+      if (_focusPaginationArmed && _switchToRecentAtVisibleMessage(visible)) {
+        return;
+      }
       if (_focusPaginationArmed && first <= 3) {
         unawaited(_loadFocusNewer());
       }
@@ -1235,8 +1255,54 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _lastVisibleIndex = first;
   }
 
+  bool _switchToRecentAtVisibleMessage(List<ItemPosition> visible) {
+    final recent = context.read<ChatBloc>().state.messages;
+    if (recent.isEmpty) return false;
+    final recentIds = recent.map((message) => message.id).toSet();
+    final ordered = [...visible]..sort((a, b) => a.index.compareTo(b.index));
+    for (final position in ordered) {
+      if (position.index >= _displayedItems.length) continue;
+      final item = _displayedItems[position.index];
+      if (item is! MessageItemElement || !recentIds.contains(item.message.id)) {
+        continue;
+      }
+      final recentItems = _buildChatTimelineItems(recent);
+      final newIndex = recentItems.indexWhere(
+        (element) =>
+            element is MessageItemElement &&
+            element.message.id == item.message.id,
+      );
+      if (newIndex < 0) return false;
+      ++_navigationGeneration;
+      _returnToRecentWhenReady = false;
+      _focusedMedia.clear();
+      _deletedFocusIds.clear();
+      _focusRecheckPending = false;
+      _focusRecheckSerial++;
+      setState(() {
+        _recentInitialIndex = newIndex;
+        _recentInitialAlignment = position.itemLeadingEdge.clamp(0.0, 1.0);
+        _lastVisibleIndex = newIndex;
+        _focusMessages = null;
+        _focusPaginationArmed = false;
+        _newMessagesCount = 0;
+        _showScrollToBottom = newIndex > 0;
+        _highlightedMessageId = null;
+      });
+      return true;
+    }
+    return false;
+  }
+
   void _handleMessagesChanged(List<ChatMessage> messages) {
+    _scheduleVisibleRead();
     _diagnoseBlankTimeline('messages_changed');
+    if (_returnToRecentWhenReady && messages.isNotEmpty) {
+      _returnToRecentWhenReady = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _focusMessages != null) scrollToBottom(animate: false);
+      });
+    }
     final currentIds = messages.map((message) => message.id).toSet();
 
     // An empty cache can be emitted before the first server page arrives.
@@ -1302,6 +1368,69 @@ class _ChatMessagesState extends State<_ChatMessages> {
     }
   }
 
+  void _scheduleVisibleRead() {
+    if (widget.chat.isDraft) return;
+    _visibleReadTimer?.cancel();
+    _visibleReadTimer = Timer(
+      const Duration(milliseconds: 450),
+      () => unawaited(_readVisibleMessages()),
+    );
+  }
+
+  Future<void> _readVisibleMessages() async {
+    if (!mounted ||
+        _visibleReadInFlight ||
+        _isNavigating ||
+        _focusLoading ||
+        _bottomJumpPending ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    final failureAt = _visibleReadFailureAt;
+    if (failureAt != null &&
+        DateTime.now().difference(failureAt) < const Duration(seconds: 10)) {
+      return;
+    }
+    final ids = visibleUnreadMessageIds(
+      _itemPositionsListener.itemPositions.value,
+      (index) {
+        if (index < 0 || index >= _displayedItems.length) return null;
+        final item = _displayedItems[index];
+        return item is MessageItemElement ? item.message : null;
+      },
+      _acknowledgedVisibleReads,
+    );
+    if (ids.isEmpty) return;
+    final chatId = widget.chat.id;
+    _visibleReadInFlight = true;
+    try {
+      await context.read<IChatRepository>().markVisibleMessagesRead(
+        chatId,
+        ids,
+      );
+      if (mounted && widget.chat.id == chatId) {
+        _acknowledgedVisibleReads.addAll(ids);
+        while (_acknowledgedVisibleReads.length > 1000) {
+          _acknowledgedVisibleReads.remove(_acknowledgedVisibleReads.first);
+        }
+        _visibleReadFailureAt = null;
+      }
+    } catch (error, stackTrace) {
+      _visibleReadFailureAt = DateTime.now();
+      if (mounted) {
+        context.read<AppConfig>().talker.handle(
+          error,
+          stackTrace,
+          'Visible message read receipt failed',
+        );
+      }
+    } finally {
+      _visibleReadInFlight = false;
+      if (mounted && widget.chat.id == chatId) _scheduleVisibleRead();
+    }
+  }
+
   double _animationProgressFor(String messageId) {
     final started = _newMessageAnimations[messageId];
     if (started == null) return 1;
@@ -1346,8 +1475,14 @@ class _ChatMessagesState extends State<_ChatMessages> {
   }
 
   void scrollToBottom({bool animate = true}) {
-    final generation = ++_navigationGeneration;
     final wasFocused = _focusMessages != null;
+    if (wasFocused && context.read<ChatBloc>().state.messages.isEmpty) {
+      // A send can precede the first recent-cache emission. Do not replace
+      // the focused list with an empty timeline for that transient interval.
+      _returnToRecentWhenReady = true;
+      return;
+    }
+    final generation = ++_navigationGeneration;
     if (wasFocused) {
       // The focused window can be many pages away from the recent timeline.
       // Animating to its own index zero and then replacing the list causes a
@@ -1400,6 +1535,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
       );
 
   void _leaveFocusedWindow() {
+    _returnToRecentWhenReady = false;
     _isAnimatingToBottom = false;
     _isNavigating = false;
     _focusedMedia.clear();
@@ -1408,6 +1544,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _focusRecheckRunning = false;
     _focusRecheckSerial++;
     setState(() {
+      _recentInitialIndex = 0;
+      _recentInitialAlignment = 0;
       _focusMessages = null;
       _focusPaginationArmed = false;
       _highlightedMessageId = null;
@@ -1485,6 +1623,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _focusedMedia.clear();
       _deletedFocusIds.clear();
       setState(() {
+        _recentInitialIndex = 0;
+        _recentInitialAlignment = 0;
         _focusMessages = null;
         _focusPaginationArmed = false;
         _showScrollToBottom = false;
@@ -1609,6 +1749,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
     }
     _focusPageLoading = true;
     final generation = _navigationGeneration;
+    final anchor = _visibleFocusedAnchor();
     try {
       final page = await context.read<IChatRepository>().loadWindowOlder(
         widget.chat.id,
@@ -1620,17 +1761,36 @@ class _ChatMessagesState extends State<_ChatMessages> {
         return;
       }
       final existing = _focusMessages!.map((message) => message.id).toSet();
+      final bounded = boundFocusedHistory([
+        ..._focusMessages!,
+        ...page.where(
+          (message) =>
+              !existing.contains(message.id) &&
+              !_deletedFocusIds.contains(message.id),
+        ),
+      ], FocusedHistoryGrowth.older);
+      final retainedIds = bounded.messages.map((message) => message.id).toSet();
+      _focusedMedia.removeWhere((id, _) => !retainedIds.contains(id));
       setState(() {
-        _focusMessages = [
-          ..._focusMessages!,
-          ...page.where(
-            (message) =>
-                !existing.contains(message.id) &&
-                !_deletedFocusIds.contains(message.id),
-          ),
-        ];
+        _focusMessages = bounded.messages;
         _focusHasOlder = page.length == 60;
+        if (bounded.trimmed) _focusHasNewer = true;
       });
+      if (bounded.trimmed && anchor != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && generation == _navigationGeneration) {
+            unawaited(
+              _showMessage(
+                anchor.messageId,
+                generation: generation,
+                animate: false,
+                alignment: anchor.alignment.clamp(0.0, 1.0),
+                highlight: false,
+              ),
+            );
+          }
+        });
+      }
     } catch (_) {
       // Keep the cursor intact: the next scroll can retry the same page.
     } finally {
@@ -1677,16 +1837,20 @@ class _ChatMessagesState extends State<_ChatMessages> {
         return;
       }
       final existing = _focusMessages!.map((message) => message.id).toSet();
+      final bounded = boundFocusedHistory([
+        ...page.where(
+          (message) =>
+              !existing.contains(message.id) &&
+              !_deletedFocusIds.contains(message.id),
+        ),
+        ..._focusMessages!,
+      ], FocusedHistoryGrowth.newer);
+      final retainedIds = bounded.messages.map((message) => message.id).toSet();
+      _focusedMedia.removeWhere((id, _) => !retainedIds.contains(id));
       setState(() {
-        _focusMessages = [
-          ...page.where(
-            (message) =>
-                !existing.contains(message.id) &&
-                !_deletedFocusIds.contains(message.id),
-          ),
-          ..._focusMessages!,
-        ];
+        _focusMessages = bounded.messages;
         _focusHasNewer = page.length == 60;
+        if (bounded.trimmed) _focusHasOlder = true;
       });
       if (page.isNotEmpty && anchorId != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1804,6 +1968,12 @@ class _ChatMessagesState extends State<_ChatMessages> {
                   ),
                   itemScrollController: _itemScrollController,
                   itemPositionsListener: _itemPositionsListener,
+                  initialScrollIndex: _focusMessages == null
+                      ? _recentInitialIndex
+                      : 0,
+                  initialAlignment: _focusMessages == null
+                      ? _recentInitialAlignment
+                      : 0,
                   chat: widget.chat,
                   items: _displayedItems,
                   animationProgressFor: _animationProgressFor,
@@ -1903,6 +2073,8 @@ class _MessagesList extends StatelessWidget {
     super.key,
     required this.itemScrollController,
     required this.itemPositionsListener,
+    required this.initialScrollIndex,
+    required this.initialAlignment,
     required this.chat,
     required this.items,
     required this.animationProgressFor,
@@ -1917,6 +2089,8 @@ class _MessagesList extends StatelessWidget {
 
   final ItemScrollController itemScrollController;
   final ItemPositionsListener itemPositionsListener;
+  final int initialScrollIndex;
+  final double initialAlignment;
   final Chat chat;
   final List<ChatListItemElement> items;
   final double Function(String messageId) animationProgressFor;
@@ -1984,6 +2158,8 @@ class _MessagesList extends StatelessWidget {
     return ScrollablePositionedList.builder(
       itemScrollController: itemScrollController,
       itemPositionsListener: itemPositionsListener,
+      initialScrollIndex: initialScrollIndex,
+      initialAlignment: initialAlignment,
       reverse: true,
       padding: EdgeInsets.only(top: headerHeight + 12.0, bottom: bottomPadding),
 

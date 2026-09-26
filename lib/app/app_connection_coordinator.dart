@@ -4,6 +4,15 @@ import 'package:yap_chat/repositories/repositories.dart';
 /// Единственная точка, которая переводит сетевые репозитории между foreground
 /// и background. Повторные lifecycle/auth-события выполняются последовательно.
 class AppConnectionCoordinator {
+  static const longInactiveRecoveryThreshold = Duration(seconds: 30);
+
+  static bool shouldRecoverAfterInactive(
+    DateTime? inactiveSince,
+    DateTime resumedAt,
+  ) =>
+      inactiveSince != null &&
+      resumedAt.difference(inactiveSince) >= longInactiveRecoveryThreshold;
+
   AppConnectionCoordinator({
     required IChatsRepository chatsRepository,
     required IChatRepository chatRepository,

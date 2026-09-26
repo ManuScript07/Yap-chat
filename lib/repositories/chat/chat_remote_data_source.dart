@@ -127,16 +127,20 @@ class ChatRemoteDataSource {
     );
   }
 
-  Future<void> markAsRead(String chatId) => measureRpc(
-    _diagnostics,
-    'mark_conversations_read',
-    () => _client.rpc<void>(
-      'mark_conversations_read',
-      params: {
-        'conversation_ids': [chatId],
-      },
-    ),
-  );
+  Future<void> markVisibleMessagesRead(String chatId, Set<String> messageIds) =>
+      measureRpc(
+        _diagnostics,
+        'mark_visible_conversation_messages_read',
+        () => _client
+            .rpc<int>(
+              'mark_visible_conversation_messages_read',
+              params: {
+                'target_conversation_id': chatId,
+                'visible_message_ids': messageIds.toList(growable: false),
+              },
+            )
+            .then((_) {}),
+      );
 
   Future<void> deleteMessage(
     String messageId, {

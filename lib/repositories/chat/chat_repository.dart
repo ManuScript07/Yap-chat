@@ -108,15 +108,24 @@ class ChatRepository implements IChatRepository {
   ) async {
     try {
       _accountSessionController.ensureCurrent(scope);
-      final messages = await _syncService.synchronizeRecent(chatId);
+      await _syncService.synchronizeRecent(chatId);
       _accountSessionController.ensureCurrent(scope);
-      final hasUnreadIncoming = messages.any(
-        (message) => !message.isMine && message.readAt == null,
-      );
-      if (hasUnreadIncoming) await _remote.markAsRead(chatId);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Initial chat sync failed');
     }
+  }
+
+  @override
+  Future<void> markVisibleMessagesRead(
+    String chatId,
+    Set<String> messageIds,
+  ) async {
+    if (messageIds.isEmpty) return;
+    final scope = _accountSessionController.capture();
+    await _remote
+        .markVisibleMessagesRead(chatId, messageIds)
+        .timeout(_remoteOperationTimeout);
+    _accountSessionController.ensureCurrent(scope);
   }
 
   @override

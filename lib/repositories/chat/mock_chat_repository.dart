@@ -105,6 +105,12 @@ class MockChatRepository implements IChatRepository {
   Future<bool> loadMoreMessages(String chatId) async => false;
 
   @override
+  Future<void> markVisibleMessagesRead(
+    String chatId,
+    Set<String> messageIds,
+  ) async {}
+
+  @override
   Future<ChatMessage> hydrateWindowMedia(ChatMessage message) async => message;
 
   @override

@@ -66,6 +66,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   bool _pendingChatRestored = false;
   bool _permissionReminderScheduled = false;
   bool _isForeground = true;
+  DateTime? _inactiveSince;
   late final ChatNavigationCoordinator _chatNavigator;
   late final ProfileNavigationCoordinator _profileNavigator;
   late final ProfileShareLinkCoordinator _profileShareLinkCoordinator;
@@ -256,14 +257,33 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     final locationTracking = context.read<LocationTrackingCoordinator>();
     final notifications = context.read<NotificationsCubit>();
     if (state == AppLifecycleState.resumed) {
+      final inactiveSince = _inactiveSince;
+      _inactiveSince = null;
       _isForeground = true;
-      unawaited(connections.setForeground(true));
+      if (AppConnectionCoordinator.shouldRecoverAfterInactive(
+        inactiveSince,
+        DateTime.now(),
+      )) {
+        // Some devices skip `paused` when suspending an inactive app. The
+        // coordinator then still believes the old channel is connected.
+        // Recreate it once on a long return and catch up open conversations;
+        // short permission/browser interruptions do not churn the channel.
+        unawaited(() async {
+          await connections.setForeground(false);
+          if (mounted && _isForeground) {
+            await connections.setForeground(true);
+          }
+        }());
+      } else {
+        unawaited(connections.setForeground(true));
+      }
       unawaited(locationTracking.setForeground(true));
       unawaited(notifications.setAppForeground(true));
       _profileShareLinkCoordinator.onAuthenticationOrForegroundChanged();
       return;
     }
     if (state == AppLifecycleState.inactive) {
+      _inactiveSince ??= DateTime.now();
       _isForeground = false;
       unawaited(notifications.setAppForeground(false));
       return;
@@ -271,6 +291,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
+      _inactiveSince = null;
       _isForeground = false;
       unawaited(connections.setForeground(false));
       unawaited(locationTracking.setForeground(false));

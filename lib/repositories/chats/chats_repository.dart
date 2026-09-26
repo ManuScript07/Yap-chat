@@ -6,7 +6,6 @@ import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
-import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
 import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
@@ -19,7 +18,6 @@ class ChatsRepository implements IChatsRepository {
     required ChatsRemoteDataSource remote,
     required MediaCacheService mediaCache,
     required ChatCacheDataSource chatCache,
-    required ChatRemoteDataSource chatRemote,
     required ConversationSyncService conversationSync,
     required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
@@ -28,7 +26,6 @@ class ChatsRepository implements IChatsRepository {
        _remote = remote,
        _mediaCache = mediaCache,
        _chatCache = chatCache,
-       _chatRemote = chatRemote,
        _conversationSync = conversationSync,
        _accountSessionController = accountSessionController,
        _uuid = uuid;
@@ -41,7 +38,6 @@ class ChatsRepository implements IChatsRepository {
   final ChatsRemoteDataSource _remote;
   final MediaCacheService _mediaCache;
   final ChatCacheDataSource _chatCache;
-  final ChatRemoteDataSource _chatRemote;
   final ConversationSyncService _conversationSync;
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
@@ -610,15 +606,7 @@ class ChatsRepository implements IChatsRepository {
   }
 
   Future<void> _synchronizeConversation(String chatId) async {
-    final messages = await _conversationSync.synchronizeRecent(
-      chatId,
-      refreshAfterActive: true,
-    );
-    if (!_conversationSync.isConversationOpen(chatId)) return;
-    final hasUnreadIncoming = messages.any(
-      (message) => !message.isMine && message.readAt == null,
-    );
-    if (hasUnreadIncoming) await _chatRemote.markAsRead(chatId);
+    await _conversationSync.synchronizeRecent(chatId, refreshAfterActive: true);
   }
 
   Future<void> _waitForSynchronizationIdle() async {

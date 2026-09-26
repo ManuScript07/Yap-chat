@@ -133,7 +133,6 @@ class RepositoryContainer {
         remote: chatsRemote,
         mediaCache: mediaCache,
         chatCache: chatCache,
-        chatRemote: chatRemote,
         conversationSync: conversationSync,
         accountSessionController: config.accountSessionController,
       ),
