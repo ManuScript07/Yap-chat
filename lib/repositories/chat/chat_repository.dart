@@ -106,12 +106,30 @@ class ChatRepository implements IChatRepository {
     String chatId,
     AccountSessionSnapshot scope,
   ) async {
+    List<ChatMessage> recent;
     try {
       _accountSessionController.ensureCurrent(scope);
-      await _syncService.synchronizeRecent(chatId);
+      recent = await _syncService.synchronizeRecent(chatId);
       _accountSessionController.ensureCurrent(scope);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Initial chat sync failed');
+      return;
+    }
+    if (!_accountSessionController.isCurrent(scope) ||
+        !_syncService.isConversationOpen(chatId)) {
+      return;
+    }
+    try {
+      await _syncService.reconcileCachedHistory(chatId, recent);
+    } on StaleAccountSessionException {
+      // The account changed while the request was in flight.
+    } catch (error, stackTrace) {
+      // Keep cached offline history if validation could not reach the server.
+      _config.talker.handle(
+        error,
+        stackTrace,
+        'Cached chat history reconciliation failed',
+      );
     }
   }
 
@@ -247,6 +265,9 @@ class ChatRepository implements IChatRepository {
         } else if (event.conversationId == chatId &&
             event.reason == 'deleted' &&
             event.messageId != null) {
+          unawaited(
+            _removeDeletedCachedMessage(scope, chatId, event.messageId!),
+          );
           listener.add(ChatHistoryChange.deleted(event.messageId!));
         } else if (event.conversationId == chatId &&
             event.reason == 'deleted') {
@@ -260,6 +281,29 @@ class ChatRepository implements IChatRepository {
         await remote?.cancel();
       };
     });
+  }
+
+  Future<void> _removeDeletedCachedMessage(
+    AccountSessionSnapshot scope,
+    String chatId,
+    String messageId,
+  ) async {
+    try {
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.removeMessages(chatId, {
+          messageId,
+        }, ownerUserId: scope.userId),
+      );
+    } on StaleAccountSessionException {
+      // An event from the previous account must not touch the new cache.
+    } catch (error, stackTrace) {
+      _config.talker.handle(
+        error,
+        stackTrace,
+        'Chat deletion cache update failed',
+      );
+    }
   }
 
   @override
@@ -385,7 +429,9 @@ class ChatRepository implements IChatRepository {
     );
     if (localMessage?.isLocalOnly ?? false) {
       await _accountSessionController.commit(scope, () async {
-        await _cache.removeMessage(messageId, ownerUserId: scope.userId);
+        await _cache.removeMessages(chatId, {
+          messageId,
+        }, ownerUserId: scope.userId);
         await _syncService.refreshLocalPreview(
           chatId,
           ownerUserId: scope.userId,
@@ -404,7 +450,9 @@ class ChatRepository implements IChatRepository {
           messageId,
           ownerUserId: scope.userId,
         );
-        await _cache.removeMessage(messageId, ownerUserId: scope.userId);
+        await _cache.removeMessages(chatId, {
+          messageId,
+        }, ownerUserId: scope.userId);
         await _syncService.refreshLocalPreview(
           chatId,
           ownerUserId: scope.userId,
@@ -421,7 +469,8 @@ class ChatRepository implements IChatRepository {
     );
     await _accountSessionController.commit(
       scope,
-      () => _cache.removeMessage(messageId, ownerUserId: scope.userId),
+      () =>
+          _cache.removeMessages(chatId, {messageId}, ownerUserId: scope.userId),
     );
     _notifyLocalDeletion(scope, chatId, messageId);
     await _syncService.synchronizeRecent(chatId, refreshAfterActive: true);

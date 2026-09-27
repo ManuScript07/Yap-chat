@@ -45,6 +45,22 @@ class ChatRemoteDataSource {
     return rows.map(_mapMessage).toList(growable: false);
   }
 
+  /// Checks cached history without downloading message bodies or media.
+  /// The existing messages RLS applies the same per-user visibility rules as
+  /// get_conversation_messages (including hides and conversation clearing).
+  Future<Set<String>> fetchVisibleMessageIds(
+    String chatId,
+    List<String> messageIds,
+  ) async {
+    if (messageIds.isEmpty) return const <String>{};
+    final rows = await _client
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', chatId)
+        .inFilter('id', messageIds);
+    return rows.map((row) => row['id'] as String).toSet();
+  }
+
   /// The server applies the same membership, clear-boundary and hidden-message
   /// rules as get_conversation_messages. A distant window is kept out of Drift.
   Future<List<ChatMessage>> fetchMessageWindow(

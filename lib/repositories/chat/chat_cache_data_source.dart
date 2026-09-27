@@ -8,7 +8,7 @@ import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
 class ChatCacheDataSource {
   static const pendingChatDeletionType = 'hide_conversation';
 
-  const ChatCacheDataSource({
+  ChatCacheDataSource({
     required AppDatabase database,
     required String Function() userIdProvider,
   }) : _database = database,
@@ -16,6 +16,23 @@ class ChatCacheDataSource {
 
   final AppDatabase _database;
   final String Function() _userIdProvider;
+  // A response started before a deletion may arrive afterwards. Keep a small
+  // process-local tombstone set so that response cannot reinsert the message.
+  final Set<String> _removedMessageKeys = {};
+  static const _maxRemovedMessageKeys = 512;
+
+  String _messageKey(String ownerUserId, String id) => '$ownerUserId\u0000$id';
+
+  void _rememberRemoved(String ownerUserId, Iterable<String> ids) {
+    for (final id in ids) {
+      final key = _messageKey(ownerUserId, id);
+      _removedMessageKeys.remove(key);
+      _removedMessageKeys.add(key);
+    }
+    while (_removedMessageKeys.length > _maxRemovedMessageKeys) {
+      _removedMessageKeys.remove(_removedMessageKeys.first);
+    }
+  }
 
   Stream<List<ChatMessage>> watchMessages(
     String chatId, {
@@ -53,6 +70,34 @@ class ChatCacheDataSource {
       ]);
     return (await query.get())
         .map((row) => _mapMessage(row, currentUserId))
+        .toList(growable: false);
+  }
+
+  /// Only server-backed IDs need a visibility check; pending and local-only
+  /// rows cannot be checked against public.messages. Avoid decoding payloads
+  /// and media metadata from the whole cached history on every chat entry.
+  Future<List<String>> readOlderServerMessageIds(
+    String chatId, {
+    required String currentUserId,
+    required Set<String> excluding,
+  }) async {
+    final table = _database.cachedMessages;
+    final query = _database.selectOnly(table)
+      ..addColumns([table.id])
+      ..where(
+        table.ownerUserId.equals(currentUserId) &
+            table.chatId.equals(chatId) &
+            table.isPending.not() &
+            (excluding.isEmpty
+                ? const Constant(true)
+                : table.id.isNotIn(excluding)),
+      )
+      ..orderBy([
+        OrderingTerm.desc(table.timestamp),
+        OrderingTerm.desc(table.id),
+      ]);
+    return (await query.get())
+        .map((row) => row.read(table.id)!)
         .toList(growable: false);
   }
 
@@ -188,6 +233,9 @@ class ChatCacheDataSource {
     String? ownerUserId,
   }) {
     final owner = ownerUserId ?? _userIdProvider();
+    if (_removedMessageKeys.contains(_messageKey(owner, message.id))) {
+      return Future<void>.value();
+    }
     return _database
         .into(_database.cachedMessages)
         .insertOnConflictUpdate(
@@ -216,10 +264,45 @@ class ChatCacheDataSource {
 
   Future<void> removeMessage(String id, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
+    _rememberRemoved(owner, [id]);
     await (_database.delete(_database.cachedMessages)..where(
           (table) => table.ownerUserId.equals(owner) & table.id.equals(id),
         ))
         .go();
+  }
+
+  /// Applies an authoritative server deletion for this conversation only.
+  Future<void> removeMessages(
+    String chatId,
+    Set<String> ids, {
+    String? ownerUserId,
+  }) async {
+    if (ids.isEmpty) return;
+    final owner = ownerUserId ?? _userIdProvider();
+    _rememberRemoved(owner, ids);
+    await _database.transaction(() async {
+      await (_database.delete(_database.cachedMessages)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                table.chatId.equals(chatId) &
+                table.id.isIn(ids),
+          ))
+          .go();
+      await (_database.update(_database.cachedMessages)..where(
+            (table) =>
+                table.ownerUserId.equals(owner) &
+                table.chatId.equals(chatId) &
+                table.replyMessageId.isIn(ids),
+          ))
+          .write(
+            const CachedMessagesCompanion(
+              replyMessageId: Value(null),
+              replySenderId: Value(null),
+              replyType: Value(null),
+              replyText: Value(null),
+            ),
+          );
+    });
   }
 
   Future<void> putPendingOperation(
@@ -618,6 +701,9 @@ class ChatCacheDataSource {
     String ownerUserId,
   ) async {
     for (final message in messages) {
+      if (_removedMessageKeys.contains(_messageKey(ownerUserId, message.id))) {
+        continue;
+      }
       await _database
           .into(_database.cachedMessages)
           .insertOnConflictUpdate(_messageCompanion(message, ownerUserId));

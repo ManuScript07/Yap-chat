@@ -30,6 +30,7 @@ class ConversationSyncService {
   final AccountSessionController _accountSessionController;
   final AppDiagnostics? _diagnostics;
   final Map<String, Future<List<ChatMessage>>> _activeSyncs = {};
+  final Map<String, Future<void>> _activeHistoryReconciliations = {};
   final Map<String, int> _openConversationCounts = {};
   String? _openConversationPrefix;
 
@@ -109,6 +110,58 @@ class ConversationSyncService {
     });
   }
 
+  /// The newest page cannot reconcile cached messages older than its cursor.
+  /// Check only those already-cached IDs on chat entry/resume. Realtime handles
+  /// live deletions; this also repairs events missed while the app was offline.
+  Future<void> reconcileCachedHistory(
+    String chatId,
+    List<ChatMessage> recentMessages,
+  ) {
+    final scope = _accountSessionController.capture();
+    final key = _operationKey(scope, chatId);
+    final active = _activeHistoryReconciliations[key];
+    if (active != null) return active;
+    final reconciliation = _reconcileCachedHistory(
+      chatId,
+      recentMessages,
+      scope,
+    );
+    _activeHistoryReconciliations[key] = reconciliation;
+    return reconciliation.whenComplete(() {
+      if (identical(_activeHistoryReconciliations[key], reconciliation)) {
+        _activeHistoryReconciliations.remove(key);
+      }
+    });
+  }
+
+  Future<void> _reconcileCachedHistory(
+    String chatId,
+    List<ChatMessage> recentMessages,
+    AccountSessionSnapshot scope,
+  ) async {
+    final recentIds = recentMessages.map((message) => message.id).toSet();
+    final olderIds = await _cache.readOlderServerMessageIds(
+      chatId,
+      currentUserId: scope.userId,
+      excluding: recentIds,
+    );
+    // Keep each PostgREST GET safely below common URL length limits. No
+    // request is made for a chat without previously downloaded older history.
+    const batchSize = 100;
+    for (var offset = 0; offset < olderIds.length; offset += batchSize) {
+      _accountSessionController.ensureCurrent(scope);
+      final end = (offset + batchSize).clamp(0, olderIds.length);
+      final batch = olderIds.sublist(offset, end);
+      final visible = await _remote.fetchVisibleMessageIds(chatId, batch);
+      final removed = batch.toSet().difference(visible);
+      if (removed.isEmpty) continue;
+      await _accountSessionController.commit(
+        scope,
+        () => _cache.removeMessages(chatId, removed, ownerUserId: scope.userId),
+      );
+    }
+  }
+
   Future<List<ChatMessage>> hydrateAll(
     List<ChatMessage> messages, {
     String? ownerUserId,
@@ -153,6 +206,7 @@ class ConversationSyncService {
 
   void resetForAccountChange() {
     _activeSyncs.clear();
+    _activeHistoryReconciliations.clear();
     _openConversationCounts.clear();
     _openConversationPrefix = null;
   }
