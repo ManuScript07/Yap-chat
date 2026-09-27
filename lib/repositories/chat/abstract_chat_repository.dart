@@ -14,6 +14,9 @@ abstract interface class IChatRepository {
   /// Подписка на поток сообщений конкретного чата.
   Stream<List<ChatMessage>> getMessagesStream(String chatId);
 
+  /// Rechecks only the cached message IDs in the viewed history page.
+  Future<void> reconcileVisibleMessages(String chatId, Set<String> ids);
+
   /// Marks only incoming message IDs that were actually visible in the open
   /// conversation. Explicit whole-chat marking remains in IChatsRepository.
   Future<void> markVisibleMessagesRead(String chatId, Set<String> messageIds);

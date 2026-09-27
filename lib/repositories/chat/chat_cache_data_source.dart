@@ -73,14 +73,14 @@ class ChatCacheDataSource {
         .toList(growable: false);
   }
 
-  /// Only server-backed IDs need a visibility check; pending and local-only
-  /// rows cannot be checked against public.messages. Avoid decoding payloads
-  /// and media metadata from the whole cached history on every chat entry.
-  Future<List<String>> readOlderServerMessageIds(
+  /// Reads only the currently displayed cache page. Pending and local-only
+  /// messages have no server row to validate.
+  Future<Set<String>> readServerMessageIds(
     String chatId, {
     required String currentUserId,
-    required Set<String> excluding,
+    required Set<String> ids,
   }) async {
+    if (ids.isEmpty) return const {};
     final table = _database.cachedMessages;
     final query = _database.selectOnly(table)
       ..addColumns([table.id])
@@ -88,17 +88,9 @@ class ChatCacheDataSource {
         table.ownerUserId.equals(currentUserId) &
             table.chatId.equals(chatId) &
             table.isPending.not() &
-            (excluding.isEmpty
-                ? const Constant(true)
-                : table.id.isNotIn(excluding)),
-      )
-      ..orderBy([
-        OrderingTerm.desc(table.timestamp),
-        OrderingTerm.desc(table.id),
-      ]);
-    return (await query.get())
-        .map((row) => row.read(table.id)!)
-        .toList(growable: false);
+            table.id.isIn(ids),
+      );
+    return (await query.get()).map((row) => row.read(table.id)!).toSet();
   }
 
   /// Returns only the newest cached message. Summary reconciliation only needs

@@ -915,7 +915,8 @@ class _ChatMessages extends StatefulWidget {
   State<_ChatMessages> createState() => _ChatMessagesState();
 }
 
-class _ChatMessagesState extends State<_ChatMessages> {
+class _ChatMessagesState extends State<_ChatMessages>
+    with WidgetsBindingObserver {
   static const _focusPrefetchItems = 12;
 
   final ItemScrollController _itemScrollController = ItemScrollController();
@@ -961,6 +962,10 @@ class _ChatMessagesState extends State<_ChatMessages> {
   final Set<String> _deletedFocusIds = {};
   final FocusedHistoryWindowCache _windowCache = FocusedHistoryWindowCache();
   Timer? _visibleReadTimer;
+  Timer? _visibleHistoryTimer;
+  bool _visibleHistoryInFlight = false;
+  bool _visibleHistoryPending = false;
+  DateTime? _visibleHistoryFailureAt;
   final Set<String> _acknowledgedVisibleReads = {};
   bool _visibleReadInFlight = false;
   DateTime? _visibleReadFailureAt;
@@ -968,8 +973,19 @@ class _ChatMessagesState extends State<_ChatMessages> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _itemPositionsListener.itemPositions.addListener(_handleScroll);
     _listenToHistoryChanges();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scheduleVisibleHistoryCheck();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _scheduleVisibleHistoryCheck();
+    }
   }
 
   void _listenToHistoryChanges() {
@@ -983,6 +999,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
           if (deletedId != null) {
             _removeFocusedMessage(deletedId);
           } else if (change.reconnected) {
+            _visibleHistoryFailureAt = null;
+            _scheduleVisibleHistoryCheck();
             _windowCache.clear();
             if (_focusLoading ||
                 _focusPageLoading ||
@@ -1158,6 +1176,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
   @override
   void dispose() {
     _visibleReadTimer?.cancel();
+    _visibleHistoryTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _itemPositionsListener.itemPositions.removeListener(_handleScroll);
     final subscription = _historyChangesSubscription;
     if (subscription != null) unawaited(subscription.cancel());
@@ -1169,6 +1189,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.chat.id != widget.chat.id) {
       _visibleReadTimer?.cancel();
+      _visibleHistoryTimer?.cancel();
+      _visibleHistoryPending = false;
+      _visibleHistoryFailureAt = null;
       _acknowledgedVisibleReads.clear();
       _visibleReadFailureAt = null;
       final subscription = _historyChangesSubscription;
@@ -1198,11 +1221,15 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _focusInitialAlignment = 0;
       _blankViewportWarningLogged = false;
       _userScrollGeneration = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scheduleVisibleHistoryCheck();
+      });
     }
   }
 
   void _handleScroll() {
     _scheduleVisibleRead();
+    _scheduleVisibleHistoryCheck();
     if (_isAnimatingToBottom || _isNavigating || _bottomJumpPending) return;
     final visible = _itemPositionsListener.itemPositions.value
         .where(
@@ -1384,6 +1411,87 @@ class _ChatMessagesState extends State<_ChatMessages> {
       const Duration(milliseconds: 450),
       () => unawaited(_readVisibleMessages()),
     );
+  }
+
+  void _scheduleVisibleHistoryCheck() {
+    if (widget.chat.isDraft || _focusMessages != null) return;
+    _visibleHistoryTimer?.cancel();
+    _visibleHistoryTimer = Timer(
+      const Duration(milliseconds: 450),
+      () => unawaited(_checkVisibleHistory()),
+    );
+  }
+
+  Future<void> _checkVisibleHistory() async {
+    if (_visibleHistoryInFlight) {
+      _visibleHistoryPending = true;
+      return;
+    }
+    if (!mounted ||
+        _focusMessages != null ||
+        _isNavigating ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    final failureAt = _visibleHistoryFailureAt;
+    if (failureAt != null &&
+        DateTime.now().difference(failureAt) < const Duration(seconds: 10)) {
+      return;
+    }
+    final visible = _itemPositionsListener.itemPositions.value
+        .where(
+          (position) =>
+              position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
+        )
+        .toList(growable: false);
+    if (visible.isEmpty || _displayedItems.isEmpty) return;
+    const pageItems = 60;
+    final firstIndex = visible
+        .map((position) => position.index)
+        .reduce(math.min);
+    final lastIndex = visible
+        .map((position) => position.index)
+        .reduce(math.max);
+    final start = (firstIndex ~/ pageItems) * pageItems;
+    final end = math.min(
+      ((lastIndex ~/ pageItems) + 1) * pageItems,
+      _displayedItems.length,
+    );
+    final ids = <String>{};
+    for (var index = start; index < end; index++) {
+      final item = _displayedItems[index];
+      if (item is MessageItemElement && !item.message.isLocalOnly) {
+        ids.add(item.message.id);
+      }
+    }
+    if (ids.isEmpty) return;
+    final chatId = widget.chat.id;
+    _visibleHistoryInFlight = true;
+    try {
+      await context.read<IChatRepository>().reconcileVisibleMessages(
+        chatId,
+        ids,
+      );
+      if (mounted && widget.chat.id == chatId) {
+        _visibleHistoryFailureAt = null;
+      }
+    } catch (error, stackTrace) {
+      if (mounted && widget.chat.id == chatId) {
+        _visibleHistoryFailureAt = DateTime.now();
+        context.read<AppConfig>().talker.handle(
+          error,
+          stackTrace,
+          'Visible cached history reconciliation failed',
+        );
+      }
+    } finally {
+      _visibleHistoryInFlight = false;
+      if (_visibleHistoryPending && mounted) {
+        _visibleHistoryPending = false;
+        _scheduleVisibleHistoryCheck();
+      }
+    }
   }
 
   Future<void> _readVisibleMessages() async {

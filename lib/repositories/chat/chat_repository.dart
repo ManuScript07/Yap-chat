@@ -106,32 +106,18 @@ class ChatRepository implements IChatRepository {
     String chatId,
     AccountSessionSnapshot scope,
   ) async {
-    List<ChatMessage> recent;
     try {
       _accountSessionController.ensureCurrent(scope);
-      recent = await _syncService.synchronizeRecent(chatId);
+      await _syncService.synchronizeRecent(chatId);
       _accountSessionController.ensureCurrent(scope);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Initial chat sync failed');
-      return;
-    }
-    if (!_accountSessionController.isCurrent(scope) ||
-        !_syncService.isConversationOpen(chatId)) {
-      return;
-    }
-    try {
-      await _syncService.reconcileCachedHistory(chatId, recent);
-    } on StaleAccountSessionException {
-      // The account changed while the request was in flight.
-    } catch (error, stackTrace) {
-      // Keep cached offline history if validation could not reach the server.
-      _config.talker.handle(
-        error,
-        stackTrace,
-        'Cached chat history reconciliation failed',
-      );
     }
   }
+
+  @override
+  Future<void> reconcileVisibleMessages(String chatId, Set<String> ids) =>
+      _syncService.reconcileVisibleMessages(chatId, ids);
 
   @override
   Future<void> markVisibleMessagesRead(
@@ -151,6 +137,9 @@ class ChatRepository implements IChatRepository {
     _isNetworkPaused = false;
     final scope = _accountSessionController.capture();
     final chatIds = _syncService.openConversationIds;
+    for (final chatId in chatIds) {
+      _syncService.resetVisibleValidation(chatId);
+    }
     _requestPendingProcessing(processDueNow: true);
     await Future.wait(chatIds.map((chatId) => _initializeChat(chatId, scope)));
   }
@@ -261,6 +250,7 @@ class ChatRepository implements IChatRepository {
       final remote = _userRealtime?.watchConversationEvents().listen((event) {
         if (!_accountSessionController.isCurrent(scope)) return;
         if (event.reason == 'subscribed') {
+          _syncService.resetVisibleValidation(chatId);
           listener.add(const ChatHistoryChange.reconnected());
         } else if (event.conversationId == chatId &&
             event.reason == 'deleted' &&

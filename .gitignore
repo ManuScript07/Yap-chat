@@ -55,3 +55,5 @@ graphify-out
 /firebase-service-account*.json
 /supabase/.env.push.local
 /AGENTS.md
+# Widget Preview related
+.widget_preview/

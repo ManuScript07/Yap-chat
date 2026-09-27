@@ -4,6 +4,9 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 
 class MockChatRepository implements IChatRepository {
+  @override
+  Future<void> reconcileVisibleMessages(String chatId, Set<String> ids) async {}
+
   final _messagesController = StreamController<List<ChatMessage>>.broadcast();
   final List<ChatMessage> _messages = [];
 
