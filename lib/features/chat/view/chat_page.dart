@@ -916,6 +916,8 @@ class _ChatMessages extends StatefulWidget {
 }
 
 class _ChatMessagesState extends State<_ChatMessages> {
+  static const _focusPrefetchItems = 12;
+
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
@@ -935,6 +937,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
   int _lastVisibleIndex = 0;
   int _recentInitialIndex = 0;
   double _recentInitialAlignment = 0;
+  int _focusListRevision = 0;
+  int _focusInitialIndex = 0;
+  double _focusInitialAlignment = 0;
   bool _isAnimatingToBottom = false;
   bool _isNavigating = false;
   bool _focusLoading = false;
@@ -1189,6 +1194,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
       _lastVisibleIndex = 0;
       _recentInitialIndex = 0;
       _recentInitialAlignment = 0;
+      _focusInitialIndex = 0;
+      _focusInitialAlignment = 0;
       _blankViewportWarningLogged = false;
       _userScrollGeneration = 0;
     }
@@ -1207,7 +1214,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
     final first = visible.map((position) => position.index).reduce(math.min);
     final last = visible.map((position) => position.index).reduce(math.max);
 
-    if (last >= _displayedItems.length - 4) {
+    if (last >=
+        _displayedItems.length -
+            (_focusMessages == null ? 4 : _focusPrefetchItems + 1)) {
       if (_focusMessages == null) {
         context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
       } else if (_focusPaginationArmed) {
@@ -1218,7 +1227,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
       if (_focusPaginationArmed && _switchToRecentAtVisibleMessage(visible)) {
         return;
       }
-      if (_focusPaginationArmed && first <= 3) {
+      if (_focusPaginationArmed && first <= _focusPrefetchItems) {
         unawaited(_loadFocusNewer());
       }
       if (_focusPaginationArmed &&
@@ -1610,6 +1619,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
     _focusRecheckPending = false;
     final generation = ++_navigationGeneration;
     _isAnimatingToBottom = false;
+    _isNavigating = false;
     final recentMessages = context.read<ChatBloc>().state.messages;
     if (_focusMessages?.any((message) => message.id == messageId) == true) {
       setState(() {
@@ -1659,6 +1669,8 @@ class _ChatMessagesState extends State<_ChatMessages> {
       }
       _focusedMedia.clear();
       setState(() {
+        _focusInitialIndex = 0;
+        _focusInitialAlignment = 0;
         _focusMessages = visibleWindow;
         _focusHasOlder = true;
         _focusHasNewer = true;
@@ -1749,7 +1761,6 @@ class _ChatMessagesState extends State<_ChatMessages> {
     }
     _focusPageLoading = true;
     final generation = _navigationGeneration;
-    final anchor = _visibleFocusedAnchor();
     try {
       final page = await context.read<IChatRepository>().loadWindowOlder(
         widget.chat.id,
@@ -1760,6 +1771,9 @@ class _ChatMessagesState extends State<_ChatMessages> {
           _focusMessages == null) {
         return;
       }
+      // The user may keep scrolling while the request is in flight. Preserve
+      // the position they see now, not the position that started the request.
+      final anchor = _visibleFocusedAnchor();
       final existing = _focusMessages!.map((message) => message.id).toSet();
       final bounded = boundFocusedHistory([
         ..._focusMessages!,
@@ -1771,26 +1785,13 @@ class _ChatMessagesState extends State<_ChatMessages> {
       ], FocusedHistoryGrowth.older);
       final retainedIds = bounded.messages.map((message) => message.id).toSet();
       _focusedMedia.removeWhere((id, _) => !retainedIds.contains(id));
-      setState(() {
-        _focusMessages = bounded.messages;
-        _focusHasOlder = page.length == 60;
-        if (bounded.trimmed) _focusHasNewer = true;
-      });
-      if (bounded.trimmed && anchor != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && generation == _navigationGeneration) {
-            unawaited(
-              _showMessage(
-                anchor.messageId,
-                generation: generation,
-                animate: false,
-                alignment: anchor.alignment.clamp(0.0, 1.0),
-                highlight: false,
-              ),
-            );
-          }
-        });
-      }
+      _setFocusedPage(
+        bounded.messages,
+        anchor: bounded.trimmed ? anchor : null,
+        generation: generation,
+        hasOlder: page.length == 60,
+        hasNewer: bounded.trimmed || _focusHasNewer,
+      );
     } catch (_) {
       // Keep the cursor intact: the next scroll can retry the same page.
     } finally {
@@ -1811,21 +1812,6 @@ class _ChatMessagesState extends State<_ChatMessages> {
     }
     _focusPageLoading = true;
     final generation = _navigationGeneration;
-    final visible =
-        _itemPositionsListener.itemPositions.value
-            .where(
-              (position) =>
-                  position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1,
-            )
-            .toList(growable: false)
-          ..sort((a, b) => a.index.compareTo(b.index));
-    final anchor = visible.firstOrNull;
-    final anchorItem = anchor == null || anchor.index >= _displayedItems.length
-        ? null
-        : _displayedItems[anchor.index];
-    final anchorId = anchorItem is MessageItemElement
-        ? anchorItem.message.id
-        : null;
     try {
       final page = await context.read<IChatRepository>().loadWindowNewer(
         widget.chat.id,
@@ -1836,6 +1822,7 @@ class _ChatMessagesState extends State<_ChatMessages> {
           _focusMessages == null) {
         return;
       }
+      final anchor = _visibleFocusedAnchor();
       final existing = _focusMessages!.map((message) => message.id).toSet();
       final bounded = boundFocusedHistory([
         ...page.where(
@@ -1847,27 +1834,13 @@ class _ChatMessagesState extends State<_ChatMessages> {
       ], FocusedHistoryGrowth.newer);
       final retainedIds = bounded.messages.map((message) => message.id).toSet();
       _focusedMedia.removeWhere((id, _) => !retainedIds.contains(id));
-      setState(() {
-        _focusMessages = bounded.messages;
-        _focusHasNewer = page.length == 60;
-        if (bounded.trimmed) _focusHasOlder = true;
-      });
-      if (page.isNotEmpty && anchorId != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted ||
-              generation != _navigationGeneration ||
-              !_itemScrollController.isAttached) {
-            return;
-          }
-          final index = _indexForMessage(anchorId);
-          if (index != null) {
-            _itemScrollController.jumpTo(
-              index: index,
-              alignment: anchor!.itemLeadingEdge.clamp(0.0, 1.0),
-            );
-          }
-        });
-      }
+      _setFocusedPage(
+        bounded.messages,
+        anchor: page.isNotEmpty ? anchor : null,
+        generation: generation,
+        hasOlder: bounded.trimmed || _focusHasOlder,
+        hasNewer: page.length == 60,
+      );
       if (!_focusHasNewer && page.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || generation != _navigationGeneration) return;
@@ -1882,6 +1855,50 @@ class _ChatMessagesState extends State<_ChatMessages> {
         _runPendingFocusRecheck();
       }
     }
+  }
+
+  /// Prepending newer messages changes every existing item index. Move the
+  /// scroll target in the same frame as the data change so the old index is
+  /// never painted with a different message. A newly mounted list is needed
+  /// only when the shifted index exceeds the old list's item count.
+  void _setFocusedPage(
+    List<ChatMessage> messages, {
+    required ({String messageId, double alignment})? anchor,
+    required int generation,
+    required bool hasOlder,
+    required bool hasNewer,
+  }) {
+    final nextItems = _buildChatTimelineItems(messages);
+    final index = anchor == null
+        ? -1
+        : nextItems.indexWhere(
+            (item) =>
+                item is MessageItemElement &&
+                item.message.id == anchor.messageId,
+          );
+    final remount =
+        index >= 0 &&
+        (!_itemScrollController.isAttached || index >= _displayedItems.length);
+    if (index >= 0) _isNavigating = true;
+    setState(() {
+      _focusMessages = messages;
+      _focusHasOlder = hasOlder;
+      _focusHasNewer = hasNewer;
+      if (remount) {
+        _focusListRevision++;
+        _focusInitialIndex = index;
+        _focusInitialAlignment = anchor!.alignment;
+      }
+    });
+    if (index < 0) return;
+    if (!remount) {
+      _itemScrollController.jumpTo(index: index, alignment: anchor!.alignment);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _navigationGeneration) return;
+      _isNavigating = false;
+      _runPendingFocusRecheck();
+    });
   }
 
   @override
@@ -1964,16 +1981,16 @@ class _ChatMessagesState extends State<_ChatMessages> {
                   key: ValueKey(
                     _focusMessages == null
                         ? 'recent_messages'
-                        : 'focus_messages',
+                        : 'focus_messages_$_focusListRevision',
                   ),
                   itemScrollController: _itemScrollController,
                   itemPositionsListener: _itemPositionsListener,
                   initialScrollIndex: _focusMessages == null
                       ? _recentInitialIndex
-                      : 0,
+                      : _focusInitialIndex,
                   initialAlignment: _focusMessages == null
                       ? _recentInitialAlignment
-                      : 0,
+                      : _focusInitialAlignment,
                   chat: widget.chat,
                   items: _displayedItems,
                   animationProgressFor: _animationProgressFor,
