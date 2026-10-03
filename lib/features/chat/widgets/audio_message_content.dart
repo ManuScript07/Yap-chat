@@ -45,20 +45,26 @@ class _AudioMessageView extends StatelessWidget {
     return BlocBuilder<AudioMessagePlayerCubit, AudioMessagePlayerState>(
       builder: (context, state) {
         final messageDuration = message.audioDuration ?? Duration.zero;
+        final effectiveDuration = messageDuration == Duration.zero
+            ? state.playback.duration
+            : messageDuration;
         final visiblePosition = state.scrubPosition ?? state.playback.position;
-        final effectiveDuration = state.playback.duration == Duration.zero
-            ? messageDuration
-            : state.playback.duration;
+        final boundedPosition = Duration(
+          milliseconds: visiblePosition.inMilliseconds.clamp(
+            0,
+            effectiveDuration.inMilliseconds,
+          ),
+        );
         final progress = effectiveDuration.inMilliseconds == 0
             ? 0.0
             : state.playback.isCompleted && state.scrubPosition == null
             ? 0.0
-            : visiblePosition.inMilliseconds / effectiveDuration.inMilliseconds;
+            : boundedPosition.inMilliseconds / effectiveDuration.inMilliseconds;
         final displayedDuration =
             (state.playback.isCompleted && state.scrubPosition == null) ||
-                visiblePosition == Duration.zero
-            ? messageDuration
-            : visiblePosition;
+                boundedPosition == Duration.zero
+            ? effectiveDuration
+            : boundedPosition;
 
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 280),

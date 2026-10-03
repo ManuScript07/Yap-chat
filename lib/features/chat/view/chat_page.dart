@@ -46,6 +46,8 @@ class ChatPage extends StatelessWidget {
           create: (context) => VoiceRecorderCubit(
             recorderRepository: context.read<IAudioRecorderRepository>(),
             playerRepository: context.read<IAudioPlayerRepository>(),
+            localMediaRepository: context.read<ILocalMediaRepository>(),
+            chatId: chat.id,
           ),
         ),
       ],
@@ -79,16 +81,18 @@ class _ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<_ChatView>
-    with AutoRouteAwareStateMixin<_ChatView> {
+    with AutoRouteAwareStateMixin<_ChatView>, WidgetsBindingObserver {
   final GlobalKey<_ChatMessagesState> _messagesKey =
       GlobalKey<_ChatMessagesState>();
   NotificationsCubit? _notificationsCubit;
   late DateTime? _lastSeenAt;
   double? _composerContentHeight;
+  bool _allowPop = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lastSeenAt = widget.chat.lastSeenAt;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreLostAttachment();
@@ -138,6 +142,7 @@ class _ChatViewState extends State<_ChatView>
 
   @override
   void didPushNext() {
+    unawaited(context.read<VoiceRecorderCubit>().finishForNavigation());
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     }
@@ -145,10 +150,27 @@ class _ChatViewState extends State<_ChatView>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      unawaited(context.read<VoiceRecorderCubit>().finishForNavigation());
+    }
+  }
+
+  Future<void> _finishRecordingAndExit() async {
+    await context.read<VoiceRecorderCubit>().finishForNavigation();
+    if (!context.mounted) return;
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   void _scrollToBottom() {
@@ -247,135 +269,152 @@ class _ChatViewState extends State<_ChatView>
         (blocklistState.blocks(widget.chat.peerId) ||
             (!blocklistState.isLoaded && widget.chat.blockedByMe));
 
-    return BlocListener<PresenceCubit, PresenceState>(
+    return BlocListener<ChatBloc, ChatState>(
       listenWhen: (previous, current) =>
-          previous.isOnline(widget.chat.peerId) &&
-          !current.isOnline(widget.chat.peerId),
-      listener: (context, state) {
-        if (!context.mounted ||
-            state.isOnline(widget.chat.peerId) ||
-            !widget.chat.showsLastSeen) {
-          return;
-        }
-        setState(() => _lastSeenAt = DateTime.now());
-      },
-      child: BlocListener<VoiceRecorderCubit, VoiceRecorderState>(
+          previous.audioSendFailureCount != current.audioSendFailureCount,
+      listener: (context, state) =>
+          context.read<VoiceRecorderCubit>().restoreUnsentDraft(),
+      child: BlocListener<PresenceCubit, PresenceState>(
         listenWhen: (previous, current) =>
-            previous.permissionStatus != current.permissionStatus &&
-            current.permissionStatus != null,
-        listener: (context, state) async {
-          final permissionStatus = state.permissionStatus;
-          if (permissionStatus == null) return;
-
-          await showPermissionDeniedDialog(
-            context,
-            title: context.l10n.microphonePermissionDenied,
-            content: context.l10n.microphonePermissionSettingsDescription,
-            onOpenSettings: () {
-              context.read<VoiceRecorderCubit>().openAppSettings();
-            },
-          );
-
-          if (context.mounted) {
-            await context.read<VoiceRecorderCubit>().clearPermissionFeedback();
+            previous.isOnline(widget.chat.peerId) &&
+            !current.isOnline(widget.chat.peerId),
+        listener: (context, state) {
+          if (!context.mounted ||
+              state.isOnline(widget.chat.peerId) ||
+              !widget.chat.showsLastSeen) {
+            return;
           }
+          setState(() => _lastSeenAt = DateTime.now());
         },
-        child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-          builder: (context, voiceState) => _ChatPopScope(
-            voiceState: voiceState,
-            child: Scaffold(
-              backgroundColor: backgroundColor,
-              // The stack owns IME avoidance.  This keeps the keyboard offset
-              // and the stable SafeArea height in the same coordinate system.
-              // Letting Scaffold resize this route as well reintroduces the
-              // transient, partially covered composer on Android.
-              resizeToAvoidBottomInset: false,
-              body: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                },
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: _ChatMessages(
-                        key: _messagesKey,
-                        chat: widget.chat,
-                        headerHeight: headerHeight,
-                        composerHeight: composerHeight,
+        child: BlocListener<VoiceRecorderCubit, VoiceRecorderState>(
+          listenWhen: (previous, current) =>
+              previous.permissionStatus != current.permissionStatus &&
+              current.permissionStatus != null,
+          listener: (context, state) async {
+            final permissionStatus = state.permissionStatus;
+            if (permissionStatus == null) return;
+
+            await showPermissionDeniedDialog(
+              context,
+              title: context.l10n.microphonePermissionDenied,
+              content: context.l10n.microphonePermissionSettingsDescription,
+              onOpenSettings: () {
+                context.read<VoiceRecorderCubit>().openAppSettings();
+              },
+            );
+
+            if (context.mounted) {
+              await context
+                  .read<VoiceRecorderCubit>()
+                  .clearPermissionFeedback();
+            }
+          },
+          child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+            builder: (context, voiceState) => _ChatPopScope(
+              voiceState: voiceState,
+              allowPop: _allowPop,
+              onExit: _finishRecordingAndExit,
+              child: Scaffold(
+                backgroundColor: backgroundColor,
+                // The stack owns IME avoidance.  This keeps the keyboard offset
+                // and the stable SafeArea height in the same coordinate system.
+                // Letting Scaffold resize this route as well reintroduces the
+                // transient, partially covered composer on Android.
+                resizeToAvoidBottomInset: false,
+                body: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  },
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _ChatMessages(
+                          key: _messagesKey,
+                          chat: widget.chat,
+                          headerHeight: headerHeight,
+                          composerHeight: composerHeight,
+                          keyboardAvoidanceOffset: keyboardAvoidanceOffset,
+                          canOpenMessageMenu:
+                              voiceState.status !=
+                              VoiceRecorderStatus.recording,
+                          onMessageLongPress: _showMessageActions,
+                        ),
+                      ),
+                      GradientOverlay(
+                        height: headerHeight + 20,
+                        isTop: true,
+                        backgroundColor: backgroundColor,
+                      ),
+                      GradientOverlay(
+                        height: composerHeight + 20,
+                        isTop: false,
+                        backgroundColor: backgroundColor,
+                        bottomOffset: keyboardAvoidanceOffset,
+                      ),
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: ChatAppBar(
+                          userName: widget.chat.userName,
+                          isOnline: isOnline,
+                          lastSeenAt: _lastSeenAt,
+                          showsLastSeen:
+                              !widget.chat.blockedByPeer &&
+                              !widget.chat.peerIsGloballyBanned &&
+                              !widget.chat.peerIsDeleted &&
+                              widget.chat.showsLastSeen,
+                          avatarUrl: widget.chat.avatarUrl,
+                          avatarLoader:
+                              widget.chat.blockedByPeer ||
+                                  widget.chat.peerIsGloballyBanned ||
+                                  widget.chat.peerIsDeleted
+                              ? null
+                              : () => context
+                                    .read<IChatsRepository>()
+                                    .resolveAvatar(widget.chat),
+                          avatarRevision:
+                              widget.chat.avatarStoragePath ??
+                              widget.chat.avatarUrl,
+                          avatarStoragePath: widget.chat.avatarStoragePath,
+                          profileId: widget.chat.peerId,
+                          onBack: () {
+                            Navigator.of(context).maybePop();
+                          },
+                          onProfileTap:
+                              widget.chat.peerId.isEmpty ||
+                                  widget.chat.peerIsDeleted
+                              ? null
+                              : () async {
+                                  await context
+                                      .read<VoiceRecorderCubit>()
+                                      .finishForNavigation();
+                                  if (!context.mounted) return;
+                                  await openViewedProfile(
+                                    context,
+                                    userId: widget.chat.peerId,
+                                    originChatId: widget.chat.id,
+                                  );
+                                },
+                        ),
+                      ),
+                      _KeyboardAwareInput(
+                        chatId: widget.chat.id,
+                        peerName: widget.chat.userName,
+                        peerId: widget.chat.peerId,
+                        blockedByMe: blockedByMe,
+                        peerIsGloballyBanned: widget.chat.peerIsGloballyBanned,
+                        peerIsDeleted: widget.chat.peerIsDeleted,
+                        isBlockActionPending: blocklistState.isPending(
+                          widget.chat.peerId,
+                        ),
                         keyboardAvoidanceOffset: keyboardAvoidanceOffset,
-                        canOpenMessageMenu:
-                            voiceState.status != VoiceRecorderStatus.recording,
-                        onMessageLongPress: _showMessageActions,
+                        onMessageSent: _scrollToBottom,
+                        onHeightChanged: _onComposerHeightChanged,
                       ),
-                    ),
-                    GradientOverlay(
-                      height: headerHeight + 20,
-                      isTop: true,
-                      backgroundColor: backgroundColor,
-                    ),
-                    GradientOverlay(
-                      height: composerHeight + 20,
-                      isTop: false,
-                      backgroundColor: backgroundColor,
-                      bottomOffset: keyboardAvoidanceOffset,
-                    ),
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: ChatAppBar(
-                        userName: widget.chat.userName,
-                        isOnline: isOnline,
-                        lastSeenAt: _lastSeenAt,
-                        showsLastSeen:
-                            !widget.chat.blockedByPeer &&
-                            !widget.chat.peerIsGloballyBanned &&
-                            !widget.chat.peerIsDeleted &&
-                            widget.chat.showsLastSeen,
-                        avatarUrl: widget.chat.avatarUrl,
-                        avatarLoader:
-                            widget.chat.blockedByPeer ||
-                                widget.chat.peerIsGloballyBanned ||
-                                widget.chat.peerIsDeleted
-                            ? null
-                            : () => context
-                                  .read<IChatsRepository>()
-                                  .resolveAvatar(widget.chat),
-                        avatarRevision:
-                            widget.chat.avatarStoragePath ??
-                            widget.chat.avatarUrl,
-                        avatarStoragePath: widget.chat.avatarStoragePath,
-                        profileId: widget.chat.peerId,
-                        onBack: () {
-                          Navigator.of(context).maybePop();
-                        },
-                        onProfileTap:
-                            widget.chat.peerId.isEmpty ||
-                                widget.chat.peerIsDeleted
-                            ? null
-                            : () => openViewedProfile(
-                                context,
-                                userId: widget.chat.peerId,
-                                originChatId: widget.chat.id,
-                              ),
-                      ),
-                    ),
-                    _KeyboardAwareInput(
-                      chatId: widget.chat.id,
-                      peerName: widget.chat.userName,
-                      peerId: widget.chat.peerId,
-                      blockedByMe: blockedByMe,
-                      peerIsGloballyBanned: widget.chat.peerIsGloballyBanned,
-                      peerIsDeleted: widget.chat.peerIsDeleted,
-                      isBlockActionPending: blocklistState.isPending(
-                        widget.chat.peerId,
-                      ),
-                      keyboardAvoidanceOffset: keyboardAvoidanceOffset,
-                      onMessageSent: _scrollToBottom,
-                      onHeightChanged: _onComposerHeightChanged,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -539,7 +578,7 @@ class _KeyboardAwareInput extends StatelessWidget {
                             child: child,
                           ),
                         ),
-                        child: state.hasPendingRecording
+                        child: state.status != VoiceRecorderStatus.idle
                             ? VoiceRecorderBar(
                                 key: const ValueKey('voice_recorder_bar'),
                                 state: state,
@@ -857,17 +896,28 @@ class _GloballyBannedComposer extends StatelessWidget {
 }
 
 class _ChatPopScope extends StatelessWidget {
-  const _ChatPopScope({required this.child, required this.voiceState});
+  const _ChatPopScope({
+    required this.child,
+    required this.voiceState,
+    required this.allowPop,
+    required this.onExit,
+  });
 
   final Widget child;
   final VoiceRecorderState voiceState;
+  final bool allowPop;
+  final Future<void> Function() onExit;
 
   @override
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return PopScope(
-      canPop: !isKeyboardOpen && !voiceState.hasPendingRecording,
+      canPop:
+          !isKeyboardOpen &&
+          (allowPop ||
+              !voiceState.hasPendingRecording ||
+              voiceState.status == VoiceRecorderStatus.preview),
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
@@ -876,17 +926,7 @@ class _ChatPopScope extends StatelessWidget {
           return;
         }
 
-        if (!voiceState.hasPendingRecording) return;
-
-        final shouldDiscard = await showConfirmationDialog(
-          context,
-          title: context.l10n.voiceRecordingExitTitle,
-          content: context.l10n.voiceRecordingExitDescription,
-          confirmLabel: context.l10n.voiceRecordingExitDiscard,
-        );
-        if (shouldDiscard == true && context.mounted) {
-          await context.read<VoiceRecorderCubit>().discardRecording();
-        }
+        if (voiceState.hasPendingRecording) await onExit();
       },
       child: child,
     );

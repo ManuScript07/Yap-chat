@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
+import 'package:yap_chat/features/chat/data/models/recorded_audio.dart';
 
 class LocalMediaRepository implements ILocalMediaRepository {
   LocalMediaRepository({
@@ -36,6 +37,130 @@ class LocalMediaRepository implements ILocalMediaRepository {
   static const _legacyPendingChatStorageKey = 'pending_chat_id';
   static const _legacyOwnerKey = 'recent_chat_media_legacy_owner';
   static const maxRecentMediaCount = 50;
+
+  @override
+  RecordedAudio? getVoiceDraft(String chatId) {
+    final scope = _captureScope();
+    if (scope == null) return null;
+    final value = _prefs.getString(_voiceDraftKey(scope.userId, chatId));
+    if (value == null) return null;
+    try {
+      final data = jsonDecode(value) as Map<String, dynamic>;
+      final audioPath = data['path'] as String;
+      if (path.basename(path.dirname(audioPath)) !=
+              _safeSegment(scope.userId) ||
+          path.basename(path.dirname(path.dirname(audioPath))) !=
+              _safeSegment(_environment) ||
+          !path.basename(audioPath).startsWith('voice_draft_')) {
+        return null;
+      }
+      if (!File(audioPath).existsSync()) return null;
+      return RecordedAudio(
+        path: audioPath,
+        duration: Duration(milliseconds: data['duration_ms'] as int),
+        waveform: (data['waveform'] as List)
+            .cast<num>()
+            .map((n) => n.toDouble())
+            .toList(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<RecordedAudio?> saveVoiceDraft(
+    String chatId,
+    RecordedAudio audio,
+  ) async {
+    final scope = _captureScope();
+    if (scope == null) return null;
+    final source = File(audio.path);
+    if (!await source.exists()) return null;
+    final directory = await _userDirectory(scope.userId);
+    await directory.create(recursive: true);
+    final destination = File(
+      path.join(
+        directory.path,
+        'voice_draft_${DateTime.now().microsecondsSinceEpoch}${path.extension(audio.path)}',
+      ),
+    );
+    await source.copy(destination.path);
+    try {
+      return await _accountSessionController.commit(scope, () async {
+        final stored = RecordedAudio(
+          path: destination.path,
+          duration: audio.duration,
+          waveform: List.unmodifiable(audio.waveform),
+        );
+        final persisted = await _prefs.setString(
+          _voiceDraftKey(scope.userId, chatId),
+          jsonEncode({
+            'path': stored.path,
+            'duration_ms': stored.duration.inMilliseconds,
+            'waveform': stored.waveform,
+          }),
+        );
+        if (!persisted) throw StateError('Voice draft metadata was not saved');
+        // A previous draft may already be queued for sending. Its source is
+        // released by sendAudio after the outbox has its own durable copy.
+        if (source.absolute.path != destination.absolute.path &&
+            await source.exists()) {
+          await source.delete();
+        }
+        return stored;
+      });
+    } catch (_) {
+      if (await destination.exists()) await destination.delete();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> removeVoiceDraft(String chatId, {bool deleteFile = true}) async {
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(scope, () async {
+      final draft = getVoiceDraft(chatId);
+      await _prefs.remove(_voiceDraftKey(scope.userId, chatId));
+      if (deleteFile && draft != null) {
+        final file = File(draft.path);
+        if (await file.exists()) await file.delete();
+      }
+    });
+  }
+
+  @override
+  Future<void> removeVoiceDraftByPath(String audioPath) async {
+    final scope = _captureScope();
+    if (scope == null) return;
+    await _accountSessionController.commit(scope, () async {
+      final directory = await _userDirectory(scope.userId);
+      final file = File(audioPath);
+      if (path.normalize(file.parent.absolute.path) !=
+              path.normalize(directory.absolute.path) ||
+          !path.basename(audioPath).startsWith('voice_draft_')) {
+        return;
+      }
+      final keys = _prefs
+          .getKeys()
+          .where(
+            (key) => key.startsWith('${_ownerKey(scope.userId)}.voice_draft.'),
+          )
+          .toList();
+      for (final key in keys) {
+        try {
+          final data = jsonDecode(_prefs.getString(key)!) as Map;
+          if (data['path'] != audioPath) continue;
+          await _prefs.remove(key);
+          break;
+        } catch (_) {
+          // Corrupt metadata cannot prevent an otherwise successful send.
+        }
+      }
+      if (await file.exists()) await file.delete();
+    });
+  }
 
   @override
   Future<String?> persistMedia(String sourcePath) async {
@@ -192,6 +317,12 @@ class LocalMediaRepository implements ILocalMediaRepository {
       _prefs.remove(_storageKey(ownerUserId)),
       _prefs.remove(_pendingStorageKey(ownerUserId)),
       _prefs.remove(_pendingChatStorageKey(ownerUserId)),
+      ..._prefs
+          .getKeys()
+          .where(
+            (key) => key.startsWith('${_ownerKey(ownerUserId)}.voice_draft.'),
+          )
+          .map(_prefs.remove),
     ]);
   }
 
@@ -227,6 +358,17 @@ class LocalMediaRepository implements ILocalMediaRepository {
       if (_prefs.getString(_pendingStorageKey(ownerUserId)) case final value?)
         value,
     };
+    for (final key in _prefs.getKeys().where(
+      (key) => key.startsWith('${_ownerKey(ownerUserId)}.voice_draft.'),
+    )) {
+      try {
+        protectedPaths.add(
+          (jsonDecode(_prefs.getString(key)!) as Map)['path'] as String,
+        );
+      } catch (_) {
+        // Broken draft metadata must not interrupt media cleanup.
+      }
+    }
     final operations = await (_database.select(
       _database.pendingChatOperations,
     )..where((table) => table.ownerUserId.equals(ownerUserId))).get();
@@ -259,6 +401,10 @@ class LocalMediaRepository implements ILocalMediaRepository {
     if (!await directory.exists()) return;
     await for (final entity in directory.list()) {
       if (entity is File && !protectedPaths.contains(entity.path)) {
+        if (path.basename(entity.path).startsWith('voice_draft_')) {
+          final age = DateTime.now().difference((await entity.stat()).modified);
+          if (age < const Duration(hours: 1)) continue;
+        }
         await entity.delete();
       }
     }
@@ -300,6 +446,9 @@ class LocalMediaRepository implements ILocalMediaRepository {
 
   String _pendingChatStorageKey(String ownerUserId) =>
       '${_ownerKey(ownerUserId)}.pending_chat_id';
+
+  String _voiceDraftKey(String ownerUserId, String chatId) =>
+      '${_ownerKey(ownerUserId)}.voice_draft.${_safeSegment(chatId)}';
 
   String _ownerKey(String ownerUserId) =>
       'chat_media.${_safeSegment(_environment)}.${_safeSegment(ownerUserId)}';

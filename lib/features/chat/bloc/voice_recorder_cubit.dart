@@ -16,6 +16,8 @@ class VoiceRecorderState extends Equatable {
     this.playback = const AudioPlaybackSnapshot(),
     this.permissionStatus,
     this.scrubPosition,
+    this.isStarting = false,
+    this.isStopping = false,
   });
 
   final VoiceRecorderStatus status;
@@ -25,11 +27,14 @@ class VoiceRecorderState extends Equatable {
   final AudioPlaybackSnapshot playback;
   final MicrophonePermissionStatus? permissionStatus;
   final Duration? scrubPosition;
+  final bool isStarting;
+  final bool isStopping;
 
-  bool get hasPendingRecording => status != VoiceRecorderStatus.idle;
+  bool get hasPendingRecording =>
+      status != VoiceRecorderStatus.idle || isStarting;
 
   bool get canFinishRecording =>
-      duration >= const Duration(seconds: 1);
+      !isStopping && duration >= const Duration(seconds: 1);
 
   VoiceRecorderState copyWith({
     VoiceRecorderStatus? status,
@@ -41,6 +46,8 @@ class VoiceRecorderState extends Equatable {
     Duration? scrubPosition,
     bool clearPermissionStatus = false,
     bool clearScrubPosition = false,
+    bool? isStarting,
+    bool? isStopping,
   }) {
     return VoiceRecorderState(
       status: status ?? this.status,
@@ -51,7 +58,11 @@ class VoiceRecorderState extends Equatable {
       permissionStatus: clearPermissionStatus
           ? null
           : permissionStatus ?? this.permissionStatus,
-      scrubPosition: clearScrubPosition ? null : scrubPosition ?? this.scrubPosition,
+      scrubPosition: clearScrubPosition
+          ? null
+          : scrubPosition ?? this.scrubPosition,
+      isStarting: isStarting ?? this.isStarting,
+      isStopping: isStopping ?? this.isStopping,
     );
   }
 
@@ -64,6 +75,8 @@ class VoiceRecorderState extends Equatable {
     playback,
     permissionStatus,
     scrubPosition,
+    isStarting,
+    isStopping,
   ];
 }
 
@@ -71,9 +84,13 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
   VoiceRecorderCubit({
     required IAudioRecorderRepository recorderRepository,
     required IAudioPlayerRepository playerRepository,
-  })  : _recorderRepository = recorderRepository,
-        _playerSession = playerRepository.createSession(),
-        super(const VoiceRecorderState()) {
+    required ILocalMediaRepository localMediaRepository,
+    required String chatId,
+  }) : _recorderRepository = recorderRepository,
+       _localMediaRepository = localMediaRepository,
+       _chatId = chatId,
+       _playerSession = playerRepository.createSession(),
+       super(_initialState(localMediaRepository.getVoiceDraft(chatId))) {
     _playbackSubscription = _playerSession.snapshots.listen((playback) {
       emit(state.copyWith(playback: playback));
     });
@@ -84,6 +101,8 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
   static const _maxAmplitudeSamples = 4000;
 
   final IAudioRecorderRepository _recorderRepository;
+  final ILocalMediaRepository _localMediaRepository;
+  final String _chatId;
   final IAudioPlayerSession _playerSession;
   late final StreamSubscription<AudioPlaybackSnapshot> _playbackSubscription;
 
@@ -91,19 +110,50 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
   Timer? _timer;
   final Stopwatch _stopwatch = Stopwatch();
   bool _isStarting = false;
+  bool _closing = false;
+  bool _isTakingRecording = false;
+  int _startGeneration = 0;
+  Future<void>? _startOperation;
+  Future<void>? _stopOperation;
+  Future<RecordedAudio?>? _takeOperation;
 
-  Future<void> startRecording() async {
-    if (state.status != VoiceRecorderStatus.idle || _isStarting) return;
+  static VoiceRecorderState _initialState(RecordedAudio? draft) => draft == null
+      ? const VoiceRecorderState()
+      : VoiceRecorderState(
+          status: VoiceRecorderStatus.preview,
+          duration: draft.duration,
+          amplitudes: draft.waveform,
+          recordedAudio: draft,
+        );
+
+  Future<void> startRecording() {
+    if (state.status != VoiceRecorderStatus.idle || _isStarting || _closing) {
+      return Future<void>.value();
+    }
     _isStarting = true;
+    final generation = ++_startGeneration;
+    final operation = _beginRecording(generation);
+    _startOperation = operation;
+    return operation.whenComplete(() {
+      if (identical(_startOperation, operation)) _startOperation = null;
+    });
+  }
 
+  Future<void> _beginRecording(int generation) async {
+    emit(state.copyWith(isStarting: true));
     try {
       final permission = await _recorderRepository.requestPermission();
+      if (generation != _startGeneration || _closing) return;
       if (permission != MicrophonePermissionStatus.granted) {
-        emit(state.copyWith(permissionStatus: permission));
+        emit(state.copyWith(permissionStatus: permission, isStarting: false));
         return;
       }
 
       await _recorderRepository.startRecording();
+      if (generation != _startGeneration || _closing) {
+        await _recorderRepository.cancelRecording();
+        return;
+      }
       _stopwatch
         ..reset()
         ..start();
@@ -116,31 +166,53 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
         }
         emit(state.copyWith(duration: duration));
       });
-      emit(
-        const VoiceRecorderState(
-          status: VoiceRecorderStatus.recording,
-        ),
-      );
+      emit(const VoiceRecorderState(status: VoiceRecorderStatus.recording));
     } catch (_) {
-      await _stopActiveRecording();
-      emit(const VoiceRecorderState());
+      await _resetActiveRecording();
+      if (!_closing) emit(const VoiceRecorderState());
     } finally {
       _isStarting = false;
+      if (!_closing && state.isStarting) {
+        emit(state.copyWith(isStarting: false));
+      }
     }
   }
 
-  Future<void> stopRecording() async {
-    if (state.status != VoiceRecorderStatus.recording) return;
+  Future<void> stopRecording({bool force = false}) {
+    if (_stopOperation case final pending?) return pending;
+    if (state.status != VoiceRecorderStatus.recording) {
+      return Future<void>.value();
+    }
 
     final duration = _stopwatch.elapsed;
-    if (duration < _minDuration) return;
+    if (duration < _minDuration && !force) return Future<void>.value();
+    final operation = _finishRecording(duration);
+    _stopOperation = operation;
+    return operation.whenComplete(() {
+      if (identical(_stopOperation, operation)) _stopOperation = null;
+    });
+  }
+
+  Future<void> _finishRecording(Duration duration) async {
+    emit(state.copyWith(isStopping: true));
     try {
       await _stopActiveRecording();
       final recordedAudio = await _recorderRepository.stopRecording(
         duration,
         state.amplitudes,
       );
-      if (recordedAudio == null || recordedAudio.duration == Duration.zero) {
+      if (recordedAudio == null || recordedAudio.duration < _minDuration) {
+        if (recordedAudio != null) {
+          await _recorderRepository.deleteRecording(recordedAudio.path);
+        }
+        emit(const VoiceRecorderState());
+        return;
+      }
+      final saved = await _localMediaRepository.saveVoiceDraft(
+        _chatId,
+        recordedAudio,
+      );
+      if (saved == null) {
         emit(const VoiceRecorderState());
         return;
       }
@@ -148,8 +220,9 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
       emit(
         state.copyWith(
           status: VoiceRecorderStatus.preview,
-          duration: recordedAudio.duration,
-          recordedAudio: recordedAudio,
+          duration: saved.duration,
+          recordedAudio: saved,
+          isStopping: false,
         ),
       );
     } catch (_) {
@@ -157,12 +230,45 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
     }
   }
 
-  Future<RecordedAudio?> takeRecordingForSending() async {
+  Future<void> finishForNavigation() async {
+    if (_isStarting) {
+      _startGeneration++;
+      await _startOperation;
+    }
+    if (state.status == VoiceRecorderStatus.recording) {
+      await stopRecording(force: true);
+    } else if (_stopOperation case final pending?) {
+      await pending;
+    }
+    await _playerSession.pause();
+  }
+
+  void restoreUnsentDraft() {
+    if (_closing || state.status != VoiceRecorderStatus.idle || _isStarting) {
+      return;
+    }
+    final draft = _localMediaRepository.getVoiceDraft(_chatId);
+    if (draft != null) emit(_initialState(draft));
+  }
+
+  Future<RecordedAudio?> takeRecordingForSending() {
+    if (_isTakingRecording || _closing) return Future<RecordedAudio?>.value();
+    _isTakingRecording = true;
+    final operation = _takeRecordingForSending();
+    _takeOperation = operation;
+    return operation.whenComplete(() {
+      _isTakingRecording = false;
+      if (identical(_takeOperation, operation)) _takeOperation = null;
+    });
+  }
+
+  Future<RecordedAudio?> _takeRecordingForSending() async {
     if (state.status == VoiceRecorderStatus.recording) {
       if (_stopwatch.elapsed < _minDuration) return null;
       await stopRecording();
     }
 
+    if (_stopOperation case final pending?) await pending;
     final recordedAudio = state.recordedAudio;
     if (recordedAudio == null) return null;
 
@@ -207,10 +313,16 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
   }
 
   Future<void> discardRecording() async {
+    if (_isStarting) {
+      _startGeneration++;
+      await _startOperation;
+    }
+    if (_stopOperation case final pending?) await pending;
     if (state.status == VoiceRecorderStatus.recording) {
       await _resetActiveRecording();
     }
     await _playerSession.pause();
+    await _localMediaRepository.removeVoiceDraft(_chatId);
     emit(const VoiceRecorderState());
   }
 
@@ -222,7 +334,9 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
   Future<void> openAppSettings() => _recorderRepository.openAppSettings();
 
   void _listenToAmplitude() {
-    _amplitudeSubscription = _recorderRepository.watchAmplitude().listen((value) {
+    _amplitudeSubscription = _recorderRepository.watchAmplitude().listen((
+      value,
+    ) {
       final amplitudes = [...state.amplitudes, value];
       if (amplitudes.length > _maxAmplitudeSamples) amplitudes.removeAt(0);
       emit(state.copyWith(amplitudes: amplitudes));
@@ -244,9 +358,14 @@ class VoiceRecorderCubit extends Cubit<VoiceRecorderState> {
 
   @override
   Future<void> close() async {
+    _closing = true;
+    _startGeneration++;
+    await _startOperation;
+    await _takeOperation;
     if (state.status == VoiceRecorderStatus.recording) {
-      await _resetActiveRecording();
+      await stopRecording(force: true);
     }
+    if (_stopOperation case final pending?) await pending;
     await _playbackSubscription.cancel();
     await _playerSession.dispose();
     return super.close();

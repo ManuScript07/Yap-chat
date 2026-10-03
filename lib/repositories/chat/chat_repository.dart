@@ -348,6 +348,13 @@ class ChatRepository implements IChatRepository {
       audioMimeType: audio.mimeType,
       replyToMessageId: replyToMessageId,
     );
+    try {
+      await _localMediaRepository.removeVoiceDraftByPath(audioPath);
+    } catch (error, stackTrace) {
+      // The message is already in the outbox. Cleanup cannot turn a successful
+      // enqueue into an apparent send failure (and invite a duplicate send).
+      _config.talker.handle(error, stackTrace, 'Voice draft cleanup failed');
+    }
   }
 
   @override

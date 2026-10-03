@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -59,6 +61,13 @@ class AudioRecorderRepository implements IAudioRecorderRepository {
   Future<void> cancelRecording() => _recorder.cancel();
 
   @override
+  Future<void> deleteRecording(String recordingPath) async {
+    if (kIsWeb) return;
+    final file = File(recordingPath);
+    if (await file.exists()) await file.delete();
+  }
+
+  @override
   Future<void> openAppSettings() async {
     await permission_handler.openAppSettings();
   }
@@ -79,6 +88,8 @@ class AudioRecorderRepository implements IAudioRecorderRepository {
         bitRate: 64000,
         sampleRate: 48000,
         numChannels: 1,
+        echoCancel: true,
+        audioInterruption: AudioInterruptionMode.none,
       );
     }
 
@@ -87,6 +98,8 @@ class AudioRecorderRepository implements IAudioRecorderRepository {
       bitRate: 96000,
       sampleRate: 44100,
       numChannels: 1,
+      echoCancel: true,
+      audioInterruption: AudioInterruptionMode.none,
     );
   }
 }

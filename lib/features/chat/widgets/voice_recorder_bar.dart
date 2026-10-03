@@ -31,17 +31,20 @@ class VoiceRecorderBar extends StatelessWidget {
         ? state.duration
         : state.recordedAudio!.duration;
     final visiblePosition = state.scrubPosition ?? state.playback.position;
+    final boundedPosition = Duration(
+      milliseconds: visiblePosition.inMilliseconds.clamp(
+        0,
+        duration.inMilliseconds,
+      ),
+    );
     final displayedDuration = isRecording
         ? duration
-        : _displayPlaybackDuration(visiblePosition, duration);
-    final playbackDuration = state.playback.duration.inMilliseconds == 0
-        ? duration
-        : state.playback.duration;
-    final progress = playbackDuration.inMilliseconds == 0
+        : _displayPlaybackDuration(boundedPosition, duration);
+    final progress = duration.inMilliseconds == 0
         ? 0.0
         : state.playback.isCompleted && state.scrubPosition == null
         ? 0.0
-        : visiblePosition.inMilliseconds / playbackDuration.inMilliseconds;
+        : boundedPosition.inMilliseconds / duration.inMilliseconds;
     final foreground = context.colorScheme.onSurface;
     final canFinish = !isRecording || state.canFinishRecording;
     final systemPadding = MediaQuery.viewPaddingOf(context);

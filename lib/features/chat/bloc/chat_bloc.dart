@@ -204,7 +204,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         replyToMessageId: replyToMessageId,
       );
     } catch (_) {
-      emit(state.copyWith(status: ChatStatus.failure));
+      emit(
+        state.copyWith(
+          status: ChatStatus.failure,
+          audioSendFailureCount: state.audioSendFailureCount + 1,
+        ),
+      );
     }
   }
 

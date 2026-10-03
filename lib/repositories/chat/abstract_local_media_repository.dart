@@ -1,4 +1,18 @@
+import 'package:yap_chat/features/chat/data/models/recorded_audio.dart';
+
 abstract interface class ILocalMediaRepository {
+  /// Черновик голосового привязан к текущему аккаунту и диалогу.
+  RecordedAudio? getVoiceDraft(String chatId);
+
+  /// Переносит временную запись в защищённый локальный кэш.
+  Future<RecordedAudio?> saveVoiceDraft(String chatId, RecordedAudio audio);
+
+  /// При отправке файл остаётся доступен outbox до его собственного копирования.
+  Future<void> removeVoiceDraft(String chatId, {bool deleteFile = true});
+
+  /// Убирает черновик только после успешного копирования аудио в outbox.
+  Future<void> removeVoiceDraftByPath(String audioPath);
+
   /// Копирует внешний файл в постоянную директорию приложения.
   Future<String?> persistMedia(String sourcePath);
 

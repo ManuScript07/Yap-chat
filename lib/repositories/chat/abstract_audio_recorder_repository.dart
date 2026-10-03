@@ -16,5 +16,7 @@ abstract interface class IAudioRecorderRepository {
 
   Future<void> cancelRecording();
 
+  Future<void> deleteRecording(String path);
+
   Future<void> openAppSettings();
 }
