@@ -6,7 +6,9 @@ type OutboxRecord = {
   message_id: string | null;
   conversation_id: string | null;
   friend_request_id: string | null;
-  notification_type: 'chat_message' | 'friend_request';
+  notification_type: 'chat_message' | 'friend_request' | 'message_reaction';
+  reaction_message_id: string | null;
+  reaction_code: string | null;
   recipient_user_id: string;
   sender_id: string;
   sender_name: string;
@@ -118,6 +120,22 @@ Deno.serve(async (request) => {
     if (!isMessageDeliverable) {
       await markCompleted(admin, job.id, 'message_deleted', 0);
       return Response.json({ status: 'message_deleted' });
+    }
+  }
+
+  if (job.notification_type === 'message_reaction') {
+    const { data: deliverable, error } = await admin.rpc('is_push_reaction_deliverable', {
+      target_message_id: job.reaction_message_id,
+      reactor_user_id: job.sender_id,
+      expected_code: job.reaction_code,
+    });
+    if (error) {
+      await markFailed(admin, job.id, error.message);
+      return Response.json({ error: 'reaction_lookup_failed' }, { status: 500 });
+    }
+    if (!deliverable) {
+      await markCompleted(admin, job.id, 'message_deleted', 0);
+      return Response.json({ status: 'reaction_no_longer_deliverable' });
     }
   }
 
@@ -251,7 +269,7 @@ async function deliver(
           token,
           data: {
             conversation_id: job.conversation_id ?? '',
-            message_id: job.message_id ?? '',
+            message_id: job.reaction_message_id ?? job.message_id ?? '',
             friend_request_id: job.friend_request_id ?? '',
             notification_type: job.notification_type,
             recipient_id: job.recipient_user_id,

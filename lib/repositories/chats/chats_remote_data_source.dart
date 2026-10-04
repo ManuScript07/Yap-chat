@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
+import 'package:yap_chat/features/chat/data/models/message_reaction.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
 
@@ -9,10 +10,14 @@ class ConversationChange {
   const ConversationChange({
     required this.conversationId,
     required this.reason,
+    this.messageId,
+    this.reactionState,
   });
 
   final String? conversationId;
   final String reason;
+  final String? messageId;
+  final MessageReactionState? reactionState;
 }
 
 class ChatsRemoteDataSource {
@@ -99,6 +104,8 @@ class ChatsRemoteDataSource {
       (event) => ConversationChange(
         conversationId: event.conversationId,
         reason: event.reason,
+        messageId: event.messageId,
+        reactionState: event.reactionState,
       ),
     );
   }

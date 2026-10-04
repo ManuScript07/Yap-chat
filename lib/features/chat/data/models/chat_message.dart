@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/chat/data/models/message_reply.dart';
+import 'package:yap_chat/features/chat/data/models/message_reaction.dart';
 
 enum MessageStatus { sending, sent, read, error }
 
@@ -25,6 +26,7 @@ class ChatMessage extends Equatable {
   final MessageReply? replyTo;
   final DateTime? readAt;
   final bool isLocalOnly;
+  final MessageReactionState reactionState;
 
   const ChatMessage({
     required this.id,
@@ -46,6 +48,7 @@ class ChatMessage extends Equatable {
     this.replyTo,
     this.readAt,
     this.isLocalOnly = false,
+    this.reactionState = const MessageReactionState(),
   });
 
   ChatMessage copyWith({
@@ -68,6 +71,7 @@ class ChatMessage extends Equatable {
     MessageReply? replyTo,
     DateTime? readAt,
     bool? isLocalOnly,
+    MessageReactionState? reactionState,
     bool clearReplyTo = false,
     bool clearReadAt = false,
   }) {
@@ -91,6 +95,7 @@ class ChatMessage extends Equatable {
       replyTo: clearReplyTo ? null : replyTo ?? this.replyTo,
       readAt: clearReadAt ? null : readAt ?? this.readAt,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
+      reactionState: reactionState ?? this.reactionState,
     );
   }
 
@@ -115,5 +120,6 @@ class ChatMessage extends Equatable {
     replyTo,
     readAt,
     isLocalOnly,
+    reactionState,
   ];
 }

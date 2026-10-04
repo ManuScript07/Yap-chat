@@ -1,5 +1,7 @@
 {
   "@@locale": "ru",
+  "notificationMessageReaction": "Поставил реакцию на «{message}»",
+  "@notificationMessageReaction": {"placeholders": {"message": {"type": "String"}}},
   "navChats": "чатикс",
   "navFriends": "друны",
   "navNearby": "рядом",

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:yap_chat/features/chat/data/models/message_reaction.dart';
 import 'package:yap_chat/core/services/reconnect_backoff.dart';
 import 'package:yap_chat/core/services/app_diagnostics.dart';
 
@@ -11,11 +12,13 @@ class UserConversationRealtimeEvent {
     required this.conversationId,
     required this.reason,
     this.messageId,
+    this.reactionState,
   });
 
   final String? conversationId;
   final String reason;
   final String? messageId;
+  final MessageReactionState? reactionState;
 }
 
 class UserPresenceRealtimeEvent {
@@ -155,6 +158,9 @@ class UserRealtimeDataSource {
         UserConversationRealtimeEvent(
           conversationId: conversationId,
           reason: reason,
+          reactionState: payload['reaction_state'] is Map
+              ? MessageReactionState.fromJson(payload['reaction_state'])
+              : null,
           messageId: payload['message_id'] is String
               ? payload['message_id'] as String
               : null,

@@ -38,20 +38,274 @@ class ChatCacheDataSource {
     String chatId, {
     required String currentUserId,
   }) {
-    final query = _database.select(_database.cachedMessages)
-      ..where(
-        (table) =>
+    final table = _database.cachedMessages;
+    final states = _database.cachedMessageReactionStates;
+    final pending = _database.pendingMessageReactions;
+    final query =
+        _database.select(table).join([
+            leftOuterJoin(
+              states,
+              states.ownerUserId.equalsExp(table.ownerUserId) &
+                  states.messageId.equalsExp(table.id),
+            ),
+            leftOuterJoin(
+              pending,
+              pending.ownerUserId.equalsExp(table.ownerUserId) &
+                  pending.messageId.equalsExp(table.id),
+            ),
+          ])
+          ..where(
             table.ownerUserId.equals(currentUserId) &
-            table.chatId.equals(chatId),
-      )
-      ..orderBy([
-        (table) => OrderingTerm.desc(table.timestamp),
-        (table) => OrderingTerm.desc(table.id),
-      ]);
-    return query.watch().map(
-      (rows) =>
-          List.unmodifiable(rows.map((row) => _mapMessage(row, currentUserId))),
+                table.chatId.equals(chatId),
+          )
+          ..orderBy([
+            OrderingTerm.desc(table.timestamp),
+            OrderingTerm.desc(table.id),
+          ]);
+    return query
+        .watch()
+        .map(
+        (rows) => List<ChatMessage>.unmodifiable(
+            rows.map((row) {
+              final confirmed = row.readTableOrNull(states);
+              var state = confirmed == null
+                  ? const MessageReactionState()
+                  : MessageReactionState.fromJson(
+                      jsonDecode(confirmed.stateJson),
+                    );
+              final intent = row.readTableOrNull(pending);
+              if (intent != null) {
+                state = state.withChoice(
+                  currentUserId,
+                  ReactionCode.parse(intent.code),
+                );
+              }
+              return _mapMessage(
+                row.readTable(table),
+                currentUserId,
+              ).copyWith(reactionState: state);
+            }),
+          ),
+        )
+        .distinct((before, after) {
+          if (before.length != after.length) return false;
+          for (var i = 0; i < before.length; i++) {
+            if (before[i] != after[i]) return false;
+          }
+          return true;
+        });
+  }
+
+  Future<MessageReactionState> readReactionState(
+    String messageId, {
+    required String ownerUserId,
+    bool optimistic = true,
+  }) async {
+    final row =
+        await (_database.select(_database.cachedMessageReactionStates)..where(
+              (t) =>
+                  t.ownerUserId.equals(ownerUserId) &
+                  t.messageId.equals(messageId),
+            ))
+            .getSingleOrNull();
+    var state = row == null
+        ? const MessageReactionState()
+        : MessageReactionState.fromJson(jsonDecode(row.stateJson));
+    if (optimistic) {
+      final pending = await readPendingReaction(
+        messageId,
+        ownerUserId: ownerUserId,
+      );
+      if (pending != null) {
+        state = state.withChoice(ownerUserId, ReactionCode.parse(pending.code));
+      }
+    }
+    return state;
+  }
+
+  Future<void> storeReactionState(
+    String chatId,
+    String messageId,
+    MessageReactionState state, {
+    required String ownerUserId,
+  }) async {
+    if (_removedMessageKeys.contains(_messageKey(ownerUserId, messageId))) {
+      return;
+    }
+    final existing = await readReactionState(
+      messageId,
+      ownerUserId: ownerUserId,
+      optimistic: false,
     );
+    if (state.version < existing.version || state == existing) return;
+    await _database
+        .into(_database.cachedMessageReactionStates)
+        .insertOnConflictUpdate(
+          CachedMessageReactionStatesCompanion.insert(
+            ownerUserId: ownerUserId,
+            messageId: messageId,
+            chatId: chatId,
+            version: state.version,
+            stateJson: jsonEncode(state.toJson()),
+          ),
+        );
+  }
+
+  Future<void> storeReactionStates(
+    String chatId,
+    Map<String, MessageReactionState> states, {
+    required String ownerUserId,
+  }) => _database.transaction(() async {
+    for (final entry in states.entries) {
+      await storeReactionState(
+        chatId,
+        entry.key,
+        entry.value,
+        ownerUserId: ownerUserId,
+      );
+    }
+  });
+
+  Future<List<ChatMessage>> mergeReactionStates(
+    List<ChatMessage> messages, {
+    required String ownerUserId,
+  }) async {
+    if (messages.isEmpty) return messages;
+    final ids = messages.map((m) => m.id).toList();
+    final rows =
+        await (_database.select(_database.cachedMessageReactionStates)..where(
+              (t) => t.ownerUserId.equals(ownerUserId) & t.messageId.isIn(ids),
+            ))
+            .get();
+    final pending =
+        await (_database.select(_database.pendingMessageReactions)..where(
+              (t) => t.ownerUserId.equals(ownerUserId) & t.messageId.isIn(ids),
+            ))
+            .get();
+    final confirmed = {
+      for (final row in rows)
+        row.messageId: MessageReactionState.fromJson(jsonDecode(row.stateJson)),
+    };
+    final intents = {for (final row in pending) row.messageId: row};
+    return messages
+        .map((message) {
+          final cached = confirmed[message.id];
+          var state =
+              cached != null && cached.version >= message.reactionState.version
+              ? cached
+              : message.reactionState;
+          final intent = intents[message.id];
+          if (intent != null) {
+            state = state.withChoice(
+              ownerUserId,
+              ReactionCode.parse(intent.code),
+            );
+          }
+          return message.copyWith(reactionState: state);
+        })
+        .toList(growable: false);
+  }
+
+  Future<PendingMessageReaction?> readPendingReaction(
+    String messageId, {
+    required String ownerUserId,
+  }) =>
+      (_database.select(_database.pendingMessageReactions)..where(
+            (t) =>
+                t.ownerUserId.equals(ownerUserId) &
+                t.messageId.equals(messageId),
+          ))
+          .getSingleOrNull();
+
+  Future<void> enqueueReaction({
+    required String ownerUserId,
+    required String chatId,
+    required String messageId,
+    required String operationId,
+    required ReactionCode? code,
+    required int expectedRevision,
+    required DateTime dueAt,
+  }) => _database
+      .into(_database.pendingMessageReactions)
+      .insertOnConflictUpdate(
+        PendingMessageReactionsCompanion.insert(
+          ownerUserId: ownerUserId,
+          messageId: messageId,
+          chatId: chatId,
+          operationId: operationId,
+          code: Value(code?.wireName),
+          expectedRevision: expectedRevision,
+          nextAttemptAt: dueAt,
+          attempts: const Value(0),
+        ),
+      );
+
+  Future<List<PendingMessageReaction>> readReactionQueue(String ownerUserId) =>
+      (_database.select(_database.pendingMessageReactions)
+            ..where((t) => t.ownerUserId.equals(ownerUserId))
+            ..orderBy([(t) => OrderingTerm.asc(t.nextAttemptAt)])
+            ..limit(100))
+          .get();
+
+  Future<void> finishReactionOperation(PendingMessageReaction operation) =>
+      (_database.delete(_database.pendingMessageReactions)..where(
+            (t) =>
+                t.ownerUserId.equals(operation.ownerUserId) &
+                t.messageId.equals(operation.messageId) &
+                t.operationId.equals(operation.operationId),
+          ))
+          .go();
+
+  Future<void> deferReactionOperation(
+    PendingMessageReaction operation,
+    DateTime dueAt,
+  ) =>
+      (_database.update(_database.pendingMessageReactions)..where(
+            (t) =>
+                t.ownerUserId.equals(operation.ownerUserId) &
+                t.messageId.equals(operation.messageId) &
+                t.operationId.equals(operation.operationId),
+          ))
+          .write(
+            PendingMessageReactionsCompanion(
+              attempts: Value(operation.attempts + 1),
+              nextAttemptAt: Value(dueAt),
+            ),
+          );
+
+  Future<void> rebasePendingReaction(
+    String messageId,
+    String ownerUserId,
+    int revision,
+  ) =>
+      (_database.update(_database.pendingMessageReactions)..where(
+            (t) =>
+                t.ownerUserId.equals(ownerUserId) &
+                t.messageId.equals(messageId),
+          ))
+          .write(
+            PendingMessageReactionsCompanion(expectedRevision: Value(revision)),
+          );
+
+  Future<void> removeReactionMetadata(
+    String chatId,
+    Set<String> ids, {
+    required String ownerUserId,
+  }) async {
+    await (_database.delete(_database.cachedMessageReactionStates)..where(
+          (t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.chatId.equals(chatId) &
+              t.messageId.isIn(ids),
+        ))
+        .go();
+    await (_database.delete(_database.pendingMessageReactions)..where(
+          (t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.chatId.equals(chatId) &
+              t.messageId.isIn(ids),
+        ))
+        .go();
   }
 
   Future<List<ChatMessage>> readMessages(
@@ -68,9 +322,12 @@ class ChatCacheDataSource {
         (table) => OrderingTerm.desc(table.timestamp),
         (table) => OrderingTerm.desc(table.id),
       ]);
-    return (await query.get())
-        .map((row) => _mapMessage(row, currentUserId))
-        .toList(growable: false);
+    return mergeReactionStates(
+      (await query.get())
+          .map((row) => _mapMessage(row, currentUserId))
+          .toList(growable: false),
+      ownerUserId: currentUserId,
+    );
   }
 
   /// Reads only the currently displayed cache page. Pending and local-only
@@ -134,6 +391,16 @@ class ChatCacheDataSource {
     String? ownerUserId,
   }) async {
     final owner = ownerUserId ?? _userIdProvider();
+    await _database.transaction(() async {
+      for (final message in messages) {
+        await storeReactionState(
+          chatId,
+          message.id,
+          message.reactionState,
+          ownerUserId: owner,
+        );
+      }
+    });
     if (await _recentMessagesMatch(chatId, messages, owner)) return false;
 
     await _database.transaction(() async {
@@ -190,7 +457,10 @@ class ChatCacheDataSource {
 
     for (var index = 0; index < rows.length; index++) {
       final cached = _mapMessage(rows[index], ownerUserId);
-      if (cached != _normalizeMessageTimestamps(messages[index])) {
+      if (cached !=
+          _normalizeMessageTimestamps(
+            messages[index],
+          ).copyWith(reactionState: const MessageReactionState())) {
         return false;
       }
     }
@@ -273,6 +543,7 @@ class ChatCacheDataSource {
     final owner = ownerUserId ?? _userIdProvider();
     _rememberRemoved(owner, ids);
     await _database.transaction(() async {
+      await removeReactionMetadata(chatId, ids, ownerUserId: owner);
       await (_database.delete(_database.cachedMessages)..where(
             (table) =>
                 table.ownerUserId.equals(owner) &
@@ -668,6 +939,14 @@ class ChatCacheDataSource {
     }
 
     await _database.transaction(() async {
+      await (_database.delete(
+            _database.cachedMessageReactionStates,
+          )..where((t) => t.ownerUserId.equals(owner) & t.chatId.isIn(chatIds)))
+          .go();
+      await (_database.delete(
+            _database.pendingMessageReactions,
+          )..where((t) => t.ownerUserId.equals(owner) & t.chatId.isIn(chatIds)))
+          .go();
       await (_database.delete(_database.cachedMessages)..where(
             (table) =>
                 table.ownerUserId.equals(owner) & table.chatId.isIn(chatIds),
@@ -699,6 +978,12 @@ class ChatCacheDataSource {
       await _database
           .into(_database.cachedMessages)
           .insertOnConflictUpdate(_messageCompanion(message, ownerUserId));
+      await storeReactionState(
+        message.chatId,
+        message.id,
+        message.reactionState,
+        ownerUserId: ownerUserId,
+      );
     }
   }
 

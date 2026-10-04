@@ -53,12 +53,55 @@ class ChatRemoteDataSource {
     List<String> messageIds,
   ) async {
     if (messageIds.isEmpty) return const <String>{};
-    final rows = await _client
-        .from('messages')
-        .select('id')
-        .eq('conversation_id', chatId)
-        .inFilter('id', messageIds);
-    return rows.map((row) => row['id'] as String).toSet();
+    return (await fetchVisibleMessageStates(chatId, messageIds)).keys.toSet();
+  }
+
+  Future<Map<String, MessageReactionState>> fetchVisibleMessageStates(
+    String chatId,
+    List<String> messageIds,
+  ) async {
+    if (messageIds.isEmpty) return const {};
+    final rows = await measureRpc(
+      _diagnostics,
+      'get_visible_conversation_message_states',
+      () => _client.rpc<List<dynamic>>(
+        'get_visible_conversation_message_states',
+        params: {'target_conversation_id': chatId, 'message_ids': messageIds},
+      ),
+    );
+    return {
+      for (final row in rows)
+        (row as Map)['id'] as String: MessageReactionState.fromJson(
+          row['reaction_state'],
+        ),
+    };
+  }
+
+  Future<({bool applied, MessageReactionState state})> setReaction({
+    required String chatId,
+    required String messageId,
+    required String operationId,
+    required ReactionCode? code,
+    required int expectedRevision,
+  }) async {
+    final result = await measureRpc(
+      _diagnostics,
+      'set_message_reaction',
+      () => _client.rpc<Map<String, dynamic>>(
+        'set_message_reaction',
+        params: {
+          'target_conversation_id': chatId,
+          'target_message_id': messageId,
+          'reaction_code': code?.wireName,
+          'operation_id': operationId,
+          'expected_user_revision': expectedRevision,
+        },
+      ),
+    );
+    return (
+      applied: result['applied'] == true,
+      state: MessageReactionState.fromJson(result['state']),
+    );
   }
 
   /// The server applies the same membership, clear-boundary and hidden-message
@@ -201,6 +244,7 @@ class ChatRemoteDataSource {
       text: row['text'] as String? ?? '',
       timestamp: DateTime.parse(row['created_at'] as String).toLocal(),
       isMine: isMine,
+      reactionState: MessageReactionState.fromJson(row['reaction_state']),
       status: isMine && readAtValue != null
           ? MessageStatus.read
           : MessageStatus.sent,

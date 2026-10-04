@@ -9,3 +9,4 @@ export 'reconnect_backoff.dart';
 export 'account_session_controller.dart';
 export 'app_diagnostics.dart';
 export 'secure_supabase_storage.dart';
+export 'bundled_asset_licenses.dart';

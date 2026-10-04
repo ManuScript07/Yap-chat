@@ -116,6 +116,31 @@ class PendingChatOperations extends Table {
   Set<Column> get primaryKey => {ownerUserId, id};
 }
 
+/// Only reaction metadata; storing a distant message here never fills a gap in
+/// the contiguous message history used by cursor pagination.
+class CachedMessageReactionStates extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get messageId => text()();
+  TextColumn get chatId => text()();
+  IntColumn get version => integer()();
+  TextColumn get stateJson => text()();
+  @override
+  Set<Column> get primaryKey => {ownerUserId, messageId};
+}
+
+class PendingMessageReactions extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get messageId => text()();
+  TextColumn get chatId => text()();
+  TextColumn get operationId => text()();
+  TextColumn get code => text().nullable()();
+  IntColumn get expectedRevision => integer()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  DateTimeColumn get nextAttemptAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {ownerUserId, messageId};
+}
+
 class CachedFriends extends Table {
   TextColumn get ownerUserId => text()();
   TextColumn get userId => text()();
@@ -300,6 +325,8 @@ class CachedAppLanguages extends Table {
     CachedChats,
     CachedMessages,
     PendingChatOperations,
+    CachedMessageReactionStates,
+    PendingMessageReactions,
     CachedFriends,
     CachedFriendListStates,
     CachedFriendRequests,
@@ -331,7 +358,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -341,6 +368,10 @@ class AppDatabase extends _$AppDatabase {
       await _createChatCacheIndexes();
     },
     onUpgrade: (migrator, from, to) async {
+      if (from < 25) {
+        await migrator.createTable(cachedMessageReactionStates);
+        await migrator.createTable(pendingMessageReactions);
+      }
       if (from < 2) {
         await migrator.createTable(cachedChats);
         await migrator.createTable(cachedMessages);
@@ -536,6 +567,12 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _createChatCacheIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS pending_reactions_owner_due_idx ON pending_message_reactions (owner_user_id, next_attempt_at)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS cached_reactions_owner_chat_idx ON cached_message_reaction_states (owner_user_id, chat_id)',
+    );
     await customStatement('''
       CREATE INDEX IF NOT EXISTS cached_messages_owner_chat_time_idx
       ON cached_messages (owner_user_id, chat_id, timestamp DESC, id DESC)

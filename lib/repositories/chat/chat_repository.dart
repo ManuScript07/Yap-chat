@@ -25,6 +25,12 @@ class _LocalMessageDeletion {
 }
 
 class ChatRepository implements IChatRepository {
+  @override
+  Future<bool> setMessageReaction(
+    ChatMessage message,
+    ReactionCode code, {
+    bool toggle = true,
+  }) => _syncService.reactions.choose(message, code, toggle: toggle);
   static const _remoteOperationTimeout = Duration(seconds: 15);
 
   ChatRepository({
@@ -135,6 +141,7 @@ class ChatRepository implements IChatRepository {
   @override
   Future<void> synchronizeOpenChats() async {
     _isNetworkPaused = false;
+    await _syncService.reactions.resume();
     final scope = _accountSessionController.capture();
     final chatIds = _syncService.openConversationIds;
     for (final chatId in chatIds) {
@@ -147,6 +154,7 @@ class ChatRepository implements IChatRepository {
   @override
   Future<void> pauseNetwork() async {
     _isNetworkPaused = true;
+    _syncService.reactions.pause();
     _pendingDeliveryTimer?.cancel();
     _pendingDeliveryTimer = null;
   }
@@ -192,7 +200,7 @@ class ChatRepository implements IChatRepository {
       targetMessageId: messageId,
     );
     _accountSessionController.ensureCurrent(scope);
-    return messages;
+    return _syncService.reactions.hydrate(messages, session: scope);
   }
 
   @override
@@ -208,7 +216,7 @@ class ChatRepository implements IChatRepository {
       pageSize: ConversationSyncService.pageSize,
     );
     _accountSessionController.ensureCurrent(scope);
-    return messages;
+    return _syncService.reactions.hydrate(messages, session: scope);
   }
 
   @override
@@ -223,7 +231,7 @@ class ChatRepository implements IChatRepository {
       afterMessageId: newest.id,
     );
     _accountSessionController.ensureCurrent(scope);
-    return messages;
+    return _syncService.reactions.hydrate(messages, session: scope);
   }
 
   @override
@@ -247,6 +255,15 @@ class ChatRepository implements IChatRepository {
           listener.add(ChatHistoryChange.deleted(event.messageId));
         }
       });
+      final reactions = _syncService.reactions.changes.listen((event) {
+        if (_accountSessionController.isCurrent(scope) &&
+            event.chatId == chatId) {
+          listener.add(ChatHistoryChange.reaction(event));
+        }
+      });
+      final reactionListenerLease = _config.diagnostics?.trackLocalListener(
+        'chat-reaction-events',
+      );
       final remote = _userRealtime?.watchConversationEvents().listen((event) {
         if (!_accountSessionController.isCurrent(scope)) return;
         if (event.reason == 'subscribed') {
@@ -268,6 +285,8 @@ class ChatRepository implements IChatRepository {
       });
       listener.onCancel = () async {
         await local.cancel();
+        await reactions.cancel();
+        reactionListenerLease?.dispose();
         await remote?.cancel();
       };
     });

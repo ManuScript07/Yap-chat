@@ -2,18 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/utils/formatters/time_formatter.dart';
+import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
 
 enum MessageAction { copy, reply, delete }
 
 Future<MessageAction?> showMessageActionsBottomSheet(
   BuildContext context, {
   required ChatMessage message,
+  ValueChanged<ReactionCode>? onReaction,
 }) {
   return showModalBottomSheet<MessageAction>(
     context: context,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => _MessageActionsBottomSheet(message: message),
+    builder: (context) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onReaction != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Material(
+                color: context.colorScheme.primary,
+                borderRadius: BorderRadius.circular(30),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Row(
+                    children: [
+                      for (final code in ReactionCode.values)
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: () {
+                              Navigator.pop(context);
+                              onReaction(code);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: ReactionIcon(code, size: 32),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Flexible(child: _MessageActionsBottomSheet(message: message)),
+      ],
+    ),
   );
 }
 

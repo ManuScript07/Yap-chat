@@ -9,6 +9,11 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
+  String notificationMessageReaction(String message) {
+    return 'Поставил реакцию на «$message»';
+  }
+
+  @override
   String get navChats => 'чатикс';
 
   @override

@@ -1,5 +1,7 @@
 {
   "@@locale": "en",
+  "notificationMessageReaction": "Reacted to “{message}”",
+  "@notificationMessageReaction": {"placeholders": {"message": {"type": "String"}}},
   "navChats": "Chats",
   "navFriends": "Friends",
   "navNearby": "Nearby",

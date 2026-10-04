@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
+import 'package:yap_chat/repositories/auth/mock_auth_repository.dart';
 
 class MockChatRepository implements IChatRepository {
   @override
@@ -325,6 +326,34 @@ class MockChatRepository implements IChatRepository {
 
   @override
   Future<void> synchronizeOpenChats() async {}
+
+  @override
+  Future<bool> setMessageReaction(
+    ChatMessage message,
+    ReactionCode code, {
+    bool toggle = true,
+  }) async {
+    final index = _messages.indexWhere(
+      (m) => m.id == message.id && m.chatId == message.chatId,
+    );
+    if (index < 0 ||
+        message.isLocalOnly ||
+        message.status == MessageStatus.sending ||
+        message.status == MessageStatus.error) {
+      return false;
+    }
+    final current = _messages[index];
+    const userId = MockAuthRepository.mockUserId;
+    final choice = toggle && current.reactionState.codeFor(userId) == code
+        ? null
+        : code;
+    if (current.reactionState.codeFor(userId) == choice) return false;
+    _messages[index] = current.copyWith(
+      reactionState: current.reactionState.withChoice(userId, choice),
+    );
+    _messagesController.add(List.unmodifiable(_messages));
+    return true;
+  }
 
   @override
   Future<void> pauseNetwork() async {}

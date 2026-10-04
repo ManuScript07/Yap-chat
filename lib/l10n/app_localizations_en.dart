@@ -9,6 +9,11 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String notificationMessageReaction(String message) {
+    return 'Reacted to “$message”';
+  }
+
+  @override
   String get navChats => 'Chats';
 
   @override

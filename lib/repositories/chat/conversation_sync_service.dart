@@ -4,6 +4,7 @@ import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/chat_message_hydrator.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
+import 'package:yap_chat/repositories/chat/message_reaction_coordinator.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 
 class ConversationSyncService {
@@ -14,12 +15,22 @@ class ConversationSyncService {
     required ChatsCacheDataSource chatsCache,
     required AccountSessionController accountSessionController,
     AppDiagnostics? diagnostics,
+    void Function(Object, StackTrace)? onReactionError,
   }) : _cache = cache,
        _remote = remote,
        _hydrator = hydrator,
        _chatsCache = chatsCache,
        _accountSessionController = accountSessionController,
-       _diagnostics = diagnostics;
+       _diagnostics = diagnostics,
+       reactions = MessageReactionCoordinator(
+         cache: cache,
+         remote: remote,
+         account: accountSessionController,
+         chatsCache: chatsCache,
+         onError: onReactionError,
+       );
+
+  final MessageReactionCoordinator reactions;
 
   static const pageSize = 60;
 
@@ -174,8 +185,10 @@ class ConversationSyncService {
       }
       _accountSessionController.ensureCurrent(scope);
       _lastVisibilityRequestAt[key] = DateTime.now();
-      final visible = await _remote.fetchVisibleMessageIds(chatId, batch);
+      final states = await _remote.fetchVisibleMessageStates(chatId, batch);
+      final visible = states.keys.toSet();
       _accountSessionController.ensureCurrent(scope);
+      await reactions.acceptBatch(chatId, states, session: scope);
       final removed = batch.toSet().difference(visible);
       if (removed.isNotEmpty) {
         await _accountSessionController.commit(

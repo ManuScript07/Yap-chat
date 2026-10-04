@@ -4538,6 +4538,923 @@ class PendingChatOperationsCompanion
   }
 }
 
+class $CachedMessageReactionStatesTable extends CachedMessageReactionStates
+    with
+        TableInfo<
+          $CachedMessageReactionStatesTable,
+          CachedMessageReactionState
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedMessageReactionStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateJsonMeta = const VerificationMeta(
+    'stateJson',
+  );
+  @override
+  late final GeneratedColumn<String> stateJson = GeneratedColumn<String>(
+    'state_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    messageId,
+    chatId,
+    version,
+    stateJson,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_message_reaction_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedMessageReactionState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('state_json')) {
+      context.handle(
+        _stateJsonMeta,
+        stateJson.isAcceptableOrUnknown(data['state_json']!, _stateJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stateJsonMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, messageId};
+  @override
+  CachedMessageReactionState map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedMessageReactionState(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      stateJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state_json'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedMessageReactionStatesTable createAlias(String alias) {
+    return $CachedMessageReactionStatesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedMessageReactionState extends DataClass
+    implements Insertable<CachedMessageReactionState> {
+  final String ownerUserId;
+  final String messageId;
+  final String chatId;
+  final int version;
+  final String stateJson;
+  const CachedMessageReactionState({
+    required this.ownerUserId,
+    required this.messageId,
+    required this.chatId,
+    required this.version,
+    required this.stateJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['message_id'] = Variable<String>(messageId);
+    map['chat_id'] = Variable<String>(chatId);
+    map['version'] = Variable<int>(version);
+    map['state_json'] = Variable<String>(stateJson);
+    return map;
+  }
+
+  CachedMessageReactionStatesCompanion toCompanion(bool nullToAbsent) {
+    return CachedMessageReactionStatesCompanion(
+      ownerUserId: Value(ownerUserId),
+      messageId: Value(messageId),
+      chatId: Value(chatId),
+      version: Value(version),
+      stateJson: Value(stateJson),
+    );
+  }
+
+  factory CachedMessageReactionState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedMessageReactionState(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      messageId: serializer.fromJson<String>(json['messageId']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      version: serializer.fromJson<int>(json['version']),
+      stateJson: serializer.fromJson<String>(json['stateJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'messageId': serializer.toJson<String>(messageId),
+      'chatId': serializer.toJson<String>(chatId),
+      'version': serializer.toJson<int>(version),
+      'stateJson': serializer.toJson<String>(stateJson),
+    };
+  }
+
+  CachedMessageReactionState copyWith({
+    String? ownerUserId,
+    String? messageId,
+    String? chatId,
+    int? version,
+    String? stateJson,
+  }) => CachedMessageReactionState(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    messageId: messageId ?? this.messageId,
+    chatId: chatId ?? this.chatId,
+    version: version ?? this.version,
+    stateJson: stateJson ?? this.stateJson,
+  );
+  CachedMessageReactionState copyWithCompanion(
+    CachedMessageReactionStatesCompanion data,
+  ) {
+    return CachedMessageReactionState(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      version: data.version.present ? data.version.value : this.version,
+      stateJson: data.stateJson.present ? data.stateJson.value : this.stateJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMessageReactionState(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('messageId: $messageId, ')
+          ..write('chatId: $chatId, ')
+          ..write('version: $version, ')
+          ..write('stateJson: $stateJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(ownerUserId, messageId, chatId, version, stateJson);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedMessageReactionState &&
+          other.ownerUserId == this.ownerUserId &&
+          other.messageId == this.messageId &&
+          other.chatId == this.chatId &&
+          other.version == this.version &&
+          other.stateJson == this.stateJson);
+}
+
+class CachedMessageReactionStatesCompanion
+    extends UpdateCompanion<CachedMessageReactionState> {
+  final Value<String> ownerUserId;
+  final Value<String> messageId;
+  final Value<String> chatId;
+  final Value<int> version;
+  final Value<String> stateJson;
+  final Value<int> rowid;
+  const CachedMessageReactionStatesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.stateJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedMessageReactionStatesCompanion.insert({
+    required String ownerUserId,
+    required String messageId,
+    required String chatId,
+    required int version,
+    required String stateJson,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       messageId = Value(messageId),
+       chatId = Value(chatId),
+       version = Value(version),
+       stateJson = Value(stateJson);
+  static Insertable<CachedMessageReactionState> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? messageId,
+    Expression<String>? chatId,
+    Expression<int>? version,
+    Expression<String>? stateJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (messageId != null) 'message_id': messageId,
+      if (chatId != null) 'chat_id': chatId,
+      if (version != null) 'version': version,
+      if (stateJson != null) 'state_json': stateJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedMessageReactionStatesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? messageId,
+    Value<String>? chatId,
+    Value<int>? version,
+    Value<String>? stateJson,
+    Value<int>? rowid,
+  }) {
+    return CachedMessageReactionStatesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      messageId: messageId ?? this.messageId,
+      chatId: chatId ?? this.chatId,
+      version: version ?? this.version,
+      stateJson: stateJson ?? this.stateJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (stateJson.present) {
+      map['state_json'] = Variable<String>(stateJson.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedMessageReactionStatesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('messageId: $messageId, ')
+          ..write('chatId: $chatId, ')
+          ..write('version: $version, ')
+          ..write('stateJson: $stateJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PendingMessageReactionsTable extends PendingMessageReactions
+    with TableInfo<$PendingMessageReactionsTable, PendingMessageReaction> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingMessageReactionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _operationIdMeta = const VerificationMeta(
+    'operationId',
+  );
+  @override
+  late final GeneratedColumn<String> operationId = GeneratedColumn<String>(
+    'operation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _expectedRevisionMeta = const VerificationMeta(
+    'expectedRevision',
+  );
+  @override
+  late final GeneratedColumn<int> expectedRevision = GeneratedColumn<int>(
+    'expected_revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextAttemptAt =
+      GeneratedColumn<DateTime>(
+        'next_attempt_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    messageId,
+    chatId,
+    operationId,
+    code,
+    expectedRevision,
+    attempts,
+    nextAttemptAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_message_reactions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingMessageReaction> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('operation_id')) {
+      context.handle(
+        _operationIdMeta,
+        operationId.isAcceptableOrUnknown(
+          data['operation_id']!,
+          _operationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_operationIdMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    }
+    if (data.containsKey('expected_revision')) {
+      context.handle(
+        _expectedRevisionMeta,
+        expectedRevision.isAcceptableOrUnknown(
+          data['expected_revision']!,
+          _expectedRevisionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_expectedRevisionMeta);
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_nextAttemptAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, messageId};
+  @override
+  PendingMessageReaction map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingMessageReaction(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      operationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operation_id'],
+      )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      ),
+      expectedRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}expected_revision'],
+      )!,
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_attempt_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingMessageReactionsTable createAlias(String alias) {
+    return $PendingMessageReactionsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingMessageReaction extends DataClass
+    implements Insertable<PendingMessageReaction> {
+  final String ownerUserId;
+  final String messageId;
+  final String chatId;
+  final String operationId;
+  final String? code;
+  final int expectedRevision;
+  final int attempts;
+  final DateTime nextAttemptAt;
+  const PendingMessageReaction({
+    required this.ownerUserId,
+    required this.messageId,
+    required this.chatId,
+    required this.operationId,
+    this.code,
+    required this.expectedRevision,
+    required this.attempts,
+    required this.nextAttemptAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['message_id'] = Variable<String>(messageId);
+    map['chat_id'] = Variable<String>(chatId);
+    map['operation_id'] = Variable<String>(operationId);
+    if (!nullToAbsent || code != null) {
+      map['code'] = Variable<String>(code);
+    }
+    map['expected_revision'] = Variable<int>(expectedRevision);
+    map['attempts'] = Variable<int>(attempts);
+    map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt);
+    return map;
+  }
+
+  PendingMessageReactionsCompanion toCompanion(bool nullToAbsent) {
+    return PendingMessageReactionsCompanion(
+      ownerUserId: Value(ownerUserId),
+      messageId: Value(messageId),
+      chatId: Value(chatId),
+      operationId: Value(operationId),
+      code: code == null && nullToAbsent ? const Value.absent() : Value(code),
+      expectedRevision: Value(expectedRevision),
+      attempts: Value(attempts),
+      nextAttemptAt: Value(nextAttemptAt),
+    );
+  }
+
+  factory PendingMessageReaction.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingMessageReaction(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      messageId: serializer.fromJson<String>(json['messageId']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      operationId: serializer.fromJson<String>(json['operationId']),
+      code: serializer.fromJson<String?>(json['code']),
+      expectedRevision: serializer.fromJson<int>(json['expectedRevision']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      nextAttemptAt: serializer.fromJson<DateTime>(json['nextAttemptAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'messageId': serializer.toJson<String>(messageId),
+      'chatId': serializer.toJson<String>(chatId),
+      'operationId': serializer.toJson<String>(operationId),
+      'code': serializer.toJson<String?>(code),
+      'expectedRevision': serializer.toJson<int>(expectedRevision),
+      'attempts': serializer.toJson<int>(attempts),
+      'nextAttemptAt': serializer.toJson<DateTime>(nextAttemptAt),
+    };
+  }
+
+  PendingMessageReaction copyWith({
+    String? ownerUserId,
+    String? messageId,
+    String? chatId,
+    String? operationId,
+    Value<String?> code = const Value.absent(),
+    int? expectedRevision,
+    int? attempts,
+    DateTime? nextAttemptAt,
+  }) => PendingMessageReaction(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    messageId: messageId ?? this.messageId,
+    chatId: chatId ?? this.chatId,
+    operationId: operationId ?? this.operationId,
+    code: code.present ? code.value : this.code,
+    expectedRevision: expectedRevision ?? this.expectedRevision,
+    attempts: attempts ?? this.attempts,
+    nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+  );
+  PendingMessageReaction copyWithCompanion(
+    PendingMessageReactionsCompanion data,
+  ) {
+    return PendingMessageReaction(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      operationId: data.operationId.present
+          ? data.operationId.value
+          : this.operationId,
+      code: data.code.present ? data.code.value : this.code,
+      expectedRevision: data.expectedRevision.present
+          ? data.expectedRevision.value
+          : this.expectedRevision,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      nextAttemptAt: data.nextAttemptAt.present
+          ? data.nextAttemptAt.value
+          : this.nextAttemptAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingMessageReaction(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('messageId: $messageId, ')
+          ..write('chatId: $chatId, ')
+          ..write('operationId: $operationId, ')
+          ..write('code: $code, ')
+          ..write('expectedRevision: $expectedRevision, ')
+          ..write('attempts: $attempts, ')
+          ..write('nextAttemptAt: $nextAttemptAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    messageId,
+    chatId,
+    operationId,
+    code,
+    expectedRevision,
+    attempts,
+    nextAttemptAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingMessageReaction &&
+          other.ownerUserId == this.ownerUserId &&
+          other.messageId == this.messageId &&
+          other.chatId == this.chatId &&
+          other.operationId == this.operationId &&
+          other.code == this.code &&
+          other.expectedRevision == this.expectedRevision &&
+          other.attempts == this.attempts &&
+          other.nextAttemptAt == this.nextAttemptAt);
+}
+
+class PendingMessageReactionsCompanion
+    extends UpdateCompanion<PendingMessageReaction> {
+  final Value<String> ownerUserId;
+  final Value<String> messageId;
+  final Value<String> chatId;
+  final Value<String> operationId;
+  final Value<String?> code;
+  final Value<int> expectedRevision;
+  final Value<int> attempts;
+  final Value<DateTime> nextAttemptAt;
+  final Value<int> rowid;
+  const PendingMessageReactionsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.operationId = const Value.absent(),
+    this.code = const Value.absent(),
+    this.expectedRevision = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingMessageReactionsCompanion.insert({
+    required String ownerUserId,
+    required String messageId,
+    required String chatId,
+    required String operationId,
+    this.code = const Value.absent(),
+    required int expectedRevision,
+    this.attempts = const Value.absent(),
+    required DateTime nextAttemptAt,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       messageId = Value(messageId),
+       chatId = Value(chatId),
+       operationId = Value(operationId),
+       expectedRevision = Value(expectedRevision),
+       nextAttemptAt = Value(nextAttemptAt);
+  static Insertable<PendingMessageReaction> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? messageId,
+    Expression<String>? chatId,
+    Expression<String>? operationId,
+    Expression<String>? code,
+    Expression<int>? expectedRevision,
+    Expression<int>? attempts,
+    Expression<DateTime>? nextAttemptAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (messageId != null) 'message_id': messageId,
+      if (chatId != null) 'chat_id': chatId,
+      if (operationId != null) 'operation_id': operationId,
+      if (code != null) 'code': code,
+      if (expectedRevision != null) 'expected_revision': expectedRevision,
+      if (attempts != null) 'attempts': attempts,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingMessageReactionsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? messageId,
+    Value<String>? chatId,
+    Value<String>? operationId,
+    Value<String?>? code,
+    Value<int>? expectedRevision,
+    Value<int>? attempts,
+    Value<DateTime>? nextAttemptAt,
+    Value<int>? rowid,
+  }) {
+    return PendingMessageReactionsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      messageId: messageId ?? this.messageId,
+      chatId: chatId ?? this.chatId,
+      operationId: operationId ?? this.operationId,
+      code: code ?? this.code,
+      expectedRevision: expectedRevision ?? this.expectedRevision,
+      attempts: attempts ?? this.attempts,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (operationId.present) {
+      map['operation_id'] = Variable<String>(operationId.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (expectedRevision.present) {
+      map['expected_revision'] = Variable<int>(expectedRevision.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingMessageReactionsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('messageId: $messageId, ')
+          ..write('chatId: $chatId, ')
+          ..write('operationId: $operationId, ')
+          ..write('code: $code, ')
+          ..write('expectedRevision: $expectedRevision, ')
+          ..write('attempts: $attempts, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedFriendsTable extends CachedFriends
     with TableInfo<$CachedFriendsTable, CachedFriend> {
   @override
@@ -10907,6 +11824,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedMessagesTable cachedMessages = $CachedMessagesTable(this);
   late final $PendingChatOperationsTable pendingChatOperations =
       $PendingChatOperationsTable(this);
+  late final $CachedMessageReactionStatesTable cachedMessageReactionStates =
+      $CachedMessageReactionStatesTable(this);
+  late final $PendingMessageReactionsTable pendingMessageReactions =
+      $PendingMessageReactionsTable(this);
   late final $CachedFriendsTable cachedFriends = $CachedFriendsTable(this);
   late final $CachedFriendListStatesTable cachedFriendListStates =
       $CachedFriendListStatesTable(this);
@@ -10942,6 +11863,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedChats,
     cachedMessages,
     pendingChatOperations,
+    cachedMessageReactionStates,
+    pendingMessageReactions,
     cachedFriends,
     cachedFriendListStates,
     cachedFriendRequests,
@@ -11361,7 +12284,16 @@ class $$CachedProfilesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedProfilesTable, CachedProfile>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedProfilesTable,
+                    CachedProfile
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -11594,7 +12526,18 @@ class $$CachedProfilePhotosTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedProfilePhotosTable, CachedProfilePhoto>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedProfilePhotosTable,
+                    CachedProfilePhoto
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -12115,7 +13058,16 @@ class $$CachedChatsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedChatsTable, CachedChat>(table),
+                  BaseReferences<_$AppDatabase, $CachedChatsTable, CachedChat>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -12677,7 +13629,16 @@ class $$CachedMessagesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedMessagesTable, CachedMessage>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedMessagesTable,
+                    CachedMessage
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -12995,7 +13956,19 @@ class $$PendingChatOperationsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $PendingChatOperationsTable,
+                    PendingChatOperation
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $PendingChatOperationsTable,
+                    PendingChatOperation
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -13021,6 +13994,535 @@ typedef $$PendingChatOperationsTableProcessedTableManager =
         >,
       ),
       PendingChatOperation,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedMessageReactionStatesTableCreateCompanionBuilder =
+    CachedMessageReactionStatesCompanion Function({
+      required String ownerUserId,
+      required String messageId,
+      required String chatId,
+      required int version,
+      required String stateJson,
+      Value<int> rowid,
+    });
+typedef $$CachedMessageReactionStatesTableUpdateCompanionBuilder =
+    CachedMessageReactionStatesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> messageId,
+      Value<String> chatId,
+      Value<int> version,
+      Value<String> stateJson,
+      Value<int> rowid,
+    });
+
+class $$CachedMessageReactionStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedMessageReactionStatesTable> {
+  $$CachedMessageReactionStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stateJson => $composableBuilder(
+    column: $table.stateJson,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedMessageReactionStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedMessageReactionStatesTable> {
+  $$CachedMessageReactionStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stateJson => $composableBuilder(
+    column: $table.stateJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedMessageReactionStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedMessageReactionStatesTable> {
+  $$CachedMessageReactionStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get stateJson =>
+      $composableBuilder(column: $table.stateJson, builder: (column) => column);
+}
+
+class $$CachedMessageReactionStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedMessageReactionStatesTable,
+          CachedMessageReactionState,
+          $$CachedMessageReactionStatesTableFilterComposer,
+          $$CachedMessageReactionStatesTableOrderingComposer,
+          $$CachedMessageReactionStatesTableAnnotationComposer,
+          $$CachedMessageReactionStatesTableCreateCompanionBuilder,
+          $$CachedMessageReactionStatesTableUpdateCompanionBuilder,
+          (
+            CachedMessageReactionState,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedMessageReactionStatesTable,
+              CachedMessageReactionState
+            >,
+          ),
+          CachedMessageReactionState,
+          PrefetchHooks Function()
+        > {
+  $$CachedMessageReactionStatesTableTableManager(
+    _$AppDatabase db,
+    $CachedMessageReactionStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedMessageReactionStatesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedMessageReactionStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedMessageReactionStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> messageId = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> stateJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMessageReactionStatesCompanion(
+                ownerUserId: ownerUserId,
+                messageId: messageId,
+                chatId: chatId,
+                version: version,
+                stateJson: stateJson,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String messageId,
+                required String chatId,
+                required int version,
+                required String stateJson,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedMessageReactionStatesCompanion.insert(
+                ownerUserId: ownerUserId,
+                messageId: messageId,
+                chatId: chatId,
+                version: version,
+                stateJson: stateJson,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedMessageReactionStatesTable,
+                    CachedMessageReactionState
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedMessageReactionStatesTable,
+                    CachedMessageReactionState
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedMessageReactionStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedMessageReactionStatesTable,
+      CachedMessageReactionState,
+      $$CachedMessageReactionStatesTableFilterComposer,
+      $$CachedMessageReactionStatesTableOrderingComposer,
+      $$CachedMessageReactionStatesTableAnnotationComposer,
+      $$CachedMessageReactionStatesTableCreateCompanionBuilder,
+      $$CachedMessageReactionStatesTableUpdateCompanionBuilder,
+      (
+        CachedMessageReactionState,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedMessageReactionStatesTable,
+          CachedMessageReactionState
+        >,
+      ),
+      CachedMessageReactionState,
+      PrefetchHooks Function()
+    >;
+typedef $$PendingMessageReactionsTableCreateCompanionBuilder =
+    PendingMessageReactionsCompanion Function({
+      required String ownerUserId,
+      required String messageId,
+      required String chatId,
+      required String operationId,
+      Value<String?> code,
+      required int expectedRevision,
+      Value<int> attempts,
+      required DateTime nextAttemptAt,
+      Value<int> rowid,
+    });
+typedef $$PendingMessageReactionsTableUpdateCompanionBuilder =
+    PendingMessageReactionsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> messageId,
+      Value<String> chatId,
+      Value<String> operationId,
+      Value<String?> code,
+      Value<int> expectedRevision,
+      Value<int> attempts,
+      Value<DateTime> nextAttemptAt,
+      Value<int> rowid,
+    });
+
+class $$PendingMessageReactionsTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingMessageReactionsTable> {
+  $$PendingMessageReactionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get expectedRevision => $composableBuilder(
+    column: $table.expectedRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingMessageReactionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingMessageReactionsTable> {
+  $$PendingMessageReactionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get expectedRevision => $composableBuilder(
+    column: $table.expectedRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingMessageReactionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingMessageReactionsTable> {
+  $$PendingMessageReactionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<int> get expectedRevision => $composableBuilder(
+    column: $table.expectedRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+}
+
+class $$PendingMessageReactionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingMessageReactionsTable,
+          PendingMessageReaction,
+          $$PendingMessageReactionsTableFilterComposer,
+          $$PendingMessageReactionsTableOrderingComposer,
+          $$PendingMessageReactionsTableAnnotationComposer,
+          $$PendingMessageReactionsTableCreateCompanionBuilder,
+          $$PendingMessageReactionsTableUpdateCompanionBuilder,
+          (
+            PendingMessageReaction,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingMessageReactionsTable,
+              PendingMessageReaction
+            >,
+          ),
+          PendingMessageReaction,
+          PrefetchHooks Function()
+        > {
+  $$PendingMessageReactionsTableTableManager(
+    _$AppDatabase db,
+    $PendingMessageReactionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingMessageReactionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$PendingMessageReactionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PendingMessageReactionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> messageId = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<String> operationId = const Value.absent(),
+                Value<String?> code = const Value.absent(),
+                Value<int> expectedRevision = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<DateTime> nextAttemptAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingMessageReactionsCompanion(
+                ownerUserId: ownerUserId,
+                messageId: messageId,
+                chatId: chatId,
+                operationId: operationId,
+                code: code,
+                expectedRevision: expectedRevision,
+                attempts: attempts,
+                nextAttemptAt: nextAttemptAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String messageId,
+                required String chatId,
+                required String operationId,
+                Value<String?> code = const Value.absent(),
+                required int expectedRevision,
+                Value<int> attempts = const Value.absent(),
+                required DateTime nextAttemptAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PendingMessageReactionsCompanion.insert(
+                ownerUserId: ownerUserId,
+                messageId: messageId,
+                chatId: chatId,
+                operationId: operationId,
+                code: code,
+                expectedRevision: expectedRevision,
+                attempts: attempts,
+                nextAttemptAt: nextAttemptAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $PendingMessageReactionsTable,
+                    PendingMessageReaction
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $PendingMessageReactionsTable,
+                    PendingMessageReaction
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingMessageReactionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingMessageReactionsTable,
+      PendingMessageReaction,
+      $$PendingMessageReactionsTableFilterComposer,
+      $$PendingMessageReactionsTableOrderingComposer,
+      $$PendingMessageReactionsTableAnnotationComposer,
+      $$PendingMessageReactionsTableCreateCompanionBuilder,
+      $$PendingMessageReactionsTableUpdateCompanionBuilder,
+      (
+        PendingMessageReaction,
+        BaseReferences<
+          _$AppDatabase,
+          $PendingMessageReactionsTable,
+          PendingMessageReaction
+        >,
+      ),
+      PendingMessageReaction,
       PrefetchHooks Function()
     >;
 typedef $$CachedFriendsTableCreateCompanionBuilder =
@@ -13264,7 +14766,16 @@ class $$CachedFriendsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedFriendsTable, CachedFriend>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedFriendsTable,
+                    CachedFriend
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -13506,7 +15017,19 @@ class $$CachedFriendListStatesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedFriendListStatesTable,
+                    CachedFriendListState
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedFriendListStatesTable,
+                    CachedFriendListState
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -13850,7 +15373,18 @@ class $$CachedFriendRequestsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedFriendRequestsTable, CachedFriendRequest>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedFriendRequestsTable,
+                    CachedFriendRequest
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -14094,7 +15628,19 @@ class $$CachedFriendLocationsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedFriendLocationsTable,
+                    CachedFriendLocation
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedFriendLocationsTable,
+                    CachedFriendLocation
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -14417,7 +15963,18 @@ class $$CachedContactMatchesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedContactMatchesTable, CachedContactMatch>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedContactMatchesTable,
+                    CachedContactMatch
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -14707,7 +16264,19 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedSearchPrivacySettingsTable,
+                    CachedSearchPrivacySetting
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedSearchPrivacySettingsTable,
+                    CachedSearchPrivacySetting
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -14892,7 +16461,19 @@ class $$CachedPreciseLocationExclusionsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedPreciseLocationExclusionsTable,
+                    CachedPreciseLocationExclusion
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedPreciseLocationExclusionsTable,
+                    CachedPreciseLocationExclusion
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -15220,7 +16801,19 @@ class $$CachedViewedProfileMetadataTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedViewedProfileMetadataTable,
+                    CachedViewedProfileMetadataData
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedViewedProfileMetadataTable,
+                    CachedViewedProfileMetadataData
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -15527,7 +17120,19 @@ class $$CachedViewedProfileFriendsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedViewedProfileFriendsTable,
+                    CachedViewedProfileFriend
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedViewedProfileFriendsTable,
+                    CachedViewedProfileFriend
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -15731,7 +17336,19 @@ class $$CachedViewedProfileFriendListsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedViewedProfileFriendListsTable,
+                    CachedViewedProfileFriendList
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedViewedProfileFriendListsTable,
+                    CachedViewedProfileFriendList
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -15976,7 +17593,18 @@ class $$CachedUserDistancesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedUserDistancesTable, CachedUserDistance>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedUserDistancesTable,
+                    CachedUserDistance
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -16180,7 +17808,19 @@ class $$CachedProfileViewCountsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedProfileViewCountsTable,
+                    CachedProfileViewCount
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedProfileViewCountsTable,
+                    CachedProfileViewCount
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -16359,7 +17999,18 @@ class $$CachedAppLanguagesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedAppLanguagesTable, CachedAppLanguage>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedAppLanguagesTable,
+                    CachedAppLanguage
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -16401,6 +18052,17 @@ class $AppDatabaseManager {
       $$CachedMessagesTableTableManager(_db, _db.cachedMessages);
   $$PendingChatOperationsTableTableManager get pendingChatOperations =>
       $$PendingChatOperationsTableTableManager(_db, _db.pendingChatOperations);
+  $$CachedMessageReactionStatesTableTableManager
+  get cachedMessageReactionStates =>
+      $$CachedMessageReactionStatesTableTableManager(
+        _db,
+        _db.cachedMessageReactionStates,
+      );
+  $$PendingMessageReactionsTableTableManager get pendingMessageReactions =>
+      $$PendingMessageReactionsTableTableManager(
+        _db,
+        _db.pendingMessageReactions,
+      );
   $$CachedFriendsTableTableManager get cachedFriends =>
       $$CachedFriendsTableTableManager(_db, _db.cachedFriends);
   $$CachedFriendListStatesTableTableManager get cachedFriendListStates =>

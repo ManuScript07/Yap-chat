@@ -5,7 +5,7 @@ import 'package:yap_chat/l10n/app_localizations.dart';
 
 enum PushMessageType { text, image, audio, location }
 
-enum PushNotificationKind { chatMessage, friendRequest }
+enum PushNotificationKind { chatMessage, friendRequest, messageReaction }
 
 class PushNotificationPayload extends Equatable {
   const PushNotificationPayload({
@@ -41,6 +41,8 @@ class PushNotificationPayload extends Equatable {
       sentAt: sentAt?.toLocal() ?? DateTime.now(),
       kind: notificationType == 'friend_request'
           ? PushNotificationKind.friendRequest
+          : notificationType == 'message_reaction'
+          ? PushNotificationKind.messageReaction
           : PushNotificationKind.chatMessage,
       friendRequestId: _stringValue(data['friend_request_id']),
     );
@@ -65,7 +67,7 @@ class PushNotificationPayload extends Equatable {
   final PushNotificationKind kind;
   final String friendRequestId;
 
-  bool get isChatMessage => kind == PushNotificationKind.chatMessage;
+  bool get isChatMessage => kind != PushNotificationKind.friendRequest;
 
   bool get isValid =>
       recipientId.isNotEmpty &&
@@ -80,13 +82,16 @@ class PushNotificationPayload extends Equatable {
           ? l10n.notificationNewFriendRequest
           : l10n.notificationFriendRequest;
     }
-    return switch (messageType) {
+    final body = switch (messageType) {
       PushMessageType.text =>
         messageText.isEmpty ? l10n.notificationNewMessage : messageText,
       PushMessageType.image => l10n.notificationPhoto,
       PushMessageType.audio => l10n.notificationAudio,
       PushMessageType.location => l10n.notificationLocation,
     };
+    return kind == PushNotificationKind.messageReaction
+        ? l10n.notificationMessageReaction(body)
+        : body;
   }
 
   String localizedTitle(AppLocalizations l10n) =>
@@ -103,6 +108,8 @@ class PushNotificationPayload extends Equatable {
     'sent_at': sentAt.toUtc().toIso8601String(),
     'notification_type': kind == PushNotificationKind.friendRequest
         ? 'friend_request'
+        : kind == PushNotificationKind.messageReaction
+        ? 'message_reaction'
         : 'chat_message',
     'friend_request_id': friendRequestId,
   });

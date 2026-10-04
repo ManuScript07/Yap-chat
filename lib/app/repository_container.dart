@@ -124,6 +124,8 @@ class RepositoryContainer {
       chatsCache: chatsCache,
       accountSessionController: config.accountSessionController,
       diagnostics: config.diagnostics,
+      onReactionError: (error, stack) =>
+          config.talker.handle(error, stack, 'Reaction queue failed'),
     );
     return RepositoryContainer(
       mediaCache: mediaCache,

@@ -1,0 +1,32 @@
+Noto Emoji reaction artwork
+Copyright 2013 Google, Inc. All Rights Reserved.
+Licensed under the Apache License, Version 2.0.
+The upstream notice is in LICENSE; the full license is in LICENSE-APACHE-2.0.
+
+Source: https://github.com/googlefonts/noto-emoji
+Release: v2026-09-24-unicode18_0 (2D SVG artwork)
+Commit: e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e
+Artwork is unchanged; filenames are mapped to existing reaction codes.
+A final newline is added where missing. SHA-256 below refers to the original
+upstream files; strip the added final newline when verifying those three files.
+
+heart.svg <- 2D/svg/emoji_u2764.svg
+SHA-256: 280a633e0e72c7f45a0bdbc819d55d3de71dc47439d3024a0b9d3d7c76642023
+
+like.svg <- 2D/svg/emoji_u1f44d.svg
+SHA-256: c30d8e01a118cb2dce565d9153cb885111fade63c8191770cce4ced236dfb98a
+
+cry.svg <- 2D/svg/emoji_u1f62d.svg
+SHA-256: b8b0845817217b19602544b7f5d0a681fd29f5d15564540de442c49e963f57c7
+Final newline added: yes
+
+fire.svg <- 2D/svg/emoji_u1f525.svg
+SHA-256: dbea451b6cba787df0bb9bc84ceec1bed96e499e8b876b80682ce323f83b1a1b
+
+mind_blown.svg <- 2D/svg/emoji_u1f92f.svg
+SHA-256: 9756b17ba39d4af1efe566ced02b182bbe99a37d049d5e9bb68bbbd383b426dd
+Final newline added: yes
+
+poop.svg <- 2D/svg/emoji_u1f4a9.svg
+SHA-256: 955782f8c199072ee768a7f9dc81310be936c742e32003e2e04ff51047ced477
+Final newline added: yes

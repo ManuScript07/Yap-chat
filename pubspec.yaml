@@ -79,6 +79,7 @@ flutter:
   assets:
     - .env
     - assets/logo/
+    - assets/reactions/
     - assets/images/distance_24dp_outlined.svg
     - assets/images/distance_24dp.svg
     - assets/images/empty_chat.svg

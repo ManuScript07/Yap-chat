@@ -19,6 +19,7 @@ import 'package:yap_chat/repositories/notifications/notifications.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerBundledAssetLicenses();
 
   await dotenv.load(isOptional: true);
   await initializeDateFormatting();

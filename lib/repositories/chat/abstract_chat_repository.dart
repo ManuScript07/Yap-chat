@@ -1,16 +1,29 @@
 import 'package:yap_chat/features/chat/data/data.dart';
 
 class ChatHistoryChange {
-  const ChatHistoryChange.deleted(this.deletedMessageId) : reconnected = false;
+  const ChatHistoryChange.deleted(this.deletedMessageId)
+    : reconnected = false,
+      reaction = null;
+  const ChatHistoryChange.reaction(this.reaction)
+    : reconnected = false,
+      deletedMessageId = null;
   const ChatHistoryChange.reconnected()
     : deletedMessageId = null,
-      reconnected = true;
+      reconnected = true,
+      reaction = null;
 
   final String? deletedMessageId;
   final bool reconnected;
+  final MessageReactionChange? reaction;
 }
 
 abstract interface class IChatRepository {
+  Future<bool> setMessageReaction(
+    ChatMessage message,
+    ReactionCode code, {
+    bool toggle = true,
+  });
+
   /// Подписка на поток сообщений конкретного чата.
   Stream<List<ChatMessage>> getMessagesStream(String chatId);
 

@@ -442,6 +442,18 @@ class ChatsRepository implements IChatsRepository {
     AccountSessionSnapshot scope,
   ) async {
     _accountSessionController.ensureCurrent(scope);
+    if (change.reason == 'reaction_changed' &&
+        change.conversationId != null &&
+        change.messageId != null &&
+        change.reactionState != null) {
+      await _conversationSync.reactions.accept(
+        change.conversationId!,
+        change.messageId!,
+        change.reactionState!,
+        session: scope,
+      );
+      return;
+    }
     await _retryPendingDeletions(scope);
     final conversationId = change.conversationId;
     if (conversationId == null) {

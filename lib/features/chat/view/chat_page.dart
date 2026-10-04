@@ -17,6 +17,7 @@ import 'package:yap_chat/features/chat/view/focused_history_reconciliation.dart'
 import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
 import 'package:yap_chat/features/chat/view/visible_chat_read_selection.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
+import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
@@ -198,6 +199,9 @@ class _ChatViewState extends State<_ChatView>
     final action = await showMessageActionsBottomSheet(
       context,
       message: message,
+      onReaction: _canReact(message)
+          ? (code) => unawaited(_react(message, code, true))
+          : null,
     );
     if (!mounted || action == null) return;
 
@@ -208,6 +212,41 @@ class _ChatViewState extends State<_ChatView>
         context.read<ChatBloc>().add(ChatReplySelected(message));
       case MessageAction.delete:
         context.read<ChatBloc>().add(ChatMessageDeleteRequested(message));
+    }
+  }
+
+  bool _canReact(ChatMessage message) =>
+      !widget.chat.isDraft &&
+      !widget.chat.blockedByPeer &&
+      !widget.chat.peerIsGloballyBanned &&
+      !widget.chat.peerIsDeleted &&
+      !context.read<BlocklistCubit>().state.blocks(widget.chat.peerId) &&
+      !widget.chat.blockedByMe &&
+      !message.isLocalOnly &&
+      message.status != MessageStatus.sending &&
+      message.status != MessageStatus.error;
+
+  Future<void> _react(
+    ChatMessage message,
+    ReactionCode code,
+    bool toggle,
+  ) async {
+    if (!_canReact(message)) return;
+    try {
+      final accepted = await context.read<IChatRepository>().setMessageReaction(
+        message,
+        code,
+        toggle: toggle,
+      );
+      if (accepted) await HapticFeedback.selectionClick();
+    } catch (error, stack) {
+      if (mounted) {
+        context.read<AppConfig>().talker.handle(
+          error,
+          stack,
+          'Message reaction failed',
+        );
+      }
     }
   }
 
@@ -339,6 +378,13 @@ class _ChatViewState extends State<_ChatView>
                               voiceState.status !=
                               VoiceRecorderStatus.recording,
                           onMessageLongPress: _showMessageActions,
+                          onReaction:
+                              blockedByMe ||
+                                  widget.chat.blockedByPeer ||
+                                  widget.chat.peerIsGloballyBanned ||
+                                  widget.chat.peerIsDeleted
+                              ? null
+                              : _react,
                         ),
                       ),
                       GradientOverlay(
@@ -942,6 +988,7 @@ class _ChatMessages extends StatefulWidget {
     required this.keyboardAvoidanceOffset,
     required this.canOpenMessageMenu,
     required this.onMessageLongPress,
+    this.onReaction,
   });
 
   final Chat chat;
@@ -950,6 +997,7 @@ class _ChatMessages extends StatefulWidget {
   final double keyboardAvoidanceOffset;
   final bool canOpenMessageMenu;
   final ValueChanged<ChatMessage> onMessageLongPress;
+  final Future<void> Function(ChatMessage, ReactionCode, bool)? onReaction;
 
   @override
   State<_ChatMessages> createState() => _ChatMessagesState();
@@ -1035,6 +1083,25 @@ class _ChatMessagesState extends State<_ChatMessages>
         .watchHistoryChanges(chatId)
         .listen((change) {
           if (!mounted || widget.chat.id != chatId) return;
+          if (change.reaction case final event?) {
+            _windowCache.updateReaction(event.messageId, event.state);
+            final current = _focusMessages;
+            if (current != null &&
+                current.any(
+                  (m) =>
+                      m.id == event.messageId && m.reactionState != event.state,
+                )) {
+              setState(
+                () => _focusMessages = [
+                  for (final m in current)
+                    m.id == event.messageId
+                        ? m.copyWith(reactionState: event.state)
+                        : m,
+                ],
+              );
+            }
+            return;
+          }
           final deletedId = change.deletedMessageId;
           if (deletedId != null) {
             _removeFocusedMessage(deletedId);
@@ -2152,6 +2219,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                       ? null
                       : _hydrateFocusedMedia,
                   retryFocusedMedia: () => setState(() {}),
+                  onReaction: widget.onReaction,
                   onReplyTap: _jumpToMessage,
                   onMessageLongPress: widget.canOpenMessageMenu
                       ? widget.onMessageLongPress
@@ -2250,6 +2318,7 @@ class _MessagesList extends StatelessWidget {
     required this.hydrateFocusedMedia,
     required this.retryFocusedMedia,
     this.onMessageLongPress,
+    this.onReaction,
   });
 
   final ItemScrollController itemScrollController;
@@ -2267,6 +2336,7 @@ class _MessagesList extends StatelessWidget {
   final Future<ChatMessage> Function(ChatMessage)? hydrateFocusedMedia;
   final VoidCallback retryFocusedMedia;
   final ValueChanged<ChatMessage>? onMessageLongPress;
+  final Future<void> Function(ChatMessage, ReactionCode, bool)? onReaction;
 
   Widget _buildMessage(
     BuildContext context,
@@ -2284,6 +2354,14 @@ class _MessagesList extends StatelessWidget {
       peerAvatarLoader: () =>
           context.read<IChatsRepository>().resolveAvatar(chat),
       onLongPress: onMessageLongPress,
+      onReaction:
+          onReaction == null ||
+              displayMessage.isLocalOnly ||
+              displayMessage.status == MessageStatus.sending ||
+              displayMessage.status == MessageStatus.error
+          ? null
+          : (code, toggle) =>
+                unawaited(onReaction!(displayMessage, code, toggle)),
       onReplyTap: displayMessage.replyTo == null
           ? null
           : () => onReplyTap(displayMessage.replyTo!.messageId),
@@ -2306,6 +2384,12 @@ class _MessagesList extends StatelessWidget {
           message: message,
           maxWidth: maxWidth,
           hasError: snapshot.hasError,
+          peerAvatarUrl: chat.avatarUrl,
+          peerAvatarLoader: () =>
+              context.read<IChatsRepository>().resolveAvatar(chat),
+          onReaction: onReaction == null
+              ? null
+              : (code, toggle) => unawaited(onReaction!(message, code, toggle)),
           onRetry: retryFocusedMedia,
           onLongPress: onMessageLongPress == null
               ? null
@@ -2381,6 +2465,9 @@ class _FocusedMediaPlaceholder extends StatelessWidget {
     required this.hasError,
     required this.onRetry,
     required this.onLongPress,
+    this.peerAvatarUrl,
+    this.peerAvatarLoader,
+    this.onReaction,
   });
 
   final ChatMessage message;
@@ -2388,6 +2475,9 @@ class _FocusedMediaPlaceholder extends StatelessWidget {
   final bool hasError;
   final VoidCallback onRetry;
   final VoidCallback? onLongPress;
+  final String? peerAvatarUrl;
+  final Future<String?> Function()? peerAvatarLoader;
+  final void Function(ReactionCode, bool)? onReaction;
 
   @override
   Widget build(BuildContext context) {
@@ -2396,12 +2486,14 @@ class _FocusedMediaPlaceholder extends StatelessWidget {
       alignment: message.isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onLongPress: onLongPress,
+        onDoubleTap: onReaction == null
+            ? null
+            : () => onReaction!(ReactionCode.heart, false),
         onTap: hasError ? onRetry : null,
         child: Container(
           width: isImage
               ? maxWidth.clamp(160.0, 300.0)
               : maxWidth.clamp(160.0, 286.0),
-          height: isImage ? 190 : 64,
           decoration: BoxDecoration(
             color: message.isMine
                 ? context.colorScheme.primary
@@ -2409,21 +2501,52 @@ class _FocusedMediaPlaceholder extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
           ),
           alignment: Alignment.center,
-          child: hasError
-              ? Icon(
-                  Icons.refresh_rounded,
-                  color: context.colorScheme.onPrimary,
-                )
-              : SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: message.isMine
-                        ? context.colorScheme.onPrimary
-                        : context.colorScheme.primary,
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: isImage ? 190 : 64,
+                child: Center(
+                  child: hasError
+                      ? Icon(
+                          Icons.refresh_rounded,
+                          color: context.colorScheme.onPrimary,
+                        )
+                      : SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: message.isMine
+                                ? context.colorScheme.onPrimary
+                                : context.colorScheme.primary,
+                          ),
+                        ),
                 ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topLeft,
+                child: message.reactionState.reactions.isEmpty
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                        child: SizedBox(
+                          height: 32,
+                          child: ConversationMessageReactions(
+                            message: message,
+                            peerAvatarUrl: peerAvatarUrl,
+                            peerAvatarLoader: peerAvatarLoader,
+                            onSelected: onReaction == null
+                                ? null
+                                : (code) => onReaction!(code, true),
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

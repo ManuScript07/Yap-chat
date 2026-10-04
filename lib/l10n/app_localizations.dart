@@ -98,6 +98,12 @@ abstract class AppLocalizations {
     Locale('ru'),
   ];
 
+  /// No description provided for @notificationMessageReaction.
+  ///
+  /// In ru, this message translates to:
+  /// **'Поставил реакцию на «{message}»'**
+  String notificationMessageReaction(String message);
+
   /// No description provided for @navChats.
   ///
   /// In ru, this message translates to:

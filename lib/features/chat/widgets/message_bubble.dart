@@ -12,6 +12,7 @@ import 'package:yap_chat/features/chat/widgets/audio_message_content.dart';
 import 'package:yap_chat/features/chat/widgets/message_reply_preview.dart';
 import 'package:yap_chat/features/chat/widgets/message_status_icon.dart';
 import 'package:yap_chat/ui/ui.dart';
+import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
 
 class MessageBubble extends StatefulWidget {
   const MessageBubble({
@@ -24,6 +25,7 @@ class MessageBubble extends StatefulWidget {
     this.peerAvatarLoader,
     this.onLongPress,
     this.onReplyTap,
+    this.onReaction,
   });
 
   final ChatMessage message;
@@ -34,6 +36,7 @@ class MessageBubble extends StatefulWidget {
   final Future<String?> Function()? peerAvatarLoader;
   final ValueChanged<ChatMessage>? onLongPress;
   final VoidCallback? onReplyTap;
+  final void Function(ReactionCode code, bool toggle)? onReaction;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -140,6 +143,9 @@ class _MessageBubbleState extends State<MessageBubble>
             clipBehavior: Clip.none,
             children: [
               GestureDetector(
+                onDoubleTap: widget.onReaction == null
+                    ? null
+                    : () => widget.onReaction!(ReactionCode.heart, false),
                 onLongPress: widget.onLongPress == null
                     ? null
                     : () {
@@ -147,7 +153,12 @@ class _MessageBubbleState extends State<MessageBubble>
                         widget.onLongPress!(message);
                       },
                 child: Container(
-                  constraints: BoxConstraints(maxWidth: widget.maxWidth),
+                  constraints: BoxConstraints(
+                    maxWidth: widget.maxWidth,
+                    minWidth: message.reactionState.reactions.isEmpty
+                        ? 0
+                        : widget.maxWidth.clamp(0, 180),
+                  ),
                   width: message.replyTo == null ? null : replyWidth,
                   padding: EdgeInsets.all(
                     isImage || isLocation || isAudio ? 3 : 12,
@@ -200,6 +211,20 @@ class _MessageBubbleState extends State<MessageBubble>
                                 ),
                               ],
                             ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topLeft,
+                        child: message.reactionState.reactions.isEmpty
+                            ? const SizedBox(width: 0, height: 0)
+                            : Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: SizedBox(
+                                  height: 32,
+                                  child: _buildReactions(context),
+                                ),
+                              ),
+                      ),
                     ],
                   ),
                 ),
@@ -289,6 +314,17 @@ class _MessageBubbleState extends State<MessageBubble>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildReactions(BuildContext context) {
+    return ConversationMessageReactions(
+      message: widget.message,
+      peerAvatarUrl: widget.peerAvatarUrl,
+      peerAvatarLoader: widget.peerAvatarLoader,
+      onSelected: widget.onReaction == null
+          ? null
+          : (code) => widget.onReaction!(code, true),
     );
   }
 

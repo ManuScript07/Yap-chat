@@ -42,6 +42,19 @@ class FocusedHistoryWindowCache {
 
   void clear() => _windows.clear();
 
+  void updateReaction(String messageId, MessageReactionState state) {
+    for (final key in _windows.keys.toList()) {
+      final entry = _windows[key]!;
+      _windows[key] = _CachedWindow([
+        for (final message in entry.messages)
+          message.id == messageId &&
+                  message.reactionState.version <= state.version
+              ? message.copyWith(reactionState: state)
+              : message,
+      ], entry.loadedAt);
+    }
+  }
+
   void _removeExpired() {
     final now = _now();
     _windows.removeWhere((_, entry) => now.difference(entry.loadedAt) >= _ttl);
