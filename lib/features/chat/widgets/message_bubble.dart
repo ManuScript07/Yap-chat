@@ -10,6 +10,7 @@ import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
 import 'package:yap_chat/features/chat/widgets/audio_message_content.dart';
 import 'package:yap_chat/features/chat/widgets/message_reply_preview.dart';
+import 'package:yap_chat/features/chat/widgets/reply_preview_mode.dart';
 import 'package:yap_chat/features/chat/widgets/message_status_icon.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
@@ -26,6 +27,7 @@ class MessageBubble extends StatefulWidget {
     this.peerAvatarLoader,
     this.onLongPress,
     this.onReplyTap,
+    this.replyPreviewMode = ReplyPreviewMode.direct,
     this.onReaction,
   });
 
@@ -37,6 +39,7 @@ class MessageBubble extends StatefulWidget {
   final Future<String?> Function()? peerAvatarLoader;
   final ValueChanged<ChatMessage>? onLongPress;
   final VoidCallback? onReplyTap;
+  final ReplyPreviewMode replyPreviewMode;
   final void Function(ReactionCode code, bool toggle)? onReaction;
 
   @override
@@ -179,6 +182,7 @@ class _MessageBubbleState extends State<MessageBubble>
                             reply: reply,
                             peerName: widget.peerName,
                             isMessageMine: message.isMine,
+                            mode: widget.replyPreviewMode,
                             onTap: widget.onReplyTap,
                           ),
                         ),
@@ -560,13 +564,7 @@ class _MessageBubbleState extends State<MessageBubble>
   TextSpan _messageTextSpan(Color textColor, double timeStatusWidth) =>
       TextSpan(
         text: widget.message.text,
-        style: TextStyle(
-          color: textColor,
-          fontSize: 20,
-          fontWeight: FontWeight.w400,
-          height: 1.2,
-          letterSpacing: 0.5,
-        ),
+        style: AppTextStyles.messageBody.copyWith(color: textColor),
         children: [
           WidgetSpan(child: SizedBox(width: timeStatusWidth, height: 1)),
         ],

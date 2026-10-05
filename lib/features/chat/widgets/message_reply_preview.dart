@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/ui/ui.dart';
+import 'package:yap_chat/features/chat/widgets/reply_preview_mode.dart';
 
 class MessageReplyPreview extends StatelessWidget {
   const MessageReplyPreview({
@@ -9,12 +10,14 @@ class MessageReplyPreview extends StatelessWidget {
     required this.reply,
     required this.peerName,
     required this.isMessageMine,
+    this.mode = ReplyPreviewMode.direct,
     this.onTap,
   });
 
   final MessageReply reply;
   final String peerName;
   final bool isMessageMine;
+  final ReplyPreviewMode mode;
   final VoidCallback? onTap;
 
   @override
@@ -39,26 +42,24 @@ class MessageReplyPreview extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                author,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+              if (mode == ReplyPreviewMode.group) ...[
+                Text(
+                  author,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
+                const SizedBox(height: 2),
+              ],
               Text(
                 _previewText(context),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppTextStyles.messageBody.copyWith(color: textColor),
               ),
             ],
           ),

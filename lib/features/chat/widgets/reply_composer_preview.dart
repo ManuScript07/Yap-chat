@@ -10,11 +10,13 @@ class ReplyComposerPreview extends StatelessWidget {
     required this.message,
     required this.peerName,
     required this.onClear,
+    this.onTap,
   });
 
   final ChatMessage message;
   final String peerName;
   final VoidCallback onClear;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -38,33 +40,37 @@ class ReplyComposerPreview extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        context.l10n.chatReplyingTo(author),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colorScheme.onSurface,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _previewText(context),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colorScheme.onSurface.withValues(
-                            alpha: 0.8,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onTap,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.chatReplyingTo(author),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.colorScheme.onSurface,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                           ),
-                          fontSize: 14,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          _previewText(context),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(

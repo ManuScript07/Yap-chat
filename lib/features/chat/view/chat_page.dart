@@ -202,6 +202,10 @@ class _ChatViewState extends State<_ChatView>
     });
   }
 
+  void _jumpToMessage(String messageId) {
+    unawaited(_messagesKey.currentState?._jumpToMessage(messageId));
+  }
+
   void _onComposerHeightChanged(double height) {
     final contentHeight = math.max(
       0.0,
@@ -471,6 +475,7 @@ class _ChatViewState extends State<_ChatView>
                       ),
                       _KeyboardAwareInput(
                         focusNode: _composerFocus.focusNode,
+                        onReplyTap: _jumpToMessage,
                         chatId: widget.chat.id,
                         peerName: widget.chat.userName,
                         peerId: widget.chat.peerId,
@@ -499,6 +504,7 @@ class _ChatViewState extends State<_ChatView>
 class _KeyboardAwareInput extends StatelessWidget {
   const _KeyboardAwareInput({
     required this.focusNode,
+    required this.onReplyTap,
     required this.chatId,
     required this.peerName,
     required this.peerId,
@@ -513,6 +519,7 @@ class _KeyboardAwareInput extends StatelessWidget {
 
   final String chatId;
   final FocusNode focusNode;
+  final ValueChanged<String> onReplyTap;
   final String peerName;
   final String peerId;
   final bool blockedByMe;
@@ -625,6 +632,7 @@ class _KeyboardAwareInput extends StatelessWidget {
                                 ReplyComposerPreview(
                                   message: reply,
                                   peerName: peerName,
+                                  onTap: () => onReplyTap(reply.id),
                                   onClear: () {
                                     context.read<ChatBloc>().add(
                                       const ChatReplyCleared(),

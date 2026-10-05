@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 abstract class AppTextStyles {
+  /// Shared body typography for chat messages and quoted-message previews.
+  static const TextStyle messageBody = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w400,
+    height: 1.2,
+    letterSpacing: 0.5,
+  );
+
   /// Заголовок "Чатикс" на Roboto Flex со всеми осями Figma
   static const TextStyle titleLargeFlex = TextStyle(
     fontFamily: 'RobotoFlex',
@@ -21,27 +29,27 @@ abstract class AppTextStyles {
   static TextStyle chatName = GoogleFonts.roboto(
     fontSize: 18,
     fontWeight: FontWeight.w500,
-    height: 1.33
+    height: 1.33,
   );
 
   /// Предпросмотр сообщения (Roboto)
   static TextStyle messagePreview = GoogleFonts.roboto(
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    height: 1.25
+    height: 1.25,
   );
 
   /// Метаданные / Время (Roboto)
   static TextStyle metadata = GoogleFonts.roboto(
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    height: 1.14
+    height: 1.14,
   );
 
   /// Текст в счетчике (Roboto)
   static TextStyle badgeText = GoogleFonts.roboto(
     fontSize: 14,
     fontWeight: FontWeight.w500,
-    height: 1.14
+    height: 1.14,
   );
 }

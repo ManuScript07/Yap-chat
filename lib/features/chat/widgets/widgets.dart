@@ -3,6 +3,7 @@ export 'message_actions_bottom_sheet.dart';
 export 'message_reply_preview.dart';
 export 'message_status_icon.dart';
 export 'reply_composer_preview.dart';
+export 'reply_preview_mode.dart';
 export 'date_separator.dart';
 export 'attachment_bottom_sheet.dart';
 export 'audio_message_content.dart';
