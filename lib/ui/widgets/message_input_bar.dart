@@ -11,6 +11,7 @@ class MessageInputBar extends StatefulWidget {
     this.onAddPhoto,
     this.onVoiceRecord,
     this.replyToMessageId,
+    this.focusNode,
   });
 
   final ValueChanged<String> onSend;
@@ -18,13 +19,18 @@ class MessageInputBar extends StatefulWidget {
   final VoidCallback? onVoiceRecord;
   final String? replyToMessageId;
 
+  /// An optional, externally owned node for coordinating route and menu focus.
+  final FocusNode? focusNode;
+
   @override
   State<MessageInputBar> createState() => _MessageInputBarState();
 }
 
 class _MessageInputBarState extends State<MessageInputBar> {
   late final TextEditingController _controller;
-  late final FocusNode _focusNode;
+  FocusNode? _ownedFocusNode;
+  FocusNode get _focusNode =>
+      widget.focusNode ?? (_ownedFocusNode ??= FocusNode());
 
   bool _hasText = false;
 
@@ -33,7 +39,6 @@ class _MessageInputBarState extends State<MessageInputBar> {
     super.initState();
 
     _controller = TextEditingController();
-    _focusNode = FocusNode();
 
     _controller.addListener(_handleTextChange);
   }
@@ -84,7 +89,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
   void dispose() {
     _controller.removeListener(_handleTextChange);
     _controller.dispose();
-    _focusNode.dispose();
+    _ownedFocusNode?.dispose();
 
     super.dispose();
   }

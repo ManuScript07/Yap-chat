@@ -16,6 +16,8 @@ import 'package:yap_chat/features/chat/view/focused_history_window_cache.dart';
 import 'package:yap_chat/features/chat/view/focused_history_reconciliation.dart';
 import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
 import 'package:yap_chat/features/chat/view/visible_chat_read_selection.dart';
+import 'package:yap_chat/features/chat/view/chat_composer_focus_controller.dart';
+import 'package:yap_chat/features/chat/widgets/chat_pop_scope.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
 import 'package:yap_chat/features/chat/widgets/animated_reaction_section.dart';
@@ -90,6 +92,8 @@ class _ChatViewState extends State<_ChatView>
   late DateTime? _lastSeenAt;
   double? _composerContentHeight;
   bool _allowPop = false;
+  bool _exitInProgress = false;
+  final _composerFocus = ChatComposerFocusController();
 
   @override
   void initState() {
@@ -144,6 +148,7 @@ class _ChatViewState extends State<_ChatView>
 
   @override
   void didPushNext() {
+    _composerFocus.dismiss();
     unawaited(context.read<VoiceRecorderCubit>().finishForNavigation());
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
@@ -153,6 +158,7 @@ class _ChatViewState extends State<_ChatView>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _composerFocus.dispose();
     if (!widget.chat.isDraft) {
       unawaited(_notificationsCubit?.clearActiveConversation(widget.chat.id));
     }
@@ -168,11 +174,26 @@ class _ChatViewState extends State<_ChatView>
   }
 
   Future<void> _finishRecordingAndExit() async {
-    await context.read<VoiceRecorderCubit>().finishForNavigation();
-    if (!context.mounted) return;
-    setState(() => _allowPop = true);
-    await WidgetsBinding.instance.endOfFrame;
-    if (mounted) Navigator.of(context).maybePop();
+    if (_exitInProgress) return;
+    _exitInProgress = true;
+    final route = ModalRoute.of(context);
+    _composerFocus.dismiss();
+    try {
+      await context.read<VoiceRecorderCubit>().finishForNavigation();
+      if (!mounted || route?.isCurrent != true) return;
+      setState(() => _allowPop = true);
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted && route?.isCurrent == true) {
+        await Navigator.of(context).maybePop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _allowPop = false;
+          _exitInProgress = false;
+        });
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -197,12 +218,15 @@ class _ChatViewState extends State<_ChatView>
   }
 
   Future<void> _showMessageActions(ChatMessage message) async {
-    final action = await showMessageActionsBottomSheet(
+    final action = await _composerFocus.suspendForMenu(
       context,
-      message: message,
-      onReaction: _canReact(message)
-          ? (code) => unawaited(_react(message, code, true))
-          : null,
+      () => showMessageActionsBottomSheet(
+        context,
+        message: message,
+        onReaction: _canReact(message)
+            ? (code) => unawaited(_react(message, code, true))
+            : null,
+      ),
     );
     if (!mounted || action == null) return;
 
@@ -350,7 +374,7 @@ class _ChatViewState extends State<_ChatView>
             }
           },
           child: BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-            builder: (context, voiceState) => _ChatPopScope(
+            builder: (context, voiceState) => ChatPopScope(
               voiceState: voiceState,
               allowPop: _allowPop,
               onExit: _finishRecordingAndExit,
@@ -426,14 +450,13 @@ class _ChatViewState extends State<_ChatView>
                               widget.chat.avatarUrl,
                           avatarStoragePath: widget.chat.avatarStoragePath,
                           profileId: widget.chat.peerId,
-                          onBack: () {
-                            Navigator.of(context).maybePop();
-                          },
+                          onBack: _finishRecordingAndExit,
                           onProfileTap:
                               widget.chat.peerId.isEmpty ||
                                   widget.chat.peerIsDeleted
                               ? null
                               : () async {
+                                  _composerFocus.dismiss();
                                   await context
                                       .read<VoiceRecorderCubit>()
                                       .finishForNavigation();
@@ -447,6 +470,7 @@ class _ChatViewState extends State<_ChatView>
                         ),
                       ),
                       _KeyboardAwareInput(
+                        focusNode: _composerFocus.focusNode,
                         chatId: widget.chat.id,
                         peerName: widget.chat.userName,
                         peerId: widget.chat.peerId,
@@ -474,6 +498,7 @@ class _ChatViewState extends State<_ChatView>
 
 class _KeyboardAwareInput extends StatelessWidget {
   const _KeyboardAwareInput({
+    required this.focusNode,
     required this.chatId,
     required this.peerName,
     required this.peerId,
@@ -487,6 +512,7 @@ class _KeyboardAwareInput extends StatelessWidget {
   });
 
   final String chatId;
+  final FocusNode focusNode;
   final String peerName;
   final String peerId;
   final bool blockedByMe;
@@ -672,6 +698,7 @@ class _KeyboardAwareInput extends StatelessWidget {
                               )
                             : MessageInputBar(
                                 key: const ValueKey('message_input_bar'),
+                                focusNode: focusNode,
                                 replyToMessageId: chatState.replyToMessage?.id,
                                 onSend: (text) {
                                   context.read<ChatBloc>().add(
@@ -938,44 +965,6 @@ class _GloballyBannedComposer extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ChatPopScope extends StatelessWidget {
-  const _ChatPopScope({
-    required this.child,
-    required this.voiceState,
-    required this.allowPop,
-    required this.onExit,
-  });
-
-  final Widget child;
-  final VoiceRecorderState voiceState;
-  final bool allowPop;
-  final Future<void> Function() onExit;
-
-  @override
-  Widget build(BuildContext context) {
-    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-
-    return PopScope(
-      canPop:
-          !isKeyboardOpen &&
-          (allowPop ||
-              !voiceState.hasPendingRecording ||
-              voiceState.status == VoiceRecorderStatus.preview),
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-
-        if (isKeyboardOpen) {
-          FocusManager.instance.primaryFocus?.unfocus();
-          return;
-        }
-
-        if (voiceState.hasPendingRecording) await onExit();
-      },
-      child: child,
     );
   }
 }
