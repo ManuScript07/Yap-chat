@@ -20,12 +20,24 @@ enum ReactionCode {
 }
 
 class MessageReaction extends Equatable {
-  const MessageReaction({required this.userId, required this.code});
+  const MessageReaction({
+    required this.userId,
+    required this.code,
+    this.position = 0,
+  });
   final String userId;
   final ReactionCode code;
-  Map<String, dynamic> toJson() => {'user_id': userId, 'code': code.wireName};
+
+  /// Server-assigned order of the current uninterrupted reaction. Replacing
+  /// its emoji keeps this position; removing and adding gets a new position.
+  final int position;
+  Map<String, dynamic> toJson() => {
+    'user_id': userId,
+    'code': code.wireName,
+    'position': position,
+  };
   @override
-  List<Object?> get props => [userId, code];
+  List<Object?> get props => [userId, code, position];
 }
 
 class MessageReactionState extends Equatable {
@@ -42,7 +54,11 @@ class MessageReactionState extends Equatable {
       final code = ReactionCode.parse(value['code']);
       if (code != null) {
         entries.add(
-          MessageReaction(userId: value['user_id'] as String, code: code),
+          MessageReaction(
+            userId: value['user_id'] as String,
+            code: code,
+            position: (value['position'] as num?)?.toInt() ?? 0,
+          ),
         );
       }
     }
@@ -62,15 +78,31 @@ class MessageReactionState extends Equatable {
   final Map<String, int> userRevisions;
   ReactionCode? codeFor(String userId) =>
       reactions.where((r) => r.userId == userId).firstOrNull?.code;
-  MessageReactionState withChoice(String userId, ReactionCode? code) =>
-      MessageReactionState(
-        version: version,
-        userRevisions: userRevisions,
-        reactions: List.unmodifiable([
-          ...reactions.where((r) => r.userId != userId),
-          if (code != null) MessageReaction(userId: userId, code: code),
-        ]),
-      );
+  MessageReactionState withChoice(String userId, ReactionCode? code) {
+    final previous = reactions.where((r) => r.userId == userId).firstOrNull;
+    final position =
+        previous?.position ??
+        reactions.fold(
+              version,
+              (latest, r) => r.position > latest ? r.position : latest,
+            ) +
+            1;
+    final choices = <MessageReaction>[
+      for (final reaction in reactions)
+        if (reaction.userId != userId)
+          reaction
+        else if (code != null)
+          MessageReaction(userId: userId, code: code, position: position),
+      if (previous == null && code != null)
+        MessageReaction(userId: userId, code: code, position: position),
+    ];
+    return MessageReactionState(
+      version: version,
+      userRevisions: userRevisions,
+      reactions: List.unmodifiable(choices),
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'version': version,
     'reactions': reactions.map((r) => r.toJson()).toList(),

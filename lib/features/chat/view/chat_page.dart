@@ -18,6 +18,7 @@ import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
 import 'package:yap_chat/features/chat/view/visible_chat_read_selection.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
+import 'package:yap_chat/features/chat/widgets/animated_reaction_section.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
@@ -238,7 +239,7 @@ class _ChatViewState extends State<_ChatView>
         code,
         toggle: toggle,
       );
-      if (accepted) await HapticFeedback.selectionClick();
+      if (accepted) await HapticFeedback.lightImpact();
     } catch (error, stack) {
       if (mounted) {
         context.read<AppConfig>().talker.handle(
@@ -2488,7 +2489,7 @@ class _FocusedMediaPlaceholder extends StatelessWidget {
         onLongPress: onLongPress,
         onDoubleTap: onReaction == null
             ? null
-            : () => onReaction!(ReactionCode.heart, false),
+            : () => onReaction!(ReactionCode.heart, true),
         onTap: hasError ? onRetry : null,
         child: Container(
           width: isImage
@@ -2524,26 +2525,21 @@ class _FocusedMediaPlaceholder extends StatelessWidget {
                         ),
                 ),
               ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topLeft,
-                child: message.reactionState.reactions.isEmpty
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                        child: SizedBox(
-                          height: 32,
-                          child: ConversationMessageReactions(
-                            message: message,
-                            peerAvatarUrl: peerAvatarUrl,
-                            peerAvatarLoader: peerAvatarLoader,
-                            onSelected: onReaction == null
-                                ? null
-                                : (code) => onReaction!(code, true),
-                          ),
-                        ),
-                      ),
+              AnimatedReactionSection(
+                visible: message.reactionState.reactions.isNotEmpty,
+                child: Padding(
+                  padding: isImage
+                      ? const EdgeInsets.fromLTRB(7, 8, 7, 12)
+                      : const EdgeInsets.fromLTRB(15, 4, 15, 11),
+                  child: ConversationMessageReactions(
+                    message: message,
+                    peerAvatarUrl: peerAvatarUrl,
+                    peerAvatarLoader: peerAvatarLoader,
+                    onSelected: onReaction == null
+                        ? null
+                        : (code) => onReaction!(code, true),
+                  ),
+                ),
               ),
             ],
           ),

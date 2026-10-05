@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -65,7 +66,7 @@ class ConversationMessageReactions extends StatelessWidget {
   }
 }
 
-class MessageReactions extends StatelessWidget {
+class MessageReactions extends StatefulWidget {
   const MessageReactions({
     super.key,
     required this.message,
@@ -82,101 +83,249 @@ class MessageReactions extends StatelessWidget {
   final ImageProvider? ownAvatarImage;
   final Future<String?> Function()? peerAvatarLoader;
   final ValueChanged<ReactionCode>? onSelected;
+
+  @override
+  State<MessageReactions> createState() => _MessageReactionsState();
+
+  static List<List<MessageReaction>> groupsFor(MessageReactionState state) {
+    final ordered = state.reactions.indexed.toList()
+      ..sort((a, b) {
+        final order = a.$2.position.compareTo(b.$2.position);
+        return order == 0 ? a.$1.compareTo(b.$1) : order;
+      });
+    final groups = <ReactionCode, List<MessageReaction>>{};
+    for (final entry in ordered) {
+      groups.putIfAbsent(entry.$2.code, () => []).add(entry.$2);
+    }
+    return groups.values.toList();
+  }
+
+  static double widthFor(MessageReactionState state) {
+    final groups = groupsFor(state);
+    return groups.fold<double>(
+          0,
+          (width, group) => width + 68 + (group.length - 1) * 15,
+        ) +
+        (groups.length - 1).clamp(0, 1) * 5;
+  }
+}
+
+class _MessageReactionsState extends State<MessageReactions> {
+  final _retiring = <String, (MessageReaction, double)>{};
+  final _retiringPills = <String, (List<MessageReaction>, double)>{};
+  Timer? _retireTimer;
+
+  List<(List<MessageReaction>, double)> _pillGroups(
+    MessageReactionState state,
+  ) {
+    final result = <(List<MessageReaction>, double)>[];
+    var left = 0.0;
+    for (final group in MessageReactions.groupsFor(state)) {
+      result.add((group, left));
+      left += 73 + (group.length - 1) * 15;
+    }
+    return result;
+  }
+
+  List<(MessageReaction, double)> _avatars(MessageReactionState state) {
+    final result = <(MessageReaction, double)>[];
+    var left = 0.0;
+    for (final group in MessageReactions.groupsFor(state)) {
+      for (var i = 0; i < group.length; i++) {
+        result.add((group[i], left + 38 + i * 15));
+      }
+      left += 73 + (group.length - 1) * 15;
+    }
+    return result;
+  }
+
+  @override
+  void didUpdateWidget(covariant MessageReactions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final active = widget.message.reactionState.reactions
+        .map((r) => r.userId)
+        .toSet();
+    _retiring.removeWhere((id, _) => active.contains(id));
+    final activePills = _pillGroups(
+      widget.message.reactionState,
+    ).map((entry) => entry.$1.first.userId).toSet();
+    _retiringPills.removeWhere((id, _) => activePills.contains(id));
+    for (final entry in _pillGroups(oldWidget.message.reactionState)) {
+      if (!activePills.contains(entry.$1.first.userId)) {
+        _retiringPills[entry.$1.first.userId] = entry;
+      }
+    }
+    for (final avatar in _avatars(oldWidget.message.reactionState)) {
+      if (!active.contains(avatar.$1.userId)) {
+        _retiring[avatar.$1.userId] = avatar;
+      }
+    }
+    if (_retiring.isNotEmpty || _retiringPills.isNotEmpty) {
+      _retireTimer?.cancel();
+      _retireTimer = Timer(const Duration(milliseconds: 260), () {
+        if (mounted) {
+          setState(() {
+            _retiring.clear();
+            _retiringPills.clear();
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _retireTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final groups = <ReactionCode, List<MessageReaction>>{};
-    for (final reaction in message.reactionState.reactions) {
-      groups.putIfAbsent(reaction.code, () => []).add(reaction);
-    }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final group in groups.entries)
-            Builder(
-              builder: (context) {
-                final selected = group.value.any(
-                  (r) => r.userId == currentUserId,
-                );
-                final background = selected
-                    ? (message.isMine
-                          ? context.scaffoldBackgroundColor
-                          : context.colorScheme.primary)
-                    : (message.isMine
-                          ? context.scaffoldBackgroundColor.withValues(
-                              alpha: .25,
-                            )
-                          : context.colorScheme.primary.withValues(alpha: .15));
-                return Padding(
-                  padding: const EdgeInsets.only(right: 5),
-                  child: Semantics(
-                    button: onSelected != null,
-                    selected: selected,
-                    label: group.key.wireName,
-                    child: Material(
-                      color: background,
-                      borderRadius: BorderRadius.circular(20),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: onSelected == null
-                            ? null
-                            : () => onSelected!(group.key),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ReactionIcon(group.key, size: 24),
-                              const SizedBox(width: 6),
-                              SizedBox(
-                                width: 22 + (group.value.length - 1) * 15,
-                                height: 22,
-                                child: Stack(
-                                  children: [
-                                    for (var i = 0; i < group.value.length; i++)
-                                      Positioned(
-                                        left: i * 15.0,
-                                        child: UserAvatar(
-                                          key: ValueKey(group.value[i].userId),
-                                          size: 22,
-                                          borderRadius: 11,
-                                          avatarUrl:
-                                              group.value[i].userId ==
-                                                  currentUserId
-                                              ? ownAvatarUrl
-                                              : peerAvatarUrl,
-                                          avatarImage:
-                                              group.value[i].userId ==
-                                                  currentUserId
-                                              ? ownAvatarImage
-                                              : null,
-                                          avatarLoader:
-                                              group.value[i].userId ==
-                                                  currentUserId
-                                              ? null
-                                              : peerAvatarLoader,
-                                          preferAvatarLoader:
-                                              group.value[i].userId !=
-                                              currentUserId,
-                                        ),
-                                      ),
-                                  ],
+    final message = widget.message;
+    final currentUserId = widget.currentUserId;
+    final onSelected = widget.onSelected;
+    final avatars = _avatars(message.reactionState);
+    final pills = <Widget>[];
+    for (final (group, left) in [
+      ..._retiringPills.values,
+      ..._pillGroups(message.reactionState),
+    ]) {
+      final retiring = _retiringPills.containsKey(group.first.userId);
+      final code = group.first.code;
+      final selected = group.any((r) => r.userId == currentUserId);
+      final base = message.isMine
+          ? AppColors.incomingBubble
+          : context.colorScheme.primary;
+      final width = 68.0 + (group.length - 1) * 15;
+      pills.add(
+        AnimatedPositioned(
+          key: ValueKey('pill:${group.first.userId}'),
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeInOutCubic,
+          left: left,
+          top: 0,
+          width: width,
+          height: 32,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: retiring ? 0 : 1),
+            duration: const Duration(milliseconds: 240),
+            builder: (_, value, child) => IgnorePointer(
+              ignoring: retiring,
+              child: Opacity(
+                opacity: value,
+                child: Transform.scale(scale: .9 + .1 * value, child: child),
+              ),
+            ),
+            child: Semantics(
+              button: onSelected != null && !retiring,
+              selected: selected,
+              label: code.wireName,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 260),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? base
+                      : base.withValues(alpha: message.isMine ? .25 : .15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: onSelected == null ? null : () => onSelected(code),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 240),
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(
+                                    begin: .85,
+                                    end: 1,
+                                  ).animate(animation),
+                                  child: child,
                                 ),
                               ),
-                            ],
+                          child: ReactionIcon(
+                            code,
+                            size: 24,
+                            key: ValueKey(code),
                           ),
                         ),
                       ),
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
-        ],
+          ),
+        ),
+      );
+    }
+    // Global avatar keys survive joining/splitting emoji groups. The newest
+    // avatar is painted last, so its edge overlaps the older avatar.
+    avatars.addAll(_retiring.values);
+    avatars.sort((a, b) => a.$1.position.compareTo(b.$1.position));
+    final width = avatars.fold<double>(
+      MessageReactions.widthFor(message.reactionState),
+      (width, avatar) => avatar.$2 + 22 > width ? avatar.$2 + 22 : width,
+    );
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: width,
+        height: 32,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ...pills,
+            for (final (reaction, offset) in avatars)
+              AnimatedPositioned(
+                key: ValueKey('avatar:${reaction.userId}'),
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOutCubic,
+                left: offset,
+                top: 5,
+                width: 22,
+                height: 22,
+                child: IgnorePointer(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(
+                      begin: 0,
+                      end: _retiring.containsKey(reaction.userId) ? 0 : 1,
+                    ),
+                    duration: const Duration(milliseconds: 240),
+                    builder: (_, value, child) => Opacity(
+                      opacity: value,
+                      child: Transform.scale(
+                        scale: .9 + .1 * value,
+                        child: child,
+                      ),
+                    ),
+                    child: UserAvatar(
+                      key: ValueKey(reaction.userId),
+                      size: 22,
+                      borderRadius: 11,
+                      avatarUrl: reaction.userId == currentUserId
+                          ? widget.ownAvatarUrl
+                          : widget.peerAvatarUrl,
+                      avatarImage: reaction.userId == currentUserId
+                          ? widget.ownAvatarImage
+                          : null,
+                      avatarLoader: reaction.userId == currentUserId
+                          ? null
+                          : widget.peerAvatarLoader,
+                      preferAvatarLoader: reaction.userId != currentUserId,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

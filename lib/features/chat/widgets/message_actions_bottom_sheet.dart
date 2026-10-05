@@ -14,6 +14,7 @@ Future<MessageAction?> showMessageActionsBottomSheet(
   return showModalBottomSheet<MessageAction>(
     context: context,
     useSafeArea: true,
+    isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) => Column(
       mainAxisSize: MainAxisSize.min,
@@ -24,27 +25,41 @@ Future<MessageAction?> showMessageActionsBottomSheet(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 360),
               child: Material(
-                color: context.colorScheme.primary,
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(30),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Row(
-                    children: [
-                      for (final code in ReactionCode.values)
-                        Expanded(
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(24),
-                            onTap: () {
-                              Navigator.pop(context);
-                              onReaction(code);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: ReactionIcon(code, size: 32),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .35),
+                        blurRadius: 24,
+                        spreadRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Row(
+                      children: [
+                        for (final code in ReactionCode.values)
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(24),
+                              onTap: () {
+                                Navigator.pop(context);
+                                onReaction(code);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: ReactionIcon(code, size: 32),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -85,10 +100,7 @@ class _MessageActionsBottomSheet extends StatelessWidget {
             widthFactor: 1,
             heightFactor: 1,
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 560,
-                maxHeight: MediaQuery.sizeOf(context).height * 0.8,
-              ),
+              constraints: BoxConstraints(maxWidth: 560),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

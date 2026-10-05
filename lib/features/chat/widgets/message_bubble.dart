@@ -13,6 +13,7 @@ import 'package:yap_chat/features/chat/widgets/message_reply_preview.dart';
 import 'package:yap_chat/features/chat/widgets/message_status_icon.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
+import 'package:yap_chat/features/chat/widgets/animated_reaction_section.dart';
 
 class MessageBubble extends StatefulWidget {
   const MessageBubble({
@@ -136,16 +137,17 @@ class _MessageBubbleState extends State<MessageBubble>
       child: SlideTransition(
         position: _slideAnimation,
         child: Align(
-          alignment: message.isMine
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
+          alignment: message.type == MessageType.text
+              ? (message.isMine ? Alignment.topRight : Alignment.topLeft)
+              : (message.isMine ? Alignment.centerRight : Alignment.centerLeft),
+          heightFactor: message.type == MessageType.text ? 1 : null,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               GestureDetector(
                 onDoubleTap: widget.onReaction == null
                     ? null
-                    : () => widget.onReaction!(ReactionCode.heart, false),
+                    : () => widget.onReaction!(ReactionCode.heart, true),
                 onLongPress: widget.onLongPress == null
                     ? null
                     : () {
@@ -153,12 +155,7 @@ class _MessageBubbleState extends State<MessageBubble>
                         widget.onLongPress!(message);
                       },
                 child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: widget.maxWidth,
-                    minWidth: message.reactionState.reactions.isEmpty
-                        ? 0
-                        : widget.maxWidth.clamp(0, 180),
-                  ),
+                  constraints: BoxConstraints(maxWidth: widget.maxWidth),
                   width: message.replyTo == null ? null : replyWidth,
                   padding: EdgeInsets.all(
                     isImage || isLocation || isAudio ? 3 : 12,
@@ -193,38 +190,28 @@ class _MessageBubbleState extends State<MessageBubble>
                           ? _buildLocationMessage(context)
                           : isAudio
                           ? AudioMessageContent(message: message)
-                          : Stack(
-                              children: [
-                                _buildMessageContent(
-                                  context,
-                                  textColor,
-                                  timeStatusWidth,
-                                ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: _buildTimeStatus(
-                                    context,
-                                    timeColor,
-                                    iconColor,
-                                  ),
-                                ),
-                              ],
+                          : _buildTextMessage(
+                              context,
+                              textColor,
+                              timeColor,
+                              iconColor,
+                              timeStatusWidth,
                             ),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topLeft,
-                        child: message.reactionState.reactions.isEmpty
-                            ? const SizedBox(width: 0, height: 0)
-                            : Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: SizedBox(
-                                  height: 32,
-                                  child: _buildReactions(context),
-                                ),
-                              ),
-                      ),
+                      if (isImage || isLocation || isAudio)
+                        AnimatedReactionSection(
+                          visible: message.reactionState.reactions.isNotEmpty,
+                          child: Padding(
+                            padding: isImage
+                                ? const EdgeInsets.fromLTRB(4, 8, 4, 9)
+                                : EdgeInsets.fromLTRB(
+                                    isAudio ? 12 : 14,
+                                    4,
+                                    isAudio ? 12 : 14,
+                                    8,
+                                  ),
+                            child: _buildReactions(context),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -240,6 +227,99 @@ class _MessageBubbleState extends State<MessageBubble>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextMessage(
+    BuildContext context,
+    Color textColor,
+    Color timeColor,
+    Color iconColor,
+    double timeStatusWidth,
+  ) {
+    final hasReactions = widget.message.reactionState.reactions.isNotEmpty;
+    final text = _buildMessageContent(context, textColor, timeStatusWidth);
+    final available = (widget.maxWidth - 24).clamp(0.0, double.infinity);
+    final reactionWidth = MessageReactions.widthFor(
+      widget.message.reactionState,
+    );
+    var naturalWidth = 0.0;
+    var footerStatusWidth = timeStatusWidth;
+    var footerStatusHeight = widget.message.isMine ? 18.0 : 14.0;
+    if (hasReactions) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: '${widget.message.text} ',
+          style: _messageTextSpan(textColor, timeStatusWidth).style,
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: available);
+      naturalWidth = (painter.width + timeStatusWidth).clamp(0.0, available);
+      painter.dispose();
+      final statusPainter = TextPainter(
+        text: TextSpan(
+          text: _timeFormat.format(widget.message.timestamp),
+          style: DefaultTextStyle.of(
+            context,
+          ).style.copyWith(fontSize: 14, fontWeight: FontWeight.w400),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      footerStatusWidth =
+          statusPainter.width + (widget.message.isMine ? 22 : 0);
+      footerStatusHeight = statusPainter.height > footerStatusHeight
+          ? statusPainter.height
+          : footerStatusHeight;
+      statusPainter.dispose();
+    }
+    final width = widget.message.replyTo != null
+        ? available
+        : (reactionWidth + footerStatusWidth + 8).clamp(
+            naturalWidth,
+            available,
+          );
+    final sharesStatusRow = reactionWidth + footerStatusWidth + 8 <= width;
+    final reservedBottom = sharesStatusRow ? 0.0 : footerStatusHeight + 4;
+    // Only reactions animate. Time/status stays mounted once, outside the
+    // reveal, at the bottom-right of the growing content stack.
+    final reactions = _buildReactions(context);
+    return SizedBox(
+      width: widget.message.replyTo == null ? null : double.infinity,
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              text,
+              AnimatedReactionSection(
+                visible: hasReactions,
+                reservedBottom: reservedBottom,
+                child: hasReactions
+                    ? SizedBox(
+                        width: width,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            top: 6,
+                            right: sharesStatusRow ? footerStatusWidth + 8 : 0,
+                            bottom: reservedBottom,
+                          ),
+                          child: reactions,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: _buildTimeStatus(context, timeColor, iconColor),
+          ),
+        ],
       ),
     );
   }
@@ -474,11 +554,12 @@ class _MessageBubbleState extends State<MessageBubble>
     Color textColor,
     double timeStatusWidth,
   ) {
-    final message = widget.message;
+    return Text.rich(_messageTextSpan(textColor, timeStatusWidth));
+  }
 
-    return Text.rich(
+  TextSpan _messageTextSpan(Color textColor, double timeStatusWidth) =>
       TextSpan(
-        text: message.text,
+        text: widget.message.text,
         style: TextStyle(
           color: textColor,
           fontSize: 20,
@@ -489,9 +570,7 @@ class _MessageBubbleState extends State<MessageBubble>
         children: [
           WidgetSpan(child: SizedBox(width: timeStatusWidth, height: 1)),
         ],
-      ),
-    );
-  }
+      );
 
   Widget _buildStatusIcon(Color color) {
     return MessageStatusIcon(status: widget.message.status, color: color);
