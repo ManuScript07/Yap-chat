@@ -8,10 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/auth/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chat/data/message_text_entity.dart';
+import 'package:yap_chat/features/chat/view/message_text_actions.dart';
 import 'package:yap_chat/features/chat/view/focused_history_window_cache.dart';
 import 'package:yap_chat/features/chat/view/focused_history_reconciliation.dart';
 import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
@@ -94,6 +98,7 @@ class _ChatViewState extends State<_ChatView>
   bool _allowPop = false;
   bool _exitInProgress = false;
   final _composerFocus = ChatComposerFocusController();
+  MessageTextActions? _textActions;
 
   @override
   void initState() {
@@ -204,6 +209,54 @@ class _ChatViewState extends State<_ChatView>
 
   void _jumpToMessage(String messageId) {
     unawaited(_messagesKey.currentState?._jumpToMessage(messageId));
+  }
+
+  Future<void> _openMessageTextEntity(MessageTextEntity entity) async {
+    final ownerId = context.read<AuthBloc>().state.session?.userId;
+    if (ownerId == null) return;
+    final talker = context.read<AppConfig>().talker;
+    // Lazy creation keeps lookup dependencies out of rendering and startup.
+    final actions = _textActions ??= MessageTextActions(
+      friends: context.read<IFriendsRepository>(),
+      profiles: context.read<IProfileRepository>(),
+      currentUserId: ownerId,
+      isActive: () =>
+          mounted &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          context.read<AuthBloc>().state.session?.userId == ownerId,
+      openLink: (uri) => launchUrl(uri, mode: LaunchMode.externalApplication),
+      openProfile: (userId) async {
+        _composerFocus.dismiss();
+        await context.read<VoiceRecorderCubit>().finishForNavigation();
+        if (!mounted ||
+            ModalRoute.of(context)?.isCurrent != true ||
+            context.read<AuthBloc>().state.session?.userId != ownerId) {
+          return;
+        }
+        await openViewedProfile(
+          context,
+          userId: userId,
+          originChatId: widget.chat.id,
+        );
+      },
+      onError: talker.handle,
+    );
+    final result = await actions.activate(entity);
+    if (!mounted ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        context.read<AuthBloc>().state.session?.userId != ownerId) {
+      return;
+    }
+    if (result == MessageTextActionResult.unavailable ||
+        result == MessageTextActionResult.failed) {
+      showAppSnackBar(
+        context,
+        message: result == MessageTextActionResult.unavailable
+            ? context.l10n.friendsUsernameNotFound
+            : context.l10n.friendsActionFailed,
+        type: SnackBarType.error,
+      );
+    }
   }
 
   void _onComposerHeightChanged(double height) {
@@ -407,6 +460,8 @@ class _ChatViewState extends State<_ChatView>
                               voiceState.status !=
                               VoiceRecorderStatus.recording,
                           onMessageLongPress: _showMessageActions,
+                          onTextEntityTap: (entity) =>
+                              unawaited(_openMessageTextEntity(entity)),
                           onReaction:
                               blockedByMe ||
                                   widget.chat.blockedByPeer ||
@@ -986,6 +1041,7 @@ class _ChatMessages extends StatefulWidget {
     required this.keyboardAvoidanceOffset,
     required this.canOpenMessageMenu,
     required this.onMessageLongPress,
+    required this.onTextEntityTap,
     this.onReaction,
   });
 
@@ -995,6 +1051,7 @@ class _ChatMessages extends StatefulWidget {
   final double keyboardAvoidanceOffset;
   final bool canOpenMessageMenu;
   final ValueChanged<ChatMessage> onMessageLongPress;
+  final ValueChanged<MessageTextEntity> onTextEntityTap;
   final Future<void> Function(ChatMessage, ReactionCode, bool)? onReaction;
 
   @override
@@ -2218,6 +2275,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                       : _hydrateFocusedMedia,
                   retryFocusedMedia: () => setState(() {}),
                   onReaction: widget.onReaction,
+                  onTextEntityTap: widget.onTextEntityTap,
                   onReplyTap: _jumpToMessage,
                   onMessageLongPress: widget.canOpenMessageMenu
                       ? widget.onMessageLongPress
@@ -2317,6 +2375,7 @@ class _MessagesList extends StatelessWidget {
     required this.retryFocusedMedia,
     this.onMessageLongPress,
     this.onReaction,
+    required this.onTextEntityTap,
   });
 
   final ItemScrollController itemScrollController;
@@ -2335,6 +2394,7 @@ class _MessagesList extends StatelessWidget {
   final VoidCallback retryFocusedMedia;
   final ValueChanged<ChatMessage>? onMessageLongPress;
   final Future<void> Function(ChatMessage, ReactionCode, bool)? onReaction;
+  final ValueChanged<MessageTextEntity> onTextEntityTap;
 
   Widget _buildMessage(
     BuildContext context,
@@ -2352,6 +2412,7 @@ class _MessagesList extends StatelessWidget {
       peerAvatarLoader: () =>
           context.read<IChatsRepository>().resolveAvatar(chat),
       onLongPress: onMessageLongPress,
+      onTextEntityTap: onTextEntityTap,
       onReaction:
           onReaction == null ||
               displayMessage.isLocalOnly ||

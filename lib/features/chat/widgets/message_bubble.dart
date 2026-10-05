@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:yap_chat/features/auth/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/features/chat/data/message_text_entity.dart';
+import 'package:yap_chat/features/chat/widgets/message_text_content.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/message_media_grid.dart';
 import 'package:yap_chat/features/chat/widgets/audio_message_content.dart';
@@ -29,6 +31,7 @@ class MessageBubble extends StatefulWidget {
     this.onReplyTap,
     this.replyPreviewMode = ReplyPreviewMode.direct,
     this.onReaction,
+    this.onTextEntityTap,
   });
 
   final ChatMessage message;
@@ -41,6 +44,7 @@ class MessageBubble extends StatefulWidget {
   final VoidCallback? onReplyTap;
   final ReplyPreviewMode replyPreviewMode;
   final void Function(ReactionCode code, bool toggle)? onReaction;
+  final ValueChanged<MessageTextEntity>? onTextEntityTap;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -558,6 +562,15 @@ class _MessageBubbleState extends State<MessageBubble>
     Color textColor,
     double timeStatusWidth,
   ) {
+    final onTap = widget.onTextEntityTap;
+    if (onTap != null) {
+      return MessageTextContent(
+        text: widget.message.text,
+        style: AppTextStyles.messageBody.copyWith(color: textColor),
+        footerWidth: timeStatusWidth,
+        onEntityTap: onTap,
+      );
+    }
     return Text.rich(_messageTextSpan(textColor, timeStatusWidth));
   }
 
