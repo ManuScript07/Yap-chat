@@ -67,6 +67,7 @@ class VoiceRecorderBar extends StatelessWidget {
             Row(
               children: [
                 GlassIconButton(
+                  chatStyle: true,
                   icon: Icons.delete_outline_rounded,
                   onTap: onDiscard,
                   width: 50,
@@ -110,6 +111,7 @@ class VoiceRecorderBar extends StatelessWidget {
                   child: IgnorePointer(
                     ignoring: !canFinish,
                     child: GlassIconButton(
+                      chatStyle: true,
                       icon: isRecording
                           ? Icons.stop_rounded
                           : state.playback.isPlaying

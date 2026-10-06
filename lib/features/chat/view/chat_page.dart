@@ -2624,6 +2624,7 @@ class _ScrollToBottomButton extends StatelessWidget {
       children: [
         GlassIconButton(
           icon: Icons.keyboard_arrow_down_rounded,
+          chatStyle: true,
           onTap: onPressed,
           width: 50,
           height: 50,

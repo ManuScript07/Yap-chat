@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/widgets/chat_glass_surface.dart';
 
 class GlassIconButton extends StatelessWidget {
   const GlassIconButton({
@@ -12,6 +13,7 @@ class GlassIconButton extends StatelessWidget {
     this.height = 50,
     this.borderRadius = 20,
     this.iconSize = 32,
+    this.chatStyle = true,
   });
 
   final IconData icon;
@@ -20,6 +22,7 @@ class GlassIconButton extends StatelessWidget {
   final double height;
   final double borderRadius;
   final double iconSize;
+  final bool chatStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +30,26 @@ class GlassIconButton extends StatelessWidget {
 
     final outerRadius = math.max(0.0, borderRadius);
     final innerRadius = math.max(0.0, borderRadius - 1.5);
+
+    if (chatStyle) {
+      return SizedBox(
+        width: width,
+        height: height,
+        child: ChatGlassSurface(
+          borderRadius: outerRadius,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(innerRadius),
+              child: Center(
+                child: Icon(icon, color: mainColor, size: iconSize),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return SizedBox(
       width: width,

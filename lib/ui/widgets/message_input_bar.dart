@@ -1,6 +1,6 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/widgets/chat_glass_surface.dart';
 import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
 import 'package:yap_chat/ui/theme/theme.dart';
 
@@ -169,6 +169,7 @@ class _AttachmentButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassIconButton(
       icon: Icons.add,
+      chatStyle: true,
       onTap: onTap ?? () {},
       width: 50,
       height: 50,
@@ -193,53 +194,40 @@ class _MessageTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 50, maxHeight: 150),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(
-            color: mainColor.withValues(alpha: 0.4),
-            width: 1.5,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              color: mainColor.withValues(alpha: 0.15),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                contextMenuBuilder: buildAppTextSelectionToolbar,
-                minLines: 1,
-                maxLines: 5,
-                keyboardType: TextInputType.multiline,
-                cursorColor: mainColor,
-                textAlignVertical: TextAlignVertical.center,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.15,
-                  color: mainColor,
-                ),
-                decoration: InputDecoration(
-                  filled: false,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  hintText: context.l10n.chatInputHint,
-                  hintStyle: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.15,
-                    color: mainColor.withValues(alpha: 0.6),
-                  ),
-                ),
+      child: ChatGlassSurface(
+        borderRadius: 32,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            contextMenuBuilder: buildAppTextSelectionToolbar,
+            minLines: 1,
+            maxLines: 5,
+            keyboardType: TextInputType.multiline,
+            cursorColor: mainColor,
+            textAlignVertical: TextAlignVertical.center,
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.15,
+              color: mainColor,
+            ),
+            decoration: InputDecoration(
+              filled: false,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 13),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              hintText: context.l10n.chatInputHint,
+              hintStyle: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.15,
+                color: mainColor.withValues(alpha: 0.6),
               ),
             ),
           ),

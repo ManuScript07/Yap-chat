@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
 import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
 import 'package:yap_chat/ui/widgets/user_avatar.dart';
@@ -40,6 +41,14 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     final onSurface = context.colorScheme.onSurface;
     final surface = context.colorScheme.surface;
     final statusText = _statusText(context);
+    // Keep the brand hue, but lift its luminance for this small header label.
+    // This is local to the chat and does not change primary buttons elsewhere.
+    // final onlineColor = Color.lerp(
+    //   context.colorScheme.primary,
+    //   onSurface,
+    //   0.7,
+    // )!;
+    final onlineColor = AppColors.incomingBubble;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -51,6 +60,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: Row(
         children: [
           GlassIconButton(
+            chatStyle: true,
             icon: Icons.arrow_back_rounded,
             onTap: onBack ?? () => Navigator.of(context).pop(),
           ),
@@ -91,14 +101,26 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  AnimatedStatusSwitcher(
-                    child: Text(
-                      statusText,
-                      key: ValueKey(statusText),
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.2,
-                        color: onSurface,
+                  SizedBox(
+                    width: double.infinity,
+                    child: AnimatedStatusSwitcher(
+                      alignment: AlignmentDirectional.centerStart,
+                      scaleAlignment: AlignmentDirectional.centerStart,
+                      scaleBegin: 0.94,
+                      duration: const Duration(milliseconds: 260),
+                      child: Text(
+                        statusText,
+                        key: ValueKey(statusText),
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.2,
+                          color: isOnline ? onlineColor : onSurface,
+                          fontWeight: isOnline
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
