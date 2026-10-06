@@ -359,11 +359,8 @@ class _ProfileScaffold extends StatelessWidget {
   Future<void> _openChat(BuildContext context) async {
     final chat = await context.read<ViewedProfileCubit>().prepareChat();
     if (!context.mounted) return;
-    if (originChatId != null &&
-        (chat.id == originChatId || chat.peerId == viewedProfile.profile.id)) {
-      await context.router.maybePop();
-      return;
-    }
+    // The shared navigator checks the actual chat below this profile. The
+    // viewed peer alone cannot identify the conversation we came from.
     await context.read<ChatNavigationCoordinator>().open(chat);
   }
 

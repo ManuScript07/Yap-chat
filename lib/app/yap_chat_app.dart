@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:yap_chat/app/chat_navigation_coordinator.dart';
+import 'package:yap_chat/router/chat_route_navigation.dart';
 import 'package:yap_chat/app/profile_navigation_coordinator.dart';
 import 'package:yap_chat/app/profile_share_link_coordinator.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
@@ -98,16 +99,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
         final authRouter = await _authenticatedRouter;
         if (!mounted || authRouter == null) return;
 
-        final chatRoute = ChatRoute(
-          key: ValueKey('chat:${chat.id}'),
-          chat: chat,
-        );
-        if (_hasActiveChatRoute(authRouter)) {
-          unawaited(authRouter.popAndPush<Object?, Object?>(chatRoute));
-        } else {
-          unawaited(authRouter.push<Object?>(chatRoute));
-        }
-        await WidgetsBinding.instance.endOfFrame;
+        await openChatRoute(authRouter, chat);
       },
       isConversationVisible: _isConversationVisible,
       isPeerVisible: _isPeerVisible,
@@ -446,11 +438,6 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       await WidgetsBinding.instance.endOfFrame;
     }
     return null;
-  }
-
-  bool _hasActiveChatRoute(StackRouter authRouter) {
-    final stack = authRouter.stackData;
-    return stack.isNotEmpty && stack.last.name == ChatRoute.name;
   }
 
   Future<void> _initializeNotificationsAndReminder(String userId) async {
