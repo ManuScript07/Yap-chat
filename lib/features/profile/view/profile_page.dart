@@ -70,6 +70,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Row(
                   children: [
                     GlassButton(
+                      frostedStyle: true,
                       icon: Icons.edit_rounded,
                       size: 50,
                       iconSize: 28,
@@ -79,6 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(width: 12),
                     GlassButton(
+                      frostedStyle: true,
                       icon: Icons.settings_rounded,
                       size: 50,
                       iconSize: 29,
@@ -87,6 +89,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const Spacer(),
                     GlassButton(
+                      frostedStyle: true,
                       icon: Icons.share_rounded,
                       size: 50,
                       iconSize: 28,

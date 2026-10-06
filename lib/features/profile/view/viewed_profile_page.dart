@@ -122,6 +122,7 @@ class _ViewedProfileView extends StatelessWidget {
                     top: MediaQuery.paddingOf(context).top + 16,
                     left: MediaQuery.paddingOf(context).left + 16,
                     child: GlassButton(
+                      frostedStyle: true,
                       icon: Icons.arrow_back_rounded,
                       size: 50,
                       iconSize: 28,
@@ -299,6 +300,7 @@ class _ProfileScaffold extends StatelessWidget {
                 child: Row(
                   children: [
                     GlassButton(
+                      frostedStyle: true,
                       icon: Icons.arrow_back_rounded,
                       size: 50,
                       iconSize: 28,
@@ -319,6 +321,7 @@ class _ProfileScaffold extends StatelessWidget {
                               .contains(viewedProfile.profile.id);
                           final visible = globalVisible && !isExcluded;
                           return GlassButton(
+                            frostedStyle: true,
                             icon: visible
                                 ? Icons.visibility_rounded
                                 : Icons.visibility_off_rounded,
@@ -340,6 +343,7 @@ class _ProfileScaffold extends StatelessWidget {
                       const SizedBox(width: 12),
                     ],
                     GlassButton(
+                      frostedStyle: true,
                       icon: Icons.settings_rounded,
                       size: 50,
                       iconSize: 29,

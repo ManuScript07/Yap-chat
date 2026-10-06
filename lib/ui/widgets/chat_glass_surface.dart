@@ -4,12 +4,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 
-/// The chat's smoky glass material, independent of layout and input behavior.
+/// Shared frosted material, independent of layout and input behavior.
 class ChatGlassSurface extends StatelessWidget {
   const ChatGlassSurface({
     super.key,
     required this.borderRadius,
     required this.child,
+    this.lightStyle = false,
   });
 
   // Preserve the space previously occupied by the 1.5px border. The new
@@ -20,22 +21,29 @@ class ChatGlassSurface extends StatelessWidget {
   final double borderRadius;
   final Widget child;
 
+  /// The profile keeps its milky-white tint; chats use the smoky tint by default.
+  final bool lightStyle;
+
   @override
   Widget build(BuildContext context) {
     final foreground = context.colorScheme.onSurface;
     final background = context.scaffoldBackgroundColor;
     final radius = math.max(0.0, borderRadius);
     final innerRadius = math.max(0.0, radius - contentInset);
-    final tint = background.withValues(alpha: 0.10);
+    final tint = lightStyle
+        ? Colors.transparent
+        : background.withValues(alpha: 0.10);
 
     return CustomPaint(
-      foregroundPainter: _GlassRimPainter(radius, foreground),
+      foregroundPainter: _GlassRimPainter(radius, foreground, lightStyle),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(radius),
           boxShadow: [
             BoxShadow(
-              color: background.withValues(alpha: 0.12),
+              color: (lightStyle ? foreground : background).withValues(
+                alpha: 0.12,
+              ),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -54,11 +62,11 @@ class ChatGlassSurface extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       Color.alphaBlend(
-                        foreground.withValues(alpha: 0.18),
+                        foreground.withValues(alpha: lightStyle ? 0.40 : 0.18),
                         tint,
                       ),
                       Color.alphaBlend(
-                        foreground.withValues(alpha: 0.12),
+                        foreground.withValues(alpha: lightStyle ? 0.32 : 0.12),
                         tint,
                       ),
                     ],
@@ -76,10 +84,11 @@ class ChatGlassSurface extends StatelessWidget {
 
 /// A subtle top highlight without another filter, layer, or layout inset.
 class _GlassRimPainter extends CustomPainter {
-  const _GlassRimPainter(this.radius, this.color);
+  const _GlassRimPainter(this.radius, this.color, this.lightStyle);
 
   final double radius;
   final Color color;
+  final bool lightStyle;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -93,9 +102,9 @@ class _GlassRimPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withValues(alpha: 0.40),
-          color.withValues(alpha: 0.20),
-          color.withValues(alpha: 0.08),
+          color.withValues(alpha: lightStyle ? 0.80 : 0.40),
+          color.withValues(alpha: lightStyle ? 0.45 : 0.20),
+          color.withValues(alpha: lightStyle ? 0.22 : 0.08),
         ],
         stops: const [0, 0.45, 1],
       ).createShader(rect);
@@ -110,5 +119,7 @@ class _GlassRimPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlassRimPainter oldDelegate) =>
-      radius != oldDelegate.radius || color != oldDelegate.color;
+      radius != oldDelegate.radius ||
+      color != oldDelegate.color ||
+      lightStyle != oldDelegate.lightStyle;
 }
