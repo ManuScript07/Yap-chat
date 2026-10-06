@@ -397,8 +397,7 @@ class _ChatViewState extends State<_ChatView>
           context.read<VoiceRecorderCubit>().restoreUnsentDraft(),
       child: BlocListener<PresenceCubit, PresenceState>(
         listenWhen: (previous, current) =>
-            previous.isOnline(widget.chat.peerId) &&
-            !current.isOnline(widget.chat.peerId),
+            current.hasNewOfflineEvent(widget.chat.peerId, previous),
         listener: (context, state) {
           if (!context.mounted ||
               state.isOnline(widget.chat.peerId) ||

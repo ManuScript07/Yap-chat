@@ -25,10 +25,12 @@ class UserPresenceRealtimeEvent {
   const UserPresenceRealtimeEvent({
     required this.userId,
     required this.isOnline,
+    this.viewerUserId,
   });
 
   final String userId;
   final bool isOnline;
+  final String? viewerUserId;
 }
 
 /// Owns the single private, user-addressed Realtime channel used by chat and
@@ -54,6 +56,7 @@ class UserRealtimeDataSource {
       StreamController<UserConversationRealtimeEvent>.broadcast();
   final _presenceController =
       StreamController<UserPresenceRealtimeEvent>.broadcast();
+  final _connectionController = StreamController<bool>.broadcast();
 
   RealtimeChannel? _channel;
   RealtimeChannel? _diagnosticsChannel;
@@ -62,6 +65,9 @@ class UserRealtimeDataSource {
   Future<void> _operation = Future<void>.value();
   bool _paused = false;
   bool _disposed = false;
+
+  /// Local subscription lifecycle, not another channel or transport.
+  Stream<bool> watchConnectionEvents() => _connectionController.stream;
 
   Stream<UserConversationRealtimeEvent> watchConversationEvents() {
     unawaited(_serialize(_ensureChannel));
@@ -95,6 +101,7 @@ class UserRealtimeDataSource {
     await Future.wait([
       _conversationController.close(),
       _presenceController.close(),
+      _connectionController.close(),
     ]);
   }
 
@@ -124,11 +131,16 @@ class UserRealtimeDataSource {
     _channelLease = _diagnostics?.trackRealtimeChannel('user-realtime');
     _channelUserId = userId;
     channel.subscribe((status, _) {
-      if (!identical(_channel, channel) || _disposed) return;
+      if (!identical(_channel, channel) ||
+          _disposed ||
+          _client.auth.currentUser?.id != userId) {
+        return;
+      }
       switch (status) {
         case RealtimeSubscribeStatus.subscribed:
           _backoff.reset();
           _talker.debug('User realtime subscribed');
+          _connectionController.add(true);
           _conversationController.add(
             const UserConversationRealtimeEvent(
               conversationId: null,
@@ -147,7 +159,9 @@ class UserRealtimeDataSource {
     RealtimeChannel channel,
     Map<String, dynamic> event,
   ) {
-    if (!identical(_channel, channel) || _conversationController.isClosed) {
+    if (!identical(_channel, channel) ||
+        _client.auth.currentUser?.id != _channelUserId ||
+        _conversationController.isClosed) {
       return;
     }
     final payload = _payload(event);
@@ -181,7 +195,11 @@ class UserRealtimeDataSource {
     RealtimeChannel channel,
     Map<String, dynamic> event,
   ) {
-    if (!identical(_channel, channel) || _presenceController.isClosed) return;
+    if (!identical(_channel, channel) ||
+        _client.auth.currentUser?.id != _channelUserId ||
+        _presenceController.isClosed) {
+      return;
+    }
     final payload = _payload(event);
     // Diagnostics must never affect normal Realtime event delivery. Payloads
     // from Supabase are JSON-compatible in practice, but keep this optional
@@ -199,7 +217,11 @@ class UserRealtimeDataSource {
     final isOnline = payload['is_online'];
     if (userId is String && isOnline is bool) {
       _presenceController.add(
-        UserPresenceRealtimeEvent(userId: userId, isOnline: isOnline),
+        UserPresenceRealtimeEvent(
+          userId: userId,
+          isOnline: isOnline,
+          viewerUserId: _channelUserId,
+        ),
       );
     }
   }
@@ -213,6 +235,7 @@ class UserRealtimeDataSource {
     if (!identical(_channel, channel)) return;
     _channel = null;
     _channelUserId = null;
+    _connectionController.add(false);
     _talker.warning('User realtime unavailable: ${status.name}');
     unawaited(
       _serialize(() async {
@@ -234,6 +257,9 @@ class UserRealtimeDataSource {
     final channel = _channel;
     _channel = null;
     _channelUserId = null;
+    if (channel != null && !_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
     if (channel != null) await _removeChannel(channel);
   }
 

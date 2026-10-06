@@ -60,6 +60,7 @@ class FriendsRemoteDataSource {
     FriendPageCursor? after,
     int pageSize = 50,
   }) async {
+    final presenceTicket = _presenceStore?.captureSnapshot();
     final response = await measureRpc(
       _diagnostics,
       'get_friends_page',
@@ -75,7 +76,7 @@ class FriendsRemoteDataSource {
     final rows = response
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList(growable: false);
-    _presenceStore?.recordAll({
+    _presenceStore?.applySnapshot(presenceTicket!, {
       for (final row in rows)
         if (row['id'] is String && row['is_online'] is bool)
           row['id'] as String: row['is_online'] as bool,
@@ -91,6 +92,7 @@ class FriendsRemoteDataSource {
   }
 
   Future<Friend?> fetchCurrentFriend(String friendId) async {
+    final presenceTicket = _presenceStore?.captureSnapshot();
     final response = await measureRpc(
       _diagnostics,
       'get_current_friend',
@@ -104,13 +106,14 @@ class FriendsRemoteDataSource {
     final id = row['id'];
     final isOnline = row['is_online'];
     if (id is String && isOnline is bool) {
-      _presenceStore?.record(id, isOnline: isOnline);
+      _presenceStore?.applySnapshot(presenceTicket!, {id: isOnline});
     }
     return _mapFriend(row);
   }
 
   Future<List<Friend>> fetchCurrentFriends(List<String> friendIds) async {
     if (friendIds.isEmpty) return const [];
+    final presenceTicket = _presenceStore?.captureSnapshot();
     final response = await measureRpc(
       _diagnostics,
       'get_current_friends',
@@ -122,7 +125,7 @@ class FriendsRemoteDataSource {
     final rows = response
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList(growable: false);
-    _presenceStore?.recordAll({
+    _presenceStore?.applySnapshot(presenceTicket!, {
       for (final row in rows)
         if (row['id'] is String && row['is_online'] is bool)
           row['id'] as String: row['is_online'] as bool,

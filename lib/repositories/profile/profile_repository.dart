@@ -107,6 +107,7 @@ class ProfileRepository
     bool registerView,
     AccountSessionSnapshot scope,
   ) async {
+    final presenceTicket = _presenceStore?.captureSnapshot();
     final response = await measureRpc(
       _diagnostics,
       'get_viewed_profile',
@@ -124,7 +125,7 @@ class ProfileRepository
     if (response.isEmpty) throw const ProfileNotFoundException();
     final row = Map<String, dynamic>.from(response.first as Map);
     if (row['is_online'] case final bool isOnline) {
-      _presenceStore?.record(userId, isOnline: isOnline);
+      _presenceStore?.applySnapshot(presenceTicket!, {userId: isOnline});
     }
     final photos = _photoRows(row['photos']);
     final baseProfile = UserProfile.fromMap(row);

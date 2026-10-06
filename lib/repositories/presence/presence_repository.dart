@@ -6,12 +6,16 @@ import 'package:uuid/uuid.dart';
 import 'package:yap_chat/repositories/presence/abstract_presence_repository.dart';
 import 'package:yap_chat/core/services/app_diagnostics.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
+import 'package:yap_chat/repositories/presence/presence_snapshot.dart';
 import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
 
 /// Maintains one server-side app session and consumes selective presence
 /// events from the shared user channel.
 class PresenceRepository
-    implements IPresenceRepository, IPresenceWatchRepository {
+    implements
+        IPresenceRepository,
+        IPresenceWatchRepository,
+        IPresenceLifecycleRepository {
   PresenceRepository({
     required SupabaseClient client,
     required Talker talker,
@@ -41,9 +45,11 @@ class PresenceRepository
   final Uuid _uuid;
   final Map<String, Set<String>> _watchScopes = {};
   final Map<String, Future<bool>> _scopeSyncs = {};
+  final Map<String, int> _scopeRevisions = {};
   final Set<String> _dirtyScopes = {};
 
   StreamSubscription<UserPresenceRealtimeEvent>? _eventSubscription;
+  StreamSubscription<bool>? _connectionSubscription;
   DiagnosticsLease? _eventListenerLease;
   Timer? _heartbeatTimer;
   Future<void> _operation = Future<void>.value();
@@ -56,9 +62,17 @@ class PresenceRepository
 
   @override
   Stream<Set<String>> watchOnlineUserIds() {
+    return _watchStore(_statusStore.watch());
+  }
+
+  @override
+  Stream<PresenceSnapshot> watchPresenceSnapshots() =>
+      _watchStore(_statusStore.watchSnapshots());
+
+  Stream<T> _watchStore<T>(Stream<T> stream) {
     return Stream.multi((controller) {
       final lease = _diagnostics?.trackLocalListener('presence-status-store');
-      final subscription = _statusStore.watch().listen(
+      final subscription = stream.listen(
         controller.add,
         onError: controller.addError,
         onDone: controller.close,
@@ -79,21 +93,44 @@ class PresenceRepository
   Future<void> _connect(String userId) async {
     if (!_shouldBeConnected) return;
     if (_connectedUserId == userId && _sessionId != null) return;
-    await _disconnect(closeRemoteSession: true, clearScopes: false);
+    if (_sessionId != null) {
+      await _disconnect(clearScopes: false);
+    }
     if (!_shouldBeConnected) return;
 
     if (_scopeOwnerUserId != null && _scopeOwnerUserId != userId) {
       _watchScopes.clear();
       _dirtyScopes.clear();
+      _scopeRevisions.clear();
       _statusStore.clear();
     }
     _scopeOwnerUserId = userId;
 
     _connectedUserId = userId;
     _sessionId = _uuid.v4();
-    _dirtyScopes.addAll(_watchScopes.keys);
+    final sessionId = _sessionId!;
+    _markAllScopesDirty();
+    _statusStore.beginRevalidation(_requestTimeout * 2);
+    _connectionSubscription = _userRealtime.watchConnectionEvents().listen((
+      joined,
+    ) {
+      if (!_isCurrent(sessionId)) return;
+      if (!joined) {
+        _statusStore.beginRevalidation(_requestTimeout * 2, restart: false);
+        return;
+      }
+      // Catch changes missed before joining or during SDK rejoin. Reuse the
+      // existing session and coalesced scope RPCs, never create another channel.
+      _markAllScopesDirty();
+      unawaited(_synchronizeDirtyScopes());
+    });
     _eventSubscription = _userRealtime.watchPresenceEvents().listen(
-      (event) => _statusStore.record(event.userId, isOnline: event.isOnline),
+      (event) {
+        if (_isCurrent(sessionId) &&
+            (event.viewerUserId == null || event.viewerUserId == userId)) {
+          _statusStore.record(event.userId, isOnline: event.isOnline);
+        }
+      },
       onError: (Object error, StackTrace stackTrace) =>
           _talker.handle(error, stackTrace, 'Presence events failed'),
     );
@@ -112,20 +149,25 @@ class PresenceRepository
   @override
   Future<void> disconnect() {
     _shouldBeConnected = false;
-    return _serialize(
-      () => _disconnect(closeRemoteSession: true, clearScopes: false),
-    );
+    _statusStore.clear();
+    return _serialize(() => _disconnect(clearScopes: true));
   }
 
-  Future<void> _disconnect({
-    required bool closeRemoteSession,
-    required bool clearScopes,
-  }) async {
+  @override
+  Future<void> suspend() {
+    _shouldBeConnected = false;
+    _statusStore.suspend();
+    return _serialize(() => _disconnect(clearScopes: false));
+  }
+
+  Future<void> _disconnect({required bool clearScopes}) async {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     final subscription = _eventSubscription;
     _eventSubscription = null;
     await subscription?.cancel();
+    await _connectionSubscription?.cancel();
+    _connectionSubscription = null;
     _eventListenerLease?.dispose();
     _eventListenerLease = null;
 
@@ -134,7 +176,15 @@ class PresenceRepository
     _sessionConfirmed = false;
     _lastHeartbeatSucceededAt = null;
     _connectedUserId = null;
-    if (closeRemoteSession && sessionId != null) {
+    // An old session's request must not suppress a new session's synchronization.
+    _scopeSyncs.clear();
+    if (clearScopes) {
+      _scopeOwnerUserId = null;
+      _watchScopes.clear();
+      _dirtyScopes.clear();
+      _scopeRevisions.clear();
+    }
+    if (sessionId != null) {
       try {
         await measureRpc(
           _diagnostics,
@@ -144,14 +194,13 @@ class PresenceRepository
                 'close_my_presence_session',
                 params: {'target_session_id': sessionId},
               )
+              .retry(enabled: false)
               .timeout(const Duration(seconds: 3)),
         );
       } catch (_) {
         // The server lease expires automatically after an abrupt disconnect.
       }
     }
-    if (clearScopes) _watchScopes.clear();
-    _statusStore.clear();
   }
 
   Future<void> _heartbeat() async {
@@ -167,16 +216,20 @@ class PresenceRepository
               'touch_my_presence_session',
               params: {'target_session_id': sessionId},
             )
+            // This repository already retries via its single heartbeat timer.
+            // Disable hidden SDK retries so one attempt sends one request;
+            // the repository owns the retry schedule and timeout.
+            .retry(enabled: false)
             .timeout(_requestTimeout),
       );
+      if (!_isCurrent(sessionId)) return;
       final mustRestoreScopes = !_sessionConfirmed;
       _sessionConfirmed = true;
       _lastHeartbeatSucceededAt = DateTime.now().toUtc();
-      if (mustRestoreScopes) _dirtyScopes.addAll(_watchScopes.keys);
-      if (_dirtyScopes.isNotEmpty) {
-        await Future.wait(Set<String>.of(_dirtyScopes).map(_synchronizeScope));
-      }
+      if (mustRestoreScopes) _markAllScopesDirty();
+      await _synchronizeDirtyScopes();
     } catch (error, stackTrace) {
+      if (!_isCurrent(sessionId)) return;
       final lastSuccess = _lastHeartbeatSucceededAt;
       if (lastSuccess == null ||
           DateTime.now().toUtc().difference(lastSuccess) >= _sessionLease) {
@@ -203,7 +256,7 @@ class PresenceRepository
     }
     if (_sameSet(_watchScopes[normalizedScope], normalizedIds)) return;
     _watchScopes[normalizedScope] = Set.unmodifiable(normalizedIds);
-    _dirtyScopes.add(normalizedScope);
+    _markScopeDirty(normalizedScope);
     await _synchronizeScope(normalizedScope);
   }
 
@@ -212,41 +265,77 @@ class PresenceRepository
     final normalizedScope = scopeId.trim();
     if (!_watchScopes.containsKey(normalizedScope)) return;
     _watchScopes.remove(normalizedScope);
-    _dirtyScopes.add(normalizedScope);
+    _markScopeDirty(normalizedScope);
     await _synchronizeScope(normalizedScope);
   }
 
   Future<void> _synchronizeScope(String scopeId) async {
     final active = _scopeSyncs[scopeId];
     if (active != null) {
-      await active;
+      final succeeded = await active;
+      if (succeeded && _dirtyScopes.contains(scopeId)) {
+        await _synchronizeScope(scopeId);
+      }
       return;
     }
     final sessionId = _sessionId;
     if (!_shouldBeConnected || sessionId == null || !_sessionConfirmed) return;
-    final snapshot = Set<String>.of(_watchScopes[scopeId] ?? const {});
-    final operation = _performScopeSync(scopeId, sessionId, snapshot);
+    final operation = _synchronizeScopeLoop(scopeId, sessionId);
     _scopeSyncs[scopeId] = operation;
-    var succeeded = false;
     try {
-      succeeded = await operation;
+      await operation;
     } finally {
       if (identical(_scopeSyncs[scopeId], operation)) {
         _scopeSyncs.remove(scopeId);
       }
     }
-    if (!_sameSet(_watchScopes[scopeId] ?? const {}, snapshot)) {
-      await _synchronizeScope(scopeId);
-    } else if (succeeded) {
-      _dirtyScopes.remove(scopeId);
+  }
+
+  Future<bool> _synchronizeScopeLoop(String scopeId, String sessionId) async {
+    while (_isCurrent(sessionId) && _sessionConfirmed) {
+      final revision = _scopeRevisions[scopeId];
+      final ids = Set<String>.of(_watchScopes[scopeId] ?? const {});
+      final succeeded = await _performScopeSync(
+        scopeId,
+        sessionId,
+        ids,
+        revision,
+      );
+      if (!_isCurrent(sessionId) || !succeeded) return false;
+      if (_scopeRevisions[scopeId] == revision) {
+        _dirtyScopes.remove(scopeId);
+        if (!_watchScopes.containsKey(scopeId)) _scopeRevisions.remove(scopeId);
+        return true;
+      }
     }
+    return false;
+  }
+
+  bool _isCurrent(String sessionId) =>
+      _shouldBeConnected && _sessionId == sessionId;
+
+  void _markScopeDirty(String scopeId) {
+    _dirtyScopes.add(scopeId);
+    _scopeRevisions[scopeId] = (_scopeRevisions[scopeId] ?? 0) + 1;
+  }
+
+  void _markAllScopesDirty() {
+    for (final scopeId in _watchScopes.keys) {
+      _markScopeDirty(scopeId);
+    }
+  }
+
+  Future<void> _synchronizeDirtyScopes() async {
+    await Future.wait(Set<String>.of(_dirtyScopes).map(_synchronizeScope));
   }
 
   Future<bool> _performScopeSync(
     String scopeId,
     String sessionId,
     Set<String> userIds,
+    int? revision,
   ) async {
+    final ticket = _statusStore.captureSnapshot();
     try {
       final response = await measureRpc(
         _diagnostics,
@@ -260,10 +349,12 @@ class PresenceRepository
                 'target_user_ids': userIds.toList(growable: false),
               },
             )
+            .retry(enabled: false)
             .timeout(_requestTimeout),
       );
-      if (_sessionId != sessionId) return false;
-      _statusStore.recordAll({
+      if (!_isCurrent(sessionId)) return false;
+      if (_scopeRevisions[scopeId] != revision) return true;
+      _statusStore.applySnapshot(ticket, {
         for (final item in response)
           if (item is Map &&
               item['target_user_id'] is String &&

@@ -46,6 +46,7 @@ class ChatsRemoteDataSource {
   }
 
   Future<List<Chat>> fetchChats() async {
+    final presenceTicket = _presenceStore?.captureSnapshot();
     final response = await measureRpc(
       _diagnostics,
       'get_chat_summaries',
@@ -54,7 +55,7 @@ class ChatsRemoteDataSource {
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
-    _presenceStore?.recordAll({
+    _presenceStore?.applySnapshot(presenceTicket!, {
       for (final row in rows)
         if (row['peer_id'] is String && row['peer_is_online'] is bool)
           row['peer_id'] as String: row['peer_is_online'] as bool,

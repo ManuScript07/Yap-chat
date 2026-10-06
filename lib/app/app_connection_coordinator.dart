@@ -72,13 +72,32 @@ class AppConnectionCoordinator {
     final desiredUserId = _desiredUserId;
 
     if (!_isForeground || desiredUserId == null) {
-      if (!_isConnected) return;
+      if (!_isConnected) {
+        // Signing out while already suspended still clears volatile presence.
+        if (desiredUserId == null || desiredUserId != _connectedUserId) {
+          await _guard(
+            'Presence disconnect failed',
+            _presenceRepository.disconnect,
+          );
+          _connectedUserId = null;
+        }
+        return;
+      }
       _isConnected = false;
-      _connectedUserId = null;
+      final suspendPresence =
+          desiredUserId != null &&
+          desiredUserId == _connectedUserId &&
+          _presenceRepository is IPresenceLifecycleRepository;
+      if (!suspendPresence) _connectedUserId = null;
       await Future.wait([
         _guard('Chats realtime pause failed', _chatsRepository.pauseRealtime),
         _guard('Chat network pause failed', _chatRepository.pauseNetwork),
-        _guard('Presence disconnect failed', _presenceRepository.disconnect),
+        _guard(
+          'Presence disconnect failed',
+          suspendPresence
+              ? (_presenceRepository as IPresenceLifecycleRepository).suspend
+              : _presenceRepository.disconnect,
+        ),
         _guard(
           'Friends realtime pause failed',
           _friendsRepository.pauseRealtime,

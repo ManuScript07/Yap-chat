@@ -155,8 +155,7 @@ class _ViewedProfileView extends StatelessWidget {
             child: BlocListener<PresenceCubit, PresenceState>(
               listenWhen: (previous, current) =>
                   !viewedProfile.isBlocked &&
-                  previous.isOnline(viewedProfile.profile.id) &&
-                  !current.isOnline(viewedProfile.profile.id),
+                  current.hasNewOfflineEvent(viewedProfile.profile.id, previous),
               listener: (context, _) =>
                   context.read<ViewedProfileCubit>().markOfflineNow(),
               child: _ProfileScaffold(

@@ -1,50 +1,169 @@
 import 'dart:async';
 
-/// In-memory online snapshot shared by repositories that already receive
-/// presence data in their normal server responses.
-///
-/// Online state is deliberately not persisted: after a process restart an old
-/// `true` would be more misleading than an unknown/offline value.
+import 'presence_snapshot.dart';
+
+/// Captured before starting an RPC, never when its response arrives.
+class PresenceSnapshotTicket {
+  const PresenceSnapshotTicket._(this.epoch, this.order, this.eventClock);
+  final int epoch;
+  final int order;
+  final int eventClock;
+}
+
+class _Observation {
+  const _Observation(
+    this.online,
+    this.revision,
+    this.eventClock,
+    this.order, {
+    this.offlineEvent = false,
+  });
+  final bool? online;
+  final int revision;
+  final int eventClock;
+  final int order;
+  final bool offlineEvent;
+}
+
+/// Volatile observations shared by existing RPCs and the single user channel.
+/// Delayed snapshots cannot undo newer events or cross account boundaries.
 class PresenceStatusStore {
-  final _controller = StreamController<Set<String>>.broadcast();
-  Set<String> _onlineUserIds = const {};
+  final _controller = StreamController<PresenceSnapshot>.broadcast();
+  final Map<String, _Observation> _observations = {};
+  PresenceSnapshot _snapshot = const PresenceSnapshot();
+  int _epoch = 0;
+  int _order = 0;
+  int _eventClock = 0;
+  int _revision = 0;
+  Timer? _revalidationTimer;
+  int _revalidationRevision = 0;
 
-  Set<String> get onlineUserIds => _onlineUserIds;
+  Set<String> get onlineUserIds => _snapshot.onlineUserIds;
 
-  Stream<Set<String>> watch() async* {
-    yield _onlineUserIds;
-    yield* _controller.stream;
-  }
+  Stream<PresenceSnapshot> watchSnapshots() => Stream.multi((controller) {
+    final subscription = _controller.stream.listen(
+      controller.add,
+      onDone: controller.close,
+    );
+    controller.add(_snapshot);
+    controller.onCancel = subscription.cancel;
+  });
 
-  void record(String userId, {required bool isOnline}) {
-    if (userId.isEmpty) return;
-    final next = Set<String>.of(_onlineUserIds);
-    final changed = isOnline ? next.add(userId) : next.remove(userId);
-    if (!changed) return;
-    _emit(next);
-  }
+  Stream<Set<String>> watch() => watchSnapshots()
+      .map((snapshot) => snapshot.onlineUserIds)
+      .distinct(_sameSet);
 
-  void recordAll(Map<String, bool> statuses) {
-    if (statuses.isEmpty) return;
-    final next = Set<String>.of(_onlineUserIds);
-    var changed = false;
+  PresenceSnapshotTicket captureSnapshot() =>
+      PresenceSnapshotTicket._(_epoch, ++_order, _eventClock);
+
+  void applySnapshot(
+    PresenceSnapshotTicket ticket,
+    Map<String, bool> statuses,
+  ) {
+    if (ticket.epoch != _epoch) return;
     for (final entry in statuses.entries) {
       if (entry.key.isEmpty) continue;
-      changed |= entry.value ? next.add(entry.key) : next.remove(entry.key);
+      final previous = _observations[entry.key];
+      if (previous != null &&
+          (previous.eventClock > ticket.eventClock ||
+              previous.order > ticket.order)) {
+        continue;
+      }
+      _observations[entry.key] = _Observation(
+        entry.value,
+        ++_revision,
+        previous?.eventClock ?? 0,
+        ticket.order,
+      );
     }
-    if (changed) _emit(next);
+    _publish();
+  }
+
+  /// Events take precedence even if online membership did not change.
+  void record(String userId, {required bool isOnline}) =>
+      recordAll({userId: isOnline});
+
+  void recordAll(Map<String, bool> statuses) {
+    for (final entry in statuses.entries) {
+      if (entry.key.isEmpty) continue;
+      _observations[entry.key] = _Observation(
+        entry.value,
+        ++_revision,
+        ++_eventClock,
+        _observations[entry.key]?.order ?? 0,
+        offlineEvent: !entry.value,
+      );
+    }
+    _publish();
+  }
+
+  /// Keep last-known values briefly during recovery, not indefinitely after a
+  /// failed connection. Expiry is unknown, not a confirmed peer logout.
+  void beginRevalidation(Duration grace, {bool restart = true}) {
+    // A later failure must also cover observations refreshed since the first
+    // attempt, while keeping the original deadline bounded during retry storms.
+    _revalidationRevision = _revision;
+    if (!restart && _revalidationTimer != null) return;
+    _revalidationTimer?.cancel();
+    _revalidationTimer = Timer(grace, () {
+      _revalidationTimer = null;
+      for (final entry in _observations.entries.toList(growable: false)) {
+        final observation = entry.value;
+        if (observation.online != true ||
+            observation.revision > _revalidationRevision) {
+          continue;
+        }
+        _observations[entry.key] = _Observation(
+          null,
+          ++_revision,
+          ++_eventClock,
+          observation.order,
+        );
+      }
+      _publish();
+    });
+  }
+
+  void suspend() {
+    _revalidationTimer?.cancel();
+    _revalidationTimer = null;
+    // Reject requests from the suspended connection without inventing logout.
+    _epoch++;
   }
 
   void clear() {
-    if (_onlineUserIds.isEmpty) return;
-    _onlineUserIds = const {};
-    if (!_controller.isClosed) _controller.add(_onlineUserIds);
+    suspend();
+    _observations.clear();
+    _publish();
   }
 
-  Future<void> dispose() => _controller.close();
-
-  void _emit(Set<String> value) {
-    _onlineUserIds = Set.unmodifiable(value);
-    if (!_controller.isClosed) _controller.add(_onlineUserIds);
+  Future<void> dispose() {
+    _revalidationTimer?.cancel();
+    return _controller.close();
   }
+
+  void _publish() {
+    final online = <String>{};
+    final offline = <String>{};
+    final offlineEvents = <String>{};
+    for (final entry in _observations.entries) {
+      if (entry.value.online == true) online.add(entry.key);
+      if (entry.value.online == false) offline.add(entry.key);
+      if (entry.value.offlineEvent) offlineEvents.add(entry.key);
+    }
+    if (_sameSet(online, _snapshot.onlineUserIds) &&
+        _sameSet(offline, _snapshot.confirmedOfflineUserIds) &&
+        _sameSet(offlineEvents, _snapshot.offlineEventUserIds)) {
+      return;
+    }
+    _snapshot = PresenceSnapshot(
+      onlineUserIds: Set.unmodifiable(online),
+      confirmedOfflineUserIds: Set.unmodifiable(offline),
+      offlineEventUserIds: Set.unmodifiable(offlineEvents),
+    );
+    if (!_controller.isClosed) _controller.add(_snapshot);
+  }
+
+  static bool _sameSet(Set<String> a, Set<String> b) =>
+      a.length == b.length && a.containsAll(b);
 }

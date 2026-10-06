@@ -28,6 +28,7 @@ class NearbyRemoteDataSource {
     required NearbyFilters filters,
     String? afterUserId,
   }) async {
+    final presenceTicket = _presenceStore?.captureSnapshot();
     final response = await measureRpc(
       _diagnostics,
       'get_nearby_people',
@@ -47,7 +48,7 @@ class NearbyRemoteDataSource {
     final rows = response
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList(growable: false);
-    _presenceStore?.recordAll({
+    _presenceStore?.applySnapshot(presenceTicket!, {
       for (final row in rows)
         if (row['id'] is String && row['is_online'] is bool)
           row['id'] as String: row['is_online'] as bool,
