@@ -32,6 +32,7 @@ import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
+import 'package:yap_chat/ui/widgets/chat_glass_surface.dart';
 
 @RoutePage()
 class ChatPage extends StatelessWidget {
@@ -813,47 +814,34 @@ class _UnblockComposer extends StatelessWidget {
       ),
       child: SizedBox(
         height: 50,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: mainColor.withValues(alpha: .4),
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(32),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: Container(
-                color: mainColor.withValues(alpha: .15),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(32),
-                    onTap: isPending ? null : () => _confirm(context),
-                    child: Center(
-                      child: isPending
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: mainColor,
-                              ),
-                            )
-                          : Text(
-                              context.l10n.unblockUser.toLowerCase(),
-                              style: TextStyle(
-                                color: mainColor.withValues(alpha: .6),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: .15,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
+        child: ChatGlassSurface(
+          borderRadius: 32,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(
+                32 - ChatGlassSurface.contentInset,
+              ),
+              onTap: isPending ? null : () => _confirm(context),
+              child: Center(
+                child: isPending
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: mainColor,
+                        ),
+                      )
+                    : Text(
+                        context.l10n.unblockUser.toLowerCase(),
+                        style: TextStyle(
+                          color: mainColor.withValues(alpha: .6),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .15,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -914,44 +902,34 @@ class _DeletedAccountComposerState extends State<_DeletedAccountComposer> {
       ),
       child: SizedBox(
         height: 50,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: mainColor.withValues(alpha: .4),
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(32),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: Material(
-                color: mainColor.withValues(alpha: .15),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(32),
-                  onTap: _isDeleting ? null : _confirmDeletion,
-                  child: Center(
-                    child: _isDeleting
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: mainColor,
-                            ),
-                          )
-                        : Text(
-                            context.l10n.chatsDeleteAccountChat,
-                            style: TextStyle(
-                              color: mainColor.withValues(alpha: .6),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: .15,
-                            ),
-                          ),
-                  ),
-                ),
+        child: ChatGlassSurface(
+          borderRadius: 32,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(
+                32 - ChatGlassSurface.contentInset,
+              ),
+              onTap: _isDeleting ? null : _confirmDeletion,
+              child: Center(
+                child: _isDeleting
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: mainColor,
+                        ),
+                      )
+                    : Text(
+                        context.l10n.chatsDeleteAccountChat,
+                        style: TextStyle(
+                          color: mainColor.withValues(alpha: .6),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .15,
+                        ),
+                      ),
               ),
             ),
           ),
