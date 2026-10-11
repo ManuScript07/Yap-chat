@@ -220,10 +220,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     _accountSessionController?.setAuthenticatedUser(session.userId);
     final accountChanged = state.session?.userId != session.userId;
+    final establishedProfile =
+        !accountChanged &&
+            state.status == AuthStatus.authenticated &&
+            state.profile?.id == session.userId
+        ? state.profile
+        : null;
+
+    // A token refresh is not another sign-in. Also protect callers that deliver
+    // a duplicate directly, rather than through the repository's distinct stream.
+    if (establishedProfile != null && state.session == session) return;
 
     emit(
       state.copyWith(
-        status: AuthStatus.loading,
+        // Changed auth metadata is revalidated in the background. Keep the
+        // established account's screen; a different account still uses Splash.
+        status: establishedProfile == null ? AuthStatus.loading : state.status,
         session: session,
         clearProfile: accountChanged,
         isSubmitting: false,
@@ -233,11 +245,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         clearBannedSupportEmail: true,
       ),
     );
-    UserProfile? cachedProfile;
-    try {
-      cachedProfile = await _profileRepository.getCachedProfile(session.userId);
-    } catch (_) {
-      // Повреждённый кеш не должен блокировать загрузку актуального профиля.
+    UserProfile? cachedProfile = establishedProfile;
+    if (cachedProfile == null) {
+      try {
+        cachedProfile = await _profileRepository.getCachedProfile(
+          session.userId,
+        );
+      } catch (_) {
+        // Повреждённый кеш не должен блокировать загрузку актуального профиля.
+      }
     }
 
     AuthAccountAccess? cachedAccess;
@@ -249,6 +265,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // A corrupted access marker must never prevent an ordinary account from
       // using its established offline profile cache.
     }
+    if (emit.isDone || _isSigningOut) return;
     var accessChecked = false;
     if (cachedAccess?.isBanned ?? false) {
       final bannedCachedAccess = cachedAccess!;
@@ -263,6 +280,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           const Duration(seconds: 3),
         );
         await _cacheAccountAccess(session.userId, access);
+        if (emit.isDone || _isSigningOut) return;
         if (access.isBanned) {
           _emitBanned(
             emit,
@@ -297,6 +315,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           const Duration(seconds: 3),
         );
         await _cacheAccountAccess(session.userId, access);
+        if (emit.isDone || _isSigningOut) return;
         if (access.isBanned) {
           _emitBanned(
             emit,
@@ -348,6 +367,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           const Duration(seconds: 3),
         );
         await _cacheAccountAccess(session.userId, access);
+        if (emit.isDone || _isSigningOut) return;
         if (access.isBanned) {
           _emitBanned(
             emit,
@@ -375,8 +395,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
     }
 
+    if (emit.isDone || _isSigningOut) return;
+
     try {
       final profile = await _profileRepository.getOrCreateProfile(session);
+      if (emit.isDone || _isSigningOut) return;
       emit(
         state.copyWith(
           status: _statusForProfile(profile),
@@ -388,6 +411,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ),
       );
     } catch (error) {
+      if (emit.isDone || _isSigningOut) return;
       if (_isGlobalBanFailure(error)) {
         await _cacheAccountAccess(
           session.userId,
@@ -696,6 +720,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     String? username,
     String? supportEmail,
   }) {
+    if (emit.isDone || _isSigningOut) return;
     _accountSessionController?.setAuthenticatedUser(null);
     emit(
       state.copyWith(
@@ -721,6 +746,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     bool expired = false,
     DateTime? scheduledFor,
   }) {
+    if (emit.isDone || _isSigningOut) return;
     _accountSessionController?.setAuthenticatedUser(null);
     emit(
       state.copyWith(

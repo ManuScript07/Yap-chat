@@ -59,15 +59,20 @@ class AuthRepository implements IAuthRepository {
   @override
   Stream<AuthSession?> observeSession() {
     final initialSession = currentSession;
-    var initialEventSkipped = false;
+    var initialEventHandled = false;
+    var observedUserId = initialSession?.userId;
 
     return _client.auth.onAuthStateChange
         .transform(
           StreamTransformer<AuthState, AuthState>.fromHandlers(
             handleData: (authState, sink) {
-              _accountSessionController?.setAuthenticatedUser(
-                authState.session?.user.id,
-              );
+              final userId = authState.session?.user.id;
+              // Same-account refreshes must not reopen a local account boundary
+              // that AuthBloc has closed after a confirmed ban or deletion.
+              if (userId != observedUserId) {
+                observedUserId = userId;
+                _accountSessionController?.setAuthenticatedUser(userId);
+              }
               if (authState.session != null) {
                 unawaited(_oauthAttemptCoordinator?.completeAttempt());
               }
@@ -80,14 +85,16 @@ class AuthRepository implements IAuthRepository {
           ),
         )
         .map((authState) => _mapSession(authState.session))
+        // Seed duplicate detection with the replayed session before dropping
+        // it: AuthBloc already handles currentSession explicitly at startup.
+        .distinct()
         .where((session) {
-          if (!initialEventSkipped && session == initialSession) {
-            initialEventSkipped = true;
-            return false;
+          if (!initialEventHandled) {
+            initialEventHandled = true;
+            return session != initialSession;
           }
           return true;
-        })
-        .distinct();
+        });
   }
 
   @override
