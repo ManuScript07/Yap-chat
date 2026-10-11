@@ -48,6 +48,7 @@ class AuthRepository implements IAuthRepository {
 
   static const _yandexProvider = OAuthProvider('custom:yandex');
   static const _yandexQueryParams = <String, String>{'force_confirm': 'yes'};
+  static final _birthDatePattern = RegExp(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
   @override
   AuthSession? get currentSession => _mapSession(_client.auth.currentSession);
@@ -217,7 +218,11 @@ class AuthRepository implements IAuthRepository {
         'display_name',
         'real_name',
       ]),
-      birthDate: _firstDate(metadata, const ['birth_date', 'birthday']),
+      birthDate: _firstBirthDate(metadata, const [
+        'birth_date',
+        'birthdate',
+        'birthday',
+      ]),
       avatarUrl: _firstString(metadata, const [
         'avatar_url',
         'picture',
@@ -234,8 +239,31 @@ class AuthRepository implements IAuthRepository {
     return null;
   }
 
-  DateTime? _firstDate(Map<String, dynamic> metadata, List<String> keys) {
-    final value = _firstString(metadata, keys);
-    return value == null ? null : DateTime.tryParse(value);
+  DateTime? _firstBirthDate(Map<String, dynamic> metadata, List<String> keys) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    for (final key in keys) {
+      final rawValue = metadata[key];
+      if (rawValue is! String) continue;
+      final value = rawValue.trim();
+      if (!_birthDatePattern.hasMatch(value)) {
+        continue;
+      }
+      final year = int.parse(value.substring(0, 4));
+      final month = int.parse(value.substring(5, 7));
+      final day = int.parse(value.substring(8, 10));
+      final date = DateTime.tryParse(value);
+      // Yandex may omit date components; DateTime also normalizes impossible
+      // dates (e.g. February 31). Neither is a usable date of birth.
+      if (year > 0 &&
+          date != null &&
+          date.year == year &&
+          date.month == month &&
+          date.day == day &&
+          !date.isAfter(today)) {
+        return date;
+      }
+    }
+    return null;
   }
 }

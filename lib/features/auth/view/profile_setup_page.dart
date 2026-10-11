@@ -31,8 +31,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   late final FocusNode _dayFocusNode;
   late final FocusNode _monthFocusNode;
   late final FocusNode _yearFocusNode;
+  late final String? _userId;
 
   var _currentStep = 0;
+  var _birthDateEdited = false;
   ProfileGender? _gender;
   Uint8List? _localAvatarBytes;
   var _isAvatarRemoved = false;
@@ -43,6 +45,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     super.initState();
     final state = context.read<AuthBloc>().state;
     final profile = state.profile;
+    _userId = state.session?.userId ?? profile?.id;
     final birthDate = profile?.birthDate ?? state.session?.birthDate;
 
     _pageController = PageController();
@@ -91,8 +94,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
     return BlocListener<AuthBloc, AuthState>(
       listenWhen: (previous, current) =>
-          previous.failure != current.failure && current.failure != null,
+          previous.profile?.birthDate != current.profile?.birthDate ||
+          previous.session?.birthDate != current.session?.birthDate ||
+          (previous.failure != current.failure && current.failure != null),
       listener: (context, state) {
+        _synchronizeBirthDate(state);
+        if (state.failure == null) return;
         setState(
           () => _validationError = _failureMessage(context, state.failure),
         );
@@ -430,7 +437,23 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   }
 
   void _onBirthDateChanged() {
+    _birthDateEdited = true;
     setState(() => _validationError = null);
+  }
+
+  void _synchronizeBirthDate(AuthState state) {
+    if (_birthDateEdited || state.session?.userId != _userId) return;
+    final birthDate = state.profile?.birthDate ?? state.session?.birthDate;
+    if (birthDate == null) return;
+
+    // The incomplete cached profile can open this page before the server
+    // refresh finishes. Fill untouched fields without replacing user edits.
+    final day = birthDate.day.toString().padLeft(2, '0');
+    final month = birthDate.month.toString().padLeft(2, '0');
+    final year = birthDate.year.toString();
+    if (_dayController.text != day) _dayController.text = day;
+    if (_monthController.text != month) _monthController.text = month;
+    if (_yearController.text != year) _yearController.text = year;
   }
 
   Future<void> _pickAvatar() async {
