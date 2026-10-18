@@ -8,6 +8,7 @@ class Friend extends Equatable {
     required this.friendsSince,
     this.avatarUrl,
     this.avatarStoragePath,
+    this.cachedAvatarPath,
   });
 
   final String id;
@@ -15,6 +16,7 @@ class Friend extends Equatable {
   final String displayName;
   final String? avatarUrl;
   final String? avatarStoragePath;
+  final String? cachedAvatarPath;
   final DateTime friendsSince;
 
   Friend copyWith({String? avatarUrl}) => Friend(
@@ -23,6 +25,12 @@ class Friend extends Equatable {
     displayName: displayName,
     avatarUrl: avatarUrl ?? this.avatarUrl,
     avatarStoragePath: avatarStoragePath,
+    cachedAvatarPath:
+        avatarStoragePath != null ||
+            avatarUrl == null ||
+            avatarUrl == this.avatarUrl
+        ? cachedAvatarPath
+        : null,
     friendsSince: friendsSince,
   );
 
@@ -33,6 +41,7 @@ class Friend extends Equatable {
     displayName,
     avatarUrl,
     avatarStoragePath,
+    cachedAvatarPath,
     friendsSince,
   ];
 }

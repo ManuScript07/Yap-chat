@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:yap_chat/core/database/database.dart';
+import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 
@@ -8,18 +9,33 @@ class ChatsCacheDataSource {
   const ChatsCacheDataSource({
     required AppDatabase database,
     required String Function() userIdProvider,
+    MediaCacheService? mediaCache,
   }) : _database = database,
-       _userIdProvider = userIdProvider;
+       _userIdProvider = userIdProvider,
+       _mediaCache = mediaCache;
 
   final AppDatabase _database;
   final String Function() _userIdProvider;
+  final MediaCacheService? _mediaCache;
+
+  Future<void> _prepareAvatarPaths() async {
+    try {
+      await _mediaCache?.prepareLocalPaths();
+    } catch (_) {
+      // A missing OS cache directory must not hide cached chat metadata.
+    }
+  }
 
   Stream<List<Chat>> watch({String? ownerUserId}) {
     final owner = ownerUserId ?? _userIdProvider();
     final query = _database.select(_database.cachedChats)
       ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.lastMessageTime)]);
-    return query.watch().map((rows) => List.unmodifiable(rows.map(_mapRow)));
+    final pathsReady = _prepareAvatarPaths();
+    return query.watch().asyncMap((rows) async {
+      await pathsReady;
+      return List.unmodifiable(rows.map(_mapRow));
+    });
   }
 
   Future<List<Chat>> read({String? ownerUserId}) async {
@@ -27,7 +43,10 @@ class ChatsCacheDataSource {
     final query = _database.select(_database.cachedChats)
       ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([(table) => OrderingTerm.desc(table.lastMessageTime)]);
-    return (await query.get()).map(_mapRow).toList(growable: false);
+    final pathsReady = _prepareAvatarPaths();
+    final rows = await query.get();
+    await pathsReady;
+    return rows.map(_mapRow).toList(growable: false);
   }
 
   Future<Chat?> readByPeerId(String peerId, {String? ownerUserId}) async {
@@ -39,6 +58,7 @@ class ChatsCacheDataSource {
       )
       ..limit(1);
     final row = await query.getSingleOrNull();
+    await _prepareAvatarPaths();
     return row == null ? null : _mapRow(row);
   }
 
@@ -182,6 +202,12 @@ class ChatsCacheDataSource {
       userName: row.peerDisplayName,
       avatarUrl: row.peerAvatarUrl,
       avatarStoragePath: row.peerAvatarStoragePath,
+      cachedAvatarPath:
+          row.blockedByPeer ||
+              row.peerIsGloballyBanned ||
+              _isDeletedAccountRow(row)
+          ? null
+          : _localAvatarPath(row),
       lastMessageId: row.lastMessageId,
       lastMessage: row.lastMessage,
       lastMessageType: ChatPreviewType.values.byName(row.lastMessageType),
@@ -197,6 +223,26 @@ class ChatsCacheDataSource {
       peerIsGloballyBanned: row.peerIsGloballyBanned,
       peerIsDeleted: _isDeletedAccountRow(row),
     );
+  }
+
+  String? _localAvatarPath(CachedChat row) {
+    final storage = row.peerAvatarStoragePath;
+    final url = row.peerAvatarUrl;
+    if (storage?.isNotEmpty == true) {
+      return _mediaCache?.localStorageFilePath(
+        ownerUserId: row.ownerUserId,
+        bucket: 'avatars',
+        storagePath: storage!,
+        mimeType: 'image/jpeg',
+      );
+    }
+    return url?.isNotEmpty == true
+        ? _mediaCache?.localStorageFilePath(
+            ownerUserId: row.ownerUserId,
+            bucket: MediaCacheService.externalAvatarsBucket,
+            storagePath: url!,
+          )
+        : null;
   }
 
   CachedChatsCompanion _companion(Chat chat, [String? ownerUserId]) {

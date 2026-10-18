@@ -47,6 +47,7 @@ class RepositoryContainer {
     );
     final chatsCache = ChatsCacheDataSource(
       database: config.database,
+      mediaCache: mediaCache,
       userIdProvider: () => client.auth.currentUser!.id,
     );
     final chatCache = ChatCacheDataSource(
@@ -74,6 +75,7 @@ class RepositoryContainer {
     );
     final friendsCache = FriendsCacheDataSource(
       database: config.database,
+      mediaCache: mediaCache,
       userIdProvider: () => client.auth.currentUser!.id,
     );
     final contactMatchCache = ContactMatchCacheDataSource(

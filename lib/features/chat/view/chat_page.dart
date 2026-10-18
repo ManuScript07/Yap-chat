@@ -298,6 +298,11 @@ class _ChatViewState extends State<_ChatView>
     }
   }
 
+  bool get _canShowPeerAvatar =>
+      !widget.chat.blockedByPeer &&
+      !widget.chat.peerIsGloballyBanned &&
+      !widget.chat.peerIsDeleted;
+
   bool _canReact(ChatMessage message) =>
       !widget.chat.isDraft &&
       !widget.chat.blockedByPeer &&
@@ -495,7 +500,12 @@ class _ChatViewState extends State<_ChatView>
                               !widget.chat.peerIsGloballyBanned &&
                               !widget.chat.peerIsDeleted &&
                               widget.chat.showsLastSeen,
-                          avatarUrl: widget.chat.avatarUrl,
+                          avatarUrl: _canShowPeerAvatar
+                              ? widget.chat.avatarUrl
+                              : null,
+                          initialAvatarPath: _canShowPeerAvatar
+                              ? widget.chat.cachedAvatarPath
+                              : null,
                           avatarLoader:
                               widget.chat.blockedByPeer ||
                                   widget.chat.peerIsGloballyBanned ||
@@ -504,10 +514,13 @@ class _ChatViewState extends State<_ChatView>
                               : () => context
                                     .read<IChatsRepository>()
                                     .resolveAvatar(widget.chat),
-                          avatarRevision:
-                              widget.chat.avatarStoragePath ??
-                              widget.chat.avatarUrl,
-                          avatarStoragePath: widget.chat.avatarStoragePath,
+                          avatarRevision: _canShowPeerAvatar
+                              ? widget.chat.avatarStoragePath ??
+                                    widget.chat.avatarUrl
+                              : null,
+                          avatarStoragePath: _canShowPeerAvatar
+                              ? widget.chat.avatarStoragePath
+                              : null,
                           profileId: widget.chat.peerId,
                           onBack: _finishRecordingAndExit,
                           onProfileTap:

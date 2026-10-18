@@ -105,10 +105,7 @@ class ProfileAvatarHero extends StatelessWidget {
 }
 
 class ProfileAvatarHeroSnapshot {
-  const ProfileAvatarHeroSnapshot({
-    this.avatarUrl,
-    this.avatarStoragePath,
-  });
+  const ProfileAvatarHeroSnapshot({this.avatarUrl, this.avatarStoragePath});
 
   final String? avatarUrl;
   final String? avatarStoragePath;
@@ -171,6 +168,8 @@ Widget _avatarFlightChild(Widget child) {
       fit: BoxFit.fill,
       child: UserAvatar(
         avatarUrl: child.avatarUrl,
+        initialAvatarPath: child.initialAvatarPath,
+        preferAvatarLoader: child.preferAvatarLoader,
         avatarImage: child.avatarImage,
         avatarLoader: child.avatarLoader,
         avatarRevision: child.avatarRevision,

@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app_connection_coordinator.dart';
 import 'package:yap_chat/app/app_config.dart';
+import 'package:yap_chat/app/cached_avatar_frames.dart';
 import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/app/permission_reminder_coordinator.dart';
 import 'package:yap_chat/app/repository_container.dart';
@@ -37,6 +38,7 @@ class _AppInitializerState extends State<AppInitializer> {
   late final PermissionReminderCoordinator _permissionReminderCoordinator;
   late final UserDataCleanupCoordinator _userDataCleanupCoordinator;
   late final IAppPublicContentRepository _appPublicContentRepository;
+  bool _firstFrameDeferred = false;
 
   @override
   void initState() {
@@ -84,10 +86,52 @@ class _AppInitializerState extends State<AppInitializer> {
       nearbyRepository: _repositories.nearbyRepository,
       talker: widget.config.talker,
     );
+    _prepareFirstAvatarFrames();
+  }
+
+  void _prepareFirstAvatarFrames() {
+    final binding = WidgetsBinding.instance;
+    final account = widget.config.accountSessionController;
+    final view = binding.platformDispatcher.implicitView;
+    if (widget.config.isDev ||
+        account.userId == null ||
+        view == null ||
+        binding.firstFrameRasterized) {
+      return;
+    }
+    final scope = account.capture();
+    // Keep the native launch screen for bounded, local-only image preparation.
+    // The widget tree/auth/router continue initializing concurrently; there is
+    // no second loading gate or spinner after the chat list has appeared.
+    binding.deferFirstFrame();
+    _firstFrameDeferred = true;
+    unawaited(
+      CachedAvatarFrames(
+            database: widget.config.database,
+            mediaCache: _repositories.mediaCache,
+          )
+          .prepare(
+            ownerUserId: scope.userId,
+            devicePixelRatio: view.devicePixelRatio,
+            viewportHeight: view.physicalSize.height / view.devicePixelRatio,
+            isCurrent: () => mounted && account.isCurrent(scope),
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            widget.config.talker.handle(error, stackTrace);
+          })
+          .whenComplete(_releaseFirstFrame),
+    );
+  }
+
+  void _releaseFirstFrame() {
+    if (!_firstFrameDeferred) return;
+    _firstFrameDeferred = false;
+    WidgetsBinding.instance.allowFirstFrame();
   }
 
   @override
   void dispose() {
+    _releaseFirstFrame();
     unawaited(() async {
       await _connectionCoordinator.dispose();
       await _locationTrackingCoordinator.dispose();

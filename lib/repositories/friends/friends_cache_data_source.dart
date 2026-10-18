@@ -1,16 +1,28 @@
 import 'package:drift/drift.dart';
 import 'package:yap_chat/core/database/database.dart';
+import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/friends/data/data.dart';
 
 class FriendsCacheDataSource {
   const FriendsCacheDataSource({
     required AppDatabase database,
     required String Function() userIdProvider,
+    MediaCacheService? mediaCache,
   }) : _database = database,
-       _userIdProvider = userIdProvider;
+       _userIdProvider = userIdProvider,
+       _mediaCache = mediaCache;
 
   final AppDatabase _database;
   final String Function() _userIdProvider;
+  final MediaCacheService? _mediaCache;
+
+  Future<void> _prepareAvatarPaths() async {
+    try {
+      await _mediaCache?.prepareLocalPaths();
+    } catch (_) {
+      // Cache-directory failure is not a failure to load the friends list.
+    }
+  }
 
   Stream<List<Friend>> watchFriends({String? ownerUserId}) {
     final owner = ownerUserId ?? _userIdProvider();
@@ -20,7 +32,11 @@ class FriendsCacheDataSource {
         (table) => OrderingTerm.desc(table.friendsSince),
         (table) => OrderingTerm.desc(table.userId),
       ]);
-    return query.watch().map((rows) => List.unmodifiable(rows.map(_mapFriend)));
+    final pathsReady = _prepareAvatarPaths();
+    return query.watch().asyncMap((rows) async {
+      await pathsReady;
+      return List.unmodifiable(rows.map(_mapFriend));
+    });
   }
 
   Stream<List<FriendRequest>> watchRequests({String? ownerUserId}) {
@@ -41,7 +57,10 @@ class FriendsCacheDataSource {
         (table) => OrderingTerm.desc(table.friendsSince),
         (table) => OrderingTerm.desc(table.userId),
       ]);
-    return (await query.get()).map(_mapFriend).toList(growable: false);
+    final pathsReady = _prepareAvatarPaths();
+    final rows = await query.get();
+    await pathsReady;
+    return rows.map(_mapFriend).toList(growable: false);
   }
 
   Future<bool> containsFriend(String friendId, {String? ownerUserId}) async {
@@ -623,8 +642,29 @@ class FriendsCacheDataSource {
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,
     avatarStoragePath: row.avatarStoragePath,
+    cachedAvatarPath: _localAvatarPath(row),
     friendsSince: row.friendsSince,
   );
+
+  String? _localAvatarPath(CachedFriend row) {
+    final storage = row.avatarStoragePath;
+    final url = row.avatarUrl;
+    if (storage?.isNotEmpty == true) {
+      return _mediaCache?.localStorageFilePath(
+        ownerUserId: row.ownerUserId,
+        bucket: 'avatars',
+        storagePath: storage!,
+        mimeType: 'image/jpeg',
+      );
+    }
+    return url?.isNotEmpty == true
+        ? _mediaCache?.localStorageFilePath(
+            ownerUserId: row.ownerUserId,
+            bucket: MediaCacheService.externalAvatarsBucket,
+            storagePath: url!,
+          )
+        : null;
+  }
 
   FriendRequest _mapRequest(CachedFriendRequest row) => FriendRequest(
     id: row.requestId,

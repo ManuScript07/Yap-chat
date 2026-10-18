@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
 
@@ -12,6 +13,7 @@ class UserAvatar extends StatefulWidget {
     this.avatarLoader,
     this.preferAvatarLoader = false,
     this.avatarRevision,
+    this.initialAvatarPath,
     this.size = 48,
     this.borderRadius = 10,
     this.isOnline = false,
@@ -27,6 +29,9 @@ class UserAvatar extends StatefulWidget {
   /// fallback.
   final bool preferAvatarLoader;
   final Object? avatarRevision;
+
+  /// File location restored with the row's metadata, not a remote fallback.
+  final String? initialAvatarPath;
   final double size;
   final double borderRadius;
   final bool isOnline;
@@ -44,6 +49,8 @@ class _UserAvatarState extends State<UserAvatar> {
   int _loadGeneration = 0;
   bool _isAvatarLoading = false;
   bool _isMissingFileReloadScheduled = false;
+  bool _hasImageFrame = false;
+  Object? _scope;
 
   @override
   void initState() {
@@ -55,15 +62,60 @@ class _UserAvatarState extends State<UserAvatar> {
   void didUpdateWidget(covariant UserAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.avatarRevision != widget.avatarRevision ||
-        oldWidget.avatarUrl != widget.avatarUrl) {
+        oldWidget.avatarUrl != widget.avatarUrl ||
+        oldWidget.initialAvatarPath != widget.initialAvatarPath ||
+        (oldWidget.avatarImage != null && widget.avatarImage == null) ||
+        _scope != _currentScope ||
+        (oldWidget.avatarLoader == null) != (widget.avatarLoader == null)) {
       _loadAvatar();
     }
+  }
+
+  bool get _hasAvatarSource =>
+      widget.avatarImage != null ||
+      widget.avatarRevision != null ||
+      widget.avatarUrl?.isNotEmpty == true;
+
+  String? get _avatarValue =>
+      _resolvedAvatarPath ??
+      (widget.preferAvatarLoader && _isAvatarLoading ? null : widget.avatarUrl);
+
+  Object? get _currentScope {
+    final account = context.read<AccountSessionController?>();
+    if (account?.userId == null) return null;
+    final snapshot = account!.capture();
+    return (snapshot.userId, snapshot.generation);
+  }
+
+  Object? get _cacheKey {
+    final revision = widget.avatarRevision ?? widget.avatarUrl;
+    return revision == null ? null : (_scope, revision);
   }
 
   void _loadAvatar() {
     final loader = widget.avatarLoader;
     final generation = ++_loadGeneration;
-    final cacheKey = widget.avatarRevision ?? widget.avatarUrl;
+    // An authoritative removal must not retain the preceding photo while a
+    // list's loader resolves null, nor allow an earlier load to restore it.
+    final scope = _currentScope;
+    if (!_hasAvatarSource || _scope != scope) {
+      _resolvedAvatarPath = null;
+      _hasImageFrame = false;
+    }
+    _scope = scope;
+    final cacheKey = _cacheKey;
+    final initialPath = widget.initialAvatarPath;
+    if (_hasAvatarSource &&
+        initialPath != null &&
+        _isExistingLocalFile(initialPath)) {
+      _resolvedAvatarPath = initialPath;
+      _isAvatarLoading = false;
+      if (cacheKey != null) _rememberResolvedPath(cacheKey, initialPath);
+      // The disk-cache fast path skips the resolver's LRU touch. Preserve it
+      // for mounted avatars only, without scanning the cache or delaying paint.
+      File(initialPath).setLastModified(DateTime.now()).ignore();
+      return;
+    }
     final cachedPath = cacheKey == null ? null : _resolvedAvatarPaths[cacheKey];
     if (cachedPath != null && _isExistingLocalFile(cachedPath)) {
       _resolvedAvatarPath = cachedPath;
@@ -79,10 +131,30 @@ class _UserAvatarState extends State<UserAvatar> {
 
     _isAvatarLoading = true;
     Future<String?>.sync(loader).then(
-      (value) {
+      (value) async {
         if (!mounted || generation != _loadGeneration) return;
+        // Keep the current Image mounted until the replacement has a decoded
+        // frame. Changing the path first leaves a blank interval even when the
+        // replacement already exists on disk.
+        if (value != null && value.isNotEmpty) {
+          var failed = false;
+          await precacheImage(
+            ResizeImage.resizeIfNeeded(
+              (widget.size * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              null,
+              _provider(value),
+            ),
+            context,
+            onError: (_, _) => failed = true,
+          );
+          if (!mounted || generation != _loadGeneration) return;
+          if (failed) {
+            setState(() => _isAvatarLoading = false);
+            return;
+          }
+        }
         setState(() {
-          _resolvedAvatarPath = value;
+          if (value != null || !_hasAvatarSource) _resolvedAvatarPath = value;
           _isAvatarLoading = false;
           if (cacheKey != null && value != null && value.isNotEmpty) {
             _rememberResolvedPath(cacheKey, value);
@@ -97,7 +169,7 @@ class _UserAvatarState extends State<UserAvatar> {
     );
   }
 
-  void _rememberResolvedPath(Object key, String path) {
+  static void _rememberResolvedPath(Object key, String path) {
     _resolvedAvatarPaths.remove(key);
     _resolvedAvatarPaths[key] = path;
     if (_resolvedAvatarPaths.length > _resolvedAvatarCacheLimit) {
@@ -155,11 +227,7 @@ class _UserAvatarState extends State<UserAvatar> {
   }
 
   Widget _avatar({required int targetWidth, required Color iconColor}) {
-    final value =
-        _resolvedAvatarPath ??
-        (widget.preferAvatarLoader && _isAvatarLoading
-            ? null
-            : widget.avatarUrl);
+    final value = _avatarValue;
     if (value == null || value.isEmpty) {
       return Icon(Icons.person, color: iconColor, size: widget.size * 0.65);
     }
@@ -180,7 +248,20 @@ class _UserAvatarState extends State<UserAvatar> {
     image: ResizeImage.resizeIfNeeded(targetWidth, null, provider),
     fit: BoxFit.cover,
     gaplessPlayback: true,
-    frameBuilder: _revealImageFrame,
+    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+      if (wasSynchronouslyLoaded || frame != null) _hasImageFrame = true;
+      // gaplessPlayback retains the previous frame during a replacement. Do
+      // not hide that frame with a restarted opacity animation.
+      return _hasImageFrame
+          ? child
+          : Center(
+              child: Icon(
+                Icons.person,
+                color: iconColor,
+                size: widget.size * 0.65,
+              ),
+            );
+    },
     errorBuilder: (_, _, _) {
       if (renderedValue != null) _reloadMissingCachedFile(renderedValue);
       return Center(
@@ -211,12 +292,11 @@ class _UserAvatarState extends State<UserAvatar> {
       _isMissingFileReloadScheduled = false;
       if (!mounted || !_canReloadMissingCachedFile(renderedValue)) return;
 
-      final cacheKey = widget.avatarRevision ?? widget.avatarUrl;
+      final cacheKey = _cacheKey;
       if (cacheKey != null && _resolvedAvatarPaths[cacheKey] == renderedValue) {
         _resolvedAvatarPaths.remove(cacheKey);
       }
-      setState(() => _resolvedAvatarPath = null);
-      _loadAvatar();
+      setState(_loadAvatar);
     });
   }
 
@@ -232,21 +312,4 @@ class _UserAvatarState extends State<UserAvatar> {
         ? NetworkImage(value)
         : FileImage(File(value));
   }
-}
-
-Widget _revealImageFrame(
-  BuildContext context,
-  Widget child,
-  int? frame,
-  bool wasSynchronouslyLoaded,
-) {
-  final isReady = wasSynchronouslyLoaded || frame != null;
-  return AnimatedOpacity(
-    opacity: isReady ? 1 : 0,
-    duration: wasSynchronouslyLoaded
-        ? Duration.zero
-        : const Duration(milliseconds: 180),
-    curve: Curves.easeOutCubic,
-    child: child,
-  );
 }

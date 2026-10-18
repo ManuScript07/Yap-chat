@@ -47,6 +47,8 @@ class FriendListItem extends StatelessWidget {
               avatarStoragePath: friend.avatarStoragePath,
               child: UserAvatar(
                 avatarUrl: friend.avatarUrl,
+                initialAvatarPath: friend.cachedAvatarPath,
+                preferAvatarLoader: true,
                 avatarLoader: avatarLoader,
                 avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
                 size: 54,

@@ -44,11 +44,64 @@ class MediaCacheService {
   final Uuid _uuid = const Uuid();
   final Map<String, Future<String>> _activeWrites = {};
   final LinkedHashMap<String, String> _resolvedPaths = LinkedHashMap();
+  final LinkedHashMap<String, String> _fileLocations = LinkedHashMap();
   final Queue<Completer<void>> _downloadQueue = Queue();
   final Map<String, Timer> _trimTimers = {};
   final Map<String, Future<void>> _maintenance = {};
   final Map<String, int> _userGenerations = {};
   int _activeDownloadCount = 0;
+  Directory? _localCacheDirectory;
+  Future<void>? _localPathsReady;
+
+  /// Resolves just the OS directory name once. No file reads, cache scans,
+  /// maintenance or network requests. Cache rows can then carry image paths.
+  Future<void> prepareLocalPaths() {
+    final pending = _localPathsReady;
+    if (pending != null) return pending;
+    late final Future<void> ready;
+    ready = Future<Directory>.sync(_cacheDirectoryProvider)
+        .then<void>((directory) {
+          _localCacheDirectory = directory;
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          if (identical(_localPathsReady, ready)) _localPathsReady = null;
+          Error.throwWithStackTrace(error, stackTrace);
+        });
+    _localPathsReady = ready;
+    return ready;
+  }
+
+  /// The deterministic location, not a promise that the file still exists.
+  /// Only mounted avatars validate it; mapping a long list does no disk I/O.
+  String? localStorageFilePath({
+    required String ownerUserId,
+    required String bucket,
+    required String storagePath,
+    String? mimeType,
+  }) {
+    final cache = _localCacheDirectory;
+    if (cache == null) return null;
+    final key =
+        '${_operationKey(ownerUserId, bucket, storagePath)}\u0000${mimeType ?? ''}';
+    final known = _fileLocations.remove(key);
+    if (known != null) {
+      _fileLocations[key] = known;
+      return known;
+    }
+    final location = path.join(
+      cache.path,
+      'media_cache',
+      _safeSegment(environment),
+      _safeSegment(ownerUserId),
+      bucket,
+      _fileName(bucket, storagePath, mimeType),
+    );
+    _fileLocations[key] = location;
+    if (_fileLocations.length > 512) {
+      _fileLocations.remove(_fileLocations.keys.first);
+    }
+    return location;
+  }
 
   Future<String> cacheStorageFile({
     required String ownerUserId,
@@ -246,6 +299,9 @@ class MediaCacheService {
   }
 
   Future<void> clearUser(String ownerUserId) async {
+    _fileLocations.removeWhere(
+      (key, _) => key.startsWith('$ownerUserId\u0000'),
+    );
     _userGenerations[ownerUserId] = _generation(ownerUserId) + 1;
     _trimTimers.remove(ownerUserId)?.cancel();
     _maintenance.remove(ownerUserId);
@@ -509,7 +565,8 @@ class MediaCacheService {
   }
 
   Future<Directory> _userDirectory(String ownerUserId) async {
-    final cache = await _cacheDirectoryProvider();
+    await prepareLocalPaths();
+    final cache = _localCacheDirectory!;
     return Directory(
       path.join(
         cache.path,
@@ -534,12 +591,9 @@ class MediaCacheService {
     final directory = Directory(
       path.join((await _userDirectory(ownerUserId)).path, bucket),
     );
-    final extension = bucket == externalAvatarsBucket
-        ? '.image'
-        : _extension(storagePath, mimeType);
-    final fileName =
-        '${_uuid.v5(Namespace.url.value, '$bucket:$storagePath')}$extension';
-    return File(path.join(directory.path, fileName));
+    return File(
+      path.join(directory.path, _fileName(bucket, storagePath, mimeType)),
+    );
   }
 
   Future<File> _legacyDestinationFile(
@@ -623,6 +677,7 @@ class MediaCacheService {
     }
     _trimTimers.clear();
     _resolvedPaths.clear();
+    _fileLocations.clear();
     _maintenance.clear();
   }
 }

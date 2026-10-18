@@ -27,6 +27,10 @@ class ChatListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final selectionColor = context.colorScheme.primary.withValues(alpha: 0.1);
     final systemPadding = MediaQuery.paddingOf(context);
+    final canShowAvatar =
+        !chat.blockedByPeer &&
+        !chat.peerIsGloballyBanned &&
+        !chat.peerIsDeleted;
     final isOnline =
         chat.blockedByPeer || chat.peerIsGloballyBanned || chat.peerIsDeleted
         ? false
@@ -52,14 +56,20 @@ class ChatListItem extends StatelessWidget {
             children: [
               ProfileAvatarHero(
                 profileId: chat.peerId,
-                avatarUrl: chat.avatarUrl,
-                avatarStoragePath: chat.avatarStoragePath,
+                avatarUrl: canShowAvatar ? chat.avatarUrl : null,
+                avatarStoragePath: canShowAvatar
+                    ? chat.avatarStoragePath
+                    : null,
                 child: UserAvatar(
-                  avatarUrl: chat.avatarUrl,
-                  avatarLoader: chat.peerIsGloballyBanned || chat.peerIsDeleted
-                      ? null
-                      : avatarLoader,
-                  avatarRevision: chat.avatarStoragePath ?? chat.avatarUrl,
+                  avatarUrl: canShowAvatar ? chat.avatarUrl : null,
+                  initialAvatarPath: canShowAvatar
+                      ? chat.cachedAvatarPath
+                      : null,
+                  preferAvatarLoader: true,
+                  avatarLoader: canShowAvatar ? avatarLoader : null,
+                  avatarRevision: canShowAvatar
+                      ? chat.avatarStoragePath ?? chat.avatarUrl
+                      : null,
                   size: 56,
                   borderRadius: 10,
                   isOnline: isOnline,

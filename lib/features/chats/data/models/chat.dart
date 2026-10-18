@@ -11,6 +11,9 @@ class Chat extends Equatable {
   final String userName;
   final String? avatarUrl;
   final String? avatarStoragePath;
+
+  /// A reconstructible local file, supplied with the cached row, never by RPC.
+  final String? cachedAvatarPath;
   final String? lastMessageId;
   final String lastMessage;
   final ChatPreviewType lastMessageType;
@@ -33,6 +36,7 @@ class Chat extends Equatable {
     required this.userName,
     this.avatarUrl,
     this.avatarStoragePath,
+    this.cachedAvatarPath,
     this.lastMessageId,
     required this.lastMessage,
     this.lastMessageType = ChatPreviewType.text,
@@ -78,6 +82,7 @@ class Chat extends Equatable {
     String? userName,
     String? avatarUrl,
     String? avatarStoragePath,
+    String? cachedAvatarPath,
     String? lastMessageId,
     String? lastMessage,
     ChatPreviewType? lastMessageType,
@@ -93,6 +98,9 @@ class Chat extends Equatable {
     bool? peerIsGloballyBanned,
     bool? peerIsDeleted,
   }) {
+    final nextAvatarSource =
+        (avatarStoragePath ?? this.avatarStoragePath) ??
+        (avatarUrl ?? this.avatarUrl);
     return Chat(
       id: id ?? this.id,
       peerId: peerId ?? this.peerId,
@@ -100,6 +108,11 @@ class Chat extends Equatable {
       userName: userName ?? this.userName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
+      cachedAvatarPath:
+          cachedAvatarPath ??
+          (nextAvatarSource == (this.avatarStoragePath ?? this.avatarUrl)
+              ? this.cachedAvatarPath
+              : null),
       lastMessageId: lastMessageId ?? this.lastMessageId,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageType: lastMessageType ?? this.lastMessageType,
@@ -125,6 +138,7 @@ class Chat extends Equatable {
     userName,
     avatarUrl,
     avatarStoragePath,
+    cachedAvatarPath,
     lastMessageId,
     lastMessage,
     lastMessageType,

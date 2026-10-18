@@ -310,7 +310,9 @@ class _FriendVisibilityRow extends StatelessWidget {
         avatarUrl: friend.avatarUrl,
         avatarLoader: () =>
             context.read<IFriendsRepository>().resolveFriendAvatar(friend),
+        preferAvatarLoader: true,
         avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
+        initialAvatarPath: friend.cachedAvatarPath,
         size: 54,
         borderRadius: 12,
       ),

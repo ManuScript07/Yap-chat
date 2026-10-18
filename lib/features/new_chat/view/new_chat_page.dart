@@ -377,7 +377,9 @@ class _NewChatFriendItem extends StatelessWidget {
             UserAvatar(
               avatarUrl: friend.avatarUrl,
               avatarLoader: avatarLoader,
+              preferAvatarLoader: true,
               avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
+              initialAvatarPath: friend.cachedAvatarPath,
               size: 54,
               borderRadius: 12,
               isOnline: isOnline,
