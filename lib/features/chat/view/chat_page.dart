@@ -204,7 +204,10 @@ class _ChatViewState extends State<_ChatView>
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _messagesKey.currentState?.scrollToBottom();
+      // Sending and the local outbox emission share one immediate bottom
+      // request. Do not race an animated positioned-list transition against
+      // the cache listener's jump (especially while the IME is resizing).
+      _messagesKey.currentState?.scrollToBottom(animate: false);
     });
   }
 
@@ -1066,13 +1069,14 @@ class _ChatMessagesState extends State<_ChatMessages>
   bool _bottomJumpScheduled = false;
   bool _bottomJumpPending = false;
   int _bottomJumpSerial = 0;
+  int _bottomJumpGeneration = 0;
   bool _blankViewportWarningLogged = false;
   int _userScrollGeneration = 0;
 
   int _lastVisibleIndex = 0;
   int _recentInitialIndex = 0;
   double _recentInitialAlignment = 0;
-  int _focusListRevision = 0;
+  int _timelineRevision = 0;
   int _focusInitialIndex = 0;
   double _focusInitialAlignment = 0;
   bool _isAnimatingToBottom = false;
@@ -1264,16 +1268,8 @@ class _ChatMessagesState extends State<_ChatMessages>
       setState(() {
         _focusMessages = reconciled;
       });
-      if (reconciled.length == previous.length) return;
-      await WidgetsBinding.instance.endOfFrame;
-      if (userScrollGeneration != _userScrollGeneration) return;
-      await _showMessage(
-        anchor.messageId,
-        generation: generation,
-        animate: false,
-        alignment: currentAnchor!.alignment,
-        highlight: false,
-      );
+      // Structural reconciliation uses the same keyed layout retention as
+      // pagination; a second controller jump would cancel an ongoing gesture.
     } catch (_) {
       // Keep the current window if reconnection happened before the API works.
     } finally {
@@ -1528,7 +1524,6 @@ class _ChatMessagesState extends State<_ChatMessages>
         );
         if (index < 0) return;
         setState(() {
-          _focusListRevision++;
           _focusMessages = messages;
           _focusUsesCache = true;
           _focusHasOlder = true; // A partial offline cache does not prove EOF.
@@ -1704,7 +1699,6 @@ class _ChatMessagesState extends State<_ChatMessages>
     );
     if (index < 0) return;
     setState(() {
-      _focusListRevision++;
       _focusMessages = previous;
       _focusUsesCache = true;
       _focusHasOlder = true;
@@ -1789,10 +1783,8 @@ class _ChatMessagesState extends State<_ChatMessages>
                 updated,
           ];
           if (!listEquals(previous, next)) {
-            final anchor = _visibleFocusedAnchor();
             _setFocusedPage(
               next,
-              anchor: next.length != previous.length ? anchor : null,
               generation: generation,
               hasOlder: _focusHasOlder,
               hasNewer: _focusHasNewer,
@@ -1888,13 +1880,15 @@ class _ChatMessagesState extends State<_ChatMessages>
   }
 
   void _jumpToBottomAfterBuild() {
+    _bottomJumpPending = true;
+    _bottomJumpGeneration = _navigationGeneration;
+    ++_bottomJumpSerial;
     if (_bottomJumpScheduled) return;
     _bottomJumpScheduled = true;
-    _bottomJumpPending = true;
-    final serial = ++_bottomJumpSerial;
-    final generation = _navigationGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _bottomJumpScheduled = false;
+      final serial = _bottomJumpSerial;
+      final generation = _bottomJumpGeneration;
       if (mounted &&
           generation == _navigationGeneration &&
           _focusMessages == null &&
@@ -1948,6 +1942,11 @@ class _ChatMessagesState extends State<_ChatMessages>
       });
     }
     if (!_itemScrollController.isAttached) return;
+    if (!animate) {
+      _isAnimatingToBottom = false;
+      _jumpToBottomAfterBuild();
+      return;
+    }
     _isAnimatingToBottom = true;
     _itemScrollController
         .scrollTo(
@@ -1990,6 +1989,7 @@ class _ChatMessagesState extends State<_ChatMessages>
     _focusRecheckRunning = false;
     _focusRecheckSerial++;
     setState(() {
+      _timelineRevision++;
       _recentInitialIndex = 0;
       _recentInitialAlignment = 0;
       _focusMessages = null;
@@ -2131,6 +2131,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       }
       _focusedMedia.clear();
       setState(() {
+        _timelineRevision++;
         _focusInitialIndex = 0;
         _focusInitialAlignment = 0;
         _focusMessages = visibleWindow;
@@ -2234,9 +2235,8 @@ class _ChatMessagesState extends State<_ChatMessages>
           _focusMessages == null) {
         return;
       }
-      // The user may keep scrolling while the request is in flight. Preserve
-      // the position they see now, not the position that started the request.
-      final anchor = _visibleFocusedAnchor();
+      // The keyed list captures the current viewport when this page is applied,
+      // not the viewport that started the request.
       final existing = _focusMessages!.map((message) => message.id).toSet();
       final bounded = boundFocusedHistory([
         ..._focusMessages!,
@@ -2250,7 +2250,6 @@ class _ChatMessagesState extends State<_ChatMessages>
       _focusedMedia.removeWhere((id, _) => !retainedIds.contains(id));
       _setFocusedPage(
         bounded.messages,
-        anchor: bounded.trimmed ? anchor : null,
         generation: generation,
         hasOlder: _focusUsesCache ? page.isNotEmpty : page.length == 60,
         hasNewer: bounded.trimmed || _focusHasNewer,
@@ -2286,7 +2285,6 @@ class _ChatMessagesState extends State<_ChatMessages>
           _focusMessages == null) {
         return;
       }
-      final anchor = _visibleFocusedAnchor();
       final existing = _focusMessages!.map((message) => message.id).toSet();
       final bounded = boundFocusedHistory([
         ...page.where(
@@ -2300,7 +2298,6 @@ class _ChatMessagesState extends State<_ChatMessages>
       _focusedMedia.removeWhere((id, _) => !retainedIds.contains(id));
       _setFocusedPage(
         bounded.messages,
-        anchor: page.isNotEmpty ? anchor : null,
         generation: generation,
         hasOlder: bounded.trimmed || _focusHasOlder,
         hasNewer: _focusUsesCache ? page.isNotEmpty : page.length == 60,
@@ -2322,43 +2319,21 @@ class _ChatMessagesState extends State<_ChatMessages>
     }
   }
 
-  /// Prepending newer messages changes every existing item index. Move the
-  /// scroll target in the same frame as the data change so the old index is
-  /// never painted with a different message. A newly mounted list is needed
-  /// only when the shifted index exceeds the old list's item count.
+  /// The keyed list retains its visible row during the next layout. Do not
+  /// jump/remount here: both operations cancel a drag or ballistic scroll and
+  /// remounting also restarts reaction/media state for all visible messages.
   void _setFocusedPage(
     List<ChatMessage> messages, {
-    required ({String messageId, double alignment})? anchor,
     required int generation,
     required bool hasOlder,
     required bool hasNewer,
   }) {
-    final nextItems = _buildChatTimelineItems(messages);
-    final index = anchor == null
-        ? -1
-        : nextItems.indexWhere(
-            (item) =>
-                item is MessageItemElement &&
-                item.message.id == anchor.messageId,
-          );
-    final remount =
-        index >= 0 &&
-        (!_itemScrollController.isAttached || index >= _displayedItems.length);
-    if (index >= 0) _isNavigating = true;
+    _isNavigating = true;
     setState(() {
       _focusMessages = messages;
       _focusHasOlder = hasOlder;
       _focusHasNewer = hasNewer;
-      if (remount) {
-        _focusListRevision++;
-        _focusInitialIndex = index;
-        _focusInitialAlignment = anchor!.alignment;
-      }
     });
-    if (index < 0) return;
-    if (!remount) {
-      _itemScrollController.jumpTo(index: index, alignment: anchor!.alignment);
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || generation != _navigationGeneration) return;
       _isNavigating = false;
@@ -2443,11 +2418,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                   return false;
                 },
                 child: _MessagesList(
-                  key: ValueKey(
-                    _focusMessages == null
-                        ? 'recent_messages'
-                        : 'focus_messages_$_focusListRevision',
-                  ),
+                  key: ValueKey('messages_$_timelineRevision'),
                   itemScrollController: _itemScrollController,
                   itemPositionsListener: _itemPositionsListener,
                   initialScrollIndex: _focusMessages == null
@@ -2458,6 +2429,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                       : _focusInitialAlignment,
                   chat: widget.chat,
                   items: _displayedItems,
+                  preserveVisiblePosition: _focusMessages != null,
                   animationProgressFor: _animationProgressFor,
                   headerHeight: widget.headerHeight,
                   bottomPadding:
@@ -2561,6 +2533,7 @@ class _MessagesList extends StatelessWidget {
     required this.initialAlignment,
     required this.chat,
     required this.items,
+    required this.preserveVisiblePosition,
     required this.animationProgressFor,
     required this.headerHeight,
     required this.bottomPadding,
@@ -2579,6 +2552,7 @@ class _MessagesList extends StatelessWidget {
   final double initialAlignment;
   final Chat chat;
   final List<ChatListItemElement> items;
+  final bool preserveVisiblePosition;
   final double Function(String messageId) animationProgressFor;
 
   final double headerHeight;
@@ -2659,6 +2633,13 @@ class _MessagesList extends StatelessWidget {
     final systemPadding = MediaQuery.paddingOf(context);
 
     return ScrollablePositionedList.builder(
+      itemKeyBuilder: (index) => switch (items[index]) {
+        MessageItemElement(:final message) => ValueKey('msg_${message.id}'),
+        DateSeparatorElement(:final date) => ValueKey(
+          'date_${date.millisecondsSinceEpoch}',
+        ),
+      },
+      maintainVisiblePosition: preserveVisiblePosition,
       itemScrollController: itemScrollController,
       itemPositionsListener: itemPositionsListener,
       initialScrollIndex: initialScrollIndex,

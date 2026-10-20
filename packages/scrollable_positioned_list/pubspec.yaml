@@ -1,0 +1,11 @@
+name: scrollable_positioned_list
+version: 0.3.8
+description: Local 0.3.8 patch for identity-preserving chat history pagination.
+publish_to: none
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  collection: ^1.15.0
