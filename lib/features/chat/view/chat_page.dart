@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -1072,6 +1073,8 @@ class _ChatMessagesState extends State<_ChatMessages>
   int _bottomJumpGeneration = 0;
   bool _blankViewportWarningLogged = false;
   int _userScrollGeneration = 0;
+  bool _userScrollActive = false;
+  bool _scrollingTowardOlder = false;
 
   int _lastVisibleIndex = 0;
   int _recentInitialIndex = 0;
@@ -1082,6 +1085,7 @@ class _ChatMessagesState extends State<_ChatMessages>
   bool _isAnimatingToBottom = false;
   bool _isNavigating = false;
   bool _focusLoading = false;
+  bool _focusRemoteLoading = false;
   bool _focusRecheckRunning = false;
   bool _focusRecheckPending = false;
   int _focusRecheckSerial = 0;
@@ -1099,7 +1103,7 @@ class _ChatMessagesState extends State<_ChatMessages>
   String? _highlightedMessageId;
   int _highlightSerial = 0;
   StreamSubscription<ChatHistoryChange>? _historyChangesSubscription;
-  final Map<String, Future<ChatMessage>> _focusedMedia = {};
+  final Map<String, _FocusedMediaLoad> _focusedMedia = {};
   final Set<String> _deletedFocusIds = {};
   final FocusedHistoryWindowCache _windowCache = FocusedHistoryWindowCache();
   Timer? _visibleReadTimer;
@@ -1323,17 +1327,37 @@ class _ChatMessagesState extends State<_ChatMessages>
     return null;
   }
 
-  Future<ChatMessage> _hydrateFocusedMedia(ChatMessage message) =>
-      _focusedMedia.putIfAbsent(message.id, () async {
-        try {
-          return await context.read<IChatRepository>().hydrateWindowMedia(
-            message,
-          );
-        } catch (_) {
+  Future<ChatMessage> _hydrateFocusedMedia(ChatMessage message) {
+    final existing = _focusedMedia[message.id];
+    if (existing != null && sameFocusedMediaSource(message, existing.source)) {
+      return existing.future;
+    }
+    final entry = _FocusedMediaLoad(message);
+    _focusedMedia[message.id] = entry;
+    entry.future = () async {
+      try {
+        final hydrated = await context
+            .read<IChatRepository>()
+            .hydrateWindowMedia(message);
+        entry.ready = hydrated;
+        return hydrated;
+      } catch (_) {
+        if (identical(_focusedMedia[message.id], entry)) {
           _focusedMedia.remove(message.id);
-          rethrow;
         }
-      });
+        rethrow;
+      }
+    }();
+    return entry.future;
+  }
+
+  ChatMessage? _readyFocusedMedia(ChatMessage message) {
+    final entry = _focusedMedia[message.id];
+    if (entry == null || !sameFocusedMediaSource(message, entry.source)) {
+      return null;
+    }
+    return entry.ready;
+  }
 
   @override
   void dispose() {
@@ -1367,6 +1391,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       _windowCache.clear();
       _deletedFocusIds.clear();
       _focusLoading = false;
+      _focusRemoteLoading = false;
       _focusRecheckRunning = false;
       _focusRecheckPending = false;
       _focusRecheckSerial++;
@@ -1386,6 +1411,8 @@ class _ChatMessagesState extends State<_ChatMessages>
       _focusInitialAlignment = 0;
       _blankViewportWarningLogged = false;
       _userScrollGeneration = 0;
+      _userScrollActive = false;
+      _scrollingTowardOlder = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _scheduleVisibleHistoryCheck();
       });
@@ -1411,7 +1438,7 @@ class _ChatMessagesState extends State<_ChatMessages>
             (_focusMessages == null ? 4 : _focusPrefetchItems + 1)) {
       if (_focusMessages == null) {
         if (context.read<IChatRepository>() is IBoundedChatHistory) {
-          _scheduleCachedHistoryEntry();
+          if (_scrollingTowardOlder) _scheduleCachedHistoryEntry();
         } else {
           context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
         }
@@ -1421,7 +1448,7 @@ class _ChatMessagesState extends State<_ChatMessages>
     }
     if (_focusMessages != null) {
       if (_focusPaginationArmed &&
-          (!_focusUsesCache || first < _lastVisibleIndex || _focusHasNewer) &&
+          !_scrollingTowardOlder &&
           _switchToRecentAtVisibleMessage(visible)) {
         return;
       }
@@ -1466,7 +1493,9 @@ class _ChatMessagesState extends State<_ChatMessages>
   /// already anchored, sliding viewport instead of growing the Bloc's list.
   /// Fetch before switching lists so an empty/failed page cannot remount it.
   void _scheduleCachedHistoryEntry() {
-    if (_historyEntryScheduled || _focusLoading) return;
+    if (_historyEntryScheduled || _focusLoading || !_scrollingTowardOlder) {
+      return;
+    }
     final head = context.read<ChatBloc>().state.messages;
     if (head.isEmpty || head.last.id == _exhaustedHeadBoundary) return;
     final repository = context.read<IChatRepository>();
@@ -1477,7 +1506,8 @@ class _ChatMessagesState extends State<_ChatMessages>
       try {
         if (!mounted ||
             generation != _navigationGeneration ||
-            _focusMessages != null) {
+            _focusMessages != null ||
+            !_scrollingTowardOlder) {
           return;
         }
         final page = await repository.loadHistoryOlder(
@@ -1487,7 +1517,8 @@ class _ChatMessagesState extends State<_ChatMessages>
         if (!mounted ||
             generation != _navigationGeneration ||
             _focusMessages != null ||
-            _focusLoading) {
+            _focusLoading ||
+            !_scrollingTowardOlder) {
           return;
         }
         if (page.isEmpty) {
@@ -1547,6 +1578,15 @@ class _ChatMessagesState extends State<_ChatMessages>
     if (recent.isEmpty) return false;
     final recentIds = recent.map((message) => message.id).toSet();
     final ordered = [...visible]..sort((a, b) => a.index.compareTo(b.index));
+    // One overlapping row is not enough: dropping the older rows that still
+    // occupy the viewport creates a blank frame and a head/window loop.
+    for (final position in ordered) {
+      if (position.index >= _displayedItems.length) return false;
+      final item = _displayedItems[position.index];
+      if (item is MessageItemElement && !recentIds.contains(item.message.id)) {
+        return false;
+      }
+    }
     for (final position in ordered) {
       if (position.index >= _displayedItems.length) continue;
       final item = _displayedItems[position.index];
@@ -1573,6 +1613,7 @@ class _ChatMessagesState extends State<_ChatMessages>
         _focusMessages = null;
         _focusUsesCache = false;
         _focusPaginationArmed = false;
+        _focusPageLoading = false;
         _newMessagesCount = 0;
         _showScrollToBottom = newIndex > 0;
         _highlightedMessageId = null;
@@ -1938,6 +1979,7 @@ class _ChatMessagesState extends State<_ChatMessages>
         _newMessagesCount = 0;
         _showScrollToBottom = false;
         _focusLoading = false;
+        _focusRemoteLoading = false;
         _focusPageLoading = false;
       });
     }
@@ -2000,6 +2042,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       _newMessagesCount = 0;
       _showScrollToBottom = false;
       _focusLoading = false;
+      _focusRemoteLoading = false;
       _focusPageLoading = false;
       _lastVisibleIndex = 0;
     });
@@ -2086,12 +2129,13 @@ class _ChatMessagesState extends State<_ChatMessages>
     }
 
     _deletedFocusIds.clear();
-    final cachedWindow = _windowCache.find(messageId);
-    if (cachedWindow == null) setState(() => _focusLoading = true);
+    final cachedWindow = _windowCache.findSnapshot(messageId);
+    _focusLoading = true;
+    _focusRemoteLoading = false;
     try {
       final repository = context.read<IChatRepository>();
-      var fromLocalHistory = false;
-      List<ChatMessage>? window = cachedWindow;
+      var fromLocalHistory = cachedWindow?.usesLocalHistory ?? false;
+      List<ChatMessage>? window = cachedWindow?.messages;
       if (window == null && repository is IBoundedChatHistory) {
         window = await repository.readCachedHistoryWindow(
           widget.chat.id,
@@ -2099,7 +2143,9 @@ class _ChatMessagesState extends State<_ChatMessages>
         );
         fromLocalHistory = window != null;
       }
+      if (!mounted || generation != _navigationGeneration) return;
       if (window == null) {
+        setState(() => _focusRemoteLoading = true);
         try {
           window = await repository.loadMessageWindow(
             widget.chat.id,
@@ -2126,14 +2172,22 @@ class _ChatMessagesState extends State<_ChatMessages>
         showAppSnackBar(context, message: context.l10n.messageNotAvailable);
         return;
       }
-      if (cachedWindow == null && !fromLocalHistory) {
-        _windowCache.remember(messageId, visibleWindow);
+      if (cachedWindow == null) {
+        _windowCache.remember(
+          messageId,
+          visibleWindow,
+          usesLocalHistory: fromLocalHistory,
+        );
       }
       _focusedMedia.clear();
+      final targetIndex = _buildChatTimelineItems(visibleWindow).indexWhere(
+        (item) => item is MessageItemElement && item.message.id == messageId,
+      );
+      _isNavigating = true;
       setState(() {
         _timelineRevision++;
-        _focusInitialIndex = 0;
-        _focusInitialAlignment = 0;
+        _focusInitialIndex = targetIndex;
+        _focusInitialAlignment = 0.5;
         _focusMessages = visibleWindow;
         _focusUsesCache = fromLocalHistory;
         _focusHasOlder = true;
@@ -2145,7 +2199,11 @@ class _ChatMessagesState extends State<_ChatMessages>
       });
       _diagnoseBlankTimeline('focus_entry');
       await WidgetsBinding.instance.endOfFrame;
-      await _showMessage(messageId, generation: generation, animate: false);
+      await _showMessage(
+        messageId,
+        generation: generation,
+        alreadyPositioned: true,
+      );
     } catch (_) {
       if (mounted && generation == _navigationGeneration) {
         showAppSnackBar(
@@ -2155,10 +2213,11 @@ class _ChatMessagesState extends State<_ChatMessages>
         );
       }
     } finally {
-      if (cachedWindow == null &&
-          mounted &&
-          generation == _navigationGeneration) {
-        setState(() => _focusLoading = false);
+      if (mounted && generation == _navigationGeneration) {
+        setState(() {
+          _focusLoading = false;
+          _focusRemoteLoading = false;
+        });
         _runPendingFocusRecheck();
       }
     }
@@ -2170,13 +2229,17 @@ class _ChatMessagesState extends State<_ChatMessages>
     bool animate = true,
     double alignment = 0.5,
     bool highlight = true,
+    bool alreadyPositioned = false,
   }) async {
     if (!mounted || generation != _navigationGeneration) return;
     final index = _indexForMessage(messageId);
     if (index == null || !_itemScrollController.isAttached) return;
     _isNavigating = true;
     try {
-      if (animate) {
+      if (alreadyPositioned) {
+        // The new list was mounted at the target; do not paint index zero or
+        // issue a second controller jump on the following frame.
+      } else if (animate) {
         await _itemScrollController.scrollTo(
           index: index,
           alignment: alignment,
@@ -2391,16 +2454,45 @@ class _ChatMessagesState extends State<_ChatMessages>
             children: [
               NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
-                  if (_focusMessages == null ||
-                      notification.metrics.axis != Axis.vertical ||
+                  if (notification.metrics.axis != Axis.vertical ||
                       notification.depth != 0) {
                     return false;
                   }
                   if (notification is ScrollStartNotification &&
                       notification.dragDetails != null) {
                     _userScrollGeneration++;
-                    _focusPaginationArmed = true;
-                  } else if (notification is ScrollUpdateNotification &&
+                    _userScrollActive = true;
+                    if (_focusMessages != null) _focusPaginationArmed = true;
+                  } else if (notification is ScrollEndNotification) {
+                    _userScrollActive = false;
+                  }
+                  // UserScroll also covers mouse/trackpad input, whose update
+                  // notifications do not carry dragDetails. Controller jumps
+                  // must not be interpreted as a request to page history.
+                  if (notification is UserScrollNotification &&
+                      notification.direction != ScrollDirection.idle) {
+                    _scrollingTowardOlder =
+                        notification.direction == ScrollDirection.reverse;
+                    if (_focusMessages != null) _focusPaginationArmed = true;
+                  }
+                  if (notification is ScrollUpdateNotification &&
+                      _userScrollActive &&
+                      (notification.scrollDelta ?? 0) != 0) {
+                    _scrollingTowardOlder = notification.scrollDelta! > 0;
+                  }
+                  // A clamped head may already be at its oldest edge. There
+                  // is no ScrollUpdate in that case, but the user's attempted
+                  // movement still needs to open the next history page.
+                  if (notification is OverscrollNotification &&
+                      notification.dragDetails != null &&
+                      notification.overscroll != 0) {
+                    _scrollingTowardOlder = notification.overscroll > 0;
+                    if (_focusMessages == null && _scrollingTowardOlder) {
+                      _scheduleCachedHistoryEntry();
+                    }
+                  }
+                  if (_focusMessages != null &&
+                      notification is ScrollUpdateNotification &&
                       notification.dragDetails != null &&
                       (notification.scrollDelta ?? 0) < 0 &&
                       !_showScrollToBottom) {
@@ -2440,6 +2532,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                   hydrateFocusedMedia: _focusMessages == null
                       ? null
                       : _hydrateFocusedMedia,
+                  readyFocusedMedia: _readyFocusedMedia,
                   retryFocusedMedia: () => setState(() {}),
                   onReaction: widget.onReaction,
                   onTextEntityTap: widget.onTextEntityTap,
@@ -2450,7 +2543,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                 ),
               ),
 
-              if (_focusLoading)
+              if (_focusRemoteLoading)
                 Positioned.fill(
                   child: ColoredBox(
                     color: context.scaffoldBackgroundColor.withValues(
@@ -2524,6 +2617,14 @@ List<ChatListItemElement> _buildChatTimelineItems(List<ChatMessage> messages) {
   return items;
 }
 
+class _FocusedMediaLoad {
+  _FocusedMediaLoad(this.source);
+
+  final ChatMessage source;
+  late final Future<ChatMessage> future;
+  ChatMessage? ready;
+}
+
 class _MessagesList extends StatelessWidget {
   const _MessagesList({
     super.key,
@@ -2540,6 +2641,7 @@ class _MessagesList extends StatelessWidget {
     required this.highlightedMessageId,
     required this.onReplyTap,
     required this.hydrateFocusedMedia,
+    required this.readyFocusedMedia,
     required this.retryFocusedMedia,
     this.onMessageLongPress,
     this.onReaction,
@@ -2560,6 +2662,7 @@ class _MessagesList extends StatelessWidget {
   final String? highlightedMessageId;
   final ValueChanged<String> onReplyTap;
   final Future<ChatMessage> Function(ChatMessage)? hydrateFocusedMedia;
+  final ChatMessage? Function(ChatMessage) readyFocusedMedia;
   final VoidCallback retryFocusedMedia;
   final ValueChanged<ChatMessage>? onMessageLongPress;
   final Future<void> Function(ChatMessage, ReactionCode, bool)? onReaction;
@@ -2603,9 +2706,20 @@ class _MessagesList extends StatelessWidget {
     if (loader == null || !needsMedia) return bubble(message);
     return FutureBuilder<ChatMessage>(
       future: loader(message),
+      initialData:
+          readyFocusedMedia(message) ??
+          (message.type == MessageType.audio &&
+                      _hasLocalMediaUrl(message.audioUrl) ||
+                  message.type == MessageType.image &&
+                      message.mediaUrls.isNotEmpty &&
+                      message.mediaUrls.every(_hasLocalMediaUrl) &&
+                      message.mediaUrls.length ==
+                          message.mediaStoragePaths.length
+              ? message
+              : null),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done &&
-            snapshot.hasData) {
+        if (snapshot.hasData &&
+            sameFocusedMediaSource(message, snapshot.data!)) {
           return bubble(withFocusedCachedMedia(message, snapshot.data!));
         }
         return _FocusedMediaPlaceholder(
@@ -2626,6 +2740,12 @@ class _MessagesList extends StatelessWidget {
       },
     );
   }
+
+  bool _hasLocalMediaUrl(String? url) =>
+      url != null &&
+      url.isNotEmpty &&
+      !url.toLowerCase().startsWith('http://') &&
+      !url.toLowerCase().startsWith('https://');
 
   @override
   Widget build(BuildContext context) {

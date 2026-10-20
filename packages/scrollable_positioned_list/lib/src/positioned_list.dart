@@ -403,6 +403,10 @@ class _PositionedListState extends State<PositionedList> {
                     scrollController.position.viewportDimension));
           }
         }
+        widget.itemPositionsNotifier?.measuredPixels =
+            scrollController.hasClients
+                ? scrollController.position.pixels
+                : null;
         widget.itemPositionsNotifier?.itemPositions.value = positions;
         updateScheduled = false;
       });

@@ -456,6 +456,8 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
       final index = keys.indexOf(oldKeys[anchor.index]);
       if (index < 0) continue;
       final position = primary.scrollController.position;
+      final unmeasuredDelta = position.pixels -
+          (primary.itemPositionsNotifier.measuredPixels ?? position.pixels);
       final alignment = anchor.itemLeadingEdge.clamp(0.0, 1.0);
       primary.target = index;
       primary.alignment = alignment;
@@ -465,7 +467,8 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
       // keeps its pointer. Negative leading edges retain partial/tall rows.
       position.correctBy(
         (alignment - anchor.itemLeadingEdge) * position.viewportDimension -
-            position.pixels,
+            position.pixels +
+            unmeasuredDelta,
       );
       return;
     }
