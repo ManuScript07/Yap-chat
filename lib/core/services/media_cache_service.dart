@@ -354,6 +354,9 @@ class MediaCacheService {
         _database.cachedMessages,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
       await (_database.delete(
+        _database.cachedChatHistoryRanges,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
         _database.cachedMessageReactionStates,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
       await (_database.delete(

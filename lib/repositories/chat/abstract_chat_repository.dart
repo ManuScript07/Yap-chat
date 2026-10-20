@@ -24,7 +24,8 @@ abstract interface class IChatRepository {
     bool toggle = true,
   });
 
-  /// Подписка на поток сообщений конкретного чата.
+  /// Live message feed. IBoundedChatHistory implementations expose only a small
+  /// recent head here; their older viewport is paged independently.
   Stream<List<ChatMessage>> getMessagesStream(String chatId);
 
   /// Rechecks only the cached message IDs in the viewed history page.
@@ -34,7 +35,8 @@ abstract interface class IChatRepository {
   /// conversation. Explicit whole-chat marking remains in IChatsRepository.
   Future<void> markVisibleMessagesRead(String chatId, Set<String> messageIds);
 
-  /// Загружает следующую страницу более старых сообщений.
+  /// Legacy growing-feed pagination (used by simple mock repositories).
+  /// Bounded implementations expose explicit history page cursors instead.
   Future<bool> loadMoreMessages(String chatId);
 
   /// Reads a separate, bounded history window around a visible message.

@@ -1059,6 +1059,7 @@ class _ChatMessagesState extends State<_ChatMessages>
   int _newMessagesCount = 0;
 
   Set<String> _knownMessageIds = {};
+  List<ChatMessage> _lastRecentMessages = const [];
   bool _initialMessagesLoaded = false;
   DateTime? _latestKnownTimestamp;
   final Map<String, DateTime> _newMessageAnimations = {};
@@ -1085,6 +1086,9 @@ class _ChatMessagesState extends State<_ChatMessages>
   bool _focusHasOlder = true;
   bool _focusHasNewer = true;
   bool _focusPaginationArmed = false;
+  bool _focusUsesCache = false;
+  bool _historyEntryScheduled = false;
+  String? _exhaustedHeadBoundary;
   int _navigationGeneration = 0;
   List<ChatMessage>? _focusMessages;
   List<ChatListItemElement> _displayedItems = const [];
@@ -1151,6 +1155,11 @@ class _ChatMessagesState extends State<_ChatMessages>
           if (deletedId != null) {
             _removeFocusedMessage(deletedId);
           } else if (change.reconnected) {
+            _exhaustedHeadBoundary = null;
+            if (_focusUsesCache) {
+              _focusHasOlder = true;
+              _focusHasNewer = true;
+            }
             _visibleHistoryFailureAt = null;
             _scheduleVisibleHistoryCheck();
             _windowCache.clear();
@@ -1159,7 +1168,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                 _focusRecheckRunning ||
                 _isNavigating) {
               _focusRecheckPending = true;
-            } else if (_focusMessages != null) {
+            } else if (_focusMessages != null && !_focusUsesCache) {
               unawaited(_refreshFocusedWindow());
             }
           }
@@ -1276,6 +1285,11 @@ class _ChatMessagesState extends State<_ChatMessages>
   }
 
   void _runPendingFocusRecheck() {
+    if (_focusUsesCache) {
+      _focusRecheckPending = false;
+      _scheduleVisibleHistoryCheck();
+      return;
+    }
     if (!_focusRecheckPending ||
         _focusMessages == null ||
         _focusLoading ||
@@ -1351,6 +1365,8 @@ class _ChatMessagesState extends State<_ChatMessages>
       _listenToHistoryChanges();
       _navigationGeneration++;
       _focusMessages = null;
+      _focusUsesCache = false;
+      _exhaustedHeadBoundary = null;
       _focusedMedia.clear();
       _windowCache.clear();
       _deletedFocusIds.clear();
@@ -1364,6 +1380,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       _highlightedMessageId = null;
       _highlightSerial++;
       _knownMessageIds = {};
+      _lastRecentMessages = const [];
       _initialMessagesLoaded = false;
       _newMessageAnimations.clear();
       _lastVisibleIndex = 0;
@@ -1397,13 +1414,19 @@ class _ChatMessagesState extends State<_ChatMessages>
         _displayedItems.length -
             (_focusMessages == null ? 4 : _focusPrefetchItems + 1)) {
       if (_focusMessages == null) {
-        context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
+        if (context.read<IChatRepository>() is IBoundedChatHistory) {
+          _scheduleCachedHistoryEntry();
+        } else {
+          context.read<ChatBloc>().add(const ChatOlderMessagesRequested());
+        }
       } else if (_focusPaginationArmed) {
         unawaited(_loadFocusOlder());
       }
     }
     if (_focusMessages != null) {
-      if (_focusPaginationArmed && _switchToRecentAtVisibleMessage(visible)) {
+      if (_focusPaginationArmed &&
+          (!_focusUsesCache || first < _lastVisibleIndex || _focusHasNewer) &&
+          _switchToRecentAtVisibleMessage(visible)) {
         return;
       }
       if (_focusPaginationArmed && first <= _focusPrefetchItems) {
@@ -1443,6 +1466,87 @@ class _ChatMessagesState extends State<_ChatMessages>
     _lastVisibleIndex = first;
   }
 
+  /// The live SQLite feed stays bounded. Continue ordinary history using the
+  /// already anchored, sliding viewport instead of growing the Bloc's list.
+  /// Fetch before switching lists so an empty/failed page cannot remount it.
+  void _scheduleCachedHistoryEntry() {
+    if (_historyEntryScheduled || _focusLoading) return;
+    final head = context.read<ChatBloc>().state.messages;
+    if (head.isEmpty || head.last.id == _exhaustedHeadBoundary) return;
+    final repository = context.read<IChatRepository>();
+    if (repository is! IBoundedChatHistory) return;
+    _historyEntryScheduled = true;
+    final generation = _navigationGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (!mounted ||
+            generation != _navigationGeneration ||
+            _focusMessages != null) {
+          return;
+        }
+        final page = await repository.loadHistoryOlder(
+          widget.chat.id,
+          head.last,
+        );
+        if (!mounted ||
+            generation != _navigationGeneration ||
+            _focusMessages != null ||
+            _focusLoading) {
+          return;
+        }
+        if (page.isEmpty) {
+          _exhaustedHeadBoundary = head.last.id;
+          return;
+        }
+        final positions =
+            _itemPositionsListener.itemPositions.value
+                .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1)
+                .toList()
+              ..sort((a, b) => a.index.compareTo(b.index));
+        if (positions.isEmpty ||
+            positions.last.index < _displayedItems.length - 8) {
+          return;
+        }
+        final anchor = positions.firstWhere(
+          (p) =>
+              p.index < _displayedItems.length &&
+              _displayedItems[p.index] is MessageItemElement,
+          orElse: () => positions.first,
+        );
+        final item = _displayedItems[anchor.index];
+        if (item is! MessageItemElement) return;
+        final ids = head.map((m) => m.id).toSet();
+        final messages = [
+          ...head,
+          ...page.where(
+            (m) => !ids.contains(m.id) && !_deletedFocusIds.contains(m.id),
+          ),
+        ];
+        final items = _buildChatTimelineItems(messages);
+        final index = items.indexWhere(
+          (i) => i is MessageItemElement && i.message.id == item.message.id,
+        );
+        if (index < 0) return;
+        setState(() {
+          _focusListRevision++;
+          _focusMessages = messages;
+          _focusUsesCache = true;
+          _focusHasOlder = true; // A partial offline cache does not prove EOF.
+          _focusHasNewer = false;
+          _focusPaginationArmed = true;
+          _focusInitialIndex = index;
+          _focusInitialAlignment = anchor.itemLeadingEdge;
+          _lastVisibleIndex = index;
+        });
+        _scheduleVisibleHistoryCheck();
+      } catch (_) {
+        // Cache and anchor stay intact. A later scroll can retry this frontier.
+      } finally {
+        _historyEntryScheduled = false;
+      }
+    });
+  }
+
   bool _switchToRecentAtVisibleMessage(List<ItemPosition> visible) {
     final recent = context.read<ChatBloc>().state.messages;
     if (recent.isEmpty) return false;
@@ -1472,6 +1576,7 @@ class _ChatMessagesState extends State<_ChatMessages>
         _recentInitialAlignment = position.itemLeadingEdge.clamp(0.0, 1.0);
         _lastVisibleIndex = newIndex;
         _focusMessages = null;
+        _focusUsesCache = false;
         _focusPaginationArmed = false;
         _newMessagesCount = 0;
         _showScrollToBottom = newIndex > 0;
@@ -1483,6 +1588,8 @@ class _ChatMessagesState extends State<_ChatMessages>
   }
 
   void _handleMessagesChanged(List<ChatMessage> messages) {
+    final previousHead = _lastRecentMessages;
+    _lastRecentMessages = messages;
     _scheduleVisibleRead();
     _diagnoseBlankTimeline('messages_changed');
     if (_returnToRecentWhenReady && messages.isNotEmpty) {
@@ -1516,6 +1623,16 @@ class _ChatMessagesState extends State<_ChatMessages>
     _latestKnownTimestamp = messages.firstOrNull?.timestamp;
 
     if (newMessages.isEmpty) return;
+
+    // A bounded live head can evict the row currently being read. Freeze that
+    // viewport before applying arrivals, rather than hiding N rows of a head
+    // that no longer contains the older tail. No server work is needed.
+    if (_focusMessages == null &&
+        _lastVisibleIndex > 0 &&
+        newMessages.every((m) => !m.isMine) &&
+        context.read<IChatRepository>() is IBoundedChatHistory) {
+      _retainRecentViewport(previousHead);
+    }
 
     if (_focusMessages != null) {
       final incomingCount = newMessages
@@ -1565,8 +1682,44 @@ class _ChatMessagesState extends State<_ChatMessages>
     );
   }
 
+  void _retainRecentViewport(List<ChatMessage> previous) {
+    final positions =
+        _itemPositionsListener.itemPositions.value
+            .where(
+              (p) =>
+                  p.itemTrailingEdge > 0 &&
+                  p.itemLeadingEdge < 1 &&
+                  p.index < _displayedItems.length &&
+                  _displayedItems[p.index] is MessageItemElement,
+            )
+            .toList()
+          ..sort((a, b) => a.index.compareTo(b.index));
+    if (positions.isEmpty || previous.isEmpty) return;
+    final position = positions.first;
+    final message =
+        (_displayedItems[position.index] as MessageItemElement).message;
+    final items = _buildChatTimelineItems(previous);
+    final index = items.indexWhere(
+      (i) => i is MessageItemElement && i.message.id == message.id,
+    );
+    if (index < 0) return;
+    setState(() {
+      _focusListRevision++;
+      _focusMessages = previous;
+      _focusUsesCache = true;
+      _focusHasOlder = true;
+      _focusHasNewer = true;
+      _focusPaginationArmed = false;
+      _focusInitialIndex = index;
+      _focusInitialAlignment = position.itemLeadingEdge;
+      _lastVisibleIndex = index;
+    });
+  }
+
   void _scheduleVisibleHistoryCheck() {
-    if (widget.chat.isDraft || _focusMessages != null) return;
+    if (widget.chat.isDraft || (_focusMessages != null && !_focusUsesCache)) {
+      return;
+    }
     _visibleHistoryTimer?.cancel();
     _visibleHistoryTimer = Timer(
       const Duration(milliseconds: 450),
@@ -1580,7 +1733,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       return;
     }
     if (!mounted ||
-        _focusMessages != null ||
+        (_focusMessages != null && !_focusUsesCache) ||
         _isNavigating ||
         WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
         ModalRoute.of(context)?.isCurrent != true) {
@@ -1619,12 +1772,36 @@ class _ChatMessagesState extends State<_ChatMessages>
     }
     if (ids.isEmpty) return;
     final chatId = widget.chat.id;
+    final generation = _navigationGeneration;
     _visibleHistoryInFlight = true;
     try {
-      await context.read<IChatRepository>().reconcileVisibleMessages(
-        chatId,
-        ids,
-      );
+      final repository = context.read<IChatRepository>();
+      if (_focusUsesCache && repository is IBoundedChatHistory) {
+        final refreshed = await repository.refreshHistoryMessages(chatId, ids);
+        if (mounted && generation == _navigationGeneration && _focusUsesCache) {
+          final byId = {for (final m in refreshed) m.id: m};
+          final previous = _focusMessages!;
+          final next = [
+            for (final m in previous)
+              if (!ids.contains(m.id))
+                m
+              else if (byId[m.id] case final updated?)
+                updated,
+          ];
+          if (!listEquals(previous, next)) {
+            final anchor = _visibleFocusedAnchor();
+            _setFocusedPage(
+              next,
+              anchor: next.length != previous.length ? anchor : null,
+              generation: generation,
+              hasOlder: _focusHasOlder,
+              hasNewer: _focusHasNewer,
+            );
+          }
+        }
+      } else {
+        await repository.reconcileVisibleMessages(chatId, ids);
+      }
       if (mounted && widget.chat.id == chatId) {
         _visibleHistoryFailureAt = null;
       }
@@ -1816,6 +1993,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       _recentInitialIndex = 0;
       _recentInitialAlignment = 0;
       _focusMessages = null;
+      _focusUsesCache = false;
       _focusPaginationArmed = false;
       _highlightedMessageId = null;
       _highlightSerial++;
@@ -1896,6 +2074,7 @@ class _ChatMessagesState extends State<_ChatMessages>
         _recentInitialIndex = 0;
         _recentInitialAlignment = 0;
         _focusMessages = null;
+        _focusUsesCache = false;
         _focusPaginationArmed = false;
         _showScrollToBottom = false;
         _newMessagesCount = 0;
@@ -1910,12 +2089,35 @@ class _ChatMessagesState extends State<_ChatMessages>
     final cachedWindow = _windowCache.find(messageId);
     if (cachedWindow == null) setState(() => _focusLoading = true);
     try {
-      final window =
-          cachedWindow ??
-          await context.read<IChatRepository>().loadMessageWindow(
+      final repository = context.read<IChatRepository>();
+      var fromLocalHistory = false;
+      List<ChatMessage>? window = cachedWindow;
+      if (window == null && repository is IBoundedChatHistory) {
+        window = await repository.readCachedHistoryWindow(
+          widget.chat.id,
+          messageId,
+        );
+        fromLocalHistory = window != null;
+      }
+      if (window == null) {
+        try {
+          window = await repository.loadMessageWindow(
             widget.chat.id,
             messageId,
           );
+        } catch (_) {
+          // Old installed caches remain usable offline, but their unknown
+          // ranges must not be persisted as server-proven continuous history.
+          if (repository is! IBoundedChatHistory) rethrow;
+          window = await repository.readCachedHistoryWindow(
+            widget.chat.id,
+            messageId,
+            allowUnverified: true,
+          );
+          if (window == null) rethrow;
+          fromLocalHistory = true;
+        }
+      }
       if (!mounted || generation != _navigationGeneration) return;
       final visibleWindow = window
           .where((message) => !_deletedFocusIds.contains(message.id))
@@ -1924,7 +2126,7 @@ class _ChatMessagesState extends State<_ChatMessages>
         showAppSnackBar(context, message: context.l10n.messageNotAvailable);
         return;
       }
-      if (cachedWindow == null) {
+      if (cachedWindow == null && !fromLocalHistory) {
         _windowCache.remember(messageId, visibleWindow);
       }
       _focusedMedia.clear();
@@ -1932,6 +2134,7 @@ class _ChatMessagesState extends State<_ChatMessages>
         _focusInitialIndex = 0;
         _focusInitialAlignment = 0;
         _focusMessages = visibleWindow;
+        _focusUsesCache = fromLocalHistory;
         _focusHasOlder = true;
         _focusHasNewer = true;
         _focusPaginationArmed = false;
@@ -2022,10 +2225,10 @@ class _ChatMessagesState extends State<_ChatMessages>
     _focusPageLoading = true;
     final generation = _navigationGeneration;
     try {
-      final page = await context.read<IChatRepository>().loadWindowOlder(
-        widget.chat.id,
-        messages.last,
-      );
+      final repository = context.read<IChatRepository>();
+      final page = _focusUsesCache && repository is IBoundedChatHistory
+          ? await repository.loadHistoryOlder(widget.chat.id, messages.last)
+          : await repository.loadWindowOlder(widget.chat.id, messages.last);
       if (!mounted ||
           generation != _navigationGeneration ||
           _focusMessages == null) {
@@ -2049,9 +2252,10 @@ class _ChatMessagesState extends State<_ChatMessages>
         bounded.messages,
         anchor: bounded.trimmed ? anchor : null,
         generation: generation,
-        hasOlder: page.length == 60,
+        hasOlder: _focusUsesCache ? page.isNotEmpty : page.length == 60,
         hasNewer: bounded.trimmed || _focusHasNewer,
       );
+      _scheduleVisibleHistoryCheck();
     } catch (_) {
       // Keep the cursor intact: the next scroll can retry the same page.
     } finally {
@@ -2073,10 +2277,10 @@ class _ChatMessagesState extends State<_ChatMessages>
     _focusPageLoading = true;
     final generation = _navigationGeneration;
     try {
-      final page = await context.read<IChatRepository>().loadWindowNewer(
-        widget.chat.id,
-        messages.first,
-      );
+      final repository = context.read<IChatRepository>();
+      final page = _focusUsesCache && repository is IBoundedChatHistory
+          ? await repository.loadHistoryNewer(widget.chat.id, messages.first)
+          : await repository.loadWindowNewer(widget.chat.id, messages.first);
       if (!mounted ||
           generation != _navigationGeneration ||
           _focusMessages == null) {
@@ -2099,8 +2303,9 @@ class _ChatMessagesState extends State<_ChatMessages>
         anchor: page.isNotEmpty ? anchor : null,
         generation: generation,
         hasOlder: bounded.trimmed || _focusHasOlder,
-        hasNewer: page.length == 60,
+        hasNewer: _focusUsesCache ? page.isNotEmpty : page.length == 60,
       );
+      _scheduleVisibleHistoryCheck();
       if (!_focusHasNewer && page.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || generation != _navigationGeneration) return;

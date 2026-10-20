@@ -9,6 +9,7 @@ import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
+import 'package:yap_chat/repositories/chat/abstract_bounded_chat_history.dart';
 import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
 import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
@@ -24,7 +25,11 @@ class _LocalMessageDeletion {
   final String ownerUserId;
 }
 
-class ChatRepository implements IChatRepository {
+class _UnavailableHistoryBoundary implements Exception {}
+
+class _HistoryRetryLater implements Exception {}
+
+class ChatRepository implements IChatRepository, IBoundedChatHistory {
   @override
   Future<bool> setMessageReaction(
     ChatMessage message,
@@ -91,7 +96,11 @@ class ChatRepository implements IChatRepository {
         streamScope = scope;
         _syncService.openConversation(chatId, session: scope);
         cacheSubscription = _cache
-            .watchMessages(chatId, currentUserId: scope.userId)
+            .watchMessages(
+              chatId,
+              currentUserId: scope.userId,
+              limit: ConversationSyncService.pageSize,
+            )
             .listen(controller.add, onError: controller.addError);
         cacheListenerLease = _config.diagnostics?.trackLocalListener(
           'chat-message-cache',
@@ -141,6 +150,7 @@ class ChatRepository implements IChatRepository {
   @override
   Future<void> synchronizeOpenChats() async {
     _isNetworkPaused = false;
+    _historyFailures.clear();
     await _syncService.reactions.resume();
     final scope = _accountSessionController.capture();
     final chatIds = _syncService.openConversationIds;
@@ -162,31 +172,217 @@ class ChatRepository implements IChatRepository {
   @override
   Future<bool> loadMoreMessages(String chatId) async {
     final scope = _accountSessionController.capture();
-    final cached = await _cache.readMessages(
+    final oldest = await _cache.readOldestServerMessage(
       chatId,
-      currentUserId: scope.userId,
-    );
-    final serverMessages = cached
-        .where((message) => message.status != MessageStatus.sending)
-        .toList(growable: false);
-    if (serverMessages.isEmpty) return false;
-    final oldest = serverMessages.last;
-    final page = await _remote.fetchMessages(
-      chatId,
-      beforeTimestamp: oldest.timestamp,
-      beforeMessageId: oldest.id,
-      pageSize: ConversationSyncService.pageSize,
-    );
-    _accountSessionController.ensureCurrent(scope);
-    final hydrated = await _syncService.hydrateAll(
-      page,
       ownerUserId: scope.userId,
     );
-    await _accountSessionController.commit(
-      scope,
-      () => _cache.upsertMessages(hydrated, ownerUserId: scope.userId),
-    );
+    _accountSessionController.ensureCurrent(scope);
+    if (oldest == null) return false;
+    final page = await loadHistoryOlder(chatId, oldest);
     return page.length == ConversationSyncService.pageSize;
+  }
+
+  final Map<String, Future<List<ChatMessage>>> _activeHistoryPages = {};
+  final Map<String, DateTime> _historyFailures = {};
+
+  @override
+  Future<List<ChatMessage>?> readCachedHistoryWindow(
+    String chatId,
+    String messageId, {
+    bool allowUnverified = false,
+  }) async {
+    final scope = _accountSessionController.capture();
+    final messages = await _cache.readHistoryWindow(
+      chatId,
+      messageId,
+      ownerUserId: scope.userId,
+      allowUnverified: allowUnverified,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return messages;
+  }
+
+  @override
+  Future<List<ChatMessage>> refreshHistoryMessages(
+    String chatId,
+    Set<String> ids,
+  ) async {
+    final scope = _accountSessionController.capture();
+    await _syncService.reconcileVisibleMessages(chatId, ids);
+    _accountSessionController.ensureCurrent(scope);
+    final messages = await _cache.readHistoryMessages(
+      chatId,
+      ids,
+      ownerUserId: scope.userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return messages;
+  }
+
+  @override
+  Future<List<ChatMessage>> loadHistoryOlder(
+    String chatId,
+    ChatMessage oldest,
+  ) => _loadHistoryPage(chatId, oldest, older: true);
+
+  @override
+  Future<List<ChatMessage>> loadHistoryNewer(
+    String chatId,
+    ChatMessage newest,
+  ) => _loadHistoryPage(chatId, newest, older: false);
+
+  Future<List<ChatMessage>> _loadHistoryPage(
+    String chatId,
+    ChatMessage boundary, {
+    required bool older,
+  }) {
+    final scope = _accountSessionController.capture();
+    final key =
+        '${scope.generation}\u0000${scope.userId}\u0000$chatId\u0000${boundary.timestamp.microsecondsSinceEpoch}\u0000${boundary.id}\u0000$older';
+    return _activeHistoryPages.putIfAbsent(key, () async {
+      try {
+        final cached = await _cache.readHistoryPage(
+          chatId,
+          boundary,
+          ownerUserId: scope.userId,
+          older: older,
+        );
+        _accountSessionController.ensureCurrent(scope);
+        if (cached != null) return cached;
+        final failedAt = _historyFailures[key];
+        if (_isNetworkPaused ||
+            (failedAt != null &&
+                _now().difference(failedAt) < const Duration(seconds: 10))) {
+          final local = await _readOfflineHistory(
+            chatId,
+            boundary,
+            scope,
+            older: older,
+          );
+          if (local.isNotEmpty) return local;
+          throw _HistoryRetryLater();
+        }
+        var exact = boundary;
+        if (!await _cache.hasExactCursor(
+          boundary.id,
+          ownerUserId: scope.userId,
+        )) {
+          // Old installations stored only seconds. Resolve this one boundary,
+          // never fabricate a microsecond server cursor from its rounded date.
+          final window = await _remote
+              .fetchMessageWindow(chatId, targetMessageId: boundary.id)
+              .timeout(_remoteOperationTimeout);
+          final resolved = window.where((m) => m.id == boundary.id).firstOrNull;
+          if (resolved == null) {
+            await _accountSessionController.commit(
+              scope,
+              () => _cache.removeMessages(chatId, {
+                boundary.id,
+              }, ownerUserId: scope.userId),
+            );
+            throw _UnavailableHistoryBoundary();
+          }
+          exact = resolved;
+        }
+        _accountSessionController.ensureCurrent(scope);
+        final page =
+            await (older
+                    ? _remote.fetchMessages(
+                        chatId,
+                        beforeTimestamp: exact.timestamp,
+                        beforeMessageId: exact.id,
+                        pageSize: ConversationSyncService.pageSize,
+                      )
+                    : _remote.fetchMessageWindow(
+                        chatId,
+                        afterTimestamp: exact.timestamp,
+                        afterMessageId: exact.id,
+                      ))
+                .timeout(_remoteOperationTimeout);
+        _accountSessionController.ensureCurrent(scope);
+        await _accountSessionController.commit(
+          scope,
+          () => _cache.storeHistoryPage(
+            chatId,
+            page,
+            ownerUserId: scope.userId,
+            boundary: exact,
+            older: older,
+          ),
+        );
+        _historyFailures.remove(key);
+        _syncService.markHistoryPageValidated(chatId, page, session: scope);
+        // Include optimistic messages and reaction intents within this proven
+        // interval; remote results alone must not hide a local failed send.
+        final local = await _cache.readHistoryPage(
+          chatId,
+          exact,
+          ownerUserId: scope.userId,
+          older: older,
+          requireFullPage: false,
+        );
+        _accountSessionController.ensureCurrent(scope);
+        if (local != null) {
+          if (local.isEmpty &&
+              page.length == ConversationSyncService.pageSize) {
+            // Every returned row was already tombstoned while this request was
+            // in flight. That is not proof that the server history has ended.
+            _historyFailures[key] = _now();
+            throw _HistoryRetryLater();
+          }
+          final returnedIds = page.map((m) => m.id).toSet();
+          return local
+              .where(
+                (m) =>
+                    returnedIds.contains(m.id) ||
+                    m.isLocalOnly ||
+                    m.status == MessageStatus.sending ||
+                    m.status == MessageStatus.error,
+              )
+              .toList(growable: false);
+        }
+        return await _syncService.reactions.hydrate(page, session: scope);
+      } on StaleAccountSessionException {
+        rethrow;
+      } on _UnavailableHistoryBoundary {
+        rethrow;
+      } on _HistoryRetryLater {
+        rethrow;
+      } catch (_) {
+        _accountSessionController.ensureCurrent(scope);
+        _historyFailures[key] = _now();
+        while (_historyFailures.length > 64) {
+          _historyFailures.remove(_historyFailures.keys.first);
+        }
+        final local = await _readOfflineHistory(
+          chatId,
+          boundary,
+          scope,
+          older: older,
+        );
+        if (local.isNotEmpty) return local;
+        rethrow;
+      } finally {
+        _activeHistoryPages.remove(key);
+      }
+    });
+  }
+
+  Future<List<ChatMessage>> _readOfflineHistory(
+    String chatId,
+    ChatMessage boundary,
+    AccountSessionSnapshot scope, {
+    required bool older,
+  }) async {
+    final messages = await _cache.readHistoryPage(
+      chatId,
+      boundary,
+      ownerUserId: scope.userId,
+      older: older,
+      allowUnverified: true,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    return messages ?? const [];
   }
 
   @override

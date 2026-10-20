@@ -136,6 +136,24 @@ class ConversationSyncService {
     _validatedHistoryIds.remove(_operationKey(scope, chatId));
   }
 
+  /// A successfully fetched history page already proves visibility and carries
+  /// current reactions. Do not immediately validate the same rows a second time.
+  void markHistoryPageValidated(
+    String chatId,
+    Iterable<ChatMessage> messages, {
+    required AccountSessionSnapshot session,
+  }) {
+    _accountSessionController.ensureCurrent(session);
+    final validated = _validatedHistoryIds.putIfAbsent(
+      _operationKey(session, chatId),
+      () => <String>{},
+    );
+    validated.addAll(messages.map((m) => m.id));
+    while (validated.length > 1200) {
+      validated.remove(validated.first);
+    }
+  }
+
   Future<void> reconcileVisibleMessages(String chatId, Set<String> ids) {
     if (ids.isEmpty) return Future.value();
     final scope = _accountSessionController.capture();
@@ -241,11 +259,7 @@ class ConversationSyncService {
       );
       await refreshLocalPreview(chatId, ownerUserId: scope.userId);
     });
-    final validated = _validatedHistoryIds.putIfAbsent(
-      _operationKey(scope, chatId),
-      () => <String>{},
-    );
-    validated.addAll(messages.map((message) => message.id));
+    markHistoryPageValidated(chatId, messages, session: scope);
     _diagnostics?.recordSyncItems('conversation', hydrated.length);
     return hydrated;
   }

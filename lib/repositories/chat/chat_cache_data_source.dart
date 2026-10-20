@@ -4,6 +4,8 @@ import 'package:drift/drift.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
+import 'package:yap_chat/repositories/chat/chat_history_cursor.dart';
+import 'package:yap_chat/repositories/chat/chat_history_coverage.dart';
 
 class ChatCacheDataSource {
   static const pendingChatDeletionType = 'hide_conversation';
@@ -16,6 +18,7 @@ class ChatCacheDataSource {
 
   final AppDatabase _database;
   final String Function() _userIdProvider;
+  late final _historyCoverage = ChatHistoryCoverage(_database);
   // A response started before a deletion may arrive afterwards. Keep a small
   // process-local tombstone set so that response cannot reinsert the message.
   final Set<String> _removedMessageKeys = {};
@@ -37,6 +40,7 @@ class ChatCacheDataSource {
   Stream<List<ChatMessage>> watchMessages(
     String chatId, {
     required String currentUserId,
+    int? limit,
   }) {
     final table = _database.cachedMessages;
     final states = _database.cachedMessageReactionStates;
@@ -59,13 +63,14 @@ class ChatCacheDataSource {
                 table.chatId.equals(chatId),
           )
           ..orderBy([
-            OrderingTerm.desc(table.timestamp),
+            OrderingTerm.desc(table.timestampMicros),
             OrderingTerm.desc(table.id),
           ]);
+    if (limit != null) query.limit(limit);
     return query
         .watch()
         .map(
-        (rows) => List<ChatMessage>.unmodifiable(
+          (rows) => List<ChatMessage>.unmodifiable(
             rows.map((row) {
               final confirmed = row.readTableOrNull(states);
               var state = confirmed == null
@@ -319,7 +324,7 @@ class ChatCacheDataSource {
             table.chatId.equals(chatId),
       )
       ..orderBy([
-        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.timestampMicros),
         (table) => OrderingTerm.desc(table.id),
       ]);
     return mergeReactionStates(
@@ -328,6 +333,293 @@ class ChatCacheDataSource {
           .toList(growable: false),
       ownerUserId: currentUserId,
     );
+  }
+
+  /// A bounded local page is safe only within a server-proven interval.
+  /// Null means a missing/unknown range, not the end of the conversation.
+  Future<List<ChatMessage>?> readHistoryPage(
+    String chatId,
+    ChatMessage boundary, {
+    required String ownerUserId,
+    required bool older,
+    int limit = 60,
+    bool allowUnverified = false,
+    bool requireFullPage = true,
+  }) async {
+    final cursor = ChatHistoryCursor.of(boundary);
+    final range = await _historyCoverage.containing(
+      ownerUserId,
+      chatId,
+      cursor,
+    );
+    if (range == null && !allowUnverified) return null;
+    final lower = range == null
+        ? null
+        : ChatHistoryCursor(range.oldestMicros, range.oldestId);
+    final upper = range == null
+        ? null
+        : ChatHistoryCursor(range.newestMicros, range.newestId);
+    final table = _database.cachedMessages;
+    final query = _database.select(table)
+      ..where(
+        (t) =>
+            t.ownerUserId.equals(ownerUserId) &
+            t.chatId.equals(chatId) &
+            (older
+                ? cursor.before(t.timestampMicros, t.id)
+                : cursor.after(t.timestampMicros, t.id)) &
+            (allowUnverified
+                ? const Constant(true)
+                : lower!.before(t.timestampMicros, t.id).not()) &
+            (allowUnverified
+                ? const Constant(true)
+                : upper!.after(t.timestampMicros, t.id).not()),
+      )
+      ..orderBy([
+        (t) => OrderingTerm(
+          expression: t.timestampMicros,
+          mode: older ? OrderingMode.desc : OrderingMode.asc,
+        ),
+        (t) => OrderingTerm(
+          expression: t.id,
+          mode: older ? OrderingMode.desc : OrderingMode.asc,
+        ),
+      ])
+      ..limit(limit);
+    final rows = await query.get();
+    if (requireFullPage && !allowUnverified && rows.length < limit) {
+      if (older) {
+        if (!range!.reachesStart) return null;
+      } else {
+        final latest =
+            await (_database.selectOnly(table)
+                  ..addColumns([table.timestampMicros, table.id])
+                  ..where(
+                    table.ownerUserId.equals(ownerUserId) &
+                        table.chatId.equals(chatId) &
+                        table.isPending.not(),
+                  )
+                  ..orderBy([
+                    OrderingTerm.desc(table.timestampMicros),
+                    OrderingTerm.desc(table.id),
+                  ])
+                  ..limit(1))
+                .getSingleOrNull();
+        if (latest == null ||
+            upper!.compareTo(
+                  ChatHistoryCursor(
+                    latest.read(table.timestampMicros)!,
+                    latest.read(table.id)!,
+                  ),
+                ) <
+                0)
+          return null;
+      }
+    }
+    final messages = rows.map((row) => _mapMessage(row, ownerUserId)).toList();
+    return mergeReactionStates(
+      older ? messages : messages.reversed.toList(),
+      ownerUserId: ownerUserId,
+    );
+  }
+
+  Future<List<ChatMessage>?> readHistoryWindow(
+    String chatId,
+    String messageId, {
+    required String ownerUserId,
+    bool allowUnverified = false,
+  }) async {
+    return _database.transaction(() async {
+      final target = await readMessage(messageId, currentUserId: ownerUserId);
+      if (target == null || target.chatId != chatId) return null;
+      final older = await readHistoryPage(
+        chatId,
+        target,
+        ownerUserId: ownerUserId,
+        older: true,
+        limit: 30,
+        allowUnverified: allowUnverified,
+        requireFullPage: false,
+      );
+      final newer = await readHistoryPage(
+        chatId,
+        target,
+        ownerUserId: ownerUserId,
+        older: false,
+        limit: 29,
+        allowUnverified: allowUnverified,
+        requireFullPage: false,
+      );
+      if (older == null || newer == null) return null;
+      final reaction = await readReactionState(
+        target.id,
+        ownerUserId: ownerUserId,
+      );
+      return [...newer, target.copyWith(reactionState: reaction), ...older];
+    });
+  }
+
+  Future<bool> hasExactCursor(String id, {required String ownerUserId}) async {
+    final table = _database.cachedMessages;
+    final query = _database.selectOnly(table)
+      ..addColumns([table.hasExactTimestamp])
+      ..where(table.ownerUserId.equals(ownerUserId) & table.id.equals(id));
+    final row = await query.getSingleOrNull();
+    return row?.read(table.hasExactTimestamp) ??
+        true; // Remote-only windows are exact.
+  }
+
+  Future<List<ChatMessage>> readHistoryMessages(
+    String chatId,
+    Set<String> ids, {
+    required String ownerUserId,
+  }) async {
+    if (ids.isEmpty) return const [];
+    final rows =
+        await (_database.select(_database.cachedMessages)..where(
+              (t) =>
+                  t.ownerUserId.equals(ownerUserId) &
+                  t.chatId.equals(chatId) &
+                  t.id.isIn(ids),
+            ))
+            .get();
+    return mergeReactionStates(
+      rows.map((r) => _mapMessage(r, ownerUserId)).toList(),
+      ownerUserId: ownerUserId,
+    );
+  }
+
+  Future<ChatMessage?> readOldestServerMessage(
+    String chatId, {
+    required String ownerUserId,
+  }) async {
+    final query = _database.select(_database.cachedMessages)
+      ..where(
+        (t) =>
+            t.ownerUserId.equals(ownerUserId) &
+            t.chatId.equals(chatId) &
+            t.isPending.not(),
+      )
+      ..orderBy([
+        (t) => OrderingTerm.asc(t.timestampMicros),
+        (t) => OrderingTerm.asc(t.id),
+      ])
+      ..limit(1);
+    final row = await query.getSingleOrNull();
+    return row == null ? null : _mapMessage(row, ownerUserId);
+  }
+
+  /// Message rows and page coverage must become visible atomically.
+  Future<void> storeHistoryPage(
+    String chatId,
+    List<ChatMessage> messages, {
+    required String ownerUserId,
+    required ChatMessage boundary,
+    required bool older,
+  }) => _database.transaction(() async {
+    final cached = {
+      for (final m in await readHistoryMessages(
+        chatId,
+        messages.map((m) => m.id).toSet(),
+        ownerUserId: ownerUserId,
+      ))
+        m.id: m,
+    };
+    final cursor = ChatHistoryCursor.of(boundary);
+    final table = _database.cachedMessages;
+    // A fresh page also proves absences inside its interval. Otherwise a
+    // cached deletion could displace a valid row when the page is read back.
+    if (older || messages.isNotEmpty) {
+      final edge = messages.isEmpty
+          ? cursor
+          : ChatHistoryCursor.of(older ? messages.last : messages.first);
+      final missing =
+          table.ownerUserId.equals(ownerUserId) &
+          table.chatId.equals(chatId) &
+          table.isPending.not() &
+          (older
+              ? cursor.before(table.timestampMicros, table.id)
+              : cursor.after(table.timestampMicros, table.id)) &
+          (older && messages.length < 60
+              ? const Constant(true)
+              : (older
+                    ? edge.before(table.timestampMicros, table.id).not()
+                    : edge.after(table.timestampMicros, table.id).not())) &
+          table.id.isNotIn(messages.map((m) => m.id));
+      final missingIds = _database.selectOnly(table)
+        ..addColumns([table.id])
+        ..where(missing);
+      await (_database.delete(_database.pendingMessageReactions)..where(
+            (t) =>
+                t.ownerUserId.equals(ownerUserId) &
+                t.chatId.equals(chatId) &
+                t.messageId.isInQuery(missingIds),
+          ))
+          .go();
+      await (_database.delete(_database.cachedMessageReactionStates)..where(
+            (t) =>
+                t.ownerUserId.equals(ownerUserId) &
+                t.chatId.equals(chatId) &
+                t.messageId.isInQuery(missingIds),
+          ))
+          .go();
+      await (_database.update(table)..where(
+            (t) =>
+                t.ownerUserId.equals(ownerUserId) &
+                t.chatId.equals(chatId) &
+                t.replyMessageId.isInQuery(missingIds),
+          ))
+          .write(
+            const CachedMessagesCompanion(
+              replyMessageId: Value(null),
+              replySenderId: Value(null),
+              replyType: Value(null),
+              replyText: Value(null),
+            ),
+          );
+      await (_database.delete(table)..where((_) => missing)).go();
+    }
+    await _upsertMessages([
+      for (final m in messages)
+        if (cached[m.id] case final previous?)
+          m.copyWith(
+            mediaUrls:
+                m.type == previous.type &&
+                    _samePaths(
+                      m.mediaStoragePaths,
+                      previous.mediaStoragePaths,
+                    ) &&
+                    m.mediaUrls.isEmpty
+                ? previous.mediaUrls
+                : m.mediaUrls,
+            audioUrl:
+                m.type == previous.type &&
+                    m.audioStoragePath == previous.audioStoragePath
+                ? m.audioUrl ?? previous.audioUrl
+                : m.audioUrl,
+          )
+        else
+          m,
+    ], ownerUserId);
+    await _historyCoverage.record(
+      ownerUserId,
+      chatId,
+      oldest: older && messages.isNotEmpty
+          ? ChatHistoryCursor.of(messages.last)
+          : cursor,
+      newest: !older && messages.isNotEmpty
+          ? ChatHistoryCursor.of(messages.first)
+          : cursor,
+      reachesStart: older && messages.length < 60,
+    );
+  });
+
+  bool _samePaths(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   /// Reads only the currently displayed cache page. Pending and local-only
@@ -364,7 +656,7 @@ class ChatCacheDataSource {
             table.chatId.equals(chatId),
       )
       ..orderBy([
-        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.timestampMicros),
         (table) => OrderingTerm.desc(table.id),
       ])
       ..limit(1);
@@ -391,7 +683,7 @@ class ChatCacheDataSource {
     String? ownerUserId,
   }) async {
     final owner = ownerUserId ?? _userIdProvider();
-    await _database.transaction(() async {
+    return _database.transaction(() async {
       for (final message in messages) {
         await storeReactionState(
           chatId,
@@ -400,10 +692,19 @@ class ChatCacheDataSource {
           ownerUserId: owner,
         );
       }
-    });
-    if (await _recentMessagesMatch(chatId, messages, owner)) return false;
+      if (messages.isEmpty) {
+        await _historyCoverage.clear(owner, [chatId]);
+      } else {
+        await _historyCoverage.record(
+          owner,
+          chatId,
+          oldest: ChatHistoryCursor.of(messages.last),
+          newest: ChatHistoryCursor.of(messages.first),
+          reachesStart: messages.length < 60,
+        );
+      }
+      if (await _recentMessagesMatch(chatId, messages, owner)) return false;
 
-    await _database.transaction(() async {
       if (messages.isEmpty) {
         await (_database.delete(_database.cachedMessages)..where(
               (table) =>
@@ -413,21 +714,23 @@ class ChatCacheDataSource {
             ))
             .go();
       } else {
-        final oldest = messages.last.timestamp;
+        final oldest = ChatHistoryCursor.of(messages.last);
         final ids = messages.map((message) => message.id).toSet();
         await (_database.delete(_database.cachedMessages)..where(
               (table) =>
                   table.ownerUserId.equals(owner) &
                   table.chatId.equals(chatId) &
                   table.isPending.not() &
-                  table.timestamp.isBiggerOrEqualValue(oldest) &
+                  (messages.length < 60
+                      ? const Constant(true)
+                      : oldest.before(table.timestampMicros, table.id).not()) &
                   table.id.isNotIn(ids),
             ))
             .go();
       }
       await _upsertMessages(messages, owner);
+      return true;
     });
-    return true;
   }
 
   Future<bool> _recentMessagesMatch(
@@ -441,21 +744,22 @@ class ChatCacheDataSource {
             table.ownerUserId.equals(ownerUserId) &
             table.chatId.equals(chatId) &
             table.isPending.not() &
-            (messages.isEmpty
+            (messages.length < 60
                 ? const Constant(true)
-                : table.timestamp.isBiggerOrEqualValue(
-                    _normalizeTimestamp(messages.last.timestamp),
-                  )),
+                : ChatHistoryCursor.of(
+                    messages.last,
+                  ).before(table.timestampMicros, table.id).not()),
       )
       ..orderBy([
-        (table) => OrderingTerm.desc(table.timestamp),
+        (table) => OrderingTerm.desc(table.timestampMicros),
         (table) => OrderingTerm.desc(table.id),
       ]);
-    if (messages.isEmpty) query.limit(1);
+    query.limit(messages.length + 1);
     final rows = await query.get();
     if (rows.length != messages.length) return false;
 
     for (var index = 0; index < rows.length; index++) {
+      if (!rows[index].hasExactTimestamp) return false;
       final cached = _mapMessage(rows[index], ownerUserId);
       if (cached !=
           _normalizeMessageTimestamps(
@@ -470,7 +774,7 @@ class ChatCacheDataSource {
   ChatMessage _normalizeMessageTimestamps(ChatMessage message) {
     final readAt = message.readAt;
     return message.copyWith(
-      timestamp: _normalizeTimestamp(message.timestamp),
+      timestamp: message.timestamp.toLocal(),
       readAt: readAt == null ? null : _normalizeTimestamp(readAt),
       clearReadAt: readAt == null,
     );
@@ -939,6 +1243,7 @@ class ChatCacheDataSource {
     }
 
     await _database.transaction(() async {
+      await _historyCoverage.clear(owner, chatIds);
       await (_database.delete(
             _database.cachedMessageReactionStates,
           )..where((t) => t.ownerUserId.equals(owner) & t.chatId.isIn(chatIds)))
@@ -1000,6 +1305,8 @@ class ChatCacheDataSource {
       senderId: message.senderId,
       messageText: message.text,
       timestamp: message.timestamp,
+      timestampMicros: Value(message.timestamp.microsecondsSinceEpoch),
+      hasExactTimestamp: const Value(true),
       status: message.status.name,
       type: message.type.name,
       mediaUrlsJson: jsonEncode(message.mediaUrls),
@@ -1036,7 +1343,9 @@ class ChatCacheDataSource {
       chatId: row.chatId,
       senderId: row.senderId,
       text: row.messageText,
-      timestamp: row.timestamp,
+      timestamp: row.timestampMicros == 0
+          ? row.timestamp
+          : DateTime.fromMicrosecondsSinceEpoch(row.timestampMicros),
       isMine: row.senderId == currentUserId,
       status: MessageStatus.values.byName(row.status),
       type: MessageType.values.byName(row.type),

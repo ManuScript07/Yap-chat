@@ -2671,6 +2671,33 @@ class $CachedMessagesTable extends CachedMessages
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _timestampMicrosMeta = const VerificationMeta(
+    'timestampMicros',
+  );
+  @override
+  late final GeneratedColumn<int> timestampMicros = GeneratedColumn<int>(
+    'timestamp_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _hasExactTimestampMeta = const VerificationMeta(
+    'hasExactTimestamp',
+  );
+  @override
+  late final GeneratedColumn<bool> hasExactTimestamp = GeneratedColumn<bool>(
+    'has_exact_timestamp',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_exact_timestamp" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -2864,6 +2891,8 @@ class $CachedMessagesTable extends CachedMessages
     senderId,
     messageText,
     timestamp,
+    timestampMicros,
+    hasExactTimestamp,
     status,
     type,
     mediaUrlsJson,
@@ -2944,6 +2973,24 @@ class $CachedMessagesTable extends CachedMessages
       );
     } else if (isInserting) {
       context.missing(_timestampMeta);
+    }
+    if (data.containsKey('timestamp_micros')) {
+      context.handle(
+        _timestampMicrosMeta,
+        timestampMicros.isAcceptableOrUnknown(
+          data['timestamp_micros']!,
+          _timestampMicrosMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_exact_timestamp')) {
+      context.handle(
+        _hasExactTimestampMeta,
+        hasExactTimestamp.isAcceptableOrUnknown(
+          data['has_exact_timestamp']!,
+          _hasExactTimestampMeta,
+        ),
+      );
     }
     if (data.containsKey('status')) {
       context.handle(
@@ -3115,6 +3162,14 @@ class $CachedMessagesTable extends CachedMessages
         DriftSqlType.dateTime,
         data['${effectivePrefix}timestamp'],
       )!,
+      timestampMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}timestamp_micros'],
+      )!,
+      hasExactTimestamp: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_exact_timestamp'],
+      )!,
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -3199,6 +3254,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
   final String senderId;
   final String messageText;
   final DateTime timestamp;
+  final int timestampMicros;
+  final bool hasExactTimestamp;
   final String status;
   final String type;
   final String mediaUrlsJson;
@@ -3223,6 +3280,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
     required this.senderId,
     required this.messageText,
     required this.timestamp,
+    required this.timestampMicros,
+    required this.hasExactTimestamp,
     required this.status,
     required this.type,
     required this.mediaUrlsJson,
@@ -3250,6 +3309,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
     map['sender_id'] = Variable<String>(senderId);
     map['message_text'] = Variable<String>(messageText);
     map['timestamp'] = Variable<DateTime>(timestamp);
+    map['timestamp_micros'] = Variable<int>(timestampMicros);
+    map['has_exact_timestamp'] = Variable<bool>(hasExactTimestamp);
     map['status'] = Variable<String>(status);
     map['type'] = Variable<String>(type);
     map['media_urls_json'] = Variable<String>(mediaUrlsJson);
@@ -3298,6 +3359,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
       senderId: Value(senderId),
       messageText: Value(messageText),
       timestamp: Value(timestamp),
+      timestampMicros: Value(timestampMicros),
+      hasExactTimestamp: Value(hasExactTimestamp),
       status: Value(status),
       type: Value(type),
       mediaUrlsJson: Value(mediaUrlsJson),
@@ -3350,6 +3413,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
       senderId: serializer.fromJson<String>(json['senderId']),
       messageText: serializer.fromJson<String>(json['messageText']),
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+      timestampMicros: serializer.fromJson<int>(json['timestampMicros']),
+      hasExactTimestamp: serializer.fromJson<bool>(json['hasExactTimestamp']),
       status: serializer.fromJson<String>(json['status']),
       type: serializer.fromJson<String>(json['type']),
       mediaUrlsJson: serializer.fromJson<String>(json['mediaUrlsJson']),
@@ -3381,6 +3446,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
       'senderId': serializer.toJson<String>(senderId),
       'messageText': serializer.toJson<String>(messageText),
       'timestamp': serializer.toJson<DateTime>(timestamp),
+      'timestampMicros': serializer.toJson<int>(timestampMicros),
+      'hasExactTimestamp': serializer.toJson<bool>(hasExactTimestamp),
       'status': serializer.toJson<String>(status),
       'type': serializer.toJson<String>(type),
       'mediaUrlsJson': serializer.toJson<String>(mediaUrlsJson),
@@ -3408,6 +3475,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
     String? senderId,
     String? messageText,
     DateTime? timestamp,
+    int? timestampMicros,
+    bool? hasExactTimestamp,
     String? status,
     String? type,
     String? mediaUrlsJson,
@@ -3432,6 +3501,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
     senderId: senderId ?? this.senderId,
     messageText: messageText ?? this.messageText,
     timestamp: timestamp ?? this.timestamp,
+    timestampMicros: timestampMicros ?? this.timestampMicros,
+    hasExactTimestamp: hasExactTimestamp ?? this.hasExactTimestamp,
     status: status ?? this.status,
     type: type ?? this.type,
     mediaUrlsJson: mediaUrlsJson ?? this.mediaUrlsJson,
@@ -3470,6 +3541,12 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
           ? data.messageText.value
           : this.messageText,
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+      timestampMicros: data.timestampMicros.present
+          ? data.timestampMicros.value
+          : this.timestampMicros,
+      hasExactTimestamp: data.hasExactTimestamp.present
+          ? data.hasExactTimestamp.value
+          : this.hasExactTimestamp,
       status: data.status.present ? data.status.value : this.status,
       type: data.type.present ? data.type.value : this.type,
       mediaUrlsJson: data.mediaUrlsJson.present
@@ -3513,6 +3590,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
           ..write('senderId: $senderId, ')
           ..write('messageText: $messageText, ')
           ..write('timestamp: $timestamp, ')
+          ..write('timestampMicros: $timestampMicros, ')
+          ..write('hasExactTimestamp: $hasExactTimestamp, ')
           ..write('status: $status, ')
           ..write('type: $type, ')
           ..write('mediaUrlsJson: $mediaUrlsJson, ')
@@ -3542,6 +3621,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
     senderId,
     messageText,
     timestamp,
+    timestampMicros,
+    hasExactTimestamp,
     status,
     type,
     mediaUrlsJson,
@@ -3570,6 +3651,8 @@ class CachedMessage extends DataClass implements Insertable<CachedMessage> {
           other.senderId == this.senderId &&
           other.messageText == this.messageText &&
           other.timestamp == this.timestamp &&
+          other.timestampMicros == this.timestampMicros &&
+          other.hasExactTimestamp == this.hasExactTimestamp &&
           other.status == this.status &&
           other.type == this.type &&
           other.mediaUrlsJson == this.mediaUrlsJson &&
@@ -3596,6 +3679,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
   final Value<String> senderId;
   final Value<String> messageText;
   final Value<DateTime> timestamp;
+  final Value<int> timestampMicros;
+  final Value<bool> hasExactTimestamp;
   final Value<String> status;
   final Value<String> type;
   final Value<String> mediaUrlsJson;
@@ -3621,6 +3706,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
     this.senderId = const Value.absent(),
     this.messageText = const Value.absent(),
     this.timestamp = const Value.absent(),
+    this.timestampMicros = const Value.absent(),
+    this.hasExactTimestamp = const Value.absent(),
     this.status = const Value.absent(),
     this.type = const Value.absent(),
     this.mediaUrlsJson = const Value.absent(),
@@ -3647,6 +3734,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
     required String senderId,
     required String messageText,
     required DateTime timestamp,
+    this.timestampMicros = const Value.absent(),
+    this.hasExactTimestamp = const Value.absent(),
     required String status,
     required String type,
     required String mediaUrlsJson,
@@ -3685,6 +3774,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
     Expression<String>? senderId,
     Expression<String>? messageText,
     Expression<DateTime>? timestamp,
+    Expression<int>? timestampMicros,
+    Expression<bool>? hasExactTimestamp,
     Expression<String>? status,
     Expression<String>? type,
     Expression<String>? mediaUrlsJson,
@@ -3711,6 +3802,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
       if (senderId != null) 'sender_id': senderId,
       if (messageText != null) 'message_text': messageText,
       if (timestamp != null) 'timestamp': timestamp,
+      if (timestampMicros != null) 'timestamp_micros': timestampMicros,
+      if (hasExactTimestamp != null) 'has_exact_timestamp': hasExactTimestamp,
       if (status != null) 'status': status,
       if (type != null) 'type': type,
       if (mediaUrlsJson != null) 'media_urls_json': mediaUrlsJson,
@@ -3740,6 +3833,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
     Value<String>? senderId,
     Value<String>? messageText,
     Value<DateTime>? timestamp,
+    Value<int>? timestampMicros,
+    Value<bool>? hasExactTimestamp,
     Value<String>? status,
     Value<String>? type,
     Value<String>? mediaUrlsJson,
@@ -3766,6 +3861,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
       senderId: senderId ?? this.senderId,
       messageText: messageText ?? this.messageText,
       timestamp: timestamp ?? this.timestamp,
+      timestampMicros: timestampMicros ?? this.timestampMicros,
+      hasExactTimestamp: hasExactTimestamp ?? this.hasExactTimestamp,
       status: status ?? this.status,
       type: type ?? this.type,
       mediaUrlsJson: mediaUrlsJson ?? this.mediaUrlsJson,
@@ -3808,6 +3905,12 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
     }
     if (timestamp.present) {
       map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    if (timestampMicros.present) {
+      map['timestamp_micros'] = Variable<int>(timestampMicros.value);
+    }
+    if (hasExactTimestamp.present) {
+      map['has_exact_timestamp'] = Variable<bool>(hasExactTimestamp.value);
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -3877,6 +3980,8 @@ class CachedMessagesCompanion extends UpdateCompanion<CachedMessage> {
           ..write('senderId: $senderId, ')
           ..write('messageText: $messageText, ')
           ..write('timestamp: $timestamp, ')
+          ..write('timestampMicros: $timestampMicros, ')
+          ..write('hasExactTimestamp: $hasExactTimestamp, ')
           ..write('status: $status, ')
           ..write('type: $type, ')
           ..write('mediaUrlsJson: $mediaUrlsJson, ')
@@ -11814,6 +11919,505 @@ class CachedAppLanguagesCompanion extends UpdateCompanion<CachedAppLanguage> {
   }
 }
 
+class $CachedChatHistoryRangesTable extends CachedChatHistoryRanges
+    with TableInfo<$CachedChatHistoryRangesTable, CachedChatHistoryRange> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedChatHistoryRangesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _oldestMicrosMeta = const VerificationMeta(
+    'oldestMicros',
+  );
+  @override
+  late final GeneratedColumn<int> oldestMicros = GeneratedColumn<int>(
+    'oldest_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _oldestIdMeta = const VerificationMeta(
+    'oldestId',
+  );
+  @override
+  late final GeneratedColumn<String> oldestId = GeneratedColumn<String>(
+    'oldest_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _newestMicrosMeta = const VerificationMeta(
+    'newestMicros',
+  );
+  @override
+  late final GeneratedColumn<int> newestMicros = GeneratedColumn<int>(
+    'newest_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _newestIdMeta = const VerificationMeta(
+    'newestId',
+  );
+  @override
+  late final GeneratedColumn<String> newestId = GeneratedColumn<String>(
+    'newest_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reachesStartMeta = const VerificationMeta(
+    'reachesStart',
+  );
+  @override
+  late final GeneratedColumn<bool> reachesStart = GeneratedColumn<bool>(
+    'reaches_start',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("reaches_start" IN (0, 1))',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    chatId,
+    oldestMicros,
+    oldestId,
+    newestMicros,
+    newestId,
+    reachesStart,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_chat_history_ranges';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedChatHistoryRange> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('oldest_micros')) {
+      context.handle(
+        _oldestMicrosMeta,
+        oldestMicros.isAcceptableOrUnknown(
+          data['oldest_micros']!,
+          _oldestMicrosMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_oldestMicrosMeta);
+    }
+    if (data.containsKey('oldest_id')) {
+      context.handle(
+        _oldestIdMeta,
+        oldestId.isAcceptableOrUnknown(data['oldest_id']!, _oldestIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_oldestIdMeta);
+    }
+    if (data.containsKey('newest_micros')) {
+      context.handle(
+        _newestMicrosMeta,
+        newestMicros.isAcceptableOrUnknown(
+          data['newest_micros']!,
+          _newestMicrosMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_newestMicrosMeta);
+    }
+    if (data.containsKey('newest_id')) {
+      context.handle(
+        _newestIdMeta,
+        newestId.isAcceptableOrUnknown(data['newest_id']!, _newestIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_newestIdMeta);
+    }
+    if (data.containsKey('reaches_start')) {
+      context.handle(
+        _reachesStartMeta,
+        reachesStart.isAcceptableOrUnknown(
+          data['reaches_start']!,
+          _reachesStartMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_reachesStartMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {
+    ownerUserId,
+    chatId,
+    newestMicros,
+    newestId,
+  };
+  @override
+  CachedChatHistoryRange map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedChatHistoryRange(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      oldestMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}oldest_micros'],
+      )!,
+      oldestId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}oldest_id'],
+      )!,
+      newestMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}newest_micros'],
+      )!,
+      newestId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}newest_id'],
+      )!,
+      reachesStart: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}reaches_start'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedChatHistoryRangesTable createAlias(String alias) {
+    return $CachedChatHistoryRangesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedChatHistoryRange extends DataClass
+    implements Insertable<CachedChatHistoryRange> {
+  final String ownerUserId;
+  final String chatId;
+  final int oldestMicros;
+  final String oldestId;
+  final int newestMicros;
+  final String newestId;
+  final bool reachesStart;
+  const CachedChatHistoryRange({
+    required this.ownerUserId,
+    required this.chatId,
+    required this.oldestMicros,
+    required this.oldestId,
+    required this.newestMicros,
+    required this.newestId,
+    required this.reachesStart,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['chat_id'] = Variable<String>(chatId);
+    map['oldest_micros'] = Variable<int>(oldestMicros);
+    map['oldest_id'] = Variable<String>(oldestId);
+    map['newest_micros'] = Variable<int>(newestMicros);
+    map['newest_id'] = Variable<String>(newestId);
+    map['reaches_start'] = Variable<bool>(reachesStart);
+    return map;
+  }
+
+  CachedChatHistoryRangesCompanion toCompanion(bool nullToAbsent) {
+    return CachedChatHistoryRangesCompanion(
+      ownerUserId: Value(ownerUserId),
+      chatId: Value(chatId),
+      oldestMicros: Value(oldestMicros),
+      oldestId: Value(oldestId),
+      newestMicros: Value(newestMicros),
+      newestId: Value(newestId),
+      reachesStart: Value(reachesStart),
+    );
+  }
+
+  factory CachedChatHistoryRange.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedChatHistoryRange(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      oldestMicros: serializer.fromJson<int>(json['oldestMicros']),
+      oldestId: serializer.fromJson<String>(json['oldestId']),
+      newestMicros: serializer.fromJson<int>(json['newestMicros']),
+      newestId: serializer.fromJson<String>(json['newestId']),
+      reachesStart: serializer.fromJson<bool>(json['reachesStart']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'chatId': serializer.toJson<String>(chatId),
+      'oldestMicros': serializer.toJson<int>(oldestMicros),
+      'oldestId': serializer.toJson<String>(oldestId),
+      'newestMicros': serializer.toJson<int>(newestMicros),
+      'newestId': serializer.toJson<String>(newestId),
+      'reachesStart': serializer.toJson<bool>(reachesStart),
+    };
+  }
+
+  CachedChatHistoryRange copyWith({
+    String? ownerUserId,
+    String? chatId,
+    int? oldestMicros,
+    String? oldestId,
+    int? newestMicros,
+    String? newestId,
+    bool? reachesStart,
+  }) => CachedChatHistoryRange(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    chatId: chatId ?? this.chatId,
+    oldestMicros: oldestMicros ?? this.oldestMicros,
+    oldestId: oldestId ?? this.oldestId,
+    newestMicros: newestMicros ?? this.newestMicros,
+    newestId: newestId ?? this.newestId,
+    reachesStart: reachesStart ?? this.reachesStart,
+  );
+  CachedChatHistoryRange copyWithCompanion(
+    CachedChatHistoryRangesCompanion data,
+  ) {
+    return CachedChatHistoryRange(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      oldestMicros: data.oldestMicros.present
+          ? data.oldestMicros.value
+          : this.oldestMicros,
+      oldestId: data.oldestId.present ? data.oldestId.value : this.oldestId,
+      newestMicros: data.newestMicros.present
+          ? data.newestMicros.value
+          : this.newestMicros,
+      newestId: data.newestId.present ? data.newestId.value : this.newestId,
+      reachesStart: data.reachesStart.present
+          ? data.reachesStart.value
+          : this.reachesStart,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatHistoryRange(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('chatId: $chatId, ')
+          ..write('oldestMicros: $oldestMicros, ')
+          ..write('oldestId: $oldestId, ')
+          ..write('newestMicros: $newestMicros, ')
+          ..write('newestId: $newestId, ')
+          ..write('reachesStart: $reachesStart')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    chatId,
+    oldestMicros,
+    oldestId,
+    newestMicros,
+    newestId,
+    reachesStart,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedChatHistoryRange &&
+          other.ownerUserId == this.ownerUserId &&
+          other.chatId == this.chatId &&
+          other.oldestMicros == this.oldestMicros &&
+          other.oldestId == this.oldestId &&
+          other.newestMicros == this.newestMicros &&
+          other.newestId == this.newestId &&
+          other.reachesStart == this.reachesStart);
+}
+
+class CachedChatHistoryRangesCompanion
+    extends UpdateCompanion<CachedChatHistoryRange> {
+  final Value<String> ownerUserId;
+  final Value<String> chatId;
+  final Value<int> oldestMicros;
+  final Value<String> oldestId;
+  final Value<int> newestMicros;
+  final Value<String> newestId;
+  final Value<bool> reachesStart;
+  final Value<int> rowid;
+  const CachedChatHistoryRangesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.oldestMicros = const Value.absent(),
+    this.oldestId = const Value.absent(),
+    this.newestMicros = const Value.absent(),
+    this.newestId = const Value.absent(),
+    this.reachesStart = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedChatHistoryRangesCompanion.insert({
+    required String ownerUserId,
+    required String chatId,
+    required int oldestMicros,
+    required String oldestId,
+    required int newestMicros,
+    required String newestId,
+    required bool reachesStart,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       chatId = Value(chatId),
+       oldestMicros = Value(oldestMicros),
+       oldestId = Value(oldestId),
+       newestMicros = Value(newestMicros),
+       newestId = Value(newestId),
+       reachesStart = Value(reachesStart);
+  static Insertable<CachedChatHistoryRange> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? chatId,
+    Expression<int>? oldestMicros,
+    Expression<String>? oldestId,
+    Expression<int>? newestMicros,
+    Expression<String>? newestId,
+    Expression<bool>? reachesStart,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (chatId != null) 'chat_id': chatId,
+      if (oldestMicros != null) 'oldest_micros': oldestMicros,
+      if (oldestId != null) 'oldest_id': oldestId,
+      if (newestMicros != null) 'newest_micros': newestMicros,
+      if (newestId != null) 'newest_id': newestId,
+      if (reachesStart != null) 'reaches_start': reachesStart,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedChatHistoryRangesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? chatId,
+    Value<int>? oldestMicros,
+    Value<String>? oldestId,
+    Value<int>? newestMicros,
+    Value<String>? newestId,
+    Value<bool>? reachesStart,
+    Value<int>? rowid,
+  }) {
+    return CachedChatHistoryRangesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      chatId: chatId ?? this.chatId,
+      oldestMicros: oldestMicros ?? this.oldestMicros,
+      oldestId: oldestId ?? this.oldestId,
+      newestMicros: newestMicros ?? this.newestMicros,
+      newestId: newestId ?? this.newestId,
+      reachesStart: reachesStart ?? this.reachesStart,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (oldestMicros.present) {
+      map['oldest_micros'] = Variable<int>(oldestMicros.value);
+    }
+    if (oldestId.present) {
+      map['oldest_id'] = Variable<String>(oldestId.value);
+    }
+    if (newestMicros.present) {
+      map['newest_micros'] = Variable<int>(newestMicros.value);
+    }
+    if (newestId.present) {
+      map['newest_id'] = Variable<String>(newestId.value);
+    }
+    if (reachesStart.present) {
+      map['reaches_start'] = Variable<bool>(reachesStart.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatHistoryRangesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('chatId: $chatId, ')
+          ..write('oldestMicros: $oldestMicros, ')
+          ..write('oldestId: $oldestId, ')
+          ..write('newestMicros: $newestMicros, ')
+          ..write('newestId: $newestId, ')
+          ..write('reachesStart: $reachesStart, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -11853,6 +12457,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedProfileViewCountsTable(this);
   late final $CachedAppLanguagesTable cachedAppLanguages =
       $CachedAppLanguagesTable(this);
+  late final $CachedChatHistoryRangesTable cachedChatHistoryRanges =
+      $CachedChatHistoryRangesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -11878,6 +12484,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedUserDistances,
     cachedProfileViewCounts,
     cachedAppLanguages,
+    cachedChatHistoryRanges,
   ];
 }
 
@@ -13099,6 +13706,8 @@ typedef $$CachedMessagesTableCreateCompanionBuilder =
       required String senderId,
       required String messageText,
       required DateTime timestamp,
+      Value<int> timestampMicros,
+      Value<bool> hasExactTimestamp,
       required String status,
       required String type,
       required String mediaUrlsJson,
@@ -13126,6 +13735,8 @@ typedef $$CachedMessagesTableUpdateCompanionBuilder =
       Value<String> senderId,
       Value<String> messageText,
       Value<DateTime> timestamp,
+      Value<int> timestampMicros,
+      Value<bool> hasExactTimestamp,
       Value<String> status,
       Value<String> type,
       Value<String> mediaUrlsJson,
@@ -13182,6 +13793,16 @@ class $$CachedMessagesTableFilterComposer
 
   ColumnFilters<DateTime> get timestamp => $composableBuilder(
     column: $table.timestamp,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get timestampMicros => $composableBuilder(
+    column: $table.timestampMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasExactTimestamp => $composableBuilder(
+    column: $table.hasExactTimestamp,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13310,6 +13931,16 @@ class $$CachedMessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get timestampMicros => $composableBuilder(
+    column: $table.timestampMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasExactTimestamp => $composableBuilder(
+    column: $table.hasExactTimestamp,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -13427,6 +14058,16 @@ class $$CachedMessagesTableAnnotationComposer
   GeneratedColumn<DateTime> get timestamp =>
       $composableBuilder(column: $table.timestamp, builder: (column) => column);
 
+  GeneratedColumn<int> get timestampMicros => $composableBuilder(
+    column: $table.timestampMicros,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasExactTimestamp => $composableBuilder(
+    column: $table.hasExactTimestamp,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
@@ -13532,6 +14173,8 @@ class $$CachedMessagesTableTableManager
                 Value<String> senderId = const Value.absent(),
                 Value<String> messageText = const Value.absent(),
                 Value<DateTime> timestamp = const Value.absent(),
+                Value<int> timestampMicros = const Value.absent(),
+                Value<bool> hasExactTimestamp = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> mediaUrlsJson = const Value.absent(),
@@ -13557,6 +14200,8 @@ class $$CachedMessagesTableTableManager
                 senderId: senderId,
                 messageText: messageText,
                 timestamp: timestamp,
+                timestampMicros: timestampMicros,
+                hasExactTimestamp: hasExactTimestamp,
                 status: status,
                 type: type,
                 mediaUrlsJson: mediaUrlsJson,
@@ -13584,6 +14229,8 @@ class $$CachedMessagesTableTableManager
                 required String senderId,
                 required String messageText,
                 required DateTime timestamp,
+                Value<int> timestampMicros = const Value.absent(),
+                Value<bool> hasExactTimestamp = const Value.absent(),
                 required String status,
                 required String type,
                 required String mediaUrlsJson,
@@ -13609,6 +14256,8 @@ class $$CachedMessagesTableTableManager
                 senderId: senderId,
                 messageText: messageText,
                 timestamp: timestamp,
+                timestampMicros: timestampMicros,
+                hasExactTimestamp: hasExactTimestamp,
                 status: status,
                 type: type,
                 mediaUrlsJson: mediaUrlsJson,
@@ -18038,6 +18687,283 @@ typedef $$CachedAppLanguagesTableProcessedTableManager =
       CachedAppLanguage,
       PrefetchHooks Function()
     >;
+typedef $$CachedChatHistoryRangesTableCreateCompanionBuilder =
+    CachedChatHistoryRangesCompanion Function({
+      required String ownerUserId,
+      required String chatId,
+      required int oldestMicros,
+      required String oldestId,
+      required int newestMicros,
+      required String newestId,
+      required bool reachesStart,
+      Value<int> rowid,
+    });
+typedef $$CachedChatHistoryRangesTableUpdateCompanionBuilder =
+    CachedChatHistoryRangesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> chatId,
+      Value<int> oldestMicros,
+      Value<String> oldestId,
+      Value<int> newestMicros,
+      Value<String> newestId,
+      Value<bool> reachesStart,
+      Value<int> rowid,
+    });
+
+class $$CachedChatHistoryRangesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedChatHistoryRangesTable> {
+  $$CachedChatHistoryRangesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get oldestMicros => $composableBuilder(
+    column: $table.oldestMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get oldestId => $composableBuilder(
+    column: $table.oldestId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get newestMicros => $composableBuilder(
+    column: $table.newestMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get newestId => $composableBuilder(
+    column: $table.newestId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get reachesStart => $composableBuilder(
+    column: $table.reachesStart,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedChatHistoryRangesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedChatHistoryRangesTable> {
+  $$CachedChatHistoryRangesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get oldestMicros => $composableBuilder(
+    column: $table.oldestMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get oldestId => $composableBuilder(
+    column: $table.oldestId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get newestMicros => $composableBuilder(
+    column: $table.newestMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get newestId => $composableBuilder(
+    column: $table.newestId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get reachesStart => $composableBuilder(
+    column: $table.reachesStart,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedChatHistoryRangesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedChatHistoryRangesTable> {
+  $$CachedChatHistoryRangesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<int> get oldestMicros => $composableBuilder(
+    column: $table.oldestMicros,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get oldestId =>
+      $composableBuilder(column: $table.oldestId, builder: (column) => column);
+
+  GeneratedColumn<int> get newestMicros => $composableBuilder(
+    column: $table.newestMicros,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get newestId =>
+      $composableBuilder(column: $table.newestId, builder: (column) => column);
+
+  GeneratedColumn<bool> get reachesStart => $composableBuilder(
+    column: $table.reachesStart,
+    builder: (column) => column,
+  );
+}
+
+class $$CachedChatHistoryRangesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedChatHistoryRangesTable,
+          CachedChatHistoryRange,
+          $$CachedChatHistoryRangesTableFilterComposer,
+          $$CachedChatHistoryRangesTableOrderingComposer,
+          $$CachedChatHistoryRangesTableAnnotationComposer,
+          $$CachedChatHistoryRangesTableCreateCompanionBuilder,
+          $$CachedChatHistoryRangesTableUpdateCompanionBuilder,
+          (
+            CachedChatHistoryRange,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedChatHistoryRangesTable,
+              CachedChatHistoryRange
+            >,
+          ),
+          CachedChatHistoryRange,
+          PrefetchHooks Function()
+        > {
+  $$CachedChatHistoryRangesTableTableManager(
+    _$AppDatabase db,
+    $CachedChatHistoryRangesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedChatHistoryRangesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedChatHistoryRangesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedChatHistoryRangesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<int> oldestMicros = const Value.absent(),
+                Value<String> oldestId = const Value.absent(),
+                Value<int> newestMicros = const Value.absent(),
+                Value<String> newestId = const Value.absent(),
+                Value<bool> reachesStart = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatHistoryRangesCompanion(
+                ownerUserId: ownerUserId,
+                chatId: chatId,
+                oldestMicros: oldestMicros,
+                oldestId: oldestId,
+                newestMicros: newestMicros,
+                newestId: newestId,
+                reachesStart: reachesStart,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String chatId,
+                required int oldestMicros,
+                required String oldestId,
+                required int newestMicros,
+                required String newestId,
+                required bool reachesStart,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatHistoryRangesCompanion.insert(
+                ownerUserId: ownerUserId,
+                chatId: chatId,
+                oldestMicros: oldestMicros,
+                oldestId: oldestId,
+                newestMicros: newestMicros,
+                newestId: newestId,
+                reachesStart: reachesStart,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedChatHistoryRangesTable,
+                    CachedChatHistoryRange
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedChatHistoryRangesTable,
+                    CachedChatHistoryRange
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedChatHistoryRangesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedChatHistoryRangesTable,
+      CachedChatHistoryRange,
+      $$CachedChatHistoryRangesTableFilterComposer,
+      $$CachedChatHistoryRangesTableOrderingComposer,
+      $$CachedChatHistoryRangesTableAnnotationComposer,
+      $$CachedChatHistoryRangesTableCreateCompanionBuilder,
+      $$CachedChatHistoryRangesTableUpdateCompanionBuilder,
+      (
+        CachedChatHistoryRange,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedChatHistoryRangesTable,
+          CachedChatHistoryRange
+        >,
+      ),
+      CachedChatHistoryRange,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -18115,4 +19041,9 @@ class $AppDatabaseManager {
       );
   $$CachedAppLanguagesTableTableManager get cachedAppLanguages =>
       $$CachedAppLanguagesTableTableManager(_db, _db.cachedAppLanguages);
+  $$CachedChatHistoryRangesTableTableManager get cachedChatHistoryRanges =>
+      $$CachedChatHistoryRangesTableTableManager(
+        _db,
+        _db.cachedChatHistoryRanges,
+      );
 }

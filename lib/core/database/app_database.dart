@@ -73,6 +73,11 @@ class CachedMessages extends Table {
   TextColumn get senderId => text()();
   TextColumn get messageText => text()();
   DateTimeColumn get timestamp => dateTime()();
+  // Drift's DateTime storage is second-resolution. Server pagination compares
+  // (created_at, id), so preserve microseconds independently of display dates.
+  IntColumn get timestampMicros => integer().withDefault(const Constant(0))();
+  BoolColumn get hasExactTimestamp =>
+      boolean().withDefault(const Constant(false))();
   TextColumn get status => text()();
   TextColumn get type => text()();
   TextColumn get mediaUrlsJson => text()();
@@ -93,6 +98,21 @@ class CachedMessages extends Table {
 
   @override
   Set<Column> get primaryKey => {ownerUserId, id};
+}
+
+/// Proven contiguous intervals, not a claim that all cached rows are adjacent.
+/// Distant reply windows deliberately never create these intervals.
+class CachedChatHistoryRanges extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get chatId => text()();
+  IntColumn get oldestMicros => integer()();
+  TextColumn get oldestId => text()();
+  IntColumn get newestMicros => integer()();
+  TextColumn get newestId => text()();
+  BoolColumn get reachesStart => boolean()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, chatId, newestMicros, newestId};
 }
 
 class PendingChatOperations extends Table {
@@ -340,6 +360,7 @@ class CachedAppLanguages extends Table {
     CachedUserDistances,
     CachedProfileViewCounts,
     CachedAppLanguages,
+    CachedChatHistoryRanges,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -358,7 +379,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -472,9 +493,6 @@ class AppDatabase extends _$AppDatabase {
           cachedViewedProfileFriendLists.hasMore,
         );
       }
-      if (from < 21) {
-        await _createChatCacheIndexes();
-      }
       if (from < 22) {
         final columns = await customSelect(
           'PRAGMA table_info(cached_chats)',
@@ -531,6 +549,40 @@ class AppDatabase extends _$AppDatabase {
             AND next_attempt_at IS NULL
         ''');
       }
+      if (from < 26) {
+        final columns = await customSelect(
+          'PRAGMA table_info(cached_messages)',
+        ).get();
+        final names = columns.map((c) => c.read<String>('name')).toSet();
+        if (!names.contains('timestamp_micros')) {
+          await migrator.addColumn(
+            cachedMessages,
+            cachedMessages.timestampMicros,
+          );
+          await customStatement(
+            'UPDATE cached_messages SET timestamp_micros = timestamp * 1000000',
+          );
+        }
+        if (!names.contains('has_exact_timestamp')) {
+          await migrator.addColumn(
+            cachedMessages,
+            cachedMessages.hasExactTimestamp,
+          );
+        }
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS cached_chat_history_ranges (
+            owner_user_id TEXT NOT NULL, chat_id TEXT NOT NULL,
+            oldest_micros INTEGER NOT NULL, oldest_id TEXT NOT NULL,
+            newest_micros INTEGER NOT NULL, newest_id TEXT NOT NULL,
+            reaches_start INTEGER NOT NULL CHECK (reaches_start IN (0, 1)),
+            PRIMARY KEY (owner_user_id, chat_id, newest_micros, newest_id)
+          )
+        ''');
+        // Replace, rather than duplicate, the old second-resolution index.
+        await customStatement(
+          'DROP INDEX IF EXISTS cached_messages_owner_chat_time_idx',
+        );
+      }
     },
     beforeOpen: (details) async {
       // Version 19 was briefly shipped while the blacklist cache schema was
@@ -574,8 +626,8 @@ class AppDatabase extends _$AppDatabase {
       'CREATE INDEX IF NOT EXISTS cached_reactions_owner_chat_idx ON cached_message_reaction_states (owner_user_id, chat_id)',
     );
     await customStatement('''
-      CREATE INDEX IF NOT EXISTS cached_messages_owner_chat_time_idx
-      ON cached_messages (owner_user_id, chat_id, timestamp DESC, id DESC)
+      CREATE INDEX IF NOT EXISTS cached_messages_owner_chat_cursor_idx
+      ON cached_messages (owner_user_id, chat_id, timestamp_micros DESC, id DESC)
     ''');
     await customStatement('''
       CREATE INDEX IF NOT EXISTS pending_chat_operations_owner_type_chat_idx
