@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
-import 'package:yap_chat/features/chat/widgets/chat_media_gallery_page.dart';
-import 'package:yap_chat/features/chat/widgets/chat_media_hero.dart';
-import 'package:yap_chat/features/chat/widgets/chat_media_aspect_ratio_cache.dart';
 import 'package:yap_chat/core/core.dart';
+
+import 'widgets.dart';
 
 class MessageMediaGrid extends StatelessWidget {
   const MessageMediaGrid({
@@ -177,6 +176,7 @@ class _MediaAlbum extends StatelessWidget {
                 heroTag: chatMediaHeroTag(message.id, absoluteIndex),
                 fit: BoxFit.cover,
                 cacheWidth: cacheWidth,
+                borderRadius: _tileBorderRadius(index),
               ),
               if (!isSending && !isError)
                 Material(
@@ -231,6 +231,30 @@ class _MediaAlbum extends StatelessWidget {
         },
       ),
     );
+  }
+
+  BorderRadiusGeometry _tileBorderRadius(int index) {
+    const corner = Radius.circular(20);
+    return switch ((paths.length, index)) {
+      (1, 0) => const BorderRadius.all(corner),
+      (2, 0) || (3, 0) || (5, 0) => const BorderRadiusDirectional.only(
+        topStart: corner,
+        bottomStart: corner,
+      ),
+      (2, 1) => const BorderRadiusDirectional.only(
+        topEnd: corner,
+        bottomEnd: corner,
+      ),
+      (3, 1) ||
+      (4, 1) ||
+      (5, 2) => const BorderRadiusDirectional.only(topEnd: corner),
+      (3, 2) ||
+      (4, 3) ||
+      (5, 4) => const BorderRadiusDirectional.only(bottomEnd: corner),
+      (4, 0) => const BorderRadiusDirectional.only(topStart: corner),
+      (4, 2) => const BorderRadiusDirectional.only(bottomStart: corner),
+      _ => BorderRadius.zero,
+    };
   }
 
   int _cacheWidthFor(BuildContext context, double logicalWidth) {

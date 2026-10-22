@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/features/chat/widgets/chat_media_hero.dart';
-import 'package:yap_chat/features/chat/widgets/chat_media_aspect_ratio_cache.dart';
 import 'package:yap_chat/ui/ui.dart';
-import 'package:yap_chat/ui/widgets/widgets.dart';
+
+import 'widgets.dart';
 
 class ChatMediaGalleryPage extends StatefulWidget {
   const ChatMediaGalleryPage({
@@ -43,6 +42,11 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
   bool _isSaving = false;
   bool _isZoomed = false;
   bool _showChrome = true;
+  Animation<double>? _routeAnimation;
+  ModalRoute<dynamic>? _route;
+  bool _routeSettled = false;
+
+  bool get _chromeVisible => _showChrome && _routeSettled;
 
   static const _overlayStyle = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -65,7 +69,35 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    _route = route;
+    final animation = route?.animation;
+    if (!identical(animation, _routeAnimation)) {
+      _routeAnimation?.removeStatusListener(_handleRouteStatus);
+      _routeAnimation = animation;
+      animation?.addStatusListener(_handleRouteStatus);
+    }
+    // Hero measures the destination offstage with a temporarily completed proxy
+    // animation. That layout is not the end of the opening transition.
+    _routeSettled =
+        route?.offstage != true &&
+        (animation == null || animation.status == AnimationStatus.completed);
+  }
+
+  void _handleRouteStatus(AnimationStatus status) {
+    final settled =
+        status == AnimationStatus.completed && _route?.offstage != true;
+    if (_routeSettled == settled || !mounted) return;
+    // Hero flights paint above the route. Do not show controls underneath the
+    // moving image and abruptly reveal them when its overlay is removed.
+    setState(() => _routeSettled = settled);
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_handleRouteStatus);
     _pageController.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(_overlayStyle);
@@ -158,10 +190,12 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                 left: systemPadding.left + 16,
                 right: systemPadding.right + 16,
                 child: IgnorePointer(
-                  ignoring: !_showChrome,
+                  ignoring: !_chromeVisible,
                   child: AnimatedOpacity(
-                    opacity: _showChrome ? 1 : 0,
-                    duration: const Duration(milliseconds: 140),
+                    opacity: _chromeVisible ? 1 : 0,
+                    duration: _routeSettled
+                        ? const Duration(milliseconds: 140)
+                        : Duration.zero,
                     curve: Curves.easeInOut,
                     child: Row(
                       children: [
@@ -235,10 +269,12 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                 left: 0,
                 right: 0,
                 child: IgnorePointer(
-                  ignoring: !_showChrome,
+                  ignoring: !_chromeVisible,
                   child: AnimatedOpacity(
-                    opacity: _showChrome ? 1 : 0,
-                    duration: const Duration(milliseconds: 140),
+                    opacity: _chromeVisible ? 1 : 0,
+                    duration: _routeSettled
+                        ? const Duration(milliseconds: 140)
+                        : Duration.zero,
                     curve: Curves.easeInOut,
                     child: Center(
                       child: DecoratedBox(
@@ -422,6 +458,7 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
                     path: widget.path,
                     heroTag: widget.heroTag,
                     fit: BoxFit.contain,
+                    borderRadius: BorderRadius.zero,
                     cacheWidth: _cacheWidth,
                     revealOnLoad: widget.thumbnailCacheWidth == null,
                     onAspectRatio: _onAspectRatio,

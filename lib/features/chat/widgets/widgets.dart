@@ -10,6 +10,7 @@ export 'audio_message_content.dart';
 export 'audio_waveform.dart';
 export 'chat_media_gallery_page.dart';
 export 'chat_media_hero.dart';
+export 'chat_media_aspect_ratio_cache.dart';
 export 'message_media_grid.dart';
 export 'voice_recorder_bar.dart';
 export 'size_reporter.dart';

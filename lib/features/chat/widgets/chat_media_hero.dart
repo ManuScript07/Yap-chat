@@ -3,7 +3,8 @@ import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/features/chat/widgets/chat_media_aspect_ratio_cache.dart';
+
+import 'widgets.dart';
 
 class ChatMediaHero extends StatelessWidget {
   const ChatMediaHero({
@@ -14,9 +15,8 @@ class ChatMediaHero extends StatelessWidget {
     this.cacheWidth,
     this.revealOnLoad = true,
     this.onAspectRatio,
+    this.borderRadius = const BorderRadius.all(Radius.circular(20)),
   });
-
-  static const _thumbnailRadius = 20.0;
 
   final String path;
   final String heroTag;
@@ -24,6 +24,7 @@ class ChatMediaHero extends StatelessWidget {
   final int? cacheWidth;
   final bool revealOnLoad;
   final ValueChanged<double>? onAspectRatio;
+  final BorderRadiusGeometry borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -31,34 +32,47 @@ class ChatMediaHero extends StatelessWidget {
       tag: heroTag,
       transitionOnUserGestures: true,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
-      flightShuttleBuilder: (_, animation, _, _, _) {
-        final radius = Tween<double>(
-          begin: _thumbnailRadius,
-          end: 0,
+      flightShuttleBuilder: (_, animation, direction, fromContext, toContext) {
+        final from = (fromContext.widget as Hero).child as ClipRRect;
+        final to = (toContext.widget as Hero).child as ClipRRect;
+        final fromRadius = from.borderRadius.resolve(
+          Directionality.of(fromContext),
+        );
+        final toRadius = to.borderRadius.resolve(Directionality.of(toContext));
+        // Hero's animation runs backwards on pop. Read the actual matched tile,
+        // including after paging to another photo, instead of rounding all corners.
+        final radius = BorderRadiusTween(
+          begin: direction == HeroFlightDirection.push ? fromRadius : toRadius,
+          end: direction == HeroFlightDirection.push ? toRadius : fromRadius,
         ).animate(animation);
+        // Reuse the mounted thumbnail in both directions. The gallery may
+        // already have requested full resolution without receiving its frame.
+        final thumbnail = direction == HeroFlightDirection.push ? from : to;
+        final image = thumbnail.child! as ChatMediaImage;
         return AnimatedBuilder(
           animation: radius,
-          builder: (context, child) => ClipRRect(
-            borderRadius: BorderRadius.circular(radius.value),
-            child: child,
-          ),
+          builder: (context, child) =>
+              ClipRRect(borderRadius: radius.value!, child: child),
           child: ColoredBox(
             color: Colors.black,
             child: ChatMediaImage(
-              path: path,
+              path: image.path,
               fit: BoxFit.cover,
-              cacheWidth: cacheWidth,
+              cacheWidth: image.cacheWidth,
               revealOnLoad: false,
             ),
           ),
         );
       },
-      child: ChatMediaImage(
-        path: path,
-        fit: fit,
-        cacheWidth: cacheWidth,
-        revealOnLoad: revealOnLoad,
-        onAspectRatio: onAspectRatio,
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: ChatMediaImage(
+          path: path,
+          fit: fit,
+          cacheWidth: cacheWidth,
+          revealOnLoad: revealOnLoad,
+          onAspectRatio: onAspectRatio,
+        ),
       ),
     );
   }
