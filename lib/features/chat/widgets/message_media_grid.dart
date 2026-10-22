@@ -4,6 +4,7 @@ import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chat/widgets/chat_media_gallery_page.dart';
 import 'package:yap_chat/features/chat/widgets/chat_media_hero.dart';
+import 'package:yap_chat/features/chat/widgets/chat_media_aspect_ratio_cache.dart';
 import 'package:yap_chat/core/core.dart';
 
 class MessageMediaGrid extends StatelessWidget {
@@ -245,14 +246,7 @@ class _MediaAlbum extends StatelessWidget {
     int? thumbnailCacheWidth,
   ) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final aspectRatio = await resolveImageAspectRatio(
-      context,
-      chatMediaImageProvider(
-        message.mediaUrls[index],
-        cacheWidth: thumbnailCacheWidth,
-      ),
-    );
-    if (!context.mounted) return;
+    final aspectRatio = chatMediaAspectRatios.lookup(message.mediaUrls[index]);
     final aspectRatios = List<double?>.filled(message.mediaUrls.length, null);
     aspectRatios[index] = aspectRatio;
 

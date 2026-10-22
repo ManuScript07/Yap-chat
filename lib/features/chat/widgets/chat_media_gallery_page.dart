@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/chat_media_hero.dart';
+import 'package:yap_chat/features/chat/widgets/chat_media_aspect_ratio_cache.dart';
 import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/ui/widgets/widgets.dart';
 
@@ -201,9 +202,7 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                               Text(
                                 DateFormat(
                                   'd MMMM yyyy',
-                                  Localizations.localeOf(
-                                    context,
-                                  ).toString(),
+                                  Localizations.localeOf(context).toString(),
                                 ).format(sentAt),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -302,23 +301,20 @@ class _ZoomableGalleryImage extends StatefulWidget {
 
 class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
   late final TransformationController _transformationController;
-  late double _aspectRatio;
+  double? _aspectRatio;
+  double? _pendingAspectRatio;
   int? _cacheWidth;
   Animation<double>? _routeAnimation;
-  bool _upgradeScheduled = false;
+  bool _imageUpdateScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _aspectRatio = widget.initialAspectRatio ?? 1;
+    _aspectRatio =
+        widget.initialAspectRatio ?? chatMediaAspectRatios.lookup(widget.path);
     _cacheWidth = widget.thumbnailCacheWidth;
     _transformationController = TransformationController();
     _transformationController.addListener(_handleTransformChanged);
-    if (widget.initialAspectRatio == null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _resolveAspectRatio(),
-      );
-    }
   }
 
   @override
@@ -331,13 +327,13 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
       animation?.addStatusListener(_handleRouteStatus);
     }
     if (animation == null) {
-      _scheduleFullResolutionUpgrade();
+      _scheduleImageUpdate();
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted &&
             identical(_routeAnimation, animation) &&
             animation.status == AnimationStatus.completed) {
-          _scheduleFullResolutionUpgrade();
+          _scheduleImageUpdate();
         }
       });
     }
@@ -353,17 +349,28 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
 
   void _handleRouteStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
-      _scheduleFullResolutionUpgrade();
+      _scheduleImageUpdate();
     }
   }
 
-  void _scheduleFullResolutionUpgrade() {
-    if (_cacheWidth == null || _upgradeScheduled) return;
-    _upgradeScheduled = true;
+  void _scheduleImageUpdate() {
+    final animation = _routeAnimation;
+    if (_imageUpdateScheduled ||
+        (animation != null && animation.status != AnimationStatus.completed)) {
+      return;
+    }
+    if (_cacheWidth == null && _pendingAspectRatio == null) return;
+    _imageUpdateScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _upgradeScheduled = false;
-      if (mounted && _cacheWidth != null) {
-        setState(() => _cacheWidth = null);
+      _imageUpdateScheduled = false;
+      if (mounted &&
+          (_routeAnimation == null ||
+              _routeAnimation!.status == AnimationStatus.completed)) {
+        setState(() {
+          _cacheWidth = null;
+          _aspectRatio ??= _pendingAspectRatio;
+          _pendingAspectRatio = null;
+        });
       }
     });
   }
@@ -373,14 +380,10 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
     widget.onZoomChanged(scale > 1.01);
   }
 
-  Future<void> _resolveAspectRatio() async {
-    final value = await resolveImageAspectRatio(
-      context,
-      chatMediaImageProvider(widget.path, cacheWidth: _cacheWidth),
-    );
-    if (mounted && value != null && value > 0) {
-      setState(() => _aspectRatio = value);
-    }
+  void _onAspectRatio(double value) {
+    if (_aspectRatio != null || !value.isFinite || value <= 0) return;
+    _pendingAspectRatio = value;
+    _scheduleImageUpdate();
   }
 
   @override
@@ -393,17 +396,40 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
         panEnabled: true,
         boundaryMargin: EdgeInsets.zero,
         clipBehavior: Clip.hardEdge,
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: _aspectRatio,
-            child: ChatMediaHero(
-              path: widget.path,
-              heroTag: widget.heroTag,
-              fit: BoxFit.contain,
-              cacheWidth: _cacheWidth,
-              revealOnLoad: widget.thumbnailCacheWidth == null,
-            ),
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final ratio = _aspectRatio;
+            // Unknown dimensions use the entire viewport with BoxFit.contain,
+            // not a guessed square. Lock the hero rectangle during its flight;
+            // fitting the known bounds afterwards preserves the painted image.
+            final size = ratio == null
+                ? constraints.biggest
+                : applyBoxFit(
+                    BoxFit.contain,
+                    Size(ratio, 1),
+                    constraints.biggest,
+                  ).destination;
+            return Center(
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: HeroMode(
+                  // Without known bounds use the route's fade, not a flight
+                  // toward a guessed crop. Enable the normal return flight once
+                  // dimensions have arrived and the opening transition is over.
+                  enabled: ratio != null,
+                  child: ChatMediaHero(
+                    path: widget.path,
+                    heroTag: widget.heroTag,
+                    fit: BoxFit.contain,
+                    cacheWidth: _cacheWidth,
+                    revealOnLoad: widget.thumbnailCacheWidth == null,
+                    onAspectRatio: _onAspectRatio,
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

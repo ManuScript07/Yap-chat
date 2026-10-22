@@ -9,9 +9,16 @@ import 'package:yap_chat/features/chat/widgets/audio_waveform.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 class AudioMessageContent extends StatelessWidget {
-  const AudioMessageContent({super.key, required this.message});
+  const AudioMessageContent({
+    super.key,
+    required this.message,
+    this.actionKey,
+    this.waveformKey,
+  });
 
   final ChatMessage message;
+  final Key? actionKey;
+  final Key? waveformKey;
 
   @override
   Widget build(BuildContext context) {
@@ -19,17 +26,27 @@ class AudioMessageContent extends StatelessWidget {
       create: (context) => AudioMessagePlayerCubit(
         playerRepository: context.read<IAudioPlayerRepository>(),
       ),
-      child: _AudioMessageView(message: message),
+      child: _AudioMessageView(
+        message: message,
+        actionKey: actionKey,
+        waveformKey: waveformKey,
+      ),
     );
   }
 }
 
 class _AudioMessageView extends StatelessWidget {
-  const _AudioMessageView({required this.message});
+  const _AudioMessageView({
+    required this.message,
+    this.actionKey,
+    this.waveformKey,
+  });
 
   static final _timeFormat = DateFormat('HH:mm');
 
   final ChatMessage message;
+  final Key? actionKey;
+  final Key? waveformKey;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +90,7 @@ class _AudioMessageView extends StatelessWidget {
             child: Row(
               children: [
                 _AudioActionButton(
+                  key: actionKey,
                   isLoading:
                       state.isLoading ||
                       message.status == MessageStatus.sending,
@@ -98,6 +116,7 @@ class _AudioMessageView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AudioWaveform(
+                          key: waveformKey,
                           values: message.audioWaveform,
                           activeColor: foreground,
                           inactiveColor: waveformInactive,
@@ -171,6 +190,7 @@ class _AudioMessageView extends StatelessWidget {
 
 class _AudioActionButton extends StatelessWidget {
   const _AudioActionButton({
+    super.key,
     required this.isLoading,
     required this.isRetry,
     required this.isPlaying,

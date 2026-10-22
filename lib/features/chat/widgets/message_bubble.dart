@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -55,6 +56,20 @@ class _MessageBubbleState extends State<MessageBubble>
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
+  late final _audioActionKey = GlobalKey();
+  late final _audioWaveformKey = GlobalKey();
+
+  bool _isAudioControl(Offset position) {
+    for (final key in [_audioActionKey, _audioWaveformKey]) {
+      final box = key.currentContext?.findRenderObject();
+      if (box is RenderBox &&
+          box.hasSize &&
+          (Offset.zero & box.size).contains(box.globalToLocal(position))) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   static final _timeFormat = DateFormat('HH:mm');
 
@@ -151,16 +166,31 @@ class _MessageBubbleState extends State<MessageBubble>
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              GestureDetector(
-                onDoubleTap: widget.onReaction == null
-                    ? null
-                    : () => widget.onReaction!(ReactionCode.heart, true),
-                onLongPress: widget.onLongPress == null
-                    ? null
-                    : () {
-                        HapticFeedback.mediumImpact();
-                        widget.onLongPress!(message);
-                      },
+              RawGestureDetector(
+                gestures: {
+                  if (widget.onReaction != null)
+                    _MessageDoubleTapRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          _MessageDoubleTapRecognizer
+                        >(
+                          () => _MessageDoubleTapRecognizer(debugOwner: this),
+                          (recognizer) => recognizer
+                            ..isExcluded = isAudio ? _isAudioControl : null
+                            ..onDoubleTap = () =>
+                                widget.onReaction!(ReactionCode.heart, true),
+                        ),
+                  if (widget.onLongPress != null)
+                    LongPressGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          LongPressGestureRecognizer
+                        >(
+                          () => LongPressGestureRecognizer(debugOwner: this),
+                          (recognizer) => recognizer.onLongPress = () {
+                            HapticFeedback.mediumImpact();
+                            widget.onLongPress!(message);
+                          },
+                        ),
+                },
                 child: Container(
                   constraints: BoxConstraints(maxWidth: widget.maxWidth),
                   width: message.replyTo == null ? null : replyWidth,
@@ -197,7 +227,11 @@ class _MessageBubbleState extends State<MessageBubble>
                           : isLocation
                           ? _buildLocationMessage(context)
                           : isAudio
-                          ? AudioMessageContent(message: message)
+                          ? AudioMessageContent(
+                              message: message,
+                              actionKey: _audioActionKey,
+                              waveformKey: _audioWaveformKey,
+                            )
                           : _buildTextMessage(
                               context,
                               textColor,
@@ -597,6 +631,19 @@ class _MessageBubbleState extends State<MessageBubble>
     HapticFeedback.selectionClick();
     context.read<ChatBloc>().add(ChatMessageRetryRequested(message));
   }
+}
+
+/// Interactive voice controls are single-tap actions, not reaction surfaces.
+/// Reject their pointers before entering the arena so taps and drags keep the
+/// normal Flutter cancellation rules without waiting for a second tap.
+class _MessageDoubleTapRecognizer extends DoubleTapGestureRecognizer {
+  _MessageDoubleTapRecognizer({super.debugOwner});
+
+  bool Function(Offset)? isExcluded;
+
+  @override
+  bool isPointerAllowed(PointerDownEvent event) =>
+      isExcluded?.call(event.position) != true && super.isPointerAllowed(event);
 }
 
 class _ExternalRetryButton extends StatelessWidget {

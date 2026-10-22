@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/chat/widgets/chat_media_aspect_ratio_cache.dart';
 
 class ChatMediaHero extends StatelessWidget {
   const ChatMediaHero({
@@ -12,6 +13,7 @@ class ChatMediaHero extends StatelessWidget {
     required this.fit,
     this.cacheWidth,
     this.revealOnLoad = true,
+    this.onAspectRatio,
   });
 
   static const _thumbnailRadius = 20.0;
@@ -21,6 +23,7 @@ class ChatMediaHero extends StatelessWidget {
   final BoxFit fit;
   final int? cacheWidth;
   final bool revealOnLoad;
+  final ValueChanged<double>? onAspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -55,24 +58,125 @@ class ChatMediaHero extends StatelessWidget {
         fit: fit,
         cacheWidth: cacheWidth,
         revealOnLoad: revealOnLoad,
+        onAspectRatio: onAspectRatio,
       ),
     );
   }
 }
 
-class ChatMediaImage extends StatelessWidget {
+class ChatMediaImage extends StatefulWidget {
   const ChatMediaImage({
     super.key,
     required this.path,
     required this.fit,
     this.cacheWidth,
     this.revealOnLoad = true,
+    this.onAspectRatio,
   });
 
   final String path;
   final BoxFit fit;
   final int? cacheWidth;
   final bool revealOnLoad;
+  final ValueChanged<double>? onAspectRatio;
+
+  @override
+  State<ChatMediaImage> createState() => _ChatMediaImageState();
+}
+
+class _ChatMediaImageState extends State<ChatMediaImage> {
+  ImageProvider<Object>? _provider;
+  ImageConfiguration? _configuration;
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  int _observation = 0;
+  bool _sizeObserved = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateProvider();
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatMediaImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateProvider();
+    if (oldWidget.onAspectRatio != widget.onAspectRatio) {
+      final ratio = chatMediaAspectRatios.lookup(widget.path);
+      if (ratio != null) _notifyAspectRatio(ratio, _observation);
+    }
+  }
+
+  void _updateProvider() {
+    final provider = chatMediaImageProvider(
+      widget.path,
+      cacheWidth: widget.cacheWidth,
+    );
+    final configuration = createLocalImageConfiguration(context);
+    if (provider == _provider && configuration == _configuration) return;
+    _stopObserving();
+    _provider = provider;
+    _configuration = configuration;
+    _observation++;
+    _sizeObserved = false;
+    final known = chatMediaAspectRatios.lookup(widget.path);
+    if (known != null) {
+      _sizeObserved = true;
+      _notifyAspectRatio(known, _observation);
+    }
+  }
+
+  void _captureAspectRatio() {
+    if (_sizeObserved) return;
+    _sizeObserved = true;
+    final observation = _observation;
+    // Only inspect after Image has a frame. Its live stream is already cached,
+    // so this neither starts a second decode nor bypasses ScrollAwareImageProvider
+    // deferral when the user flings through historical media.
+    final stream = _provider!.resolve(_configuration!);
+    _stream = stream;
+    _listener = ImageStreamListener(
+      (info, _) {
+        try {
+          if (observation != _observation) return;
+          final ratio = info.image.width / info.image.height;
+          chatMediaAspectRatios.remember(widget.path, ratio);
+          _notifyAspectRatio(ratio, observation);
+          _stopObserving();
+        } finally {
+          info.dispose();
+        }
+      },
+      onError: (_, _) {
+        if (observation == _observation) _stopObserving();
+      },
+    );
+    stream.addListener(_listener!);
+  }
+
+  void _notifyAspectRatio(double ratio, int observation) {
+    if (widget.onAspectRatio == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && observation == _observation) {
+        widget.onAspectRatio?.call(ratio);
+      }
+    });
+  }
+
+  void _stopObserving() {
+    final listener = _listener;
+    if (listener != null) _stream?.removeListener(listener);
+    _stream = null;
+    _listener = null;
+  }
+
+  @override
+  void dispose() {
+    _observation++;
+    _stopObserving();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,19 +192,21 @@ class ChatMediaImage extends StatelessWidget {
     );
 
     return Image(
-      image: chatMediaImageProvider(path, cacheWidth: cacheWidth),
-      fit: fit,
+      image: _provider!,
+      fit: widget.fit,
       gaplessPlayback: true,
-      frameBuilder: revealOnLoad
-          ? (context, child, frame, wasSynchronouslyLoaded) =>
-                _revealImageFrame(
-                  context,
-                  child,
-                  frame,
-                  wasSynchronouslyLoaded,
-                  path,
-                )
-          : null,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) _captureAspectRatio();
+        return widget.revealOnLoad
+            ? _revealImageFrame(
+                context,
+                child,
+                frame,
+                wasSynchronouslyLoaded,
+                widget.path,
+              )
+            : child;
+      },
       errorBuilder: errorBuilder,
     );
   }
