@@ -23,7 +23,6 @@ import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
 import 'package:yap_chat/features/chat/view/visible_chat_read_selection.dart';
 import 'package:yap_chat/features/chat/view/chat_composer_focus_controller.dart';
 import 'package:yap_chat/features/chat/widgets/chat_pop_scope.dart';
-import 'package:yap_chat/features/chat/widgets/history_viewport_transition.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
 import 'package:yap_chat/features/chat/widgets/animated_reaction_section.dart';

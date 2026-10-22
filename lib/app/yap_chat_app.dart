@@ -603,6 +603,8 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
           buildWhen: (previous, current) =>
               previous.language != current.language,
           builder: (context, languageState) => MaterialApp.router(
+            builder: (context, child) =>
+                KeyboardResumeScope(child: child ?? const SizedBox.shrink()),
             title: 'Yap chat',
             theme: theme,
             locale: languageState.language.locale,
