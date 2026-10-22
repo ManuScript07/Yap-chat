@@ -13,3 +13,4 @@ export 'chat_media_hero.dart';
 export 'message_media_grid.dart';
 export 'voice_recorder_bar.dart';
 export 'size_reporter.dart';
+export 'history_viewport_transition.dart';

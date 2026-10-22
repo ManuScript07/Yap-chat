@@ -23,6 +23,7 @@ import 'package:yap_chat/features/chat/view/focused_history_slice.dart';
 import 'package:yap_chat/features/chat/view/visible_chat_read_selection.dart';
 import 'package:yap_chat/features/chat/view/chat_composer_focus_controller.dart';
 import 'package:yap_chat/features/chat/widgets/chat_pop_scope.dart';
+import 'package:yap_chat/features/chat/widgets/history_viewport_transition.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart';
 import 'package:yap_chat/features/chat/widgets/message_reactions.dart';
 import 'package:yap_chat/features/chat/widgets/animated_reaction_section.dart';
@@ -1061,6 +1062,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       ItemPositionsListener.create();
   bool _showScrollToBottom = false;
   int _newMessagesCount = 0;
+
   // Independent of the temporary rows withheld from the recent feed. Moving
   // between history windows must not acknowledge arrivals that remain below.
   int _unseenIncomingCount = 0;
@@ -1087,6 +1089,9 @@ class _ChatMessagesState extends State<_ChatMessages>
   int _recentInitialIndex = 0;
   double _recentInitialAlignment = 0;
   int _timelineRevision = 0;
+  final _windowTransitionKey = GlobalKey<HistoryViewportTransitionState>();
+  int _windowTransitionRevision = 0;
+  bool _windowTransitionFromOlder = true;
   int _focusInitialIndex = 0;
   double _focusInitialAlignment = 0;
   bool _isAnimatingToBottom = false;
@@ -1749,6 +1754,7 @@ class _ChatMessagesState extends State<_ChatMessages>
   void _scheduleVisibleRead() {
     if (widget.chat.isDraft) return;
     _visibleReadTimer?.cancel();
+    if (_windowTransitionKey.currentState?.isAnimating == true) return;
     _visibleReadTimer = Timer(
       const Duration(milliseconds: 450),
       () => unawaited(_readVisibleMessages()),
@@ -1897,6 +1903,7 @@ class _ChatMessagesState extends State<_ChatMessages>
     if (!mounted ||
         _visibleReadInFlight ||
         _isNavigating ||
+        _windowTransitionKey.currentState?.isAnimating == true ||
         _focusLoading ||
         _bottomJumpPending ||
         WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
@@ -1996,6 +2003,7 @@ class _ChatMessagesState extends State<_ChatMessages>
   }
 
   void scrollToBottom({bool animate = true}) {
+    _windowTransitionKey.currentState?.finish();
     final wasFocused = _focusMessages != null;
     if (wasFocused && context.read<ChatBloc>().state.messages.isEmpty) {
       // A send can precede the first recent-cache emission. Do not replace
@@ -2008,7 +2016,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       // The focused window can be many pages away from the recent timeline.
       // Animating to its own index zero and then replacing the list causes a
       // second, visible jump (and can briefly display an empty viewport).
-      _leaveFocusedWindow();
+      _leaveFocusedWindow(animate: animate);
       return;
     }
     if (_newMessagesCount != 0 ||
@@ -2063,7 +2071,7 @@ class _ChatMessagesState extends State<_ChatMessages>
             position.itemLeadingEdge <= _bottomAlignment + 0.02,
       );
 
-  void _leaveFocusedWindow() {
+  void _leaveFocusedWindow({bool animate = false}) {
     _returnToRecentWhenReady = false;
     _isAnimatingToBottom = false;
     _isNavigating = false;
@@ -2073,6 +2081,10 @@ class _ChatMessagesState extends State<_ChatMessages>
     _focusRecheckRunning = false;
     _focusRecheckSerial++;
     setState(() {
+      if (animate) {
+        _windowTransitionFromOlder = false;
+        _windowTransitionRevision++;
+      }
       _timelineRevision++;
       _recentInitialIndex = 0;
       _recentInitialAlignment = 0;
@@ -2138,6 +2150,7 @@ class _ChatMessagesState extends State<_ChatMessages>
 
   Future<void> _jumpToMessage(String messageId) async {
     if (_focusLoading) return;
+    _windowTransitionKey.currentState?.finish();
     _focusRecheckRunning = false;
     _focusRecheckSerial++;
     _focusRecheckPending = false;
@@ -2228,6 +2241,14 @@ class _ChatMessagesState extends State<_ChatMessages>
       );
       _isNavigating = true;
       setState(() {
+        if (cachedWindow != null || fromLocalHistory) {
+          final source = _displayedItems.elementAtOrNull(_lastVisibleIndex);
+          final target = visibleWindow.firstWhere((m) => m.id == messageId);
+          _windowTransitionFromOlder =
+              source is! MessageItemElement ||
+              !target.timestamp.isAfter(source.message.timestamp);
+          _windowTransitionRevision++;
+        }
         _timelineRevision++;
         _focusInitialIndex = targetIndex;
         _focusInitialAlignment = 0.5;
@@ -2503,6 +2524,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                   }
                   if (notification is ScrollStartNotification &&
                       notification.dragDetails != null) {
+                    _windowTransitionKey.currentState?.finish();
                     _userScrollGeneration++;
                     _userScrollActive = true;
                     if (_focusMessages != null) _focusPaginationArmed = true;
@@ -2514,6 +2536,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                   // must not be interpreted as a request to page history.
                   if (notification is UserScrollNotification &&
                       notification.direction != ScrollDirection.idle) {
+                    _windowTransitionKey.currentState?.finish();
                     _scrollingTowardOlder =
                         notification.direction == ScrollDirection.reverse;
                     _userScrollActive = true;
@@ -2542,37 +2565,43 @@ class _ChatMessagesState extends State<_ChatMessages>
                   }
                   return false;
                 },
-                child: _MessagesList(
-                  key: ValueKey('messages_$_timelineRevision'),
-                  itemScrollController: _itemScrollController,
-                  itemPositionsListener: _itemPositionsListener,
-                  initialScrollIndex: _focusMessages == null
-                      ? _recentInitialIndex
-                      : _focusInitialIndex,
-                  initialAlignment: _focusMessages == null
-                      ? _recentInitialAlignment
-                      : _focusInitialAlignment,
-                  chat: widget.chat,
-                  items: _displayedItems,
-                  preserveVisiblePosition: _focusMessages != null,
-                  animationProgressFor: _animationProgressFor,
-                  headerHeight: widget.headerHeight,
-                  bottomPadding:
-                      widget.composerHeight +
-                      widget.keyboardAvoidanceOffset +
-                      12,
-                  highlightedMessageId: _highlightedMessageId,
-                  hydrateFocusedMedia: _focusMessages == null
-                      ? null
-                      : _hydrateFocusedMedia,
-                  readyFocusedMedia: _readyFocusedMedia,
-                  retryFocusedMedia: () => setState(() {}),
-                  onReaction: widget.onReaction,
-                  onTextEntityTap: widget.onTextEntityTap,
-                  onReplyTap: _jumpToMessage,
-                  onMessageLongPress: widget.canOpenMessageMenu
-                      ? widget.onMessageLongPress
-                      : null,
+                child: HistoryViewportTransition(
+                  key: _windowTransitionKey,
+                  revision: _windowTransitionRevision,
+                  fromOlder: _windowTransitionFromOlder,
+                  onCompleted: _scheduleVisibleRead,
+                  child: _MessagesList(
+                    key: ValueKey('messages_$_timelineRevision'),
+                    itemScrollController: _itemScrollController,
+                    itemPositionsListener: _itemPositionsListener,
+                    initialScrollIndex: _focusMessages == null
+                        ? _recentInitialIndex
+                        : _focusInitialIndex,
+                    initialAlignment: _focusMessages == null
+                        ? _recentInitialAlignment
+                        : _focusInitialAlignment,
+                    chat: widget.chat,
+                    items: _displayedItems,
+                    preserveVisiblePosition: _focusMessages != null,
+                    animationProgressFor: _animationProgressFor,
+                    headerHeight: widget.headerHeight,
+                    bottomPadding:
+                        widget.composerHeight +
+                        widget.keyboardAvoidanceOffset +
+                        12,
+                    highlightedMessageId: _highlightedMessageId,
+                    hydrateFocusedMedia: _focusMessages == null
+                        ? null
+                        : _hydrateFocusedMedia,
+                    readyFocusedMedia: _readyFocusedMedia,
+                    retryFocusedMedia: () => setState(() {}),
+                    onReaction: widget.onReaction,
+                    onTextEntityTap: widget.onTextEntityTap,
+                    onReplyTap: _jumpToMessage,
+                    onMessageLongPress: widget.canOpenMessageMenu
+                        ? widget.onMessageLongPress
+                        : null,
+                  ),
                 ),
               ),
 
