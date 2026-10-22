@@ -12,6 +12,10 @@ class ItemPositionsNotifier implements ItemPositionsListener {
   /// move again before the next layout publishes another set of item edges.
   double? measuredPixels;
 
+  /// Unrounded edges from the same measurement as [measuredPixels]. Public
+  /// position reporting retains its pixel rounding for existing consumers.
+  Iterable<ItemPosition> precisePositions = const [];
+
   @override
   final ValueNotifier<Iterable<ItemPosition>> itemPositions = ValueNotifier([]);
 }

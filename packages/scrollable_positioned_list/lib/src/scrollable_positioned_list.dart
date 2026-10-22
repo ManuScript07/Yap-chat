@@ -445,7 +445,26 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
         )) {
       return;
     }
-    final positions = primary.itemPositionsNotifier.itemPositions.value
+    // Appending/trimming beyond both the center and the visible rows does not
+    // change this coordinate system. Rebasing here needlessly changes slivers
+    // under a moving viewport and repeats layout on an otherwise stable page.
+    final measured = primary.itemPositionsNotifier.precisePositions;
+    var lastRetainedIndex = primary.target;
+    for (final p in measured) {
+      if (p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1 &&
+          p.index > lastRetainedIndex) {
+        lastRetainedIndex = p.index;
+      }
+    }
+    var unchangedPrefix = lastRetainedIndex < oldKeys.length &&
+        lastRetainedIndex < keys.length;
+    for (var i = 0; unchangedPrefix && i <= lastRetainedIndex; i++) {
+      unchangedPrefix = oldKeys[i] == keys[i];
+    }
+    if (unchangedPrefix) {
+      return;
+    }
+    final positions = primary.itemPositionsNotifier.precisePositions
         .where((p) =>
             p.itemTrailingEdge > 0 &&
             p.itemLeadingEdge < 1 &&

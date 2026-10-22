@@ -114,6 +114,8 @@ class _MessageReactionsState extends State<MessageReactions> {
   final _retiring = <String, (MessageReaction, double)>{};
   final _retiringPills = <String, (List<MessageReaction>, double)>{};
   Timer? _retireTimer;
+  Set<String> _enteringUsers = {};
+  Set<String> _enteringPills = {};
 
   List<(List<MessageReaction>, double)> _pillGroups(
     MessageReactionState state,
@@ -149,6 +151,14 @@ class _MessageReactionsState extends State<MessageReactions> {
     final activePills = _pillGroups(
       widget.message.reactionState,
     ).map((entry) => entry.$1.first.userId).toSet();
+    _enteringUsers = active.difference(
+      oldWidget.message.reactionState.reactions.map((r) => r.userId).toSet(),
+    );
+    _enteringPills = activePills.difference(
+      _pillGroups(
+        oldWidget.message.reactionState,
+      ).map((entry) => entry.$1.first.userId).toSet(),
+    );
     _retiringPills.removeWhere((id, _) => activePills.contains(id));
     for (final entry in _pillGroups(oldWidget.message.reactionState)) {
       if (!activePills.contains(entry.$1.first.userId)) {
@@ -207,7 +217,10 @@ class _MessageReactionsState extends State<MessageReactions> {
           width: width,
           height: 32,
           child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: retiring ? 0 : 1),
+            tween: Tween(
+              begin: _enteringPills.contains(group.first.userId) ? 0 : 1,
+              end: retiring ? 0 : 1,
+            ),
             duration: const Duration(milliseconds: 240),
             builder: (_, value, child) => IgnorePointer(
               ignoring: retiring,
@@ -295,7 +308,7 @@ class _MessageReactionsState extends State<MessageReactions> {
                 child: IgnorePointer(
                   child: TweenAnimationBuilder<double>(
                     tween: Tween(
-                      begin: 0,
+                      begin: _enteringUsers.contains(reaction.userId) ? 0 : 1,
                       end: _retiring.containsKey(reaction.userId) ? 0 : 1,
                     ),
                     duration: const Duration(milliseconds: 240),

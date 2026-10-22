@@ -356,6 +356,7 @@ class _PositionedListState extends State<PositionedList> {
           return;
         }
         final positions = <ItemPosition>[];
+        final precisePositions = <ItemPosition>[];
         RenderViewportBase? viewport;
         for (var element in elements) {
           final RenderBox box = element.renderObject as RenderBox;
@@ -377,6 +378,12 @@ class _PositionedListState extends State<PositionedList> {
             if (!reveal.isFinite) continue;
             final itemOffset =
                 reveal - viewport.offset.pixels + anchor * viewport.size.height;
+            precisePositions.add(ItemPosition(
+                index: index,
+                itemLeadingEdge: itemOffset /
+                    scrollController.position.viewportDimension,
+                itemTrailingEdge: (itemOffset + box.size.height) /
+                    scrollController.position.viewportDimension));
             positions.add(ItemPosition(
                 index: index,
                 itemLeadingEdge: itemOffset.round() /
@@ -387,6 +394,17 @@ class _PositionedListState extends State<PositionedList> {
             final itemOffset =
                 box.localToGlobal(Offset.zero, ancestor: viewport).dx;
             if (!itemOffset.isFinite) continue;
+            precisePositions.add(ItemPosition(
+                index: index,
+                itemLeadingEdge: (widget.reverse
+                        ? scrollController.position.viewportDimension -
+                            (itemOffset + box.size.width)
+                        : itemOffset) /
+                    scrollController.position.viewportDimension,
+                itemTrailingEdge: (widget.reverse
+                        ? scrollController.position.viewportDimension - itemOffset
+                        : (itemOffset + box.size.width)) /
+                    scrollController.position.viewportDimension));
             positions.add(ItemPosition(
                 index: index,
                 itemLeadingEdge: (widget.reverse
@@ -407,6 +425,7 @@ class _PositionedListState extends State<PositionedList> {
             scrollController.hasClients
                 ? scrollController.position.pixels
                 : null;
+        widget.itemPositionsNotifier?.precisePositions = precisePositions;
         widget.itemPositionsNotifier?.itemPositions.value = positions;
         updateScheduled = false;
       });

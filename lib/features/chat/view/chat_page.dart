@@ -1061,6 +1061,9 @@ class _ChatMessagesState extends State<_ChatMessages>
       ItemPositionsListener.create();
   bool _showScrollToBottom = false;
   int _newMessagesCount = 0;
+  // Independent of the temporary rows withheld from the recent feed. Moving
+  // between history windows must not acknowledge arrivals that remain below.
+  int _unseenIncomingCount = 0;
 
   Set<String> _knownMessageIds = {};
   List<ChatMessage> _lastRecentMessages = const [];
@@ -1074,6 +1077,10 @@ class _ChatMessagesState extends State<_ChatMessages>
   bool _blankViewportWarningLogged = false;
   int _userScrollGeneration = 0;
   bool _userScrollActive = false;
+  int _scrollButtonUpdateSerial = 0;
+  int _scrollButtonDirectionGeneration = -1;
+  double _olderScrollDistance = 0;
+  static const _hideScrollButtonDistance = 64.0;
   bool _scrollingTowardOlder = false;
 
   int _lastVisibleIndex = 0;
@@ -1401,6 +1408,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       _highlightedMessageId = null;
       _highlightSerial++;
       _knownMessageIds = {};
+      _unseenIncomingCount = 0;
       _lastRecentMessages = const [];
       _initialMessagesLoaded = false;
       _newMessageAnimations.clear();
@@ -1467,26 +1475,51 @@ class _ChatMessagesState extends State<_ChatMessages>
     }
 
     if (first == 0) {
-      if (_showScrollToBottom || _newMessagesCount != 0) {
+      if (_showScrollToBottom ||
+          _newMessagesCount != 0 ||
+          (_unseenIncomingCount > 0 && _isFocusedWindowAtBottom)) {
         setState(() {
           _showScrollToBottom = false;
           _newMessagesCount = 0;
+          if (_isFocusedWindowAtBottom) _unseenIncomingCount = 0;
         });
       }
       _lastVisibleIndex = first;
       return;
     }
 
-    if (first > _lastVisibleIndex) {
-      if (_showScrollToBottom) {
-        setState(() => _showScrollToBottom = false);
-      }
-    } else if (first < _lastVisibleIndex) {
-      if (!_showScrollToBottom) {
-        setState(() => _showScrollToBottom = true);
-      }
-    }
     _lastVisibleIndex = first;
+  }
+
+  void _scheduleScrollButtonDirection(bool towardOlder, {double distance = 0}) {
+    if (_isNavigating || _isAnimatingToBottom || _bottomJumpPending) return;
+    if (_scrollButtonDirectionGeneration != _navigationGeneration) {
+      _scrollButtonDirectionGeneration = _navigationGeneration;
+      _olderScrollDistance = 0;
+    }
+    _olderScrollDistance = towardOlder ? _olderScrollDistance + distance : 0;
+    if (towardOlder && _olderScrollDistance < _hideScrollButtonDistance) return;
+    final serial = ++_scrollButtonUpdateSerial;
+    final generation = _navigationGeneration;
+    final arrivals = _unseenIncomingCount;
+    // Scroll notifications can arrive during layout. Coalesce direction
+    // changes and apply only the latest user intent after that frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          serial != _scrollButtonUpdateSerial ||
+          generation != _navigationGeneration ||
+          _isNavigating ||
+          _isAnimatingToBottom ||
+          _bottomJumpPending ||
+          _unseenIncomingCount > arrivals) {
+        return;
+      }
+      final show =
+          !towardOlder && (_focusMessages != null || !_isFocusedWindowAtBottom);
+      if (show != _showScrollToBottom) {
+        setState(() => _showScrollToBottom = show);
+      }
+    });
   }
 
   /// The live SQLite feed stays bounded. Continue ordinary history using the
@@ -1678,6 +1711,8 @@ class _ChatMessagesState extends State<_ChatMessages>
         setState(() {
           _showScrollToBottom = true;
           _newMessagesCount += incomingCount;
+          _unseenIncomingCount += incomingCount;
+          _olderScrollDistance = 0;
         });
       }
       return;
@@ -1703,6 +1738,8 @@ class _ChatMessagesState extends State<_ChatMessages>
       setState(() {
         _showScrollToBottom = true;
         _newMessagesCount += newMessages.length;
+        _unseenIncomingCount += newMessages.where((m) => !m.isMine).length;
+        _olderScrollDistance = 0;
       });
     } else {
       _jumpToBottomAfterBuild();
@@ -1945,10 +1982,13 @@ class _ChatMessagesState extends State<_ChatMessages>
           return;
         }
         _lastVisibleIndex = 0;
-        if (_showScrollToBottom || _newMessagesCount != 0) {
+        if (_showScrollToBottom ||
+            _newMessagesCount != 0 ||
+            _unseenIncomingCount > 0) {
           setState(() {
             _showScrollToBottom = false;
             _newMessagesCount = 0;
+            _unseenIncomingCount = 0;
           });
         }
       });
@@ -1972,11 +2012,13 @@ class _ChatMessagesState extends State<_ChatMessages>
       return;
     }
     if (_newMessagesCount != 0 ||
+        _unseenIncomingCount > 0 ||
         _showScrollToBottom ||
         _focusLoading ||
         _focusPageLoading) {
       setState(() {
         _newMessagesCount = 0;
+        _unseenIncomingCount = 0;
         _showScrollToBottom = false;
         _focusLoading = false;
         _focusRemoteLoading = false;
@@ -2040,6 +2082,7 @@ class _ChatMessagesState extends State<_ChatMessages>
       _highlightedMessageId = null;
       _highlightSerial++;
       _newMessagesCount = 0;
+      _unseenIncomingCount = 0;
       _showScrollToBottom = false;
       _focusLoading = false;
       _focusRemoteLoading = false;
@@ -2473,12 +2516,18 @@ class _ChatMessagesState extends State<_ChatMessages>
                       notification.direction != ScrollDirection.idle) {
                     _scrollingTowardOlder =
                         notification.direction == ScrollDirection.reverse;
+                    _userScrollActive = true;
+                    _scheduleScrollButtonDirection(_scrollingTowardOlder);
                     if (_focusMessages != null) _focusPaginationArmed = true;
                   }
                   if (notification is ScrollUpdateNotification &&
                       _userScrollActive &&
                       (notification.scrollDelta ?? 0) != 0) {
                     _scrollingTowardOlder = notification.scrollDelta! > 0;
+                    _scheduleScrollButtonDirection(
+                      _scrollingTowardOlder,
+                      distance: notification.scrollDelta!.abs(),
+                    );
                   }
                   // A clamped head may already be at its oldest edge. There
                   // is no ScrollUpdate in that case, but the user's attempted
@@ -2490,22 +2539,6 @@ class _ChatMessagesState extends State<_ChatMessages>
                     if (_focusMessages == null && _scrollingTowardOlder) {
                       _scheduleCachedHistoryEntry();
                     }
-                  }
-                  if (_focusMessages != null &&
-                      notification is ScrollUpdateNotification &&
-                      notification.dragDetails != null &&
-                      (notification.scrollDelta ?? 0) < 0 &&
-                      !_showScrollToBottom) {
-                    _focusPaginationArmed = true;
-                    final generation = _navigationGeneration;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted &&
-                          generation == _navigationGeneration &&
-                          _focusMessages != null &&
-                          !_showScrollToBottom) {
-                        setState(() => _showScrollToBottom = true);
-                      }
-                    });
                   }
                   return false;
                 },
@@ -2583,7 +2616,7 @@ class _ChatMessagesState extends State<_ChatMessages>
                   child: _showScrollToBottom
                       ? _ScrollToBottomButton(
                           key: const ValueKey('scroll_to_bottom'),
-                          newMessagesCount: _newMessagesCount,
+                          newMessagesCount: _unseenIncomingCount,
                           onPressed: scrollToBottom,
                         )
                       : const SizedBox(
