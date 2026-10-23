@@ -24,6 +24,16 @@ class ChatHistoryCursor implements Comparable<ChatHistoryCursor> {
 
   Expression<bool> after(Expression<int> time, Expression<String> messageId) =>
       _CursorComparison(time, messageId, this, '>');
+
+  Expression<bool> atOrAfter(
+    Expression<int> time,
+    Expression<String> messageId,
+  ) => _CursorComparison(time, messageId, this, '>=');
+
+  Expression<bool> atOrBefore(
+    Expression<int> time,
+    Expression<String> messageId,
+  ) => _CursorComparison(time, messageId, this, '<=');
 }
 
 /// SQLite row-value comparison can seek the composite index even when many

@@ -9,6 +9,8 @@ import 'package:yap_chat/repositories/chat/chat_history_coverage.dart';
 
 class ChatCacheDataSource {
   static const pendingChatDeletionType = 'hide_conversation';
+  // Stay below SQLite's legacy 999-variable limit, including scope/cursors.
+  static const _historyPageBatchSize = 400;
 
   ChatCacheDataSource({
     required AppDatabase database,
@@ -518,7 +520,7 @@ class ChatCacheDataSource {
     required bool older,
   }) => _database.transaction(() async {
     final cached = {
-      for (final m in await readHistoryMessages(
+      for (final m in await _readStoredHistoryMessages(
         chatId,
         messages.map((m) => m.id).toSet(),
         ownerUserId: ownerUserId,
@@ -543,41 +545,10 @@ class ChatCacheDataSource {
           (older && messages.length < 60
               ? const Constant(true)
               : (older
-                    ? edge.before(table.timestampMicros, table.id).not()
-                    : edge.after(table.timestampMicros, table.id).not())) &
+                    ? edge.atOrAfter(table.timestampMicros, table.id)
+                    : edge.atOrBefore(table.timestampMicros, table.id))) &
           table.id.isNotIn(messages.map((m) => m.id));
-      final missingIds = _database.selectOnly(table)
-        ..addColumns([table.id])
-        ..where(missing);
-      await (_database.delete(_database.pendingMessageReactions)..where(
-            (t) =>
-                t.ownerUserId.equals(ownerUserId) &
-                t.chatId.equals(chatId) &
-                t.messageId.isInQuery(missingIds),
-          ))
-          .go();
-      await (_database.delete(_database.cachedMessageReactionStates)..where(
-            (t) =>
-                t.ownerUserId.equals(ownerUserId) &
-                t.chatId.equals(chatId) &
-                t.messageId.isInQuery(missingIds),
-          ))
-          .go();
-      await (_database.update(table)..where(
-            (t) =>
-                t.ownerUserId.equals(ownerUserId) &
-                t.chatId.equals(chatId) &
-                t.replyMessageId.isInQuery(missingIds),
-          ))
-          .write(
-            const CachedMessagesCompanion(
-              replyMessageId: Value(null),
-              replySenderId: Value(null),
-              replyType: Value(null),
-              replyText: Value(null),
-            ),
-          );
-      await (_database.delete(table)..where((_) => missing)).go();
+      await _removeMissingHistoryMessages(chatId, ownerUserId, missing);
     }
     await _upsertMessages([
       for (final m in messages)
@@ -613,6 +584,125 @@ class ChatCacheDataSource {
       reachesStart: older && messages.length < 60,
     );
   });
+
+  /// Only old media paths are needed here, not optimistic reaction hydration.
+  /// Seek by the owner/ID primary key, then check chat before decoding any row.
+  Future<List<ChatMessage>> _readStoredHistoryMessages(
+    String chatId,
+    Set<String> ids, {
+    required String ownerUserId,
+  }) async {
+    final result = <ChatMessage>[];
+    final values = ids.toList(growable: false);
+    for (var start = 0; start < values.length; start += _historyPageBatchSize) {
+      final end = (start + _historyPageBatchSize).clamp(0, values.length);
+      final rows =
+          await (_database.select(_database.cachedMessages)..where(
+                (t) =>
+                    t.ownerUserId.equals(ownerUserId) &
+                    t.id.isIn(values.sublist(start, end)),
+              ))
+              .get();
+      result.addAll(
+        rows
+            .where((r) => r.chatId == chatId)
+            .map((r) => _mapMessage(r, ownerUserId)),
+      );
+    }
+    return result;
+  }
+
+  /// Keep absent IDs in SQLite, not an unbounded Dart/SQL-parameter list. A
+  /// temporary primary-key set avoids scanning replies for every ID batch
+  /// when an empty last page proves that a large cached tail was removed.
+  /// All work runs on the caller's serialized transaction/SQLite connection.
+  Future<void> _removeMissingHistoryMessages(
+    String chatId,
+    String ownerUserId,
+    Expression<bool> missing,
+  ) async {
+    final table = _database.cachedMessages;
+    final probe = _database.selectOnly(table)
+      ..addColumns([table.id])
+      ..where(missing)
+      ..limit(_historyPageBatchSize);
+    final ids = (await probe.get()).map((r) => r.read(table.id)!).toList();
+    if (ids.isEmpty) return;
+    if (ids.length < _historyPageBatchSize) {
+      // The complete small set fits in bound parameters. Avoid temporary DDL
+      // for ordinary single-message deletions, including on small caches.
+      await _clearMissingHistoryMessages(
+        chatId,
+        ownerUserId,
+        missing,
+        (column) => column.isIn(ids),
+      );
+      return;
+    }
+    // Connection-local and transaction-scoped; no persistent schema/migration.
+    await _database.customStatement('''
+      CREATE TEMP TABLE chat_page_missing_ids (id TEXT NOT NULL PRIMARY KEY)
+      WITHOUT ROWID
+    ''');
+    try {
+      final predicate = GenerationContext.fromDb(_database);
+      missing.writeInto(predicate);
+      await _database.customStatement(
+        'INSERT INTO temp.chat_page_missing_ids (id) '
+        'SELECT id FROM cached_messages WHERE ${predicate.sql}',
+        predicate.boundVariables,
+      );
+      await _clearMissingHistoryMessages(
+        chatId,
+        ownerUserId,
+        missing,
+        _MissingHistoryId.new,
+      );
+    } finally {
+      await _database.customStatement('DROP TABLE temp.chat_page_missing_ids');
+    }
+  }
+
+  Future<void> _clearMissingHistoryMessages(
+    String chatId,
+    String ownerUserId,
+    Expression<bool> missing,
+    Expression<bool> Function(Expression<String>) isMissing,
+  ) async {
+    final table = _database.cachedMessages;
+    await (_database.delete(_database.pendingMessageReactions)..where(
+          (t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.chatId.equals(chatId) &
+              isMissing(t.messageId),
+        ))
+        .go();
+    await (_database.delete(_database.cachedMessageReactionStates)..where(
+          (t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.chatId.equals(chatId) &
+              isMissing(t.messageId),
+        ))
+        .go();
+    await (_database.update(table)..where(
+          (t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.chatId.equals(chatId) &
+              isMissing(t.replyMessageId),
+        ))
+        .write(
+          const CachedMessagesCompanion(
+            replyMessageId: Value(null),
+            replySenderId: Value(null),
+            replyType: Value(null),
+            replyText: Value(null),
+          ),
+        );
+    // Only reply fields have changed, so the scoped absence predicate still
+    // identifies exactly the materialized set. Delete via its cursor range:
+    // a mass tail deletion must not turn into random primary-key lookups.
+    await (_database.delete(table)..where((_) => missing)).go();
+  }
 
   bool _samePaths(List<String> a, List<String> b) {
     if (a.length != b.length) return false;
@@ -1367,6 +1457,22 @@ class ChatCacheDataSource {
       readAt: row.readAt,
       isLocalOnly: row.isPending && row.status == MessageStatus.sent.name,
     );
+  }
+}
+
+/// The table name is constant, while the compared column is emitted by Drift.
+class _MissingHistoryId extends Expression<bool> {
+  _MissingHistoryId(this.column);
+  final Expression<String> column;
+
+  @override
+  Precedence get precedence => Precedence.primary;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write('(');
+    column.writeInto(context);
+    context.buffer.write(' IN (SELECT id FROM temp.chat_page_missing_ids))');
   }
 }
 

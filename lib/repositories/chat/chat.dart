@@ -1,5 +1,7 @@
 export 'abstract_chat_repository.dart';
 export 'chat_cache_data_source.dart';
+export 'chat_history_cursor.dart';
+export 'chat_history_coverage.dart';
 export 'abstract_bounded_chat_history.dart';
 export 'chat_remote_data_source.dart';
 export 'abstract_audio_player_repository.dart';
