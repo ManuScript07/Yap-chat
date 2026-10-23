@@ -33,7 +33,6 @@ import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
-import 'package:yap_chat/ui/widgets/chat_glass_surface.dart';
 
 @RoutePage()
 class ChatPage extends StatelessWidget {
@@ -61,21 +60,23 @@ class ChatPage extends StatelessWidget {
           ),
         ),
       ],
-      child: BlocBuilder<ChatBloc, ChatState>(
-        buildWhen: (previous, current) =>
-            previous.resolvedChat != current.resolvedChat,
-        builder: (context, state) {
-          final activeChat = state.resolvedChat ?? chat;
-          if (activeChat.isDraft) return _ChatView(chat: activeChat);
+      child: ChatMediaTransitionScope(
+        child: BlocBuilder<ChatBloc, ChatState>(
+          buildWhen: (previous, current) =>
+              previous.resolvedChat != current.resolvedChat,
+          builder: (context, state) {
+            final activeChat = state.resolvedChat ?? chat;
+            if (activeChat.isDraft) return _ChatView(chat: activeChat);
 
-          return StreamBuilder<Chat?>(
-            key: ValueKey(activeChat.id),
-            stream: context.read<IChatsRepository>().watchChat(activeChat.id),
-            initialData: activeChat,
-            builder: (context, snapshot) =>
-                _ChatView(chat: snapshot.data ?? activeChat),
-          );
-        },
+            return StreamBuilder<Chat?>(
+              key: ValueKey(activeChat.id),
+              stream: context.read<IChatsRepository>().watchChat(activeChat.id),
+              initialData: activeChat,
+              builder: (context, snapshot) =>
+                  _ChatView(chat: snapshot.data ?? activeChat),
+            );
+          },
+        ),
       ),
     );
   }
@@ -480,14 +481,9 @@ class _ChatViewState extends State<_ChatView>
                               : _react,
                         ),
                       ),
-                      GradientOverlay(
-                        height: headerHeight + 20,
-                        isTop: true,
-                        backgroundColor: backgroundColor,
-                      ),
-                      GradientOverlay(
-                        height: composerHeight + 20,
-                        isTop: false,
+                      ChatMediaTransitionShadows(
+                        topHeight: headerHeight + 20,
+                        bottomHeight: composerHeight + 20,
                         backgroundColor: backgroundColor,
                         bottomOffset: keyboardAvoidanceOffset,
                       ),
@@ -495,54 +491,56 @@ class _ChatViewState extends State<_ChatView>
                         top: 0,
                         left: 0,
                         right: 0,
-                        child: ChatAppBar(
-                          userName: widget.chat.userName,
-                          isOnline: isOnline,
-                          lastSeenAt: _lastSeenAt,
-                          showsLastSeen:
-                              !widget.chat.blockedByPeer &&
-                              !widget.chat.peerIsGloballyBanned &&
-                              !widget.chat.peerIsDeleted &&
-                              widget.chat.showsLastSeen,
-                          avatarUrl: _canShowPeerAvatar
-                              ? widget.chat.avatarUrl
-                              : null,
-                          initialAvatarPath: _canShowPeerAvatar
-                              ? widget.chat.cachedAvatarPath
-                              : null,
-                          avatarLoader:
-                              widget.chat.blockedByPeer ||
-                                  widget.chat.peerIsGloballyBanned ||
-                                  widget.chat.peerIsDeleted
-                              ? null
-                              : () => context
-                                    .read<IChatsRepository>()
-                                    .resolveAvatar(widget.chat),
-                          avatarRevision: _canShowPeerAvatar
-                              ? widget.chat.avatarStoragePath ??
-                                    widget.chat.avatarUrl
-                              : null,
-                          avatarStoragePath: _canShowPeerAvatar
-                              ? widget.chat.avatarStoragePath
-                              : null,
-                          profileId: widget.chat.peerId,
-                          onBack: _finishRecordingAndExit,
-                          onProfileTap:
-                              widget.chat.peerId.isEmpty ||
-                                  widget.chat.peerIsDeleted
-                              ? null
-                              : () async {
-                                  _composerFocus.dismiss();
-                                  await context
-                                      .read<VoiceRecorderCubit>()
-                                      .finishForNavigation();
-                                  if (!context.mounted) return;
-                                  await openViewedProfile(
-                                    context,
-                                    userId: widget.chat.peerId,
-                                    originChatId: widget.chat.id,
-                                  );
-                                },
+                        child: ChatMediaTransitionChrome(
+                          child: ChatAppBar(
+                            userName: widget.chat.userName,
+                            isOnline: isOnline,
+                            lastSeenAt: _lastSeenAt,
+                            showsLastSeen:
+                                !widget.chat.blockedByPeer &&
+                                !widget.chat.peerIsGloballyBanned &&
+                                !widget.chat.peerIsDeleted &&
+                                widget.chat.showsLastSeen,
+                            avatarUrl: _canShowPeerAvatar
+                                ? widget.chat.avatarUrl
+                                : null,
+                            initialAvatarPath: _canShowPeerAvatar
+                                ? widget.chat.cachedAvatarPath
+                                : null,
+                            avatarLoader:
+                                widget.chat.blockedByPeer ||
+                                    widget.chat.peerIsGloballyBanned ||
+                                    widget.chat.peerIsDeleted
+                                ? null
+                                : () => context
+                                      .read<IChatsRepository>()
+                                      .resolveAvatar(widget.chat),
+                            avatarRevision: _canShowPeerAvatar
+                                ? widget.chat.avatarStoragePath ??
+                                      widget.chat.avatarUrl
+                                : null,
+                            avatarStoragePath: _canShowPeerAvatar
+                                ? widget.chat.avatarStoragePath
+                                : null,
+                            profileId: widget.chat.peerId,
+                            onBack: _finishRecordingAndExit,
+                            onProfileTap:
+                                widget.chat.peerId.isEmpty ||
+                                    widget.chat.peerIsDeleted
+                                ? null
+                                : () async {
+                                    _composerFocus.dismiss();
+                                    await context
+                                        .read<VoiceRecorderCubit>()
+                                        .finishForNavigation();
+                                    if (!context.mounted) return;
+                                    await openViewedProfile(
+                                      context,
+                                      userId: widget.chat.peerId,
+                                      originChatId: widget.chat.id,
+                                    );
+                                  },
+                          ),
                         ),
                       ),
                       _KeyboardAwareInput(
@@ -643,164 +641,176 @@ class _KeyboardAwareInput extends StatelessWidget {
       left: 0,
       right: 0,
       bottom: keyboardAvoidanceOffset,
-      child: MediaQuery(
-        data: composerMediaQuery,
-        child: BlocBuilder<ChatBloc, ChatState>(
-          buildWhen: (previous, current) =>
-              previous.replyToMessage != current.replyToMessage,
-          builder: (context, chatState) {
-            if (peerIsGloballyBanned) {
-              return SizeReporter(
-                onSizeChanged: (size) => onHeightChanged(size.height),
-                child: const _GloballyBannedComposer(),
-              );
-            }
-            if (peerIsDeleted) {
-              return SizeReporter(
-                onSizeChanged: (size) => onHeightChanged(size.height),
-                child: _DeletedAccountComposer(chatId: chatId),
-              );
-            }
-            if (blockedByMe) {
-              return SizeReporter(
-                onSizeChanged: (size) => onHeightChanged(size.height),
-                child: _UnblockComposer(
-                  peerName: peerName,
-                  peerId: peerId,
-                  isPending: isBlockActionPending,
-                ),
-              );
-            }
-            return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
-              builder: (context, state) {
+      child: ChatMediaTransitionChrome(
+        region: ChatMediaChromeRegion.composer,
+        child: MediaQuery(
+          data: composerMediaQuery,
+          child: BlocBuilder<ChatBloc, ChatState>(
+            buildWhen: (previous, current) =>
+                previous.replyToMessage != current.replyToMessage,
+            builder: (context, chatState) {
+              if (peerIsGloballyBanned) {
                 return SizeReporter(
                   onSizeChanged: (size) => onHeightChanged(size.height),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        reverseDuration: const Duration(milliseconds: 180),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SizeTransition(
-                            sizeFactor: animation,
-                            axisAlignment: -1,
-                            child: child,
-                          ),
-                        ),
-                        child: switch (chatState.replyToMessage) {
-                          final reply? => Padding(
-                            key: ValueKey('reply_${reply.id}'),
-                            padding: EdgeInsets.only(
-                              left: systemPadding.left + 16,
-                              right: systemPadding.right + 16,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ReplyComposerPreview(
-                                  message: reply,
-                                  peerName: peerName,
-                                  onTap: () => onReplyTap(reply.id),
-                                  onClear: () {
-                                    context.read<ChatBloc>().add(
-                                      const ChatReplyCleared(),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 4),
-                              ],
-                            ),
-                          ),
-                          null => const SizedBox(key: ValueKey('reply_empty')),
-                        },
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        reverseDuration: const Duration(milliseconds: 180),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SizeTransition(
-                            sizeFactor: animation,
-                            alignment: Alignment.topCenter,
-                            child: child,
-                          ),
-                        ),
-                        child: state.status != VoiceRecorderStatus.idle
-                            ? VoiceRecorderBar(
-                                key: const ValueKey('voice_recorder_bar'),
-                                state: state,
-                                onDiscard: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .discardRecording();
-                                },
-                                onStop: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .stopRecording();
-                                },
-                                onTogglePreview: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .togglePreviewPlayback();
-                                },
-                                onSeekUpdate: (position) {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .previewSeek(position);
-                                },
-                                onSeekEnd: () {
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .finishPreviewSeeking();
-                                },
-                                onSend: () async {
-                                  final audio = await context
-                                      .read<VoiceRecorderCubit>()
-                                      .takeRecordingForSending();
-                                  if (audio == null || !context.mounted) return;
-
-                                  context.read<ChatBloc>().add(
-                                    ChatMessageAudioSent(
-                                      audioPath: audio.path,
-                                      duration: audio.duration,
-                                      waveform: audio.waveform,
-                                    ),
-                                  );
-                                  onMessageSent();
-                                },
-                              )
-                            : MessageInputBar(
-                                key: const ValueKey('message_input_bar'),
-                                focusNode: focusNode,
-                                replyToMessageId: chatState.replyToMessage?.id,
-                                onSend: (text) {
-                                  context.read<ChatBloc>().add(
-                                    ChatMessageSent(text),
-                                  );
-                                  onMessageSent();
-                                },
-                                onAddPhoto: () => _openAttachmentSheet(context),
-                                onVoiceRecord: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  context
-                                      .read<VoiceRecorderCubit>()
-                                      .startRecording();
-                                },
-                              ),
-                      ),
-                    ],
+                  child: const _GloballyBannedComposer(),
+                );
+              }
+              if (peerIsDeleted) {
+                return SizeReporter(
+                  onSizeChanged: (size) => onHeightChanged(size.height),
+                  child: _DeletedAccountComposer(chatId: chatId),
+                );
+              }
+              if (blockedByMe) {
+                return SizeReporter(
+                  onSizeChanged: (size) => onHeightChanged(size.height),
+                  child: _UnblockComposer(
+                    peerName: peerName,
+                    peerId: peerId,
+                    isPending: isBlockActionPending,
                   ),
                 );
-              },
-            );
-          },
+              }
+              return BlocBuilder<VoiceRecorderCubit, VoiceRecorderState>(
+                builder: (context, state) {
+                  return SizeReporter(
+                    onSizeChanged: (size) => onHeightChanged(size.height),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          reverseDuration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(
+                                  sizeFactor: animation,
+                                  axisAlignment: -1,
+                                  child: child,
+                                ),
+                              ),
+                          child: switch (chatState.replyToMessage) {
+                            final reply? => Padding(
+                              key: ValueKey('reply_${reply.id}'),
+                              padding: EdgeInsets.only(
+                                left: systemPadding.left + 16,
+                                right: systemPadding.right + 16,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ReplyComposerPreview(
+                                    message: reply,
+                                    peerName: peerName,
+                                    onTap: () => onReplyTap(reply.id),
+                                    onClear: () {
+                                      context.read<ChatBloc>().add(
+                                        const ChatReplyCleared(),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 4),
+                                ],
+                              ),
+                            ),
+                            null => const SizedBox(
+                              key: ValueKey('reply_empty'),
+                            ),
+                          },
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          reverseDuration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(
+                                  sizeFactor: animation,
+                                  alignment: Alignment.topCenter,
+                                  child: child,
+                                ),
+                              ),
+                          child: state.status != VoiceRecorderStatus.idle
+                              ? VoiceRecorderBar(
+                                  key: const ValueKey('voice_recorder_bar'),
+                                  state: state,
+                                  onDiscard: () {
+                                    context
+                                        .read<VoiceRecorderCubit>()
+                                        .discardRecording();
+                                  },
+                                  onStop: () {
+                                    context
+                                        .read<VoiceRecorderCubit>()
+                                        .stopRecording();
+                                  },
+                                  onTogglePreview: () {
+                                    context
+                                        .read<VoiceRecorderCubit>()
+                                        .togglePreviewPlayback();
+                                  },
+                                  onSeekUpdate: (position) {
+                                    context
+                                        .read<VoiceRecorderCubit>()
+                                        .previewSeek(position);
+                                  },
+                                  onSeekEnd: () {
+                                    context
+                                        .read<VoiceRecorderCubit>()
+                                        .finishPreviewSeeking();
+                                  },
+                                  onSend: () async {
+                                    final audio = await context
+                                        .read<VoiceRecorderCubit>()
+                                        .takeRecordingForSending();
+                                    if (audio == null || !context.mounted) {
+                                      return;
+                                    }
+
+                                    context.read<ChatBloc>().add(
+                                      ChatMessageAudioSent(
+                                        audioPath: audio.path,
+                                        duration: audio.duration,
+                                        waveform: audio.waveform,
+                                      ),
+                                    );
+                                    onMessageSent();
+                                  },
+                                )
+                              : MessageInputBar(
+                                  key: const ValueKey('message_input_bar'),
+                                  focusNode: focusNode,
+                                  replyToMessageId:
+                                      chatState.replyToMessage?.id,
+                                  onSend: (text) {
+                                    context.read<ChatBloc>().add(
+                                      ChatMessageSent(text),
+                                    );
+                                    onMessageSent();
+                                  },
+                                  onAddPhoto: () =>
+                                      _openAttachmentSheet(context),
+                                  onVoiceRecord: () {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                    context
+                                        .read<VoiceRecorderCubit>()
+                                        .startRecording();
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -2618,6 +2628,8 @@ class _ChatMessagesState extends State<_ChatMessages>
                   ),
                 ),
 
+              const Positioned.fill(child: ChatMediaTransitionLayer()),
+
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
@@ -2976,32 +2988,36 @@ class _ScrollToBottomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        GlassIconButton(
-          icon: Icons.keyboard_arrow_down_rounded,
-          chatStyle: true,
-          onTap: onPressed,
-          width: 50,
-          height: 50,
-          borderRadius: 36,
-          iconSize: 36,
-        ),
-
-        Positioned(
-          top: -5,
-          right: -5,
-          child: AnimatedUnreadBadge(
-            count: newMessagesCount,
-            color: context.colorScheme.primary,
-            textColor: context.scaffoldBackgroundColor,
-            size: 22,
-            borderColor: context.scaffoldBackgroundColor,
-            borderWidth: 1.5,
+    return ChatMediaTransitionChrome(
+      region: ChatMediaChromeRegion.scrollButton,
+      paintOutset: 8,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GlassIconButton(
+            icon: Icons.keyboard_arrow_down_rounded,
+            chatStyle: true,
+            onTap: onPressed,
+            width: 50,
+            height: 50,
+            borderRadius: 36,
+            iconSize: 36,
           ),
-        ),
-      ],
+
+          Positioned(
+            top: -5,
+            right: -5,
+            child: AnimatedUnreadBadge(
+              count: newMessagesCount,
+              color: context.colorScheme.primary,
+              textColor: context.scaffoldBackgroundColor,
+              size: 22,
+              borderColor: context.scaffoldBackgroundColor,
+              borderWidth: 1.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

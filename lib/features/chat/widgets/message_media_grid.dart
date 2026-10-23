@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
@@ -274,36 +276,70 @@ class _MediaAlbum extends StatelessWidget {
     final aspectRatios = List<double?>.filled(message.mediaUrls.length, null);
     aspectRatios[index] = aspectRatio;
 
-    await Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 260),
-        reverseTransitionDuration: const Duration(milliseconds: 180),
-        pageBuilder: (_, _, _) => ChatMediaGalleryPage(
-          imagePaths: message.mediaUrls,
-          heroTags: List.generate(
-            message.mediaUrls.length,
-            (imageIndex) => chatMediaHeroTag(message.id, imageIndex),
-          ),
-          initialIndex: index,
-          initialThumbnailCacheWidth: thumbnailCacheWidth,
-          senderName: senderName,
-          sentAt: message.timestamp,
-          senderAvatarUrl: senderAvatarUrl,
-          senderAvatarLoader: senderAvatarLoader,
-          senderAvatarImage: senderAvatarImage,
-          imageAspectRatios: aspectRatios,
+    final transitionGeometry = ChatMediaTransitionScope.maybeOf(context);
+    late final _ChatMediaGalleryRoute route;
+    route = _ChatMediaGalleryRoute(
+      transitionDuration: const Duration(milliseconds: 260),
+      reverseTransitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (_, _, _) => ChatMediaGalleryPage(
+        imagePaths: message.mediaUrls,
+        heroTags: List.generate(
+          message.mediaUrls.length,
+          (imageIndex) => chatMediaHeroTag(message.id, imageIndex),
         ),
-        transitionsBuilder: (_, animation, _, child) => FadeTransition(
-          opacity: CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
+        initialIndex: index,
+        initialThumbnailCacheWidth: thumbnailCacheWidth,
+        senderName: senderName,
+        sentAt: message.timestamp,
+        senderAvatarUrl: senderAvatarUrl,
+        senderAvatarLoader: senderAvatarLoader,
+        senderAvatarImage: senderAvatarImage,
+        imageAspectRatios: aspectRatios,
+        transitionGeometry: transitionGeometry,
+      ),
+      transitionsBuilder: (_, animation, _, child) =>
+          transitionGeometry?.localFlight.routeTransition(
+            route.mediaAnimation,
+            child,
+          ) ??
+          FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+            child: child,
           ),
-          child: child,
-        ),
+    );
+    final completion = Navigator.of(context).push(route);
+    transitionGeometry?.localFlight.follow(
+      route.mediaAnimation,
+      tag: chatMediaHeroTag(message.id, index),
+      ratio: aspectRatio,
+    );
+    final animation = route.mediaAnimation;
+    unawaited(
+      route.completed.then(
+        (_) => transitionGeometry?.localFlight.release(animation),
       ),
     );
+    await completion;
   }
+}
+
+class _ChatMediaGalleryRoute extends PageRouteBuilder<void> {
+  _ChatMediaGalleryRoute({
+    required super.pageBuilder,
+    required super.transitionsBuilder,
+    required super.transitionDuration,
+    required super.reverseTransitionDuration,
+  });
+
+  // ModalRoute.animation is a proxy: HeroController temporarily replaces it
+  // with a completed animation for offstage layout, before any time advances.
+  // Use the SAME route controller's read-only view for visible local effects.
+  // No additional ticker/controller and no changes to Navigator/Hero behavior.
+  Animation<double> get mediaAnimation => controller!.view;
 }
 
 String chatMediaHeroTag(String messageId, int imageIndex) {

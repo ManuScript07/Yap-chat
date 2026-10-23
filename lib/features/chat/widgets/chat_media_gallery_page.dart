@@ -19,6 +19,7 @@ class ChatMediaGalleryPage extends StatefulWidget {
     this.senderAvatarLoader,
     this.senderAvatarImage,
     this.imageAspectRatios = const [],
+    this.transitionGeometry,
   });
 
   final List<String> imagePaths;
@@ -31,6 +32,7 @@ class ChatMediaGalleryPage extends StatefulWidget {
   final Future<String?> Function()? senderAvatarLoader;
   final ImageProvider? senderAvatarImage;
   final List<double?> imageAspectRatios;
+  final ChatMediaTransitionGeometry? transitionGeometry;
 
   @override
   State<ChatMediaGalleryPage> createState() => _ChatMediaGalleryPageState();
@@ -161,6 +163,9 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                     itemCount: widget.imagePaths.length,
                     onPageChanged: (index) => setState(() {
                       _currentIndex = index;
+                      widget.transitionGeometry?.localFlight.select(
+                        widget.heroTags[index],
+                      );
                       _isZoomed = false;
                     }),
                     itemBuilder: (context, index) {
@@ -179,12 +184,15 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                               ? widget.initialThumbnailCacheWidth
                               : null,
                           onZoomChanged: _setZoomed,
+                          transitionGeometry: widget.transitionGeometry,
                         ),
                       );
                     },
                   ),
                 ),
               ),
+              if (widget.transitionGeometry case final geometry?)
+                ChatMediaGalleryShadows(geometry: geometry),
               Positioned(
                 top: systemPadding.top + 16,
                 left: systemPadding.left + 16,
@@ -322,6 +330,7 @@ class _ZoomableGalleryImage extends StatefulWidget {
     required this.heroTag,
     this.initialAspectRatio,
     this.thumbnailCacheWidth,
+    this.transitionGeometry,
     required this.onZoomChanged,
   });
 
@@ -329,6 +338,7 @@ class _ZoomableGalleryImage extends StatefulWidget {
   final String heroTag;
   final double? initialAspectRatio;
   final int? thumbnailCacheWidth;
+  final ChatMediaTransitionGeometry? transitionGeometry;
   final ValueChanged<bool> onZoomChanged;
 
   @override
@@ -336,6 +346,7 @@ class _ZoomableGalleryImage extends StatefulWidget {
 }
 
 class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
+  final _imageKey = GlobalKey();
   late final TransformationController _transformationController;
   double? _aspectRatio;
   double? _pendingAspectRatio;
@@ -453,8 +464,12 @@ class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage> {
                   // Without known bounds use the route's fade, not a flight
                   // toward a guessed crop. Enable the normal return flight once
                   // dimensions have arrived and the opening transition is over.
-                  enabled: ratio != null,
+                  enabled:
+                      ratio != null &&
+                      widget.transitionGeometry?.localFlight.hasHost != true,
                   child: ChatMediaHero(
+                    imageKey: _imageKey,
+                    transitionGeometry: widget.transitionGeometry,
                     path: widget.path,
                     heroTag: widget.heroTag,
                     fit: BoxFit.contain,

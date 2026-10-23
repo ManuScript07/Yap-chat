@@ -6,7 +6,7 @@ import 'package:yap_chat/core/core.dart';
 
 import 'widgets.dart';
 
-class ChatMediaHero extends StatelessWidget {
+class ChatMediaHero extends StatefulWidget {
   const ChatMediaHero({
     super.key,
     required this.path,
@@ -16,6 +16,8 @@ class ChatMediaHero extends StatelessWidget {
     this.revealOnLoad = true,
     this.onAspectRatio,
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
+    this.transitionGeometry,
+    this.imageKey,
   });
 
   final String path;
@@ -25,10 +27,90 @@ class ChatMediaHero extends StatelessWidget {
   final bool revealOnLoad;
   final ValueChanged<double>? onAspectRatio;
   final BorderRadiusGeometry borderRadius;
+  final ChatMediaTransitionGeometry? transitionGeometry;
+
+  /// Keep the gallery's mounted decoder/stream when entering its placeholder.
+  /// Never copy this key to the separate flying thumbnail.
+  final GlobalKey? imageKey;
+
+  @override
+  State<ChatMediaHero> createState() => _ChatMediaHeroState();
+}
+
+class _ChatMediaHeroState extends State<ChatMediaHero> {
+  GlobalKey? _sourceImageKey;
+  final _boundsKey = GlobalKey();
+  final _hidden = ValueNotifier(false);
+  ChatMediaTransitionGeometry? _geometry;
+
+  void _unregister(ChatMediaHero owner) => _geometry?.localFlight.unregister(
+    owner.heroTag,
+    _boundsKey,
+    gallery: owner.fit == BoxFit.contain,
+  );
+
+  void _register() {
+    _geometry =
+        widget.transitionGeometry ?? ChatMediaTransitionScope.maybeOf(context);
+    _geometry?.localFlight.register(
+      tag: widget.heroTag,
+      key: _boundsKey,
+      path: widget.path,
+      cacheWidth: widget.cacheWidth,
+      radius: widget.borderRadius.resolve(Directionality.of(context)),
+      gallery: widget.fit == BoxFit.contain,
+      hidden: widget.fit == BoxFit.contain ? null : _hidden,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _unregister(widget);
+    _register();
+  }
+
+  @override
+  void didUpdateWidget(ChatMediaHero oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.heroTag != widget.heroTag ||
+        oldWidget.fit != widget.fit ||
+        oldWidget.transitionGeometry != widget.transitionGeometry) {
+      _unregister(oldWidget);
+    }
+    _register();
+  }
+
+  @override
+  void dispose() {
+    _unregister(widget);
+    _hidden.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Hero(
+    final ChatMediaHero(
+      :path,
+      :heroTag,
+      :fit,
+      :cacheWidth,
+      :revealOnLoad,
+      :onAspectRatio,
+      :borderRadius,
+      :transitionGeometry,
+      :imageKey,
+    ) = widget;
+    final placeholderGeometry =
+        transitionGeometry ?? ChatMediaTransitionScope.maybeOf(context);
+    // Keep the mounted decoder when Hero reparents its child into a placeholder.
+    // Without this, protected source pixels can briefly reveal the bubble below.
+    final retainedImageKey =
+        imageKey ??
+        (placeholderGeometry == null
+            ? null
+            : (_sourceImageKey ??= GlobalKey()));
+    final hero = Hero(
       tag: heroTag,
       transitionOnUserGestures: true,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
@@ -65,8 +147,10 @@ class ChatMediaHero extends StatelessWidget {
         );
       },
       child: ClipRRect(
+        key: _boundsKey,
         borderRadius: borderRadius,
         child: ChatMediaImage(
+          key: retainedImageKey,
           path: path,
           fit: fit,
           cacheWidth: cacheWidth,
@@ -74,6 +158,14 @@ class ChatMediaHero extends StatelessWidget {
           onAspectRatio: onAspectRatio,
         ),
       ),
+    );
+    final flight = _geometry?.localFlight;
+    if (fit != BoxFit.cover || flight == null) return hero;
+    return ValueListenableBuilder<bool>(
+      valueListenable: _hidden,
+      child: hero,
+      builder: (_, hidden, child) =>
+          Opacity(opacity: hidden ? 0 : 1, child: child),
     );
   }
 }

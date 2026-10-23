@@ -1,4 +1,5 @@
 export 'message_bubble.dart';
+export 'message_text_content.dart';
 export 'message_actions_bottom_sheet.dart';
 export 'message_reply_preview.dart';
 export 'message_status_icon.dart';
@@ -9,6 +10,9 @@ export 'attachment_bottom_sheet.dart';
 export 'audio_message_content.dart';
 export 'audio_waveform.dart';
 export 'chat_media_gallery_page.dart';
+export 'chat_media_transition_scope.dart';
+export 'chat_media_transition_shadows.dart';
+export 'chat_media_local_flight.dart';
 export 'chat_media_hero.dart';
 export 'chat_media_aspect_ratio_cache.dart';
 export 'message_media_grid.dart';
