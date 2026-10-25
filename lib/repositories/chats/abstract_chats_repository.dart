@@ -10,6 +10,7 @@ abstract interface class IChatsRepository {
   /// Загружает полный список чатов из источника данных.
   Future<List<Chat>> getChats();
 
+  /// Cache-first lookup; a miss reads that conversation only on a supported server.
   Future<Chat?> getChatById(String chatId);
 
   /// Returns an existing direct chat from the local cache only.

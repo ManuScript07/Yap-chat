@@ -94,6 +94,31 @@ class ChatsRemoteDataSource {
     return _mapSummaries(response, presenceTicket);
   }
 
+  /// Read an existing visible conversation only; never create/reopen one.
+  Future<Chat?> fetchChatByPeerId(String peerId) async {
+    final peer = peerId.trim();
+    if (peer.isEmpty || peer == currentUserId) {
+      throw ArgumentError('Invalid direct chat peer');
+    }
+    final ticket = _presenceStore?.captureSnapshot();
+    final response = await _readRpc<List<dynamic>>(
+      'get_direct_chat_summary',
+      params: {'peer_user_id': peer},
+    );
+    if (response.length > 1 ||
+        response.any(
+          (row) =>
+              row is! Map ||
+              row['peer_id'] != peer ||
+              row['id'] is! String ||
+              (row['id'] as String).isEmpty,
+        )) {
+      throw const FormatException('Invalid direct chat summary');
+    }
+    final chats = _mapSummaries(response, ticket);
+    return chats.isEmpty ? null : chats.single;
+  }
+
   /// Prepared for the paged repository contract; the active list does not yet
   /// treat these partial results as its complete authoritative snapshot.
   Future<ChatListPage> fetchChatListPage({

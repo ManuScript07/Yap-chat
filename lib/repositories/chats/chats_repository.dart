@@ -60,6 +60,11 @@ class ChatsRepository implements IChatsRepository {
   int _nextSummaryAttemptMicros = 0;
   int _summaryFailures = 0;
   bool _targetedSummariesSupported = true;
+  bool _directLookupSupported = true;
+  final _lookups = <(String, int, int, bool, String), Future<Chat?>>{};
+  final _lookupQueues = <bool, Future<void>>{};
+  (String, int, int)? _lookupQueueScope;
+  final _directCreations = <(String, int, String), Future<Chat>>{};
   bool _isRealtimePaused = false;
   StreamController<List<Chat>>? _watchController;
   StreamSubscription<List<Chat>>? _cacheSubscription;
@@ -180,8 +185,10 @@ class ChatsRepository implements IChatsRepository {
   Stream<Chat?> watchChat(String chatId) {
     final scope = _accountSessionController.capture();
     return _cache
-        .watch(ownerUserId: scope.userId)
-        .map((chats) => _findChat(chats, chatId));
+        .watchById(chatId, ownerUserId: scope.userId)
+        .map(
+          (chat) => _accountSessionController.isCurrent(scope) ? chat : null,
+        );
   }
 
   @override
@@ -205,23 +212,19 @@ class ChatsRepository implements IChatsRepository {
     if (normalizedChatId.isEmpty) return null;
 
     final scope = _accountSessionController.capture();
-    final cachedChat = _findChat(
-      await _cache.read(ownerUserId: scope.userId),
+    final cachedChat = await _cache.readById(
       normalizedChatId,
+      ownerUserId: scope.userId,
     );
+    _accountSessionController.ensureCurrent(scope);
     if (cachedChat != null) return cachedChat;
 
     try {
-      await _synchronize();
+      return await _lookupChat(normalizedChatId, byPeer: false, scope: scope);
     } catch (error, stackTrace) {
       _config.talker.handle(error, stackTrace, 'Chat lookup failed');
       return null;
     }
-
-    return _findChat(
-      await _cache.read(ownerUserId: scope.userId),
-      normalizedChatId,
-    );
   }
 
   @override
@@ -229,12 +232,12 @@ class ChatsRepository implements IChatsRepository {
     final normalizedPeerId = peerId.trim();
     if (normalizedPeerId.isEmpty) return null;
     final scope = _accountSessionController.capture();
-    final cached = await _cache.read(ownerUserId: scope.userId);
+    final cached = await _cache.readByPeerId(
+      normalizedPeerId,
+      ownerUserId: scope.userId,
+    );
     _accountSessionController.ensureCurrent(scope);
-    for (final chat in cached) {
-      if (chat.peerId == normalizedPeerId) return chat;
-    }
-    return null;
+    return cached;
   }
 
   @override
@@ -255,12 +258,12 @@ class ChatsRepository implements IChatsRepository {
       normalizedPeerId,
       ownerUserId: scope.userId,
     );
+    _accountSessionController.ensureCurrent(scope);
     if (cachedChat != null) return cachedChat;
 
-    // A slow first summary request must not prevent navigation. The shared
-    // cache sync continues in the background and an open draft is promoted
-    // once the existing conversation appears there.
-    unawaited(_synchronizeSafely(scope));
+    // Navigation remains immediate. A single-peer read promotes a draft when
+    // the conversation exists outside the loaded list; it never creates one.
+    unawaited(_lookupPeerSafely(normalizedPeerId, scope));
 
     return Chat.directDraft(
       peerId: normalizedPeerId,
@@ -283,22 +286,149 @@ class ChatsRepository implements IChatsRepository {
       normalizedPeerId,
       ownerUserId: scope.userId,
     );
+    _accountSessionController.ensureCurrent(scope);
     if (cachedChat != null) return cachedChat;
 
-    final chatId = await _remote.createDirectConversation(normalizedPeerId);
+    final key = (scope.userId, scope.generation, normalizedPeerId);
+    final existing = _directCreations[key];
+    if (existing != null) return existing;
+    late final Future<Chat> operation;
+    operation = _createDirectChat(normalizedPeerId, scope).whenComplete(() {
+      if (identical(_directCreations[key], operation)) {
+        _directCreations.remove(key);
+      }
+    });
+    _directCreations[key] = operation;
+    return operation;
+  }
+
+  Future<Chat> _createDirectChat(
+    String peerId,
+    AccountSessionSnapshot scope,
+  ) async {
+    final chatId = await _remote.createDirectConversation(peerId);
     _accountSessionController.ensureCurrent(scope);
-    // A preceding list refresh may still be in flight. Force a fresh summary
-    // after creating/reopening the conversation so the returned id is visible
-    // before ChatBloc starts sending the first message.
-    await _synchronize();
-    _accountSessionController.ensureCurrent(scope);
-    final chat = _findChat(
-      await _cache.read(ownerUserId: scope.userId),
-      chatId,
-    );
+    final chat = await _lookupChat(chatId, byPeer: false, scope: scope);
     if (chat == null) {
       throw StateError('Created conversation is missing from summaries');
     }
+    return chat;
+  }
+
+  Future<void> _lookupPeerSafely(
+    String peerId,
+    AccountSessionSnapshot scope,
+  ) async {
+    try {
+      await _lookupChat(peerId, byPeer: true, scope: scope);
+    } catch (error, stackTrace) {
+      if (error is StaleAccountSessionException ||
+          !_accountSessionController.isCurrent(scope)) {
+        return;
+      }
+      _config.talker.handle(error, stackTrace, 'Direct chat lookup failed');
+    }
+  }
+
+  Future<Chat?> _lookupChat(
+    String value, {
+    required bool byPeer,
+    required AccountSessionSnapshot scope,
+  }) {
+    final epoch = _summaryEpoch;
+    final identity = (scope.userId, scope.generation, epoch);
+    if (_lookupQueueScope != identity) {
+      _lookupQueueScope = identity;
+      _lookupQueues.clear();
+    }
+    final key = (scope.userId, scope.generation, epoch, byPeer, value);
+    final existing = _lookups[key];
+    if (existing != null) return existing;
+    // Two bounded read lanes: an optional peer lookup cannot delay opening a
+    // known conversation after an accepted first-send creation. Each lane is
+    // serial; all requests reuse the same SDK client and cancellation scope.
+    late final Future<Chat?> operation;
+    operation = (_lookupQueues[byPeer] ?? Future<void>.value())
+        .then((_) async {
+          _ensureSummaryScope(scope, epoch);
+          // An event can invalidate the first response before the row has ever
+          // entered the cache. Retry once rather than silently losing a push
+          // navigation; a busy conversation cannot create an unbounded loop.
+          for (var attempt = 0; attempt < 2; attempt++) {
+            final version = _summaryVersion;
+            List<Chat> chats;
+            try {
+              if (byPeer && _directLookupSupported) {
+                final chat = await _remote.fetchChatByPeerId(value);
+                chats = chat == null ? const [] : [chat];
+              } else if (!byPeer && _targetedSummariesSupported) {
+                chats = await _remote.fetchChatsByIds({value});
+              } else {
+                await _synchronize();
+                _ensureSummaryScope(scope, epoch);
+                return await _readLookupCache(value, byPeer, scope, epoch);
+              }
+            } on PostgrestException catch (error) {
+              if (error.code != 'PGRST202') rethrow;
+              _ensureSummaryScope(scope, epoch);
+              if (byPeer) {
+                _directLookupSupported = false;
+              } else {
+                _targetedSummariesSupported = false;
+              }
+              await _synchronize();
+              _ensureSummaryScope(scope, epoch);
+              return _readLookupCache(value, byPeer, scope, epoch);
+            }
+            _ensureSummaryScope(scope, epoch);
+            if (byPeer &&
+                (chats.length > 1 ||
+                    chats.any(
+                      (chat) => chat.peerId != value || chat.id.isEmpty,
+                    ))) {
+              throw const FormatException('Invalid direct chat summary');
+            }
+            final ids = byPeer ? chats.map((chat) => chat.id).toSet() : {value};
+            await _applySummaryResult(
+              ids,
+              chats,
+              scope,
+              epoch,
+              version,
+              protectAgainstSnapshot: true,
+            );
+            _ensureSummaryScope(scope, epoch);
+            final cached = await _readLookupCache(value, byPeer, scope, epoch);
+            if (cached != null ||
+                chats.isEmpty ||
+                attempt == 1 ||
+                !ids.any((id) => (_summaryVersions[id] ?? 0) > version)) {
+              return cached;
+            }
+          }
+          return null;
+        })
+        .whenComplete(() {
+          if (identical(_lookups[key], operation)) _lookups.remove(key);
+        });
+    _lookups[key] = operation;
+    _lookupQueues[byPeer] = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<Chat?> _readLookupCache(
+    String value,
+    bool byPeer,
+    AccountSessionSnapshot scope,
+    int epoch,
+  ) async {
+    final chat = byPeer
+        ? await _cache.readByPeerId(value, ownerUserId: scope.userId)
+        : await _cache.readById(value, ownerUserId: scope.userId);
+    _ensureSummaryScope(scope, epoch);
     return chat;
   }
 
@@ -700,6 +830,8 @@ class ChatsRepository implements IChatsRepository {
   void _resetSummaryScheduling({bool clearIds = true}) {
     _remote.cancelSummaryRequests();
     _summaryEpoch++;
+    _lookupQueues.clear();
+    _lookupQueueScope = null;
     _activeFullSync = null;
     _activeSync = null;
     _summaryQueue = Future<void>.value();
@@ -870,6 +1002,14 @@ class ChatsRepository implements IChatsRepository {
           .where((entry) => entry.value > version)
           .map((entry) => entry.key)
           .toSet();
+      // An open conversation can be outside a capped legacy snapshot (and,
+      // later, outside loaded pages). Verify its absence by an addressed read,
+      // not by dropping live metadata because it is absent from the first 1000.
+      final outsideOpenIds = _conversationSync.openConversationIds
+          .difference(visibleChats.map((chat) => chat.id).toSet())
+          .difference(pendingChatIds);
+      newerIds.addAll(outsideOpenIds);
+      _dirtyChatIds.addAll(outsideOpenIds);
       final preserved = await _cache.readForAction(
         newerIds,
         ownerUserId: scope.userId,
@@ -891,6 +1031,7 @@ class ChatsRepository implements IChatsRepository {
         _summarySyncTimer = null;
       }
     });
+    _scheduleSummarySync();
     _config.diagnostics?.recordSyncItems('chats', reconciled.length);
   }
 
@@ -917,6 +1058,17 @@ class ChatsRepository implements IChatsRepository {
       await _performSync(scope, epoch);
       return;
     }
+    await _applySummaryResult(ids, chats, scope, epoch, version);
+  }
+
+  Future<void> _applySummaryResult(
+    Set<String> ids,
+    List<Chat> chats,
+    AccountSessionSnapshot scope,
+    int epoch,
+    int version, {
+    bool protectAgainstSnapshot = false,
+  }) async {
     _ensureSummaryScope(scope, epoch);
     if (chats.any((chat) => !ids.contains(chat.id)) ||
         chats.map((chat) => chat.id).toSet().length != chats.length) {
@@ -932,11 +1084,17 @@ class ChatsRepository implements IChatsRepository {
     );
     await _accountSessionController.commit(scope, () async {
       _ensureSummaryScope(scope, epoch);
+      final pendingNow = protectAgainstSnapshot
+          ? (await _chatCache.readPendingChatDeletions(
+              ownerUserId: scope.userId,
+            )).map((item) => item.chatId).toSet()
+          : pending;
+      _ensureSummaryScope(scope, epoch);
       final newer = ids
           .where((id) => (_summaryVersions[id] ?? 0) > version)
           .toSet();
       _dirtyChatIds.addAll(newer);
-      final currentIds = ids.difference(newer).difference(pending);
+      final currentIds = ids.difference(newer).difference(pendingNow);
       await _cache.applySummaryBatch(
         currentIds,
         reconciled
@@ -944,7 +1102,14 @@ class ChatsRepository implements IChatsRepository {
             .toList(growable: false),
         ownerUserId: scope.userId,
       );
+      if (protectAgainstSnapshot) {
+        _dirtyChatIds.removeAll(currentIds);
+        for (final id in currentIds) {
+          _summaryVersions[id] = ++_summaryVersion;
+        }
+      }
     });
+    if (protectAgainstSnapshot) _scheduleSummarySync();
     _config.diagnostics?.recordSyncItems(
       'chat_summary_batch',
       reconciled.length,
@@ -1039,12 +1204,5 @@ class ChatsRepository implements IChatsRepository {
         controller.addError(error, stackTrace);
       }
     }
-  }
-
-  Chat? _findChat(List<Chat> chats, String chatId) {
-    for (final chat in chats) {
-      if (chat.id == chatId) return chat;
-    }
-    return null;
   }
 }

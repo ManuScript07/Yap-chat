@@ -63,6 +63,31 @@ class ChatsCacheDataSource {
     return row == null ? null : _mapRow(row);
   }
 
+  Future<Chat?> readById(String chatId, {String? ownerUserId}) async {
+    final owner = ownerUserId ?? _userIdProvider();
+    final row =
+        await (_database.select(_database.cachedChats)..where(
+              (table) =>
+                  table.ownerUserId.equals(owner) & table.id.equals(chatId),
+            ))
+            .getSingleOrNull();
+    await _prepareAvatarPaths();
+    return row == null ? null : _mapRow(row);
+  }
+
+  Stream<Chat?> watchById(String chatId, {String? ownerUserId}) {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.select(_database.cachedChats)
+      ..where(
+        (table) => table.ownerUserId.equals(owner) & table.id.equals(chatId),
+      );
+    final pathsReady = _prepareAvatarPaths();
+    return query.watchSingleOrNull().asyncMap((row) async {
+      await pathsReady;
+      return row == null ? null : _mapRow(row);
+    });
+  }
+
   Future<bool> isDeliveryBlocked(String chatId, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
     final row =
