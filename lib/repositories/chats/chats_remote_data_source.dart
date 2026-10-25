@@ -52,10 +52,7 @@ class ChatsRemoteDataSource {
     }
   }
 
-  Future<List<dynamic>> _fetchSummaries(
-    String rpc, {
-    Map<String, dynamic>? params,
-  }) async {
+  Future<T> _readRpc<T>(String rpc, {Map<String, dynamic>? params}) async {
     final abort = Completer<void>();
     _summaryRequests.add(abort);
     try {
@@ -63,7 +60,7 @@ class ChatsRemoteDataSource {
         _diagnostics,
         rpc,
         () => _client
-            .rpc<List<dynamic>>(rpc, params: params)
+            .rpc<T>(rpc, params: params)
             .retry(enabled: false, requestTimeout: summaryRequestTimeout)
             .abortSignal(abort.future),
       );
@@ -80,7 +77,7 @@ class ChatsRemoteDataSource {
 
   Future<List<Chat>> fetchChats() async {
     final presenceTicket = _presenceStore?.captureSnapshot();
-    final response = await _fetchSummaries('get_chat_summaries');
+    final response = await _readRpc<List<dynamic>>('get_chat_summaries');
     return _mapSummaries(response, presenceTicket);
   }
 
@@ -90,11 +87,142 @@ class ChatsRemoteDataSource {
       throw ArgumentError('Invalid chat summary batch');
     }
     final presenceTicket = _presenceStore?.captureSnapshot();
-    final response = await _fetchSummaries(
+    final response = await _readRpc<List<dynamic>>(
       'get_chat_summaries_by_ids',
       params: {'conversation_ids': ids.toList(growable: false)},
     );
     return _mapSummaries(response, presenceTicket);
+  }
+
+  /// Prepared for the paged repository contract; the active list does not yet
+  /// treat these partial results as its complete authoritative snapshot.
+  Future<ChatListPage> fetchChatListPage({
+    ChatListPageCursor? after,
+    int pageSize = summaryBatchSize,
+    String searchQuery = '',
+  }) async {
+    final query = searchQuery.trim().toLowerCase();
+    if (pageSize < 1 ||
+        pageSize > summaryBatchSize ||
+        query.runes.length > 100 ||
+        after != null &&
+            (after.query != query || after.conversationId.trim().isEmpty)) {
+      throw ArgumentError(
+        'Invalid chat page or cursor from a different search',
+      );
+    }
+    final ticket = _presenceStore?.captureSnapshot();
+    final response = await _readRpc<Map<String, dynamic>>(
+      'get_chat_list_page',
+      params: {
+        'after_activity_at': after?.activityAt.toUtc().toIso8601String(),
+        'after_conversation_id': after?.conversationId,
+        'page_size': pageSize,
+        'search_query': query,
+      },
+    );
+    final rawItems = response['items'];
+    final more = response['has_more'];
+    if (rawItems is! List ||
+        rawItems.length > pageSize ||
+        more is! bool ||
+        response['query'] != query) {
+      throw const FormatException('Invalid chat page response');
+    }
+    final rows = <Map<String, dynamic>>[];
+    final times = <DateTime>[];
+    final ids = <String>{};
+    for (final value in rawItems) {
+      if (value is! Map) throw const FormatException('Invalid chat page item');
+      final row = Map<String, dynamic>.from(value);
+      final id = row['id'];
+      final activity = row['list_activity_at'];
+      final time = activity is String ? DateTime.tryParse(activity) : null;
+      if (id is! String || id.isEmpty || !ids.add(id) || time == null) {
+        throw const FormatException('Invalid chat page identity or activity');
+      }
+      if (rows.isNotEmpty &&
+          _comparePagePosition(
+                times.last,
+                rows.last['id'] as String,
+                time,
+                id,
+              ) <=
+              0) {
+        throw const FormatException('Chat page is not in cursor order');
+      }
+      rows.add(row);
+      times.add(time.toUtc());
+    }
+    ChatListPageCursor? next;
+    final rawCursor = response['next_cursor'];
+    if (more) {
+      if (rawCursor is! Map ||
+          rawCursor['query'] != query ||
+          rawCursor['activity_at'] is! String ||
+          rawCursor['conversation_id'] is! String) {
+        throw const FormatException('Missing chat page cursor');
+      }
+      final time = DateTime.tryParse(rawCursor['activity_at'] as String);
+      final id = rawCursor['conversation_id'] as String;
+      if (time == null ||
+          id.isEmpty ||
+          after != null &&
+              _comparePagePosition(
+                    after.activityAt,
+                    after.conversationId,
+                    time,
+                    id,
+                  ) <=
+                  0 ||
+          rows.isNotEmpty &&
+              _comparePagePosition(
+                    times.last,
+                    rows.last['id'] as String,
+                    time,
+                    id,
+                  ) <
+                  0) {
+        throw const FormatException('Chat page cursor did not advance');
+      }
+      next = ChatListPageCursor(
+        activityAt: time.toUtc(),
+        conversationId: id,
+        query: query,
+      );
+    } else if (rawCursor != null) {
+      throw const FormatException('Unexpected final-page cursor');
+    }
+    if (after != null &&
+        rows.isNotEmpty &&
+        _comparePagePosition(
+              after.activityAt,
+              after.conversationId,
+              times.first,
+              rows.first['id'] as String,
+            ) <=
+            0) {
+      throw const FormatException('Chat page crossed its cursor boundary');
+    }
+    final chats = _mapSummaries(rows, ticket);
+    return ChatListPage(
+      items: [
+        for (var i = 0; i < chats.length; i++)
+          ChatListPageItem(chat: chats[i], activityAt: times[i]),
+      ],
+      query: query,
+      nextCursor: next,
+    );
+  }
+
+  static int _comparePagePosition(
+    DateTime firstAt,
+    String firstId,
+    DateTime secondAt,
+    String secondId,
+  ) {
+    final time = firstAt.compareTo(secondAt);
+    return time == 0 ? firstId.compareTo(secondId) : time;
   }
 
   List<Chat> _mapSummaries(
