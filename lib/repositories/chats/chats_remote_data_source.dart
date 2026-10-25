@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
-import 'package:yap_chat/core/services/app_diagnostics.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
-import 'package:yap_chat/features/chat/data/models/message_reaction.dart';
-import 'package:yap_chat/repositories/presence/presence_status_store.dart';
-import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
+import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/repositories/presence/presence.dart';
+import 'package:yap_chat/repositories/realtime/realtime.dart';
 
 class ConversationChange {
   const ConversationChange({
@@ -21,12 +23,14 @@ class ConversationChange {
 }
 
 class ChatsRemoteDataSource {
+  static const summaryBatchSize = 50;
   ChatsRemoteDataSource({
     required SupabaseClient client,
     required Talker talker,
     UserRealtimeDataSource? userRealtime,
     PresenceStatusStore? presenceStore,
     AppDiagnostics? diagnostics,
+    this.summaryRequestTimeout = const Duration(seconds: 30),
   }) : _client = client,
        _userRealtime =
            userRealtime ??
@@ -38,6 +42,35 @@ class ChatsRemoteDataSource {
   final UserRealtimeDataSource _userRealtime;
   final PresenceStatusStore? _presenceStore;
   final AppDiagnostics? _diagnostics;
+  final Duration summaryRequestTimeout;
+  final _summaryRequests = <Completer<void>>{};
+
+  /// Cancels only reads owned by this source, never accepted bulk writes.
+  void cancelSummaryRequests() {
+    for (final request in _summaryRequests.toList(growable: false)) {
+      if (!request.isCompleted) request.complete();
+    }
+  }
+
+  Future<List<dynamic>> _fetchSummaries(
+    String rpc, {
+    Map<String, dynamic>? params,
+  }) async {
+    final abort = Completer<void>();
+    _summaryRequests.add(abort);
+    try {
+      return await measureRpc(
+        _diagnostics,
+        rpc,
+        () => _client
+            .rpc<List<dynamic>>(rpc, params: params)
+            .retry(enabled: false, requestTimeout: summaryRequestTimeout)
+            .abortSignal(abort.future),
+      );
+    } finally {
+      _summaryRequests.remove(abort);
+    }
+  }
 
   String get currentUserId {
     final id = _client.auth.currentUser?.id;
@@ -47,11 +80,27 @@ class ChatsRemoteDataSource {
 
   Future<List<Chat>> fetchChats() async {
     final presenceTicket = _presenceStore?.captureSnapshot();
-    final response = await measureRpc(
-      _diagnostics,
-      'get_chat_summaries',
-      () => _client.rpc<List<dynamic>>('get_chat_summaries'),
+    final response = await _fetchSummaries('get_chat_summaries');
+    return _mapSummaries(response, presenceTicket);
+  }
+
+  Future<List<Chat>> fetchChatsByIds(Set<String> ids) async {
+    if (ids.isEmpty) return const [];
+    if (ids.length > summaryBatchSize || ids.any((id) => id.trim().isEmpty)) {
+      throw ArgumentError('Invalid chat summary batch');
+    }
+    final presenceTicket = _presenceStore?.captureSnapshot();
+    final response = await _fetchSummaries(
+      'get_chat_summaries_by_ids',
+      params: {'conversation_ids': ids.toList(growable: false)},
     );
+    return _mapSummaries(response, presenceTicket);
+  }
+
+  List<Chat> _mapSummaries(
+    List<dynamic> response,
+    PresenceSnapshotTicket? presenceTicket,
+  ) {
     final rows = response
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList(growable: false);
@@ -111,7 +160,10 @@ class ChatsRemoteDataSource {
     );
   }
 
-  Future<void> pauseChanges() => _userRealtime.pause();
+  Future<void> pauseChanges() {
+    cancelSummaryRequests();
+    return _userRealtime.pause();
+  }
 
   Future<void> resumeChanges() => _userRealtime.resume();
 

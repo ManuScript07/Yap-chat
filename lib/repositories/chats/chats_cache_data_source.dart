@@ -5,6 +5,7 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 
 class ChatsCacheDataSource {
+  static const _idBatchSize = 400;
   static const _deletedAccountDisplayName = 'Удалённый пользователь';
   const ChatsCacheDataSource({
     required AppDatabase database,
@@ -81,23 +82,58 @@ class ChatsCacheDataSource {
     final owner = ownerUserId ?? _userIdProvider();
     final cachedChats = await read(ownerUserId: owner);
     if (_sameChats(cachedChats, chats)) return false;
+    final cachedById = {for (final chat in cachedChats) chat.id: chat};
 
     await _database.transaction(() async {
       final ids = chats.map((chat) => chat.id).toSet();
-      final deleteQuery = _database.delete(_database.cachedChats)
-        ..where(
-          (table) =>
-              table.ownerUserId.equals(owner) &
-              (ids.isEmpty ? const Constant(true) : table.id.isNotIn(ids)),
-        );
-      await deleteQuery.go();
+      await remove(cachedById.keys.toSet().difference(ids), ownerUserId: owner);
       for (final chat in chats) {
+        final previous = cachedById[chat.id];
+        if (previous != null && _sameChat(previous, chat)) continue;
         await _database
             .into(_database.cachedChats)
             .insertOnConflictUpdate(_companion(chat, owner));
       }
     });
     return true;
+  }
+
+  /// An authoritative response for ONLY [requestedIds]. Missing requested rows
+  /// are hidden/inaccessible; rows outside the batch are never removed.
+  Future<void> applySummaryBatch(
+    Set<String> requestedIds,
+    List<Chat> chats, {
+    String? ownerUserId,
+  }) async {
+    final returnedIds = chats.map((chat) => chat.id).toSet();
+    if (returnedIds.length != chats.length ||
+        !requestedIds.containsAll(returnedIds)) {
+      throw ArgumentError(
+        'Summary response contains unrequested or duplicate IDs',
+      );
+    }
+    if (requestedIds.isEmpty) return;
+    final owner = ownerUserId ?? _userIdProvider();
+    await _database.transaction(() async {
+      final current = {
+        for (final chat in await readForAction(
+          requestedIds,
+          ownerUserId: owner,
+        ))
+          chat.id: chat,
+      };
+      final removed = requestedIds.difference(returnedIds);
+      if (removed.isNotEmpty) {
+        await remove(removed, ownerUserId: owner);
+      }
+      for (final chat in chats) {
+        final previous = current[chat.id];
+        if (previous != null && _sameChat(previous, chat)) continue;
+        await _database
+            .into(_database.cachedChats)
+            .insertOnConflictUpdate(_companion(chat, owner));
+      }
+    });
   }
 
   bool _sameChats(List<Chat> cached, List<Chat> incoming) {
@@ -140,10 +176,14 @@ class ChatsCacheDataSource {
   Future<void> remove(Set<String> ids, {String? ownerUserId}) async {
     if (ids.isEmpty) return;
     final owner = ownerUserId ?? _userIdProvider();
-    await (_database.delete(_database.cachedChats)..where(
-          (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
-        ))
-        .go();
+    final orderedIds = ids.toList(growable: false);
+    for (var start = 0; start < orderedIds.length; start += _idBatchSize) {
+      final batch = orderedIds.skip(start).take(_idBatchSize);
+      await (_database.delete(_database.cachedChats)..where(
+            (table) => table.ownerUserId.equals(owner) & table.id.isIn(batch),
+          ))
+          .go();
+    }
   }
 
   Future<List<Chat>> readForAction(
@@ -152,12 +192,19 @@ class ChatsCacheDataSource {
   }) async {
     if (ids.isEmpty) return const [];
     final owner = ownerUserId ?? _userIdProvider();
-    final rows =
-        await (_database.select(_database.cachedChats)..where(
-              (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
-            ))
-            .get();
-    return rows.map(_mapRow).toList(growable: false);
+    final chats = <Chat>[];
+    final orderedIds = ids.toList(growable: false);
+    for (var start = 0; start < orderedIds.length; start += _idBatchSize) {
+      final batch = orderedIds.skip(start).take(_idBatchSize);
+      final rows =
+          await (_database.select(_database.cachedChats)..where(
+                (table) =>
+                    table.ownerUserId.equals(owner) & table.id.isIn(batch),
+              ))
+              .get();
+      chats.addAll(rows.map(_mapRow));
+    }
+    return chats;
   }
 
   Future<void> markAsReadIfUnchanged(

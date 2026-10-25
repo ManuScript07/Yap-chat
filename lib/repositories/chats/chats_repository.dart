@@ -1,12 +1,12 @@
 import 'dart:async';
 
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
-import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
-import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
+import 'package:yap_chat/repositories/chat/chat.dart';
 import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_remote_data_source.dart';
@@ -32,6 +32,7 @@ class ChatsRepository implements IChatsRepository {
 
   static const _reconciliationInterval = Duration(seconds: 20);
   static const _summarySyncDebounce = Duration(milliseconds: 250);
+  static const _summaryMinimumInterval = Duration(seconds: 1);
 
   final AppConfig _config;
   final ChatsCacheDataSource _cache;
@@ -42,11 +43,23 @@ class ChatsRepository implements IChatsRepository {
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
   Future<void>? _activeSync;
+  Future<void>? _activeFullSync;
+  AccountSessionSnapshot? _activeFullScope;
+  Future<void> _summaryQueue = Future<void>.value();
   Future<void>? _activeDeletionRetry;
   Future<void> _changeQueue = Future<void>.value();
   Future<void> _muteQueue = Future<void>.value();
   final _activeReadOperations = <String, Future<void>>{};
-  bool _reconciliationQueued = false;
+  Object? _reconciliationToken;
+  Object? _summaryBatchToken;
+  final _dirtyChatIds = <String>{};
+  final _summaryVersions = <String, int>{};
+  final _summaryClock = Stopwatch()..start();
+  int _summaryEpoch = 0;
+  int _summaryVersion = 0;
+  int _nextSummaryAttemptMicros = 0;
+  int _summaryFailures = 0;
+  bool _targetedSummariesSupported = true;
   bool _isRealtimePaused = false;
   StreamController<List<Chat>>? _watchController;
   StreamSubscription<List<Chat>>? _cacheSubscription;
@@ -139,6 +152,7 @@ class ChatsRepository implements IChatsRepository {
   }
 
   Future<void> _stopWatching() async {
+    _resetSummaryScheduling();
     _reconciliationTimer?.cancel();
     _reconciliationTimer = null;
     _summarySyncTimer?.cancel();
@@ -434,10 +448,10 @@ class ChatsRepository implements IChatsRepository {
   @override
   Future<void> pauseRealtime() {
     _isRealtimePaused = true;
-    _activeSync = null;
     _activeDeletionRetry = null;
-    _summarySyncTimer?.cancel();
-    _summarySyncTimer = null;
+    // The SDK may keep an old HTTP future alive after the transport is lost.
+    // Detach that epoch so recovery never waits for it; its commit is invalid.
+    _resetSummaryScheduling(clearIds: false);
     return _remote.pauseChanges();
   }
 
@@ -448,6 +462,7 @@ class ChatsRepository implements IChatsRepository {
     await _remote.resumeChanges();
     await _retryPendingDeletions(_accountSessionController.capture());
     await _synchronize();
+    _scheduleSummarySync();
   }
 
   Future<void> _restartWatcherForCurrentAccount() async {
@@ -458,6 +473,8 @@ class ChatsRepository implements IChatsRepository {
             activeScope.generation == currentScope.generation) {
       return;
     }
+
+    _resetSummaryScheduling();
 
     await _cacheSubscription?.cancel();
     await _realtimeSubscription?.cancel();
@@ -476,14 +493,33 @@ class ChatsRepository implements IChatsRepository {
   }
 
   Future<void> _initialize(AccountSessionSnapshot scope) async {
-    await _retryPendingDeletions(scope);
-    await _synchronizeSafely(scope);
+    final epoch = _summaryEpoch;
+    try {
+      await _retryPendingDeletions(scope);
+      if (_summaryScopeIsCurrent(scope, epoch)) await _synchronizeSafely(scope);
+    } on StaleAccountSessionException {
+      // Initialization can outlive logout or a foreground transition.
+    }
   }
 
   void _enqueueChange(ConversationChange change, AccountSessionSnapshot scope) {
+    if (!_accountSessionController.isCurrent(scope) || _isRealtimePaused) {
+      return;
+    }
+    // Record at receipt time, before the serialized handler can wait on HTTP.
+    // A response started earlier must not restore a subsequently hidden row.
+    if (change.conversationId != null && change.reason != 'reaction_changed') {
+      _summaryVersions[change.conversationId!] = ++_summaryVersion;
+    }
+    final epoch = _summaryEpoch;
     _changeQueue = _changeQueue
-        .then((_) => _handleChange(change, scope))
+        .then((_) async {
+          if (_summaryScopeIsCurrent(scope, epoch)) {
+            await _handleChange(change, scope, epoch);
+          }
+        })
         .catchError((Object error, StackTrace stackTrace) {
+          if (error is StaleAccountSessionException) return;
           _config.talker.handle(
             error,
             stackTrace,
@@ -493,11 +529,23 @@ class ChatsRepository implements IChatsRepository {
   }
 
   void _enqueueReconciliation() {
-    if (_reconciliationQueued) return;
-    _reconciliationQueued = true;
+    if (_reconciliationToken != null || _isRealtimePaused) return;
+    final scope = _watchScope;
+    if (scope == null || !_accountSessionController.isCurrent(scope)) return;
+    final token = Object();
+    _reconciliationToken = token;
+    final epoch = _summaryEpoch;
     _changeQueue = _changeQueue
-        .then((_) => _synchronizeSafely(_accountSessionController.capture()))
-        .whenComplete(() => _reconciliationQueued = false)
+        .then((_) async {
+          if (_summaryScopeIsCurrent(scope, epoch)) {
+            await _synchronizeSafely(scope);
+          }
+        })
+        .whenComplete(() {
+          if (identical(_reconciliationToken, token)) {
+            _reconciliationToken = null;
+          }
+        })
         .catchError((Object error, StackTrace stackTrace) {
           _config.talker.handle(
             error,
@@ -510,8 +558,10 @@ class ChatsRepository implements IChatsRepository {
   Future<void> _handleChange(
     ConversationChange change,
     AccountSessionSnapshot scope,
+    int epoch,
   ) async {
     _accountSessionController.ensureCurrent(scope);
+    if (_isRealtimePaused) return;
     if (change.reason == 'reaction_changed' &&
         change.conversationId != null &&
         change.messageId != null &&
@@ -525,6 +575,7 @@ class ChatsRepository implements IChatsRepository {
       return;
     }
     await _retryPendingDeletions(scope);
+    if (!_summaryScopeIsCurrent(scope, epoch)) return;
     final conversationId = change.conversationId;
     if (conversationId == null) {
       _scheduleSummarySync(immediately: true);
@@ -533,15 +584,20 @@ class ChatsRepository implements IChatsRepository {
     final pendingIds = (await _chatCache.readPendingChatDeletions(
       ownerUserId: scope.userId,
     )).map((item) => item.chatId).toSet();
+    if (!_summaryScopeIsCurrent(scope, epoch)) return;
     if (change.reason == 'hidden') {
-      await _accountSessionController.commit(
+      _dirtyChatIds.remove(conversationId);
+      await _accountSessionController.commit(scope, () {
+        _ensureSummaryScope(scope, epoch);
+        return _cache.remove({conversationId}, ownerUserId: scope.userId);
+      });
+      await _clearLocalConversations(
+        {conversationId},
         scope,
-        () => _cache.remove({conversationId}, ownerUserId: scope.userId),
+        summaryEpoch: epoch,
       );
-      await _clearLocalConversations({conversationId}, scope);
     } else if (!pendingIds.contains(conversationId)) {
-      // Mute changes only member metadata, never message history. Keep the
-      // existing coalesced summary refresh, even if this chat is open elsewhere.
+      // Mute changes only member metadata, never message history.
       if (change.reason != 'muted' &&
           _conversationSync.isConversationOpen(conversationId)) {
         try {
@@ -554,6 +610,8 @@ class ChatsRepository implements IChatsRepository {
           );
         }
       }
+      if (!_summaryScopeIsCurrent(scope, epoch)) return;
+      _dirtyChatIds.add(conversationId);
       _scheduleSummarySync();
     }
   }
@@ -566,21 +624,112 @@ class ChatsRepository implements IChatsRepository {
       _enqueueReconciliation();
       return;
     }
-    if (_summarySyncTimer != null) return;
-    _summarySyncTimer = Timer(_summarySyncDebounce, () {
+    if (_dirtyChatIds.isEmpty ||
+        _summarySyncTimer != null ||
+        _summaryBatchToken != null) {
+      return;
+    }
+    final remaining =
+        _nextSummaryAttemptMicros - _summaryClock.elapsedMicroseconds;
+    final delay = Duration(
+      microseconds: remaining > _summarySyncDebounce.inMicroseconds
+          ? remaining
+          : _summarySyncDebounce.inMicroseconds,
+    );
+    final scope = _watchScope;
+    if (scope == null || !_accountSessionController.isCurrent(scope)) return;
+    final epoch = _summaryEpoch;
+    _summarySyncTimer = Timer(delay, () {
       _summarySyncTimer = null;
-      _enqueueReconciliation();
+      if (!_summaryScopeIsCurrent(scope, epoch)) return;
+      final token = Object();
+      _summaryBatchToken = token;
+      _changeQueue = _changeQueue
+          .then((_) async {
+            if (!_summaryScopeIsCurrent(scope, epoch) ||
+                _dirtyChatIds.isEmpty) {
+              return;
+            }
+            final ids = _dirtyChatIds
+                .take(ChatsRemoteDataSource.summaryBatchSize)
+                .toSet();
+            _dirtyChatIds.removeAll(ids);
+            _nextSummaryAttemptMicros =
+                _summaryClock.elapsedMicroseconds +
+                _summaryMinimumInterval.inMicroseconds;
+            try {
+              await _enqueueSummaryOperation(
+                () => _performSummaryBatch(ids, scope, epoch),
+              );
+              if (_summaryScopeIsCurrent(scope, epoch)) _summaryFailures = 0;
+            } catch (error, stackTrace) {
+              if (_summaryScopeIsCurrent(scope, epoch)) {
+                _dirtyChatIds.addAll(ids);
+                _summaryFailures = (_summaryFailures + 1).clamp(1, 5);
+                final quotaLimited =
+                    error is PostgrestException &&
+                    (error.code == 'PT429' || error.code == '42901');
+                final seconds = quotaLimited ? 60 : (1 << _summaryFailures);
+                _nextSummaryAttemptMicros =
+                    _summaryClock.elapsedMicroseconds +
+                    Duration(seconds: seconds).inMicroseconds;
+                _config.talker.handle(
+                  error,
+                  stackTrace,
+                  'Chat summary batch failed; retry deferred',
+                );
+              }
+            }
+          })
+          .whenComplete(() {
+            if (identical(_summaryBatchToken, token)) {
+              _summaryBatchToken = null;
+              _scheduleSummarySync();
+            }
+          })
+          .catchError((Object error, StackTrace stackTrace) {
+            _config.talker.handle(
+              error,
+              stackTrace,
+              'Chat summary scheduling failed',
+            );
+          });
     });
   }
 
+  void _resetSummaryScheduling({bool clearIds = true}) {
+    _remote.cancelSummaryRequests();
+    _summaryEpoch++;
+    _activeFullSync = null;
+    _activeSync = null;
+    _summaryQueue = Future<void>.value();
+    _changeQueue = Future<void>.value();
+    _reconciliationToken = null;
+    _summaryBatchToken = null;
+    _summarySyncTimer?.cancel();
+    _summarySyncTimer = null;
+    if (clearIds) {
+      _dirtyChatIds.clear();
+      _summaryVersions.clear();
+      _summaryFailures = 0;
+      _nextSummaryAttemptMicros = 0;
+    }
+  }
+
+  bool _summaryScopeIsCurrent(AccountSessionSnapshot scope, int epoch) =>
+      _summaryEpoch == epoch &&
+      !_isRealtimePaused &&
+      _accountSessionController.isCurrent(scope);
+
   Future<void> _clearLocalConversations(
     Set<String> ids,
-    AccountSessionSnapshot scope,
-  ) async {
-    final files = await _accountSessionController.commit(
-      scope,
-      () => _chatCache.clearConversations(ids, ownerUserId: scope.userId),
-    );
+    AccountSessionSnapshot scope, {
+    int? summaryEpoch,
+  }) async {
+    final files = await _accountSessionController.commit(scope, () {
+      if (summaryEpoch != null) _ensureSummaryScope(scope, summaryEpoch);
+      return _chatCache.clearConversations(ids, ownerUserId: scope.userId);
+    });
     try {
       await Future.wait([
         _mediaCache.removeStorageFiles(
@@ -652,28 +801,60 @@ class ChatsRepository implements IChatsRepository {
   }
 
   Future<void> _synchronize() async {
-    final activeSync = _activeSync;
-    if (activeSync != null) {
+    final activeSync = _activeFullSync;
+    final activeScope = _activeFullScope;
+    if (activeSync != null &&
+        activeScope != null &&
+        _accountSessionController.isCurrent(activeScope)) {
       await activeSync;
       return;
     }
-    final sync =
-        _config.diagnostics?.measureSync('chats', _performSync) ??
-        _performSync();
-    _activeSync = sync;
+    final scope = _accountSessionController.capture();
+    final epoch = _summaryEpoch;
+    final sync = _enqueueSummaryOperation(
+      () =>
+          _config.diagnostics?.measureSync(
+            'chats',
+            () => _performSync(scope, epoch),
+          ) ??
+          _performSync(scope, epoch),
+    );
+    _activeFullSync = sync;
+    _activeFullScope = scope;
     await sync.whenComplete(() {
-      if (identical(_activeSync, sync)) _activeSync = null;
+      if (identical(_activeFullSync, sync)) _activeFullSync = null;
     });
   }
 
-  Future<void> _performSync() async {
-    final scope = _accountSessionController.capture();
+  Future<void> _enqueueSummaryOperation(Future<void> Function() operation) {
+    final next = _summaryQueue.then((_) => operation());
+    _activeSync = next;
+    _summaryQueue = next.then<void>(
+      (_) {
+        if (identical(_activeSync, next)) _activeSync = null;
+      },
+      onError: (Object _, StackTrace _) {
+        if (identical(_activeSync, next)) _activeSync = null;
+      },
+    );
+    return next;
+  }
+
+  void _ensureSummaryScope(AccountSessionSnapshot scope, int epoch) {
+    if (!_summaryScopeIsCurrent(scope, epoch)) {
+      throw const StaleAccountSessionException();
+    }
+  }
+
+  Future<void> _performSync(AccountSessionSnapshot scope, int epoch) async {
+    _ensureSummaryScope(scope, epoch);
+    final version = _summaryVersion;
     // The first request after an OAuth return may need to establish a fresh
     // mobile connection and can legitimately take longer than a UI deadline.
     // This shared startup synchronization must eventually populate the cache;
     // navigation is independently protected by direct drafts.
     final chats = await _remote.fetchChats();
-    _accountSessionController.ensureCurrent(scope);
+    _ensureSummaryScope(scope, epoch);
     final pendingChatIds = (await _chatCache.readPendingChatDeletions(
       ownerUserId: scope.userId,
     )).map((item) => item.chatId).toSet();
@@ -683,11 +864,91 @@ class ChatsRepository implements IChatsRepository {
     final reconciled = await Future.wait(
       visibleChats.map((chat) => _mergeLocalPreview(chat, scope)),
     );
-    await _accountSessionController.commit(
-      scope,
-      () => _cache.replaceAll(reconciled, ownerUserId: scope.userId),
-    );
+    await _accountSessionController.commit(scope, () async {
+      _ensureSummaryScope(scope, epoch);
+      final newerIds = _summaryVersions.entries
+          .where((entry) => entry.value > version)
+          .map((entry) => entry.key)
+          .toSet();
+      final preserved = await _cache.readForAction(
+        newerIds,
+        ownerUserId: scope.userId,
+      );
+      _ensureSummaryScope(scope, epoch);
+      await _cache.replaceAll([
+        ...reconciled.where((chat) => !newerIds.contains(chat.id)),
+        ...preserved,
+      ], ownerUserId: scope.userId);
+      // Only returned, current rows are satisfied by a whole-list snapshot.
+      // A row absent due to the legacy API cap still needs its targeted query.
+      _dirtyChatIds.removeAll(
+        reconciled
+            .where((chat) => !newerIds.contains(chat.id))
+            .map((chat) => chat.id),
+      );
+      if (_dirtyChatIds.isEmpty) {
+        _summarySyncTimer?.cancel();
+        _summarySyncTimer = null;
+      }
+    });
     _config.diagnostics?.recordSyncItems('chats', reconciled.length);
+  }
+
+  Future<void> _performSummaryBatch(
+    Set<String> ids,
+    AccountSessionSnapshot scope,
+    int epoch,
+  ) async {
+    _ensureSummaryScope(scope, epoch);
+    if (!_targetedSummariesSupported) {
+      await _performSync(scope, epoch);
+      return;
+    }
+    final version = _summaryVersion;
+    late final List<Chat> chats;
+    try {
+      chats = await _remote.fetchChatsByIds(ids);
+    } on PostgrestException catch (error) {
+      // Safe rollout: an app updated before its migration retains legacy sync.
+      // Other errors must retain/retry dirty IDs, never masquerade as emptiness.
+      if (error.code != 'PGRST202') rethrow;
+      _targetedSummariesSupported = false;
+      _ensureSummaryScope(scope, epoch);
+      await _performSync(scope, epoch);
+      return;
+    }
+    _ensureSummaryScope(scope, epoch);
+    if (chats.any((chat) => !ids.contains(chat.id)) ||
+        chats.map((chat) => chat.id).toSet().length != chats.length) {
+      throw StateError('Invalid targeted chat summary response');
+    }
+    final pending = (await _chatCache.readPendingChatDeletions(
+      ownerUserId: scope.userId,
+    )).map((item) => item.chatId).toSet();
+    final reconciled = await Future.wait(
+      chats
+          .where((chat) => !pending.contains(chat.id))
+          .map((chat) => _mergeLocalPreview(chat, scope)),
+    );
+    await _accountSessionController.commit(scope, () async {
+      _ensureSummaryScope(scope, epoch);
+      final newer = ids
+          .where((id) => (_summaryVersions[id] ?? 0) > version)
+          .toSet();
+      _dirtyChatIds.addAll(newer);
+      final currentIds = ids.difference(newer).difference(pending);
+      await _cache.applySummaryBatch(
+        currentIds,
+        reconciled
+            .where((chat) => currentIds.contains(chat.id))
+            .toList(growable: false),
+        ownerUserId: scope.userId,
+      );
+    });
+    _config.diagnostics?.recordSyncItems(
+      'chat_summary_batch',
+      reconciled.length,
+    );
   }
 
   Future<void> _synchronizeConversation(String chatId) async {
@@ -761,9 +1022,14 @@ class ChatsRepository implements IChatsRepository {
   }
 
   Future<void> _synchronizeSafely(AccountSessionSnapshot scope) async {
+    final epoch = _summaryEpoch;
     try {
       await _synchronize();
     } catch (error, stackTrace) {
+      if (error is StaleAccountSessionException ||
+          !_summaryScopeIsCurrent(scope, epoch)) {
+        return;
+      }
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
       final controller = _watchController;
       if (_accountSessionController.isCurrent(scope) &&
