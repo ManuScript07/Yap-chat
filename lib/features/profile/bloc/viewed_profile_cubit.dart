@@ -367,7 +367,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     if (chat.isDraft) {
       chat = await _chatsRepository.ensureDirectChat(_userId);
     }
-    await _chatsRepository.toggleMute({chat.id});
+    await _chatsRepository.setMuted({chat.id}, isMuted: !chat.isMuted);
     emit(state.copyWith(chat: chat.copyWith(isMuted: !chat.isMuted)));
   });
 

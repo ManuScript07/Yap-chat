@@ -37,8 +37,8 @@ abstract interface class IChatsRepository {
   /// Сбрасывает счетчик непрочитанных сообщений у выбранных чатов.
   Future<void> markAsRead(Set<String> ids);
 
-  /// Переключает mute-состояние у выбранных чатов.
-  Future<void> toggleMute(Set<String> ids);
+  /// Sets one explicit mute state. Already matching cached rows need no write.
+  Future<void> setMuted(Set<String> ids, {required bool isMuted});
 
   /// Останавливает Realtime-канал, сохраняя локальную подписку на кеш.
   Future<void> pauseRealtime();

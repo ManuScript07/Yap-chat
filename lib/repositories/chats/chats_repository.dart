@@ -44,6 +44,7 @@ class ChatsRepository implements IChatsRepository {
   Future<void>? _activeSync;
   Future<void>? _activeDeletionRetry;
   Future<void> _changeQueue = Future<void>.value();
+  Future<void> _muteQueue = Future<void>.value();
   bool _reconciliationQueued = false;
   bool _isRealtimePaused = false;
   StreamController<List<Chat>>? _watchController;
@@ -351,13 +352,59 @@ class ChatsRepository implements IChatsRepository {
   }
 
   @override
-  Future<void> toggleMute(Set<String> ids) async {
-    if (ids.isEmpty) return;
+  Future<void> setMuted(Set<String> ids, {required bool isMuted}) {
+    if (ids.isEmpty) return Future<void>.value();
     final scope = _accountSessionController.capture();
-    await _remote.toggleMute(ids);
+    final selectedIds = Set<String>.unmodifiable(ids);
+    final operation = _muteQueue.then(
+      (_) => _setMuted(selectedIds, isMuted, scope),
+    );
+    // Serialize writes from the list and profile. A repeated identical command
+    // sees the committed cache and becomes a no-op; a failed write cannot poison
+    // the queue. Each operation retains its original account generation.
+    _muteQueue = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<void> _setMuted(
+    Set<String> ids,
+    bool isMuted,
+    AccountSessionSnapshot scope,
+  ) async {
+    _accountSessionController.ensureCurrent(scope);
+    final matching = await _cache.readIdsWithMuteState(
+      ids,
+      isMuted: isMuted,
+      ownerUserId: scope.userId,
+    );
+    _accountSessionController.ensureCurrent(scope);
+    final changedIds = ids.difference(matching);
+    if (changedIds.isEmpty) return;
+    if (changedIds.length > 50) {
+      throw ArgumentError.value(
+        changedIds.length,
+        'ids',
+        'Maximum batch is 50',
+      );
+    }
+    await _remote.setMuted(changedIds, isMuted: isMuted);
+    try {
+      // Do not let an already-running pre-write snapshot overwrite this commit.
+      // No additional fetch: only wait for existing synchronization to finish.
+      await _waitForSynchronizationIdle();
+    } catch (_) {
+      // An unrelated failed read does not undo a successfully accepted write.
+    }
     await _accountSessionController.commit(
       scope,
-      () => _cache.toggleMute(ids, ownerUserId: scope.userId),
+      () => _cache.setMuted(
+        changedIds,
+        isMuted: isMuted,
+        ownerUserId: scope.userId,
+      ),
     );
   }
 
@@ -470,7 +517,10 @@ class ChatsRepository implements IChatsRepository {
       );
       await _clearLocalConversations({conversationId}, scope);
     } else if (!pendingIds.contains(conversationId)) {
-      if (_conversationSync.isConversationOpen(conversationId)) {
+      // Mute changes only member metadata, never message history. Keep the
+      // existing coalesced summary refresh, even if this chat is open elsewhere.
+      if (change.reason != 'muted' &&
+          _conversationSync.isConversationOpen(conversationId)) {
         try {
           await _synchronizeConversation(conversationId);
         } catch (error, stackTrace) {

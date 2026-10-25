@@ -155,23 +155,38 @@ class ChatsCacheDataSource {
         .write(const CachedChatsCompanion(unreadCount: Value(0)));
   }
 
-  Future<void> toggleMute(Set<String> ids, {String? ownerUserId}) async {
+  Future<Set<String>> readIdsWithMuteState(
+    Set<String> ids, {
+    required bool isMuted,
+    String? ownerUserId,
+  }) async {
+    if (ids.isEmpty) return const {};
+    final owner = ownerUserId ?? _userIdProvider();
+    final table = _database.cachedChats;
+    final query = _database.selectOnly(table)
+      ..addColumns([table.id])
+      ..where(
+        table.ownerUserId.equals(owner) &
+            table.id.isIn(ids) &
+            table.isMuted.equals(isMuted),
+      );
+    return (await query.get()).map((row) => row.read(table.id)!).toSet();
+  }
+
+  Future<void> setMuted(
+    Set<String> ids, {
+    required bool isMuted,
+    String? ownerUserId,
+  }) async {
     if (ids.isEmpty) return;
     final owner = ownerUserId ?? _userIdProvider();
-    final rows =
-        await (_database.select(_database.cachedChats)..where(
-              (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
-            ))
-            .get();
-    await _database.transaction(() async {
-      for (final row in rows) {
-        await (_database.update(_database.cachedChats)..where(
-              (table) =>
-                  table.ownerUserId.equals(owner) & table.id.equals(row.id),
-            ))
-            .write(CachedChatsCompanion(isMuted: Value(!row.isMuted)));
-      }
-    });
+    await (_database.update(_database.cachedChats)..where(
+          (table) =>
+              table.ownerUserId.equals(owner) &
+              table.id.isIn(ids) &
+              table.isMuted.equals(!isMuted),
+        ))
+        .write(CachedChatsCompanion(isMuted: Value(isMuted)));
   }
 
   Future<void> updateLastMessage(

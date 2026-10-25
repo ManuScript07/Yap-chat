@@ -134,16 +134,25 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     ChatsMuteToggled event,
     Emitter<ChatsState> emit,
   ) async {
+    if (state.isBulkActionInProgress) return;
     final selectedIds = Set<String>.of(state.selectedChatIds);
+    final isMuted = !state.hasMutedSelection;
+    final changedIds = state.chats
+        .where(
+          (chat) => selectedIds.contains(chat.id) && chat.isMuted != isMuted,
+        )
+        .map((chat) => chat.id)
+        .toSet();
     await _performBulkAction(
       selectedIds,
       ChatsBulkAction.toggleMute,
-      () => _chatsRepository.toggleMute(selectedIds),
+      () => _chatsRepository.setMuted(changedIds, isMuted: isMuted),
       (chats) => _updateSelectedChats(
-        selectedIds,
-        (chat) => chat.copyWith(isMuted: !chat.isMuted),
+        changedIds,
+        (chat) => chat.copyWith(isMuted: isMuted),
       ),
       emit,
+      muteValue: isMuted,
     );
   }
 
@@ -152,8 +161,9 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     ChatsBulkAction action,
     Future<void> Function() operation,
     List<Chat> Function(List<Chat>) updateChats,
-    Emitter<ChatsState> emit,
-  ) async {
+    Emitter<ChatsState> emit, {
+    bool? muteValue,
+  }) async {
     if (selectedIds.isEmpty || state.isBulkActionInProgress) return;
     emit(state.copyWith(isBulkActionInProgress: true, clearFeedback: true));
     try {
@@ -167,6 +177,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
           isBulkActionInProgress: false,
           feedback: ChatsBulkActionFeedback.success,
           feedbackAction: action,
+          feedbackIsMuted: muteValue,
           feedbackId: state.feedbackId + 1,
         ),
       );
@@ -176,6 +187,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
           isBulkActionInProgress: false,
           feedback: ChatsBulkActionFeedback.failure,
           feedbackAction: action,
+          feedbackIsMuted: muteValue,
           feedbackId: state.feedbackId + 1,
         ),
       );

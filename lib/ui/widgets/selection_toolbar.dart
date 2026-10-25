@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/ui/widgets/glass_button.dart';
+import 'glass_button.dart';
 
 class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
   const SelectionToolbar({
     super.key,
     required this.selectedCount,
     required this.onClose,
-    required this.isMuted,
+    required this.enableNotifications,
     this.onToggleNotifications,
     this.onMarkAsRead,
     this.onDelete,
@@ -16,7 +16,9 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
 
   final int selectedCount;
   final VoidCallback onClose;
-  final bool isMuted;
+
+  /// The action, not the current state of an arbitrary selected chat.
+  final bool enableNotifications;
   final VoidCallback? onToggleNotifications;
   final VoidCallback? onMarkAsRead;
   final VoidCallback? onDelete;
@@ -72,9 +74,9 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
                     )
                   else
                     GlassButton(
-                      icon: isMuted
-                          ? Icons.notifications_off_rounded
-                          : Icons.notifications_active_rounded,
+                      icon: enableNotifications
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_off_rounded,
                       onPressed: onToggleNotifications,
                     ),
                   const SizedBox(width: 12),

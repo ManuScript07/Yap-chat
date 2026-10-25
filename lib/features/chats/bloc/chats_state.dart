@@ -18,6 +18,7 @@ class ChatsState extends Equatable {
     this.isBulkActionInProgress = false,
     this.feedback,
     this.feedbackAction,
+    this.feedbackIsMuted,
     this.feedbackId = 0,
   });
 
@@ -29,9 +30,12 @@ class ChatsState extends Equatable {
   final bool isBulkActionInProgress;
   final ChatsBulkActionFeedback? feedback;
   final ChatsBulkAction? feedbackAction;
+  final bool? feedbackIsMuted;
   final int feedbackId;
 
   bool get isSelectionMode => selectedChatIds.isNotEmpty;
+  bool get hasMutedSelection =>
+      chats.any((chat) => selectedChatIds.contains(chat.id) && chat.isMuted);
 
   ChatsState copyWith({
     ChatsStatus? status,
@@ -42,6 +46,7 @@ class ChatsState extends Equatable {
     bool? isBulkActionInProgress,
     ChatsBulkActionFeedback? feedback,
     ChatsBulkAction? feedbackAction,
+    bool? feedbackIsMuted,
     bool clearFeedback = false,
     int? feedbackId,
   }) {
@@ -57,6 +62,9 @@ class ChatsState extends Equatable {
       feedbackAction: clearFeedback
           ? null
           : feedbackAction ?? this.feedbackAction,
+      feedbackIsMuted: clearFeedback
+          ? null
+          : feedbackIsMuted ?? this.feedbackIsMuted,
       feedbackId: feedbackId ?? this.feedbackId,
     );
   }
@@ -71,6 +79,7 @@ class ChatsState extends Equatable {
     isBulkActionInProgress,
     feedback,
     feedbackAction,
+    feedbackIsMuted,
     feedbackId,
   ];
 }

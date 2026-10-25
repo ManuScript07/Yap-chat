@@ -137,12 +137,15 @@ class ChatsRemoteDataSource {
     ),
   );
 
-  Future<void> toggleMute(Set<String> ids) => measureRpc(
+  Future<void> setMuted(Set<String> ids, {required bool isMuted}) => measureRpc(
     _diagnostics,
-    'toggle_conversations_mute',
+    'set_conversations_muted',
     () => _client.rpc<void>(
-      'toggle_conversations_mute',
-      params: {'conversation_ids': ids.toList(growable: false)},
+      'set_conversations_muted',
+      params: {
+        'conversation_ids': ids.toList(growable: false),
+        'muted': isMuted,
+      },
     ),
   );
 

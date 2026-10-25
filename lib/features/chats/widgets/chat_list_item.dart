@@ -43,6 +43,10 @@ class ChatListItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
+      splashFactory: NoSplash.splashFactory,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       child: Container(
         color: isSelected ? selectionColor : Colors.transparent,
         child: Padding(
@@ -77,9 +81,24 @@ class ChatListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              Expanded(child: _buildChatInfo(context)),
-              const SizedBox(width: 16),
-              _buildMetadata(context),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    children: [
+                      Expanded(child: _buildChatInfo(context)),
+                      const SizedBox(width: 16),
+                      // Large localized dates must leave space for the name
+                      // and its fixed-width mute indicator.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth * .55,
+                        ),
+                        child: _buildMetadata(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -104,11 +123,27 @@ class ChatListItem extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          chat.userName,
-          style: AppTextStyles.chatName.copyWith(color: primaryTextColor),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                chat.userName,
+                style: AppTextStyles.chatName.copyWith(color: primaryTextColor),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (chat.isMuted) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.notifications_off_rounded,
+                size: 16,
+                color: secondaryTextColor,
+                semanticLabel: context.l10n.chatsNotificationsDisabled,
+              ),
+            ],
+          ],
         ),
         if (!chat.peerIsGloballyBanned && !chat.peerIsDeleted)
           AnimatedStatusSwitcher(
@@ -142,6 +177,8 @@ class ChatListItem extends StatelessWidget {
         Text(
           TimeFormatter.format(context, chat.lastMessageTime),
           style: AppTextStyles.metadata.copyWith(color: secondaryTextColor),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
         AnimatedUnreadBadge(

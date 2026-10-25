@@ -175,9 +175,9 @@ class MockChatsRepository implements IChatsRepository {
   }
 
   @override
-  Future<void> toggleMute(Set<String> ids) async {
+  Future<void> setMuted(Set<String> ids, {required bool isMuted}) async {
     await Future<void>.delayed(_networkDelay);
-    _replaceSelected(ids, (chat) => chat.copyWith(isMuted: !chat.isMuted));
+    _replaceSelected(ids, (chat) => chat.copyWith(isMuted: isMuted));
   }
 
   @override

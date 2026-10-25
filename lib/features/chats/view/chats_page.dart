@@ -17,21 +17,11 @@ class ChatsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ChatsBloc, ChatsState>(
-      buildWhen: (previous, current) {
-        final prevMuted = previous.chats
-            .where((c) => previous.selectedChatIds.contains(c.id))
-            .firstOrNull
-            ?.isMuted;
-        final currMuted = current.chats
-            .where((c) => current.selectedChatIds.contains(c.id))
-            .firstOrNull
-            ?.isMuted;
-
-        return previous.isSelectionMode != current.isSelectionMode ||
-            previous.selectedChatIds.length != current.selectedChatIds.length ||
-            prevMuted != currMuted ||
-            previous.isBulkActionInProgress != current.isBulkActionInProgress;
-      },
+      buildWhen: (previous, current) =>
+          previous.isSelectionMode != current.isSelectionMode ||
+          previous.selectedChatIds.length != current.selectedChatIds.length ||
+          previous.hasMutedSelection != current.hasMutedSelection ||
+          previous.isBulkActionInProgress != current.isBulkActionInProgress,
       builder: (context, state) {
         final mediaQuery = MediaQuery.of(context);
         final isLandscapeKeyboard =
@@ -50,10 +40,6 @@ class ChatsPage extends StatelessWidget {
             !state.isSelectionMode &&
             isLandscapeKeyboard &&
             searchBarTop < appBarHeight;
-        final selectedChats = state.chats.where(
-          (chat) => state.selectedChatIds.contains(chat.id),
-        );
-        final firstSelectedMuted = selectedChats.firstOrNull?.isMuted ?? false;
 
         return ScaffoldMessenger(
           child: Builder(
@@ -69,9 +55,9 @@ class ChatsPage extends StatelessWidget {
                 final message = isSuccess
                     ? switch (action) {
                         ChatsBulkAction.toggleMute =>
-                          firstSelectedMuted
-                              ? context.l10n.chatsNotificationsEnabled
-                              : context.l10n.chatsNotificationsDisabled,
+                          actionState.feedbackIsMuted == true
+                              ? context.l10n.chatsNotificationsDisabled
+                              : context.l10n.chatsNotificationsEnabled,
                         ChatsBulkAction.delete =>
                           context.l10n.chatsActionCompleted,
                         ChatsBulkAction.markRead =>
@@ -119,7 +105,7 @@ class ChatsPage extends StatelessWidget {
                                   onClose: () => context.read<ChatsBloc>().add(
                                     const ChatSelectionCleared(),
                                   ),
-                                  isMuted: firstSelectedMuted,
+                                  enableNotifications: state.hasMutedSelection,
                                   isLoading: state.isBulkActionInProgress,
                                   onToggleNotifications: () {
                                     context.read<ChatsBloc>().add(
