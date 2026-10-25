@@ -85,6 +85,17 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     if (state.isBulkActionInProgress) return;
     final selectedChatIds = Set<String>.of(state.selectedChatIds);
 
+    if (!selectedChatIds.contains(event.id) &&
+        selectedChatIds.length >= ChatBulkSelection.maximum) {
+      emit(
+        state.copyWith(
+          feedback: ChatsBulkActionFeedback.selectionLimit,
+          feedbackId: state.feedbackId + 1,
+        ),
+      );
+      return;
+    }
+
     if (!selectedChatIds.add(event.id)) {
       selectedChatIds.remove(event.id);
     }
@@ -122,10 +133,9 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
       selectedIds,
       ChatsBulkAction.markRead,
       () => _chatsRepository.markAsRead(selectedIds),
-      (chats) => _updateSelectedChats(
-        selectedIds,
-        (chat) => chat.copyWith(unreadCount: 0),
-      ),
+      // The repository updates the authoritative cache conditionally. Never
+      // overwrite a newer Realtime snapshot with an unconditional zero here.
+      (chats) => chats,
       emit,
     );
   }

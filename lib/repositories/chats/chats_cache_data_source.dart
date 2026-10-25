@@ -146,11 +146,43 @@ class ChatsCacheDataSource {
         .go();
   }
 
-  Future<void> markAsRead(Set<String> ids, {String? ownerUserId}) async {
-    if (ids.isEmpty) return;
+  Future<List<Chat>> readForAction(
+    Set<String> ids, {
+    String? ownerUserId,
+  }) async {
+    if (ids.isEmpty) return const [];
+    final owner = ownerUserId ?? _userIdProvider();
+    final rows =
+        await (_database.select(_database.cachedChats)..where(
+              (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
+            ))
+            .get();
+    return rows.map(_mapRow).toList(growable: false);
+  }
+
+  Future<void> markAsReadIfUnchanged(
+    List<Chat> snapshot, {
+    String? ownerUserId,
+  }) async {
+    final expected = snapshot.where((chat) => chat.unreadCount > 0).toList();
+    if (expected.isEmpty) return;
     final owner = ownerUserId ?? _userIdProvider();
     await (_database.update(_database.cachedChats)..where(
-          (table) => table.ownerUserId.equals(owner) & table.id.isIn(ids),
+          (table) =>
+              table.ownerUserId.equals(owner) &
+              table.id.isIn(expected.map((chat) => chat.id)) &
+              expected
+                  .map(
+                    (chat) =>
+                        table.id.equals(chat.id) &
+                        table.unreadCount.equals(chat.unreadCount) &
+                        table.lastMessageTime.equals(chat.lastMessageTime) &
+                        table.lastMessage.equals(chat.lastMessage) &
+                        (chat.lastMessageId == null
+                            ? table.lastMessageId.isNull()
+                            : table.lastMessageId.equals(chat.lastMessageId!)),
+                  )
+                  .reduce((left, right) => left | right),
         ))
         .write(const CachedChatsCompanion(unreadCount: Value(0)));
   }

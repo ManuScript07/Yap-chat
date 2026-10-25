@@ -5,7 +5,7 @@ enum ChatsStatus { initial, loading, success, failure }
 
 enum ChatsBulkAction { delete, markRead, toggleMute }
 
-enum ChatsBulkActionFeedback { success, failure }
+enum ChatsBulkActionFeedback { success, failure, selectionLimit }
 
 /// Единый read-only снимок состояния страницы чатов.
 class ChatsState extends Equatable {

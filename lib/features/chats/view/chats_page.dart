@@ -49,10 +49,17 @@ class ChatsPage extends StatelessWidget {
                   current.feedback != null,
               listener: (context, actionState) {
                 final action = actionState.feedbackAction;
-                if (action == null) return;
+                final selectionLimit =
+                    actionState.feedback ==
+                    ChatsBulkActionFeedback.selectionLimit;
+                if (action == null && !selectionLimit) return;
                 final isSuccess =
                     actionState.feedback == ChatsBulkActionFeedback.success;
-                final message = isSuccess
+                final message = selectionLimit
+                    ? context.l10n.chatsSelectionLimit(
+                        ChatBulkSelection.maximum,
+                      )
+                    : isSuccess
                     ? switch (action) {
                         ChatsBulkAction.toggleMute =>
                           actionState.feedbackIsMuted == true
@@ -62,6 +69,7 @@ class ChatsPage extends StatelessWidget {
                           context.l10n.chatsActionCompleted,
                         ChatsBulkAction.markRead =>
                           context.l10n.chatsActionCompleted,
+                        null => context.l10n.chatsActionFailed,
                       }
                     : context.l10n.chatsActionFailed;
                 showAppSnackBar(

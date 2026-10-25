@@ -270,6 +270,8 @@
   "chatsNotificationsEnabled": "Notifications enabled",
   "chatsNotificationsDisabled": "Notifications disabled",
   "chatsActionCompleted": "Action completed",
+  "chatsSelectionLimit": "You can select up to {limit} chats",
+  "@chatsSelectionLimit": {"placeholders": {"limit": {"type": "int"}}},
   "chatsActionFailed": "Could not complete the action. Check your internet connection",
   "newChatTitle": "write",
   "newChatFindUser": "find a user",

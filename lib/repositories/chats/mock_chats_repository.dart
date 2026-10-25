@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 
@@ -83,8 +85,12 @@ class MockChatsRepository implements IChatsRepository {
 
   @override
   Stream<List<Chat>> watchChats() async* {
+    final changes = _changes ??= StreamController<List<Chat>>.broadcast();
     yield await getChats();
+    yield* changes.stream;
   }
+
+  StreamController<List<Chat>>? _changes;
 
   @override
   Stream<Chat?> watchChat(String chatId) async* {
@@ -164,18 +170,22 @@ class MockChatsRepository implements IChatsRepository {
 
   @override
   Future<void> deleteChats(Set<String> ids) async {
+    ChatBulkSelection.validate(ids);
     await Future<void>.delayed(_networkDelay);
     _chats.removeWhere((chat) => ids.contains(chat.id));
+    _changes?.add(List.unmodifiable(_chats));
   }
 
   @override
   Future<void> markAsRead(Set<String> ids) async {
+    ChatBulkSelection.validate(ids);
     await Future<void>.delayed(_networkDelay);
     _replaceSelected(ids, (chat) => chat.copyWith(unreadCount: 0));
   }
 
   @override
   Future<void> setMuted(Set<String> ids, {required bool isMuted}) async {
+    ChatBulkSelection.validate(ids);
     await Future<void>.delayed(_networkDelay);
     _replaceSelected(ids, (chat) => chat.copyWith(isMuted: isMuted));
   }
@@ -193,5 +203,6 @@ class MockChatsRepository implements IChatsRepository {
         _chats[index] = update(chat);
       }
     }
+    _changes?.add(List.unmodifiable(_chats));
   }
 }

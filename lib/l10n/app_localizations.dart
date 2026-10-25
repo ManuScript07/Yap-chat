@@ -1358,6 +1358,12 @@ abstract class AppLocalizations {
   /// **'Действие выполнено'**
   String get chatsActionCompleted;
 
+  /// No description provided for @chatsSelectionLimit.
+  ///
+  /// In ru, this message translates to:
+  /// **'Можно выбрать не больше {limit} чатов'**
+  String chatsSelectionLimit(int limit);
+
   /// No description provided for @chatsActionFailed.
   ///
   /// In ru, this message translates to:

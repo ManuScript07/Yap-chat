@@ -733,6 +733,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsActionCompleted => 'Action completed';
 
   @override
+  String chatsSelectionLimit(int limit) {
+    return 'You can select up to $limit chats';
+  }
+
+  @override
   String get chatsActionFailed =>
       'Could not complete the action. Check your internet connection';
 

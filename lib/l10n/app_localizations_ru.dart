@@ -739,6 +739,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatsActionCompleted => 'Действие выполнено';
 
   @override
+  String chatsSelectionLimit(int limit) {
+    return 'Можно выбрать не больше $limit чатов';
+  }
+
+  @override
   String get chatsActionFailed =>
       'Не удалось выполнить действие. Проверьте подключение к интернету';
 

@@ -45,6 +45,7 @@ class ChatsRepository implements IChatsRepository {
   Future<void>? _activeDeletionRetry;
   Future<void> _changeQueue = Future<void>.value();
   Future<void> _muteQueue = Future<void>.value();
+  final _activeReadOperations = <String, Future<void>>{};
   bool _reconciliationQueued = false;
   bool _isRealtimePaused = false;
   StreamController<List<Chat>>? _watchController;
@@ -289,7 +290,9 @@ class ChatsRepository implements IChatsRepository {
 
   @override
   Future<void> deleteChats(Set<String> ids) async {
+    ChatBulkSelection.validate(ids);
     if (ids.isEmpty) return;
+    ids = Set<String>.unmodifiable(ids);
     final scope = _accountSessionController.capture();
     final clearedAt = DateTime.now().toUtc();
     final pendingIds = <String>[];
@@ -342,17 +345,44 @@ class ChatsRepository implements IChatsRepository {
 
   @override
   Future<void> markAsRead(Set<String> ids) async {
+    ChatBulkSelection.validate(ids);
     if (ids.isEmpty) return;
     final scope = _accountSessionController.capture();
+    final selected = Set<String>.unmodifiable(ids);
+    final key =
+        '${scope.generation}:${scope.userId}:${(ids.toList()..sort()).join(',')}';
+    final active = _activeReadOperations[key];
+    if (active != null) return active;
+    final operation = _markAsRead(selected, scope);
+    _activeReadOperations[key] = operation;
+    await operation.whenComplete(() {
+      if (identical(_activeReadOperations[key], operation)) {
+        _activeReadOperations.remove(key);
+      }
+    });
+  }
+
+  Future<void> _markAsRead(
+    Set<String> ids,
+    AccountSessionSnapshot scope,
+  ) async {
+    final snapshot = await _cache.readForAction(ids, ownerUserId: scope.userId);
+    _accountSessionController.ensureCurrent(scope);
     await _remote.markAsRead(ids);
+    try {
+      await _waitForSynchronizationIdle();
+    } catch (_) {
+      // A failed pre-existing list read does not undo the accepted write.
+    }
     await _accountSessionController.commit(
       scope,
-      () => _cache.markAsRead(ids, ownerUserId: scope.userId),
+      () => _cache.markAsReadIfUnchanged(snapshot, ownerUserId: scope.userId),
     );
   }
 
   @override
-  Future<void> setMuted(Set<String> ids, {required bool isMuted}) {
+  Future<void> setMuted(Set<String> ids, {required bool isMuted}) async {
+    ChatBulkSelection.validate(ids);
     if (ids.isEmpty) return Future<void>.value();
     final scope = _accountSessionController.capture();
     final selectedIds = Set<String>.unmodifiable(ids);
@@ -383,13 +413,6 @@ class ChatsRepository implements IChatsRepository {
     _accountSessionController.ensureCurrent(scope);
     final changedIds = ids.difference(matching);
     if (changedIds.isEmpty) return;
-    if (changedIds.length > 50) {
-      throw ArgumentError.value(
-        changedIds.length,
-        'ids',
-        'Maximum batch is 50',
-      );
-    }
     await _remote.setMuted(changedIds, isMuted: isMuted);
     try {
       // Do not let an already-running pre-write snapshot overwrite this commit.
