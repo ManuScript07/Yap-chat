@@ -1,8 +1,12 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
+import 'package:stream_transform/stream_transform.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/core/services/media_cache_service.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
+
+part 'chats_list_cache.dart';
 
 class ChatsCacheDataSource {
   static const _idBatchSize = 400;
@@ -202,13 +206,20 @@ class ChatsCacheDataSource {
     if (ids.isEmpty) return;
     final owner = ownerUserId ?? _userIdProvider();
     final orderedIds = ids.toList(growable: false);
-    for (var start = 0; start < orderedIds.length; start += _idBatchSize) {
-      final batch = orderedIds.skip(start).take(_idBatchSize);
-      await (_database.delete(_database.cachedChats)..where(
-            (table) => table.ownerUserId.equals(owner) & table.id.isIn(batch),
-          ))
-          .go();
-    }
+    await _database.transaction(() async {
+      for (var start = 0; start < orderedIds.length; start += _idBatchSize) {
+        final batch = orderedIds.skip(start).take(_idBatchSize);
+        await (_database.delete(_database.cachedChatListEntries)..where(
+              (table) =>
+                  table.ownerUserId.equals(owner) & table.chatId.isIn(batch),
+            ))
+            .go();
+        await (_database.delete(_database.cachedChats)..where(
+              (table) => table.ownerUserId.equals(owner) & table.id.isIn(batch),
+            ))
+            .go();
+      }
+    });
   }
 
   Future<List<Chat>> readForAction(
@@ -371,6 +382,7 @@ class ChatsCacheDataSource {
       peerId: chat.peerId,
       peerUsername: chat.peerUsername,
       peerDisplayName: chat.userName,
+      peerDisplayNameSearch: Value(chat.userName.toLowerCase()),
       peerAvatarUrl: Value(chat.avatarUrl),
       peerAvatarStoragePath: Value(chat.avatarStoragePath),
       lastMessageId: Value(chat.lastMessageId),

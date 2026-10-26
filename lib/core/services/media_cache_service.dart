@@ -348,6 +348,15 @@ class MediaCacheService {
           .map((row) => row.targetUserId)
           .toSet();
       await (_database.delete(
+        _database.cachedChatListEntries,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedChatListStates,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
+        _database.cachedChatUnreadTotals,
+      )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
+      await (_database.delete(
         _database.cachedChats,
       )..where((table) => table.ownerUserId.equals(ownerUserId))).go();
       await (_database.delete(

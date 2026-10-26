@@ -1457,6 +1457,18 @@ class $CachedChatsTable extends CachedChats
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _peerDisplayNameSearchMeta =
+      const VerificationMeta('peerDisplayNameSearch');
+  @override
+  late final GeneratedColumn<String> peerDisplayNameSearch =
+      GeneratedColumn<String>(
+        'peer_display_name_search',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
   static const VerificationMeta _peerAvatarUrlMeta = const VerificationMeta(
     'peerAvatarUrl',
   );
@@ -1650,6 +1662,7 @@ class $CachedChatsTable extends CachedChats
     peerId,
     peerUsername,
     peerDisplayName,
+    peerDisplayNameSearch,
     peerAvatarUrl,
     peerAvatarStoragePath,
     lastMessageId,
@@ -1723,6 +1736,15 @@ class $CachedChatsTable extends CachedChats
       );
     } else if (isInserting) {
       context.missing(_peerDisplayNameMeta);
+    }
+    if (data.containsKey('peer_display_name_search')) {
+      context.handle(
+        _peerDisplayNameSearchMeta,
+        peerDisplayNameSearch.isAcceptableOrUnknown(
+          data['peer_display_name_search']!,
+          _peerDisplayNameSearchMeta,
+        ),
+      );
     }
     if (data.containsKey('peer_avatar_url')) {
       context.handle(
@@ -1896,6 +1918,10 @@ class $CachedChatsTable extends CachedChats
         DriftSqlType.string,
         data['${effectivePrefix}peer_display_name'],
       )!,
+      peerDisplayNameSearch: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_display_name_search'],
+      )!,
       peerAvatarUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}peer_avatar_url'],
@@ -1971,6 +1997,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
   final String peerId;
   final String peerUsername;
   final String peerDisplayName;
+  final String peerDisplayNameSearch;
   final String? peerAvatarUrl;
   final String? peerAvatarStoragePath;
   final String? lastMessageId;
@@ -1992,6 +2019,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     required this.peerId,
     required this.peerUsername,
     required this.peerDisplayName,
+    required this.peerDisplayNameSearch,
     this.peerAvatarUrl,
     this.peerAvatarStoragePath,
     this.lastMessageId,
@@ -2016,6 +2044,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     map['peer_id'] = Variable<String>(peerId);
     map['peer_username'] = Variable<String>(peerUsername);
     map['peer_display_name'] = Variable<String>(peerDisplayName);
+    map['peer_display_name_search'] = Variable<String>(peerDisplayNameSearch);
     if (!nullToAbsent || peerAvatarUrl != null) {
       map['peer_avatar_url'] = Variable<String>(peerAvatarUrl);
     }
@@ -2049,6 +2078,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       peerId: Value(peerId),
       peerUsername: Value(peerUsername),
       peerDisplayName: Value(peerDisplayName),
+      peerDisplayNameSearch: Value(peerDisplayNameSearch),
       peerAvatarUrl: peerAvatarUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(peerAvatarUrl),
@@ -2086,6 +2116,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       peerId: serializer.fromJson<String>(json['peerId']),
       peerUsername: serializer.fromJson<String>(json['peerUsername']),
       peerDisplayName: serializer.fromJson<String>(json['peerDisplayName']),
+      peerDisplayNameSearch: serializer.fromJson<String>(
+        json['peerDisplayNameSearch'],
+      ),
       peerAvatarUrl: serializer.fromJson<String?>(json['peerAvatarUrl']),
       peerAvatarStoragePath: serializer.fromJson<String?>(
         json['peerAvatarStoragePath'],
@@ -2118,6 +2151,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       'peerId': serializer.toJson<String>(peerId),
       'peerUsername': serializer.toJson<String>(peerUsername),
       'peerDisplayName': serializer.toJson<String>(peerDisplayName),
+      'peerDisplayNameSearch': serializer.toJson<String>(peerDisplayNameSearch),
       'peerAvatarUrl': serializer.toJson<String?>(peerAvatarUrl),
       'peerAvatarStoragePath': serializer.toJson<String?>(
         peerAvatarStoragePath,
@@ -2144,6 +2178,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     String? peerId,
     String? peerUsername,
     String? peerDisplayName,
+    String? peerDisplayNameSearch,
     Value<String?> peerAvatarUrl = const Value.absent(),
     Value<String?> peerAvatarStoragePath = const Value.absent(),
     Value<String?> lastMessageId = const Value.absent(),
@@ -2165,6 +2200,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     peerId: peerId ?? this.peerId,
     peerUsername: peerUsername ?? this.peerUsername,
     peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+    peerDisplayNameSearch: peerDisplayNameSearch ?? this.peerDisplayNameSearch,
     peerAvatarUrl: peerAvatarUrl.present
         ? peerAvatarUrl.value
         : this.peerAvatarUrl,
@@ -2200,6 +2236,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       peerDisplayName: data.peerDisplayName.present
           ? data.peerDisplayName.value
           : this.peerDisplayName,
+      peerDisplayNameSearch: data.peerDisplayNameSearch.present
+          ? data.peerDisplayNameSearch.value
+          : this.peerDisplayNameSearch,
       peerAvatarUrl: data.peerAvatarUrl.present
           ? data.peerAvatarUrl.value
           : this.peerAvatarUrl,
@@ -2252,6 +2291,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ..write('peerId: $peerId, ')
           ..write('peerUsername: $peerUsername, ')
           ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('peerDisplayNameSearch: $peerDisplayNameSearch, ')
           ..write('peerAvatarUrl: $peerAvatarUrl, ')
           ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
           ..write('lastMessageId: $lastMessageId, ')
@@ -2272,12 +2312,13 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     ownerUserId,
     id,
     peerId,
     peerUsername,
     peerDisplayName,
+    peerDisplayNameSearch,
     peerAvatarUrl,
     peerAvatarStoragePath,
     lastMessageId,
@@ -2293,7 +2334,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     blockedByPeer,
     peerIsGloballyBanned,
     cachedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2303,6 +2344,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           other.peerId == this.peerId &&
           other.peerUsername == this.peerUsername &&
           other.peerDisplayName == this.peerDisplayName &&
+          other.peerDisplayNameSearch == this.peerDisplayNameSearch &&
           other.peerAvatarUrl == this.peerAvatarUrl &&
           other.peerAvatarStoragePath == this.peerAvatarStoragePath &&
           other.lastMessageId == this.lastMessageId &&
@@ -2326,6 +2368,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
   final Value<String> peerId;
   final Value<String> peerUsername;
   final Value<String> peerDisplayName;
+  final Value<String> peerDisplayNameSearch;
   final Value<String?> peerAvatarUrl;
   final Value<String?> peerAvatarStoragePath;
   final Value<String?> lastMessageId;
@@ -2348,6 +2391,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     this.peerId = const Value.absent(),
     this.peerUsername = const Value.absent(),
     this.peerDisplayName = const Value.absent(),
+    this.peerDisplayNameSearch = const Value.absent(),
     this.peerAvatarUrl = const Value.absent(),
     this.peerAvatarStoragePath = const Value.absent(),
     this.lastMessageId = const Value.absent(),
@@ -2371,6 +2415,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     required String peerId,
     required String peerUsername,
     required String peerDisplayName,
+    this.peerDisplayNameSearch = const Value.absent(),
     this.peerAvatarUrl = const Value.absent(),
     this.peerAvatarStoragePath = const Value.absent(),
     this.lastMessageId = const Value.absent(),
@@ -2405,6 +2450,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Expression<String>? peerId,
     Expression<String>? peerUsername,
     Expression<String>? peerDisplayName,
+    Expression<String>? peerDisplayNameSearch,
     Expression<String>? peerAvatarUrl,
     Expression<String>? peerAvatarStoragePath,
     Expression<String>? lastMessageId,
@@ -2428,6 +2474,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       if (peerId != null) 'peer_id': peerId,
       if (peerUsername != null) 'peer_username': peerUsername,
       if (peerDisplayName != null) 'peer_display_name': peerDisplayName,
+      if (peerDisplayNameSearch != null)
+        'peer_display_name_search': peerDisplayNameSearch,
       if (peerAvatarUrl != null) 'peer_avatar_url': peerAvatarUrl,
       if (peerAvatarStoragePath != null)
         'peer_avatar_storage_path': peerAvatarStoragePath,
@@ -2456,6 +2504,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Value<String>? peerId,
     Value<String>? peerUsername,
     Value<String>? peerDisplayName,
+    Value<String>? peerDisplayNameSearch,
     Value<String?>? peerAvatarUrl,
     Value<String?>? peerAvatarStoragePath,
     Value<String?>? lastMessageId,
@@ -2479,6 +2528,8 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       peerId: peerId ?? this.peerId,
       peerUsername: peerUsername ?? this.peerUsername,
       peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+      peerDisplayNameSearch:
+          peerDisplayNameSearch ?? this.peerDisplayNameSearch,
       peerAvatarUrl: peerAvatarUrl ?? this.peerAvatarUrl,
       peerAvatarStoragePath:
           peerAvatarStoragePath ?? this.peerAvatarStoragePath,
@@ -2516,6 +2567,11 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     }
     if (peerDisplayName.present) {
       map['peer_display_name'] = Variable<String>(peerDisplayName.value);
+    }
+    if (peerDisplayNameSearch.present) {
+      map['peer_display_name_search'] = Variable<String>(
+        peerDisplayNameSearch.value,
+      );
     }
     if (peerAvatarUrl.present) {
       map['peer_avatar_url'] = Variable<String>(peerAvatarUrl.value);
@@ -2582,6 +2638,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
           ..write('peerId: $peerId, ')
           ..write('peerUsername: $peerUsername, ')
           ..write('peerDisplayName: $peerDisplayName, ')
+          ..write('peerDisplayNameSearch: $peerDisplayNameSearch, ')
           ..write('peerAvatarUrl: $peerAvatarUrl, ')
           ..write('peerAvatarStoragePath: $peerAvatarStoragePath, ')
           ..write('lastMessageId: $lastMessageId, ')
@@ -12418,6 +12475,1164 @@ class CachedChatHistoryRangesCompanion
   }
 }
 
+class $CachedChatListEntriesTable extends CachedChatListEntries
+    with TableInfo<$CachedChatListEntriesTable, CachedChatListEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedChatListEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _queryMeta = const VerificationMeta('query');
+  @override
+  late final GeneratedColumn<String> query = GeneratedColumn<String>(
+    'query',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatIdMeta = const VerificationMeta('chatId');
+  @override
+  late final GeneratedColumn<String> chatId = GeneratedColumn<String>(
+    'chat_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _activityMicrosMeta = const VerificationMeta(
+    'activityMicros',
+  );
+  @override
+  late final GeneratedColumn<int> activityMicros = GeneratedColumn<int>(
+    'activity_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    query,
+    chatId,
+    activityMicros,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_chat_list_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedChatListEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('query')) {
+      context.handle(
+        _queryMeta,
+        query.isAcceptableOrUnknown(data['query']!, _queryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_queryMeta);
+    }
+    if (data.containsKey('chat_id')) {
+      context.handle(
+        _chatIdMeta,
+        chatId.isAcceptableOrUnknown(data['chat_id']!, _chatIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatIdMeta);
+    }
+    if (data.containsKey('activity_micros')) {
+      context.handle(
+        _activityMicrosMeta,
+        activityMicros.isAcceptableOrUnknown(
+          data['activity_micros']!,
+          _activityMicrosMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_activityMicrosMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, query, chatId};
+  @override
+  CachedChatListEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedChatListEntry(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      query: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}query'],
+      )!,
+      chatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_id'],
+      )!,
+      activityMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}activity_micros'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedChatListEntriesTable createAlias(String alias) {
+    return $CachedChatListEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedChatListEntry extends DataClass
+    implements Insertable<CachedChatListEntry> {
+  final String ownerUserId;
+  final String query;
+  final String chatId;
+  final int activityMicros;
+  const CachedChatListEntry({
+    required this.ownerUserId,
+    required this.query,
+    required this.chatId,
+    required this.activityMicros,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['query'] = Variable<String>(query);
+    map['chat_id'] = Variable<String>(chatId);
+    map['activity_micros'] = Variable<int>(activityMicros);
+    return map;
+  }
+
+  CachedChatListEntriesCompanion toCompanion(bool nullToAbsent) {
+    return CachedChatListEntriesCompanion(
+      ownerUserId: Value(ownerUserId),
+      query: Value(query),
+      chatId: Value(chatId),
+      activityMicros: Value(activityMicros),
+    );
+  }
+
+  factory CachedChatListEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedChatListEntry(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      query: serializer.fromJson<String>(json['query']),
+      chatId: serializer.fromJson<String>(json['chatId']),
+      activityMicros: serializer.fromJson<int>(json['activityMicros']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'query': serializer.toJson<String>(query),
+      'chatId': serializer.toJson<String>(chatId),
+      'activityMicros': serializer.toJson<int>(activityMicros),
+    };
+  }
+
+  CachedChatListEntry copyWith({
+    String? ownerUserId,
+    String? query,
+    String? chatId,
+    int? activityMicros,
+  }) => CachedChatListEntry(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    query: query ?? this.query,
+    chatId: chatId ?? this.chatId,
+    activityMicros: activityMicros ?? this.activityMicros,
+  );
+  CachedChatListEntry copyWithCompanion(CachedChatListEntriesCompanion data) {
+    return CachedChatListEntry(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      query: data.query.present ? data.query.value : this.query,
+      chatId: data.chatId.present ? data.chatId.value : this.chatId,
+      activityMicros: data.activityMicros.present
+          ? data.activityMicros.value
+          : this.activityMicros,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatListEntry(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('query: $query, ')
+          ..write('chatId: $chatId, ')
+          ..write('activityMicros: $activityMicros')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(ownerUserId, query, chatId, activityMicros);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedChatListEntry &&
+          other.ownerUserId == this.ownerUserId &&
+          other.query == this.query &&
+          other.chatId == this.chatId &&
+          other.activityMicros == this.activityMicros);
+}
+
+class CachedChatListEntriesCompanion
+    extends UpdateCompanion<CachedChatListEntry> {
+  final Value<String> ownerUserId;
+  final Value<String> query;
+  final Value<String> chatId;
+  final Value<int> activityMicros;
+  final Value<int> rowid;
+  const CachedChatListEntriesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.query = const Value.absent(),
+    this.chatId = const Value.absent(),
+    this.activityMicros = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedChatListEntriesCompanion.insert({
+    required String ownerUserId,
+    required String query,
+    required String chatId,
+    required int activityMicros,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       query = Value(query),
+       chatId = Value(chatId),
+       activityMicros = Value(activityMicros);
+  static Insertable<CachedChatListEntry> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? query,
+    Expression<String>? chatId,
+    Expression<int>? activityMicros,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (query != null) 'query': query,
+      if (chatId != null) 'chat_id': chatId,
+      if (activityMicros != null) 'activity_micros': activityMicros,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedChatListEntriesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? query,
+    Value<String>? chatId,
+    Value<int>? activityMicros,
+    Value<int>? rowid,
+  }) {
+    return CachedChatListEntriesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      query: query ?? this.query,
+      chatId: chatId ?? this.chatId,
+      activityMicros: activityMicros ?? this.activityMicros,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (query.present) {
+      map['query'] = Variable<String>(query.value);
+    }
+    if (chatId.present) {
+      map['chat_id'] = Variable<String>(chatId.value);
+    }
+    if (activityMicros.present) {
+      map['activity_micros'] = Variable<int>(activityMicros.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatListEntriesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('query: $query, ')
+          ..write('chatId: $chatId, ')
+          ..write('activityMicros: $activityMicros, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedChatListStatesTable extends CachedChatListStates
+    with TableInfo<$CachedChatListStatesTable, CachedChatListState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedChatListStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _queryMeta = const VerificationMeta('query');
+  @override
+  late final GeneratedColumn<String> query = GeneratedColumn<String>(
+    'query',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<String> revision = GeneratedColumn<String>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hasRemotePageMeta = const VerificationMeta(
+    'hasRemotePage',
+  );
+  @override
+  late final GeneratedColumn<bool> hasRemotePage = GeneratedColumn<bool>(
+    'has_remote_page',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_remote_page" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _nextActivityMicrosMeta =
+      const VerificationMeta('nextActivityMicros');
+  @override
+  late final GeneratedColumn<int> nextActivityMicros = GeneratedColumn<int>(
+    'next_activity_micros',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nextChatIdMeta = const VerificationMeta(
+    'nextChatId',
+  );
+  @override
+  late final GeneratedColumn<String> nextChatId = GeneratedColumn<String>(
+    'next_chat_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _checkedAtMeta = const VerificationMeta(
+    'checkedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> checkedAt = GeneratedColumn<DateTime>(
+    'checked_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    query,
+    revision,
+    hasRemotePage,
+    nextActivityMicros,
+    nextChatId,
+    checkedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_chat_list_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedChatListState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('query')) {
+      context.handle(
+        _queryMeta,
+        query.isAcceptableOrUnknown(data['query']!, _queryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_queryMeta);
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionMeta);
+    }
+    if (data.containsKey('has_remote_page')) {
+      context.handle(
+        _hasRemotePageMeta,
+        hasRemotePage.isAcceptableOrUnknown(
+          data['has_remote_page']!,
+          _hasRemotePageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_activity_micros')) {
+      context.handle(
+        _nextActivityMicrosMeta,
+        nextActivityMicros.isAcceptableOrUnknown(
+          data['next_activity_micros']!,
+          _nextActivityMicrosMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_chat_id')) {
+      context.handle(
+        _nextChatIdMeta,
+        nextChatId.isAcceptableOrUnknown(
+          data['next_chat_id']!,
+          _nextChatIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('checked_at')) {
+      context.handle(
+        _checkedAtMeta,
+        checkedAt.isAcceptableOrUnknown(data['checked_at']!, _checkedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, query};
+  @override
+  CachedChatListState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedChatListState(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      query: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}query'],
+      )!,
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}revision'],
+      )!,
+      hasRemotePage: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_remote_page'],
+      )!,
+      nextActivityMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_activity_micros'],
+      ),
+      nextChatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}next_chat_id'],
+      ),
+      checkedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}checked_at'],
+      ),
+    );
+  }
+
+  @override
+  $CachedChatListStatesTable createAlias(String alias) {
+    return $CachedChatListStatesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedChatListState extends DataClass
+    implements Insertable<CachedChatListState> {
+  final String ownerUserId;
+  final String query;
+  final String revision;
+  final bool hasRemotePage;
+  final int? nextActivityMicros;
+  final String? nextChatId;
+  final DateTime? checkedAt;
+  const CachedChatListState({
+    required this.ownerUserId,
+    required this.query,
+    required this.revision,
+    required this.hasRemotePage,
+    this.nextActivityMicros,
+    this.nextChatId,
+    this.checkedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['query'] = Variable<String>(query);
+    map['revision'] = Variable<String>(revision);
+    map['has_remote_page'] = Variable<bool>(hasRemotePage);
+    if (!nullToAbsent || nextActivityMicros != null) {
+      map['next_activity_micros'] = Variable<int>(nextActivityMicros);
+    }
+    if (!nullToAbsent || nextChatId != null) {
+      map['next_chat_id'] = Variable<String>(nextChatId);
+    }
+    if (!nullToAbsent || checkedAt != null) {
+      map['checked_at'] = Variable<DateTime>(checkedAt);
+    }
+    return map;
+  }
+
+  CachedChatListStatesCompanion toCompanion(bool nullToAbsent) {
+    return CachedChatListStatesCompanion(
+      ownerUserId: Value(ownerUserId),
+      query: Value(query),
+      revision: Value(revision),
+      hasRemotePage: Value(hasRemotePage),
+      nextActivityMicros: nextActivityMicros == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextActivityMicros),
+      nextChatId: nextChatId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextChatId),
+      checkedAt: checkedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(checkedAt),
+    );
+  }
+
+  factory CachedChatListState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedChatListState(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      query: serializer.fromJson<String>(json['query']),
+      revision: serializer.fromJson<String>(json['revision']),
+      hasRemotePage: serializer.fromJson<bool>(json['hasRemotePage']),
+      nextActivityMicros: serializer.fromJson<int?>(json['nextActivityMicros']),
+      nextChatId: serializer.fromJson<String?>(json['nextChatId']),
+      checkedAt: serializer.fromJson<DateTime?>(json['checkedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'query': serializer.toJson<String>(query),
+      'revision': serializer.toJson<String>(revision),
+      'hasRemotePage': serializer.toJson<bool>(hasRemotePage),
+      'nextActivityMicros': serializer.toJson<int?>(nextActivityMicros),
+      'nextChatId': serializer.toJson<String?>(nextChatId),
+      'checkedAt': serializer.toJson<DateTime?>(checkedAt),
+    };
+  }
+
+  CachedChatListState copyWith({
+    String? ownerUserId,
+    String? query,
+    String? revision,
+    bool? hasRemotePage,
+    Value<int?> nextActivityMicros = const Value.absent(),
+    Value<String?> nextChatId = const Value.absent(),
+    Value<DateTime?> checkedAt = const Value.absent(),
+  }) => CachedChatListState(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    query: query ?? this.query,
+    revision: revision ?? this.revision,
+    hasRemotePage: hasRemotePage ?? this.hasRemotePage,
+    nextActivityMicros: nextActivityMicros.present
+        ? nextActivityMicros.value
+        : this.nextActivityMicros,
+    nextChatId: nextChatId.present ? nextChatId.value : this.nextChatId,
+    checkedAt: checkedAt.present ? checkedAt.value : this.checkedAt,
+  );
+  CachedChatListState copyWithCompanion(CachedChatListStatesCompanion data) {
+    return CachedChatListState(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      query: data.query.present ? data.query.value : this.query,
+      revision: data.revision.present ? data.revision.value : this.revision,
+      hasRemotePage: data.hasRemotePage.present
+          ? data.hasRemotePage.value
+          : this.hasRemotePage,
+      nextActivityMicros: data.nextActivityMicros.present
+          ? data.nextActivityMicros.value
+          : this.nextActivityMicros,
+      nextChatId: data.nextChatId.present
+          ? data.nextChatId.value
+          : this.nextChatId,
+      checkedAt: data.checkedAt.present ? data.checkedAt.value : this.checkedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatListState(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('query: $query, ')
+          ..write('revision: $revision, ')
+          ..write('hasRemotePage: $hasRemotePage, ')
+          ..write('nextActivityMicros: $nextActivityMicros, ')
+          ..write('nextChatId: $nextChatId, ')
+          ..write('checkedAt: $checkedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    query,
+    revision,
+    hasRemotePage,
+    nextActivityMicros,
+    nextChatId,
+    checkedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedChatListState &&
+          other.ownerUserId == this.ownerUserId &&
+          other.query == this.query &&
+          other.revision == this.revision &&
+          other.hasRemotePage == this.hasRemotePage &&
+          other.nextActivityMicros == this.nextActivityMicros &&
+          other.nextChatId == this.nextChatId &&
+          other.checkedAt == this.checkedAt);
+}
+
+class CachedChatListStatesCompanion
+    extends UpdateCompanion<CachedChatListState> {
+  final Value<String> ownerUserId;
+  final Value<String> query;
+  final Value<String> revision;
+  final Value<bool> hasRemotePage;
+  final Value<int?> nextActivityMicros;
+  final Value<String?> nextChatId;
+  final Value<DateTime?> checkedAt;
+  final Value<int> rowid;
+  const CachedChatListStatesCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.query = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.hasRemotePage = const Value.absent(),
+    this.nextActivityMicros = const Value.absent(),
+    this.nextChatId = const Value.absent(),
+    this.checkedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedChatListStatesCompanion.insert({
+    required String ownerUserId,
+    required String query,
+    required String revision,
+    this.hasRemotePage = const Value.absent(),
+    this.nextActivityMicros = const Value.absent(),
+    this.nextChatId = const Value.absent(),
+    this.checkedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       query = Value(query),
+       revision = Value(revision);
+  static Insertable<CachedChatListState> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? query,
+    Expression<String>? revision,
+    Expression<bool>? hasRemotePage,
+    Expression<int>? nextActivityMicros,
+    Expression<String>? nextChatId,
+    Expression<DateTime>? checkedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (query != null) 'query': query,
+      if (revision != null) 'revision': revision,
+      if (hasRemotePage != null) 'has_remote_page': hasRemotePage,
+      if (nextActivityMicros != null)
+        'next_activity_micros': nextActivityMicros,
+      if (nextChatId != null) 'next_chat_id': nextChatId,
+      if (checkedAt != null) 'checked_at': checkedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedChatListStatesCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? query,
+    Value<String>? revision,
+    Value<bool>? hasRemotePage,
+    Value<int?>? nextActivityMicros,
+    Value<String?>? nextChatId,
+    Value<DateTime?>? checkedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedChatListStatesCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      query: query ?? this.query,
+      revision: revision ?? this.revision,
+      hasRemotePage: hasRemotePage ?? this.hasRemotePage,
+      nextActivityMicros: nextActivityMicros ?? this.nextActivityMicros,
+      nextChatId: nextChatId ?? this.nextChatId,
+      checkedAt: checkedAt ?? this.checkedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (query.present) {
+      map['query'] = Variable<String>(query.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<String>(revision.value);
+    }
+    if (hasRemotePage.present) {
+      map['has_remote_page'] = Variable<bool>(hasRemotePage.value);
+    }
+    if (nextActivityMicros.present) {
+      map['next_activity_micros'] = Variable<int>(nextActivityMicros.value);
+    }
+    if (nextChatId.present) {
+      map['next_chat_id'] = Variable<String>(nextChatId.value);
+    }
+    if (checkedAt.present) {
+      map['checked_at'] = Variable<DateTime>(checkedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatListStatesCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('query: $query, ')
+          ..write('revision: $revision, ')
+          ..write('hasRemotePage: $hasRemotePage, ')
+          ..write('nextActivityMicros: $nextActivityMicros, ')
+          ..write('nextChatId: $nextChatId, ')
+          ..write('checkedAt: $checkedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedChatUnreadTotalsTable extends CachedChatUnreadTotals
+    with TableInfo<$CachedChatUnreadTotalsTable, CachedChatUnreadTotal> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedChatUnreadTotalsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _unreadTotalMeta = const VerificationMeta(
+    'unreadTotal',
+  );
+  @override
+  late final GeneratedColumn<int> unreadTotal = GeneratedColumn<int>(
+    'unread_total',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _checkedAtMeta = const VerificationMeta(
+    'checkedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> checkedAt = GeneratedColumn<DateTime>(
+    'checked_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    revision,
+    unreadTotal,
+    checkedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_chat_unread_totals';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedChatUnreadTotal> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    if (data.containsKey('unread_total')) {
+      context.handle(
+        _unreadTotalMeta,
+        unreadTotal.isAcceptableOrUnknown(
+          data['unread_total']!,
+          _unreadTotalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('checked_at')) {
+      context.handle(
+        _checkedAtMeta,
+        checkedAt.isAcceptableOrUnknown(data['checked_at']!, _checkedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId};
+  @override
+  CachedChatUnreadTotal map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedChatUnreadTotal(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+      unreadTotal: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unread_total'],
+      ),
+      checkedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}checked_at'],
+      ),
+    );
+  }
+
+  @override
+  $CachedChatUnreadTotalsTable createAlias(String alias) {
+    return $CachedChatUnreadTotalsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedChatUnreadTotal extends DataClass
+    implements Insertable<CachedChatUnreadTotal> {
+  final String ownerUserId;
+  final int revision;
+  final int? unreadTotal;
+  final DateTime? checkedAt;
+  const CachedChatUnreadTotal({
+    required this.ownerUserId,
+    required this.revision,
+    this.unreadTotal,
+    this.checkedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['revision'] = Variable<int>(revision);
+    if (!nullToAbsent || unreadTotal != null) {
+      map['unread_total'] = Variable<int>(unreadTotal);
+    }
+    if (!nullToAbsent || checkedAt != null) {
+      map['checked_at'] = Variable<DateTime>(checkedAt);
+    }
+    return map;
+  }
+
+  CachedChatUnreadTotalsCompanion toCompanion(bool nullToAbsent) {
+    return CachedChatUnreadTotalsCompanion(
+      ownerUserId: Value(ownerUserId),
+      revision: Value(revision),
+      unreadTotal: unreadTotal == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unreadTotal),
+      checkedAt: checkedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(checkedAt),
+    );
+  }
+
+  factory CachedChatUnreadTotal.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedChatUnreadTotal(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      revision: serializer.fromJson<int>(json['revision']),
+      unreadTotal: serializer.fromJson<int?>(json['unreadTotal']),
+      checkedAt: serializer.fromJson<DateTime?>(json['checkedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'revision': serializer.toJson<int>(revision),
+      'unreadTotal': serializer.toJson<int?>(unreadTotal),
+      'checkedAt': serializer.toJson<DateTime?>(checkedAt),
+    };
+  }
+
+  CachedChatUnreadTotal copyWith({
+    String? ownerUserId,
+    int? revision,
+    Value<int?> unreadTotal = const Value.absent(),
+    Value<DateTime?> checkedAt = const Value.absent(),
+  }) => CachedChatUnreadTotal(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    revision: revision ?? this.revision,
+    unreadTotal: unreadTotal.present ? unreadTotal.value : this.unreadTotal,
+    checkedAt: checkedAt.present ? checkedAt.value : this.checkedAt,
+  );
+  CachedChatUnreadTotal copyWithCompanion(
+    CachedChatUnreadTotalsCompanion data,
+  ) {
+    return CachedChatUnreadTotal(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      revision: data.revision.present ? data.revision.value : this.revision,
+      unreadTotal: data.unreadTotal.present
+          ? data.unreadTotal.value
+          : this.unreadTotal,
+      checkedAt: data.checkedAt.present ? data.checkedAt.value : this.checkedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatUnreadTotal(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('revision: $revision, ')
+          ..write('unreadTotal: $unreadTotal, ')
+          ..write('checkedAt: $checkedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(ownerUserId, revision, unreadTotal, checkedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedChatUnreadTotal &&
+          other.ownerUserId == this.ownerUserId &&
+          other.revision == this.revision &&
+          other.unreadTotal == this.unreadTotal &&
+          other.checkedAt == this.checkedAt);
+}
+
+class CachedChatUnreadTotalsCompanion
+    extends UpdateCompanion<CachedChatUnreadTotal> {
+  final Value<String> ownerUserId;
+  final Value<int> revision;
+  final Value<int?> unreadTotal;
+  final Value<DateTime?> checkedAt;
+  final Value<int> rowid;
+  const CachedChatUnreadTotalsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.unreadTotal = const Value.absent(),
+    this.checkedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedChatUnreadTotalsCompanion.insert({
+    required String ownerUserId,
+    this.revision = const Value.absent(),
+    this.unreadTotal = const Value.absent(),
+    this.checkedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId);
+  static Insertable<CachedChatUnreadTotal> custom({
+    Expression<String>? ownerUserId,
+    Expression<int>? revision,
+    Expression<int>? unreadTotal,
+    Expression<DateTime>? checkedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (revision != null) 'revision': revision,
+      if (unreadTotal != null) 'unread_total': unreadTotal,
+      if (checkedAt != null) 'checked_at': checkedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedChatUnreadTotalsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<int>? revision,
+    Value<int?>? unreadTotal,
+    Value<DateTime?>? checkedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedChatUnreadTotalsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      revision: revision ?? this.revision,
+      unreadTotal: unreadTotal ?? this.unreadTotal,
+      checkedAt: checkedAt ?? this.checkedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (unreadTotal.present) {
+      map['unread_total'] = Variable<int>(unreadTotal.value);
+    }
+    if (checkedAt.present) {
+      map['checked_at'] = Variable<DateTime>(checkedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedChatUnreadTotalsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('revision: $revision, ')
+          ..write('unreadTotal: $unreadTotal, ')
+          ..write('checkedAt: $checkedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -12459,6 +13674,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedAppLanguagesTable(this);
   late final $CachedChatHistoryRangesTable cachedChatHistoryRanges =
       $CachedChatHistoryRangesTable(this);
+  late final $CachedChatListEntriesTable cachedChatListEntries =
+      $CachedChatListEntriesTable(this);
+  late final $CachedChatListStatesTable cachedChatListStates =
+      $CachedChatListStatesTable(this);
+  late final $CachedChatUnreadTotalsTable cachedChatUnreadTotals =
+      $CachedChatUnreadTotalsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -12485,6 +13706,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedProfileViewCounts,
     cachedAppLanguages,
     cachedChatHistoryRanges,
+    cachedChatListEntries,
+    cachedChatListStates,
+    cachedChatUnreadTotals,
   ];
 }
 
@@ -13179,6 +14403,7 @@ typedef $$CachedChatsTableCreateCompanionBuilder =
       required String peerId,
       required String peerUsername,
       required String peerDisplayName,
+      Value<String> peerDisplayNameSearch,
       Value<String?> peerAvatarUrl,
       Value<String?> peerAvatarStoragePath,
       Value<String?> lastMessageId,
@@ -13203,6 +14428,7 @@ typedef $$CachedChatsTableUpdateCompanionBuilder =
       Value<String> peerId,
       Value<String> peerUsername,
       Value<String> peerDisplayName,
+      Value<String> peerDisplayNameSearch,
       Value<String?> peerAvatarUrl,
       Value<String?> peerAvatarStoragePath,
       Value<String?> lastMessageId,
@@ -13252,6 +14478,11 @@ class $$CachedChatsTableFilterComposer
 
   ColumnFilters<String> get peerDisplayName => $composableBuilder(
     column: $table.peerDisplayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerDisplayNameSearch => $composableBuilder(
+    column: $table.peerDisplayNameSearch,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13365,6 +14596,11 @@ class $$CachedChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get peerDisplayNameSearch => $composableBuilder(
+    column: $table.peerDisplayNameSearch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get peerAvatarUrl => $composableBuilder(
     column: $table.peerAvatarUrl,
     builder: (column) => ColumnOrderings(column),
@@ -13468,6 +14704,11 @@ class $$CachedChatsTableAnnotationComposer
 
   GeneratedColumn<String> get peerDisplayName => $composableBuilder(
     column: $table.peerDisplayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get peerDisplayNameSearch => $composableBuilder(
+    column: $table.peerDisplayNameSearch,
     builder: (column) => column,
   );
 
@@ -13579,6 +14820,7 @@ class $$CachedChatsTableTableManager
                 Value<String> peerId = const Value.absent(),
                 Value<String> peerUsername = const Value.absent(),
                 Value<String> peerDisplayName = const Value.absent(),
+                Value<String> peerDisplayNameSearch = const Value.absent(),
                 Value<String?> peerAvatarUrl = const Value.absent(),
                 Value<String?> peerAvatarStoragePath = const Value.absent(),
                 Value<String?> lastMessageId = const Value.absent(),
@@ -13601,6 +14843,7 @@ class $$CachedChatsTableTableManager
                 peerId: peerId,
                 peerUsername: peerUsername,
                 peerDisplayName: peerDisplayName,
+                peerDisplayNameSearch: peerDisplayNameSearch,
                 peerAvatarUrl: peerAvatarUrl,
                 peerAvatarStoragePath: peerAvatarStoragePath,
                 lastMessageId: lastMessageId,
@@ -13625,6 +14868,7 @@ class $$CachedChatsTableTableManager
                 required String peerId,
                 required String peerUsername,
                 required String peerDisplayName,
+                Value<String> peerDisplayNameSearch = const Value.absent(),
                 Value<String?> peerAvatarUrl = const Value.absent(),
                 Value<String?> peerAvatarStoragePath = const Value.absent(),
                 Value<String?> lastMessageId = const Value.absent(),
@@ -13647,6 +14891,7 @@ class $$CachedChatsTableTableManager
                 peerId: peerId,
                 peerUsername: peerUsername,
                 peerDisplayName: peerDisplayName,
+                peerDisplayNameSearch: peerDisplayNameSearch,
                 peerAvatarUrl: peerAvatarUrl,
                 peerAvatarStoragePath: peerAvatarStoragePath,
                 lastMessageId: lastMessageId,
@@ -18964,6 +20209,710 @@ typedef $$CachedChatHistoryRangesTableProcessedTableManager =
       CachedChatHistoryRange,
       PrefetchHooks Function()
     >;
+typedef $$CachedChatListEntriesTableCreateCompanionBuilder =
+    CachedChatListEntriesCompanion Function({
+      required String ownerUserId,
+      required String query,
+      required String chatId,
+      required int activityMicros,
+      Value<int> rowid,
+    });
+typedef $$CachedChatListEntriesTableUpdateCompanionBuilder =
+    CachedChatListEntriesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> query,
+      Value<String> chatId,
+      Value<int> activityMicros,
+      Value<int> rowid,
+    });
+
+class $$CachedChatListEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedChatListEntriesTable> {
+  $$CachedChatListEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get query => $composableBuilder(
+    column: $table.query,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get activityMicros => $composableBuilder(
+    column: $table.activityMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedChatListEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedChatListEntriesTable> {
+  $$CachedChatListEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get query => $composableBuilder(
+    column: $table.query,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatId => $composableBuilder(
+    column: $table.chatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get activityMicros => $composableBuilder(
+    column: $table.activityMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedChatListEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedChatListEntriesTable> {
+  $$CachedChatListEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get query =>
+      $composableBuilder(column: $table.query, builder: (column) => column);
+
+  GeneratedColumn<String> get chatId =>
+      $composableBuilder(column: $table.chatId, builder: (column) => column);
+
+  GeneratedColumn<int> get activityMicros => $composableBuilder(
+    column: $table.activityMicros,
+    builder: (column) => column,
+  );
+}
+
+class $$CachedChatListEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedChatListEntriesTable,
+          CachedChatListEntry,
+          $$CachedChatListEntriesTableFilterComposer,
+          $$CachedChatListEntriesTableOrderingComposer,
+          $$CachedChatListEntriesTableAnnotationComposer,
+          $$CachedChatListEntriesTableCreateCompanionBuilder,
+          $$CachedChatListEntriesTableUpdateCompanionBuilder,
+          (
+            CachedChatListEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedChatListEntriesTable,
+              CachedChatListEntry
+            >,
+          ),
+          CachedChatListEntry,
+          PrefetchHooks Function()
+        > {
+  $$CachedChatListEntriesTableTableManager(
+    _$AppDatabase db,
+    $CachedChatListEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedChatListEntriesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedChatListEntriesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedChatListEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> query = const Value.absent(),
+                Value<String> chatId = const Value.absent(),
+                Value<int> activityMicros = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatListEntriesCompanion(
+                ownerUserId: ownerUserId,
+                query: query,
+                chatId: chatId,
+                activityMicros: activityMicros,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String query,
+                required String chatId,
+                required int activityMicros,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatListEntriesCompanion.insert(
+                ownerUserId: ownerUserId,
+                query: query,
+                chatId: chatId,
+                activityMicros: activityMicros,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CachedChatListEntriesTable, CachedChatListEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedChatListEntriesTable,
+                    CachedChatListEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedChatListEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedChatListEntriesTable,
+      CachedChatListEntry,
+      $$CachedChatListEntriesTableFilterComposer,
+      $$CachedChatListEntriesTableOrderingComposer,
+      $$CachedChatListEntriesTableAnnotationComposer,
+      $$CachedChatListEntriesTableCreateCompanionBuilder,
+      $$CachedChatListEntriesTableUpdateCompanionBuilder,
+      (
+        CachedChatListEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedChatListEntriesTable,
+          CachedChatListEntry
+        >,
+      ),
+      CachedChatListEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedChatListStatesTableCreateCompanionBuilder =
+    CachedChatListStatesCompanion Function({
+      required String ownerUserId,
+      required String query,
+      required String revision,
+      Value<bool> hasRemotePage,
+      Value<int?> nextActivityMicros,
+      Value<String?> nextChatId,
+      Value<DateTime?> checkedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedChatListStatesTableUpdateCompanionBuilder =
+    CachedChatListStatesCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> query,
+      Value<String> revision,
+      Value<bool> hasRemotePage,
+      Value<int?> nextActivityMicros,
+      Value<String?> nextChatId,
+      Value<DateTime?> checkedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedChatListStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedChatListStatesTable> {
+  $$CachedChatListStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get query => $composableBuilder(
+    column: $table.query,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasRemotePage => $composableBuilder(
+    column: $table.hasRemotePage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get nextActivityMicros => $composableBuilder(
+    column: $table.nextActivityMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nextChatId => $composableBuilder(
+    column: $table.nextChatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get checkedAt => $composableBuilder(
+    column: $table.checkedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedChatListStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedChatListStatesTable> {
+  $$CachedChatListStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get query => $composableBuilder(
+    column: $table.query,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasRemotePage => $composableBuilder(
+    column: $table.hasRemotePage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get nextActivityMicros => $composableBuilder(
+    column: $table.nextActivityMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nextChatId => $composableBuilder(
+    column: $table.nextChatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get checkedAt => $composableBuilder(
+    column: $table.checkedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedChatListStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedChatListStatesTable> {
+  $$CachedChatListStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get query =>
+      $composableBuilder(column: $table.query, builder: (column) => column);
+
+  GeneratedColumn<String> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  GeneratedColumn<bool> get hasRemotePage => $composableBuilder(
+    column: $table.hasRemotePage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get nextActivityMicros => $composableBuilder(
+    column: $table.nextActivityMicros,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nextChatId => $composableBuilder(
+    column: $table.nextChatId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get checkedAt =>
+      $composableBuilder(column: $table.checkedAt, builder: (column) => column);
+}
+
+class $$CachedChatListStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedChatListStatesTable,
+          CachedChatListState,
+          $$CachedChatListStatesTableFilterComposer,
+          $$CachedChatListStatesTableOrderingComposer,
+          $$CachedChatListStatesTableAnnotationComposer,
+          $$CachedChatListStatesTableCreateCompanionBuilder,
+          $$CachedChatListStatesTableUpdateCompanionBuilder,
+          (
+            CachedChatListState,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedChatListStatesTable,
+              CachedChatListState
+            >,
+          ),
+          CachedChatListState,
+          PrefetchHooks Function()
+        > {
+  $$CachedChatListStatesTableTableManager(
+    _$AppDatabase db,
+    $CachedChatListStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedChatListStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedChatListStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedChatListStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> query = const Value.absent(),
+                Value<String> revision = const Value.absent(),
+                Value<bool> hasRemotePage = const Value.absent(),
+                Value<int?> nextActivityMicros = const Value.absent(),
+                Value<String?> nextChatId = const Value.absent(),
+                Value<DateTime?> checkedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatListStatesCompanion(
+                ownerUserId: ownerUserId,
+                query: query,
+                revision: revision,
+                hasRemotePage: hasRemotePage,
+                nextActivityMicros: nextActivityMicros,
+                nextChatId: nextChatId,
+                checkedAt: checkedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String query,
+                required String revision,
+                Value<bool> hasRemotePage = const Value.absent(),
+                Value<int?> nextActivityMicros = const Value.absent(),
+                Value<String?> nextChatId = const Value.absent(),
+                Value<DateTime?> checkedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatListStatesCompanion.insert(
+                ownerUserId: ownerUserId,
+                query: query,
+                revision: revision,
+                hasRemotePage: hasRemotePage,
+                nextActivityMicros: nextActivityMicros,
+                nextChatId: nextChatId,
+                checkedAt: checkedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CachedChatListStatesTable, CachedChatListState>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedChatListStatesTable,
+                    CachedChatListState
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedChatListStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedChatListStatesTable,
+      CachedChatListState,
+      $$CachedChatListStatesTableFilterComposer,
+      $$CachedChatListStatesTableOrderingComposer,
+      $$CachedChatListStatesTableAnnotationComposer,
+      $$CachedChatListStatesTableCreateCompanionBuilder,
+      $$CachedChatListStatesTableUpdateCompanionBuilder,
+      (
+        CachedChatListState,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedChatListStatesTable,
+          CachedChatListState
+        >,
+      ),
+      CachedChatListState,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedChatUnreadTotalsTableCreateCompanionBuilder =
+    CachedChatUnreadTotalsCompanion Function({
+      required String ownerUserId,
+      Value<int> revision,
+      Value<int?> unreadTotal,
+      Value<DateTime?> checkedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedChatUnreadTotalsTableUpdateCompanionBuilder =
+    CachedChatUnreadTotalsCompanion Function({
+      Value<String> ownerUserId,
+      Value<int> revision,
+      Value<int?> unreadTotal,
+      Value<DateTime?> checkedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedChatUnreadTotalsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedChatUnreadTotalsTable> {
+  $$CachedChatUnreadTotalsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unreadTotal => $composableBuilder(
+    column: $table.unreadTotal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get checkedAt => $composableBuilder(
+    column: $table.checkedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedChatUnreadTotalsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedChatUnreadTotalsTable> {
+  $$CachedChatUnreadTotalsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unreadTotal => $composableBuilder(
+    column: $table.unreadTotal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get checkedAt => $composableBuilder(
+    column: $table.checkedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedChatUnreadTotalsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedChatUnreadTotalsTable> {
+  $$CachedChatUnreadTotalsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  GeneratedColumn<int> get unreadTotal => $composableBuilder(
+    column: $table.unreadTotal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get checkedAt =>
+      $composableBuilder(column: $table.checkedAt, builder: (column) => column);
+}
+
+class $$CachedChatUnreadTotalsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedChatUnreadTotalsTable,
+          CachedChatUnreadTotal,
+          $$CachedChatUnreadTotalsTableFilterComposer,
+          $$CachedChatUnreadTotalsTableOrderingComposer,
+          $$CachedChatUnreadTotalsTableAnnotationComposer,
+          $$CachedChatUnreadTotalsTableCreateCompanionBuilder,
+          $$CachedChatUnreadTotalsTableUpdateCompanionBuilder,
+          (
+            CachedChatUnreadTotal,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedChatUnreadTotalsTable,
+              CachedChatUnreadTotal
+            >,
+          ),
+          CachedChatUnreadTotal,
+          PrefetchHooks Function()
+        > {
+  $$CachedChatUnreadTotalsTableTableManager(
+    _$AppDatabase db,
+    $CachedChatUnreadTotalsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedChatUnreadTotalsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedChatUnreadTotalsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedChatUnreadTotalsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int?> unreadTotal = const Value.absent(),
+                Value<DateTime?> checkedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatUnreadTotalsCompanion(
+                ownerUserId: ownerUserId,
+                revision: revision,
+                unreadTotal: unreadTotal,
+                checkedAt: checkedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                Value<int> revision = const Value.absent(),
+                Value<int?> unreadTotal = const Value.absent(),
+                Value<DateTime?> checkedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedChatUnreadTotalsCompanion.insert(
+                ownerUserId: ownerUserId,
+                revision: revision,
+                unreadTotal: unreadTotal,
+                checkedAt: checkedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedChatUnreadTotalsTable,
+                    CachedChatUnreadTotal
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedChatUnreadTotalsTable,
+                    CachedChatUnreadTotal
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedChatUnreadTotalsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedChatUnreadTotalsTable,
+      CachedChatUnreadTotal,
+      $$CachedChatUnreadTotalsTableFilterComposer,
+      $$CachedChatUnreadTotalsTableOrderingComposer,
+      $$CachedChatUnreadTotalsTableAnnotationComposer,
+      $$CachedChatUnreadTotalsTableCreateCompanionBuilder,
+      $$CachedChatUnreadTotalsTableUpdateCompanionBuilder,
+      (
+        CachedChatUnreadTotal,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedChatUnreadTotalsTable,
+          CachedChatUnreadTotal
+        >,
+      ),
+      CachedChatUnreadTotal,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -19045,5 +20994,14 @@ class $AppDatabaseManager {
       $$CachedChatHistoryRangesTableTableManager(
         _db,
         _db.cachedChatHistoryRanges,
+      );
+  $$CachedChatListEntriesTableTableManager get cachedChatListEntries =>
+      $$CachedChatListEntriesTableTableManager(_db, _db.cachedChatListEntries);
+  $$CachedChatListStatesTableTableManager get cachedChatListStates =>
+      $$CachedChatListStatesTableTableManager(_db, _db.cachedChatListStates);
+  $$CachedChatUnreadTotalsTableTableManager get cachedChatUnreadTotals =>
+      $$CachedChatUnreadTotalsTableTableManager(
+        _db,
+        _db.cachedChatUnreadTotals,
       );
 }

@@ -44,6 +44,8 @@ class CachedChats extends Table {
   TextColumn get peerId => text()();
   TextColumn get peerUsername => text()();
   TextColumn get peerDisplayName => text()();
+  TextColumn get peerDisplayNameSearch =>
+      text().withDefault(const Constant(''))();
   TextColumn get peerAvatarUrl => text().nullable()();
   TextColumn get peerAvatarStoragePath => text().nullable()();
   TextColumn get lastMessageId => text().nullable()();
@@ -64,6 +66,41 @@ class CachedChats extends Table {
 
   @override
   Set<Column> get primaryKey => {ownerUserId, id};
+}
+
+/// Membership in a fetched list query is separate from retained chat metadata.
+class CachedChatListEntries extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get query => text()();
+  TextColumn get chatId => text()();
+  IntColumn get activityMicros => integer()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, query, chatId};
+}
+
+class CachedChatListStates extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get query => text()();
+  TextColumn get revision => text()();
+  BoolColumn get hasRemotePage =>
+      boolean().withDefault(const Constant(false))();
+  IntColumn get nextActivityMicros => integer().nullable()();
+  TextColumn get nextChatId => text().nullable()();
+  DateTimeColumn get checkedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, query};
+}
+
+class CachedChatUnreadTotals extends Table {
+  TextColumn get ownerUserId => text()();
+  IntColumn get revision => integer().withDefault(const Constant(0))();
+  IntColumn get unreadTotal => integer().nullable()();
+  DateTimeColumn get checkedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId};
 }
 
 class CachedMessages extends Table {
@@ -361,6 +398,9 @@ class CachedAppLanguages extends Table {
     CachedProfileViewCounts,
     CachedAppLanguages,
     CachedChatHistoryRanges,
+    CachedChatListEntries,
+    CachedChatListStates,
+    CachedChatUnreadTotals,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -379,7 +419,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 27;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -583,6 +623,55 @@ class AppDatabase extends _$AppDatabase {
           'DROP INDEX IF EXISTS cached_messages_owner_chat_time_idx',
         );
       }
+      if (from < 27) {
+        final columns = await customSelect(
+          'PRAGMA table_info(cached_chats)',
+        ).get();
+        if (!columns.any(
+          (c) => c.read<String>('name') == 'peer_display_name_search',
+        )) {
+          await migrator.addColumn(
+            cachedChats,
+            cachedChats.peerDisplayNameSearch,
+          );
+        }
+        for (final table in <TableInfo<Table, dynamic>>[
+          cachedChatListEntries,
+          cachedChatListStates,
+          cachedChatUnreadTotals,
+        ]) {
+          final exists = await customSelect(
+            'SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?',
+            variables: [
+              Variable<String>('table'),
+              Variable<String>(table.actualTableName),
+            ],
+          ).getSingleOrNull();
+          if (exists == null) await migrator.createTable(table);
+        }
+        // SQLite lower() only folds ASCII. Normalize old names in Dart once,
+        // in bounded batches, so Russian offline search matches the server.
+        int? rowId;
+        while (true) {
+          final rows = await customSelect(
+            'SELECT rowid AS migration_rowid, peer_display_name FROM cached_chats ${rowId == null ? '' : 'WHERE rowid > ?'} ORDER BY rowid LIMIT 400',
+            variables: [if (rowId != null) Variable<int>(rowId)],
+          ).get();
+          if (rows.isEmpty) break;
+          await batch((b) {
+            for (final row in rows) {
+              b.customStatement(
+                'UPDATE cached_chats SET peer_display_name_search = ? WHERE rowid = ?',
+                [
+                  row.read<String>('peer_display_name').toLowerCase(),
+                  row.read<int>('migration_rowid'),
+                ],
+              );
+            }
+          });
+          rowId = rows.last.read<int>('migration_rowid');
+        }
+      }
     },
     beforeOpen: (details) async {
       // Version 19 was briefly shipped while the blacklist cache schema was
@@ -619,6 +708,26 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _createChatCacheIndexes() async {
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_chats_owner_peer_idx
+      ON cached_chats (owner_user_id, peer_id)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_chats_owner_time_idx
+      ON cached_chats (owner_user_id, last_message_time DESC, id DESC)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_chats_owner_name_idx
+      ON cached_chats (owner_user_id, peer_display_name_search)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_chats_owner_list_fallback_idx
+      ON cached_chats (owner_user_id, (last_message_time * 1000000) DESC, id DESC)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_chat_list_entries_order_idx
+      ON cached_chat_list_entries (owner_user_id, query, activity_micros DESC, chat_id DESC)
+    ''');
     await customStatement(
       'CREATE INDEX IF NOT EXISTS pending_reactions_owner_due_idx ON pending_message_reactions (owner_user_id, next_attempt_at)',
     );
