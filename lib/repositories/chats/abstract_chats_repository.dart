@@ -47,3 +47,35 @@ abstract interface class IChatsRepository {
   /// Пересоздаёт Realtime-канал и сразу сверяет кеш с сервером.
   Future<void> resumeRealtime();
 }
+
+/// Optional read capability while presentation adapters migrate away from
+/// complete list snapshots. Production implements indexed, account-scoped reads.
+abstract interface class IChatsPeerRepository {
+  Stream<Chat?> watchChatByPeerId(String peerId);
+}
+
+/// Confirmed account-wide count, independent of list/search coverage. Null
+/// means no confirmed snapshot (including servers awaiting the migration).
+abstract interface class IChatsUnreadRepository {
+  Stream<int?> watchUnreadCount();
+}
+
+extension ChatsPeerRepositoryAccess on IChatsRepository {
+  IChatsPeerRepository get _peerRepository => this as IChatsPeerRepository;
+  Stream<Chat?> watchChatByPeerId(String peerId) {
+    final normalized = peerId.trim();
+    if (normalized.isEmpty) return Stream.value(null);
+    final repository = this;
+    if (repository is IChatsPeerRepository) {
+      return _peerRepository.watchChatByPeerId(normalized);
+    }
+    // Legacy/in-memory implementations retain their existing contract. Never
+    // turn a cache observer into a getChats()/network call.
+    return watchChats().map((chats) {
+      for (final chat in chats) {
+        if (chat.peerId == normalized) return chat;
+      }
+      return null;
+    }).distinct();
+  }
+}

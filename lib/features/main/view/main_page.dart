@@ -74,9 +74,7 @@ class _MainView extends StatelessWidget {
           (bloc) => bloc.state.isSelectionMode,
         );
         final unreadChatsCount = context.select<ChatsBloc, int>(
-          (bloc) => bloc.state.chats
-              .where((chat) => !chat.isMuted)
-              .fold(0, (total, chat) => total + chat.unreadCount),
+          (bloc) => bloc.state.unreadCount,
         );
         final incomingFriendRequestsCount = context.select<FriendsBloc, int>(
           (bloc) => bloc.state.incomingRequestCount,

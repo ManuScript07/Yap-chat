@@ -13,7 +13,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   String? _draftPeerId;
   Future<Chat>? _directChatFuture;
   StreamSubscription? _messagesSubscription;
-  StreamSubscription<List<Chat>>? _draftChatSubscription;
+  StreamSubscription<Chat?>? _draftChatSubscription;
 
   ChatBloc({
     required IChatRepository chatRepository,
@@ -67,14 +67,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   void _watchForDraftResolution(String peerId) {
     unawaited(_draftChatSubscription?.cancel());
-    _draftChatSubscription = _chatsRepository.watchChats().listen((chats) {
-      if (_draftPeerId != peerId) return;
-      for (final chat in chats) {
-        if (chat.peerId == peerId) {
-          add(ChatDraftResolved(peerId: peerId, chat: chat));
-          return;
-        }
+    _draftChatSubscription = _chatsRepository.watchChatByPeerId(peerId).listen((
+      chat,
+    ) {
+      if (_draftPeerId != peerId || chat == null || chat.peerId != peerId) {
+        return;
       }
+      add(ChatDraftResolved(peerId: peerId, chat: chat));
     });
   }
 

@@ -45,3 +45,9 @@ final class ChatsSubscriptionUpdated extends ChatsEvent {
 final class ChatsSubscriptionFailed extends ChatsEvent {
   const ChatsSubscriptionFailed();
 }
+
+final class ChatsUnreadCountUpdated extends ChatsEvent {
+  const ChatsUnreadCountUpdated(this.total, this.generation);
+  final int? total;
+  final int generation;
+}

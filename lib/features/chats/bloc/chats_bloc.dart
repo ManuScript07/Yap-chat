@@ -28,18 +28,42 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     on<ChatsMuteToggled>(_onMuteToggled);
     on<ChatsSubscriptionUpdated>(_onSubscriptionUpdated);
     on<ChatsSubscriptionFailed>(_onSubscriptionFailed);
+    on<ChatsUnreadCountUpdated>((event, emit) {
+      if (event.generation != _subscriptionGeneration) return;
+      emit(
+        state.copyWith(
+          unreadTotal: event.total,
+          clearUnreadTotal: event.total == null,
+        ),
+      );
+    });
   }
 
   final IChatsRepository _chatsRepository;
   StreamSubscription<List<Chat>>? _chatsSubscription;
+  StreamSubscription<int?>? _unreadSubscription;
+  int _subscriptionGeneration = 0;
 
   Future<void> _onLoadStarted(
     ChatsLoadStarted event,
     Emitter<ChatsState> emit,
   ) async {
     emit(state.copyWith(status: ChatsStatus.loading));
-
+    final generation = ++_subscriptionGeneration;
+    await _unreadSubscription?.cancel();
     await _chatsSubscription?.cancel();
+    if (isClosed || generation != _subscriptionGeneration) return;
+    if (_chatsRepository case final IChatsUnreadRepository repository) {
+      _unreadSubscription = repository.watchUnreadCount().listen(
+        (total) {
+          if (!isClosed && generation == _subscriptionGeneration) {
+            add(ChatsUnreadCountUpdated(total, generation));
+          }
+        },
+        // An unavailable count must not replace the visible list with failure.
+        onError: (Object _, StackTrace _) {},
+      );
+    }
     _chatsSubscription = _chatsRepository.watchChats().listen(
       (chats) => add(ChatsSubscriptionUpdated(chats)),
       onError: (_, _) => add(const ChatsSubscriptionFailed()),
@@ -227,6 +251,8 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
 
   @override
   Future<void> close() async {
+    _subscriptionGeneration++;
+    await _unreadSubscription?.cancel();
     await _chatsSubscription?.cancel();
     return super.close();
   }

@@ -11,7 +11,8 @@ import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_remote_data_source.dart';
 
-class ChatsRepository implements IChatsRepository {
+class ChatsRepository
+    implements IChatsRepository, IChatsPeerRepository, IChatsUnreadRepository {
   ChatsRepository({
     required AppConfig config,
     required ChatsCacheDataSource cache,
@@ -61,6 +62,11 @@ class ChatsRepository implements IChatsRepository {
   int _summaryFailures = 0;
   bool _targetedSummariesSupported = true;
   bool _directLookupSupported = true;
+  bool _unreadStateSupported = true;
+  bool _needsUnreadRefresh = false;
+  int _unreadConsumers = 0;
+  int _unreadVersion = 0;
+  final _unreadMutations = <Object, AccountSessionSnapshot>{};
   final _lookups = <(String, int, int, bool, String), Future<Chat?>>{};
   final _lookupQueues = <bool, Future<void>>{};
   (String, int, int)? _lookupQueueScope;
@@ -169,16 +175,18 @@ class ChatsRepository implements IChatsRepository {
     // teardown operation.
     final cacheSubscription = _cacheSubscription;
     final realtimeSubscription = _realtimeSubscription;
+    final cacheListenerLease = _cacheListenerLease;
+    final realtimeListenerLease = _realtimeListenerLease;
     _cacheSubscription = null;
     _realtimeSubscription = null;
+    _cacheListenerLease = null;
+    _realtimeListenerLease = null;
     _watchScope = null;
     _latestChats = null;
     await cacheSubscription?.cancel();
     await realtimeSubscription?.cancel();
-    _cacheListenerLease?.dispose();
-    _cacheListenerLease = null;
-    _realtimeListenerLease?.dispose();
-    _realtimeListenerLease = null;
+    cacheListenerLease?.dispose();
+    realtimeListenerLease?.dispose();
   }
 
   @override
@@ -189,6 +197,122 @@ class ChatsRepository implements IChatsRepository {
         .map(
           (chat) => _accountSessionController.isCurrent(scope) ? chat : null,
         );
+  }
+
+  @override
+  Stream<Chat?> watchChatByPeerId(String peerId) {
+    final normalized = peerId.trim();
+    if (normalized.isEmpty) return Stream.value(null);
+    final scope = _accountSessionController.capture();
+    return Stream.multi((listener) {
+      if (!_accountSessionController.isCurrent(scope)) {
+        listener.add(null);
+        listener.close();
+        return;
+      }
+      // Keep the existing shared synchronization alive, just as watchChats
+      // did for profile/draft consumers. No per-peer remote subscription or
+      // initialization request is introduced. This lease does not inspect lists.
+      final lease = _ensureWatchController().stream.listen(
+        (_) {},
+        onError: (Object _) {},
+      );
+      final diagnostics = _config.diagnostics?.trackLocalListener(
+        'chats-peer-cache',
+      );
+      final subscription = _cache
+          .watchByPeerId(normalized, ownerUserId: scope.userId)
+          .listen(
+            (chat) => listener.add(
+              _accountSessionController.isCurrent(scope) ? chat : null,
+            ),
+            onError: listener.addError,
+          );
+      listener.onCancel = () async {
+        try {
+          await Future.wait([subscription.cancel(), lease.cancel()]);
+        } finally {
+          diagnostics?.dispose();
+        }
+      };
+    });
+  }
+
+  @override
+  Stream<int?> watchUnreadCount() {
+    final scope = _accountSessionController.capture();
+    return Stream.multi((listener) {
+      if (!_accountSessionController.isCurrent(scope)) {
+        listener.add(null);
+        listener.close();
+        return;
+      }
+      _unreadConsumers++;
+      final lease = _ensureWatchController().stream.listen(
+        (_) {},
+        onError: (Object _) {},
+      );
+      final diagnostics = _config.diagnostics?.trackLocalListener(
+        'chats-unread-cache',
+      );
+      final subscription = _cache
+          .watchUnreadState(ownerUserId: scope.userId)
+          .map(
+            (state) =>
+                _accountSessionController.isCurrent(scope) ? state.total : null,
+          )
+          .distinct()
+          .listen(listener.add, onError: listener.addError);
+      if (_unreadConsumers == 1) _requestUnreadRefresh();
+      listener.onCancel = () async {
+        _unreadConsumers--;
+        try {
+          await Future.wait([subscription.cancel(), lease.cancel()]);
+        } finally {
+          diagnostics?.dispose();
+        }
+      };
+    });
+  }
+
+  void _requestUnreadRefresh() {
+    if (_unreadConsumers == 0 || !_unreadStateSupported) return;
+    _needsUnreadRefresh = true;
+    _scheduleSummarySync();
+  }
+
+  bool _hasUnreadMutation(AccountSessionSnapshot scope) =>
+      _unreadMutations.values.any(
+        (pending) =>
+            pending.userId == scope.userId &&
+            pending.generation == scope.generation,
+      );
+
+  Future<T> _withUnreadMutation<T>(
+    AccountSessionSnapshot scope,
+    Future<T> Function() operation,
+  ) async {
+    _accountSessionController.ensureCurrent(scope);
+    final token = Object();
+    _unreadMutations[token] = scope;
+    _unreadVersion++;
+    var accepted = false;
+    try {
+      final result = await operation();
+      accepted = true;
+      return result;
+    } finally {
+      _unreadMutations.remove(token);
+      if (_accountSessionController.isCurrent(scope)) {
+        _unreadVersion++;
+        if (accepted && _unreadConsumers > 0 && _unreadStateSupported) {
+          // Join the existing queue even when no Realtime event arrives.
+          // Metadata was already committed locally: only outstanding dirty IDs
+          // need another read. Never derive a total from possibly stale rows.
+          _requestUnreadRefresh();
+        }
+      }
+    }
   }
 
   @override
@@ -438,6 +562,13 @@ class ChatsRepository implements IChatsRepository {
     if (ids.isEmpty) return;
     ids = Set<String>.unmodifiable(ids);
     final scope = _accountSessionController.capture();
+    return _withUnreadMutation(scope, () => _deleteChats(ids, scope));
+  }
+
+  Future<void> _deleteChats(
+    Set<String> ids,
+    AccountSessionSnapshot scope,
+  ) async {
     final clearedAt = DateTime.now().toUtc();
     final pendingIds = <String>[];
     await _accountSessionController.commit(scope, () async {
@@ -497,7 +628,10 @@ class ChatsRepository implements IChatsRepository {
         '${scope.generation}:${scope.userId}:${(ids.toList()..sort()).join(',')}';
     final active = _activeReadOperations[key];
     if (active != null) return active;
-    final operation = _markAsRead(selected, scope);
+    final operation = _withUnreadMutation(
+      scope,
+      () => _markAsRead(selected, scope),
+    );
     _activeReadOperations[key] = operation;
     await operation.whenComplete(() {
       if (identical(_activeReadOperations[key], operation)) {
@@ -557,6 +691,17 @@ class ChatsRepository implements IChatsRepository {
     _accountSessionController.ensureCurrent(scope);
     final changedIds = ids.difference(matching);
     if (changedIds.isEmpty) return;
+    return _withUnreadMutation(
+      scope,
+      () => _commitMuted(changedIds, isMuted, scope),
+    );
+  }
+
+  Future<void> _commitMuted(
+    Set<String> changedIds,
+    bool isMuted,
+    AccountSessionSnapshot scope,
+  ) async {
     await _remote.setMuted(changedIds, isMuted: isMuted);
     try {
       // Do not let an already-running pre-write snapshot overwrite this commit.
@@ -641,6 +786,7 @@ class ChatsRepository implements IChatsRepository {
     if (change.conversationId != null && change.reason != 'reaction_changed') {
       _summaryVersions[change.conversationId!] = ++_summaryVersion;
     }
+    if (change.reason != 'reaction_changed') _unreadVersion++;
     final epoch = _summaryEpoch;
     _changeQueue = _changeQueue
         .then((_) async {
@@ -726,6 +872,7 @@ class ChatsRepository implements IChatsRepository {
         scope,
         summaryEpoch: epoch,
       );
+      _requestUnreadRefresh();
     } else if (!pendingIds.contains(conversationId)) {
       // Mute changes only member metadata, never message history.
       if (change.reason != 'muted' &&
@@ -754,7 +901,9 @@ class ChatsRepository implements IChatsRepository {
       _enqueueReconciliation();
       return;
     }
-    if (_dirtyChatIds.isEmpty ||
+    final needsUnread =
+        _needsUnreadRefresh && _unreadConsumers > 0 && _unreadStateSupported;
+    if ((_dirtyChatIds.isEmpty && !needsUnread) ||
         _summarySyncTimer != null ||
         _summaryBatchToken != null) {
       return;
@@ -777,13 +926,14 @@ class ChatsRepository implements IChatsRepository {
       _changeQueue = _changeQueue
           .then((_) async {
             if (!_summaryScopeIsCurrent(scope, epoch) ||
-                _dirtyChatIds.isEmpty) {
+                (_dirtyChatIds.isEmpty && !_needsUnreadRefresh)) {
               return;
             }
             final ids = _dirtyChatIds
                 .take(ChatsRemoteDataSource.summaryBatchSize)
                 .toSet();
             _dirtyChatIds.removeAll(ids);
+            _needsUnreadRefresh = false;
             _nextSummaryAttemptMicros =
                 _summaryClock.elapsedMicroseconds +
                 _summaryMinimumInterval.inMicroseconds;
@@ -795,6 +945,9 @@ class ChatsRepository implements IChatsRepository {
             } catch (error, stackTrace) {
               if (_summaryScopeIsCurrent(scope, epoch)) {
                 _dirtyChatIds.addAll(ids);
+                if (_unreadConsumers > 0 && _unreadStateSupported) {
+                  _needsUnreadRefresh = true;
+                }
                 _summaryFailures = (_summaryFailures + 1).clamp(1, 5);
                 final quotaLimited =
                     error is PostgrestException &&
@@ -841,6 +994,7 @@ class ChatsRepository implements IChatsRepository {
     _summarySyncTimer?.cancel();
     _summarySyncTimer = null;
     if (clearIds) {
+      _needsUnreadRefresh = false;
       _dirtyChatIds.clear();
       _summaryVersions.clear();
       _summaryFailures = 0;
@@ -1032,6 +1186,7 @@ class ChatsRepository implements IChatsRepository {
       }
     });
     _scheduleSummarySync();
+    _requestUnreadRefresh();
     _config.diagnostics?.recordSyncItems('chats', reconciled.length);
   }
 
@@ -1041,6 +1196,32 @@ class ChatsRepository implements IChatsRepository {
     int epoch,
   ) async {
     _ensureSummaryScope(scope, epoch);
+    if (_unreadConsumers > 0 && _unreadStateSupported) {
+      final version = _summaryVersion;
+      final unreadVersion = _unreadVersion;
+      final unread = await _cache.readUnreadState(ownerUserId: scope.userId);
+      _ensureSummaryScope(scope, epoch);
+      try {
+        final response = await _remote.fetchUnreadState(conversationIds: ids);
+        await _applySummaryResult(
+          ids,
+          response.chats,
+          scope,
+          epoch,
+          version,
+          unreadTotal: response.unreadTotal,
+          unreadRevision: unread.revision,
+          unreadVersion: unreadVersion,
+        );
+        return;
+      } on PostgrestException catch (error) {
+        if (error.code != 'PGRST202') rethrow;
+        _ensureSummaryScope(scope, epoch);
+        _unreadStateSupported = false;
+        _needsUnreadRefresh = false;
+      }
+    }
+    if (ids.isEmpty) return;
     if (!_targetedSummariesSupported) {
       await _performSync(scope, epoch);
       return;
@@ -1068,6 +1249,9 @@ class ChatsRepository implements IChatsRepository {
     int epoch,
     int version, {
     bool protectAgainstSnapshot = false,
+    int? unreadTotal,
+    int? unreadRevision,
+    int? unreadVersion,
   }) async {
     _ensureSummaryScope(scope, epoch);
     if (chats.any((chat) => !ids.contains(chat.id)) ||
@@ -1101,7 +1285,21 @@ class ChatsRepository implements IChatsRepository {
             .where((chat) => currentIds.contains(chat.id))
             .toList(growable: false),
         ownerUserId: scope.userId,
+        activityByChatId: {
+          for (final chat in chats)
+            if (currentIds.contains(chat.id))
+              chat.id: chat.lastMessageTime.toUtc(),
+        },
       );
+      if (unreadTotal != null &&
+          unreadVersion == _unreadVersion &&
+          !_hasUnreadMutation(scope)) {
+        await _cache.applyUnreadTotal(
+          unreadTotal,
+          expectedRevision: unreadRevision!,
+          ownerUserId: scope.userId,
+        );
+      }
       if (protectAgainstSnapshot) {
         _dirtyChatIds.removeAll(currentIds);
         for (final id in currentIds) {

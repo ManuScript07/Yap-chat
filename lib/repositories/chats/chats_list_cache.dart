@@ -5,6 +5,90 @@ extension ChatsListCache on ChatsCacheDataSource {
   static const _uuid = Uuid();
   static const maximumSliceSize = 200;
 
+  /// Exact positions captured from the remote summaries BEFORE pending preview
+  /// merging or Drift's second-resolution timestamps. Delta membership never
+  /// advances the original server cursor or claims coverage of a missing range.
+  Future<void> _applyListActivity(
+    List<Chat> chats,
+    Map<String, DateTime> activityByChatId,
+    String owner,
+  ) async {
+    if (activityByChatId.isEmpty) return;
+    final states =
+        await (_database.select(_database.cachedChatListStates)..where(
+              (t) => t.ownerUserId.equals(owner) & t.hasRemotePage.equals(true),
+            ))
+            .get();
+    if (states.isEmpty) return;
+    final positioned = chats
+        .where((c) => activityByChatId.containsKey(c.id))
+        .toList();
+    // Page/search coverage is bounded independently of metadata history.
+    // Keep both query and ID in each PK lookup; selecting owner+ID alone can
+    // scan all entries of every cached search query.
+    for (final state in states) {
+      for (
+        var start = 0;
+        start < positioned.length;
+        start += ChatsCacheDataSource._idBatchSize
+      ) {
+        final batch = positioned
+            .skip(start)
+            .take(ChatsCacheDataSource._idBatchSize)
+            .toList();
+        final entries = await _database
+            .customSelect(
+              '''
+          WITH requested(id) AS (VALUES ${List.filled(batch.length, '(?)').join(',')})
+          SELECT e.chat_id, e.activity_micros FROM requested r
+          CROSS JOIN cached_chat_list_entries e
+          WHERE e.owner_user_id=? AND e.query=? AND e.chat_id=r.id
+        ''',
+              variables: [
+                ...batch.map((c) => Variable<String>(c.id)),
+                Variable<String>(owner),
+                Variable<String>(state.query),
+              ],
+              readsFrom: {_database.cachedChatListEntries},
+            )
+            .get();
+        final current = {
+          for (final row in entries)
+            row.read<String>('chat_id'): row.read<int>('activity_micros'),
+        };
+        for (final chat in batch) {
+          final matches =
+              state.query.isEmpty ||
+              chat.userName.toLowerCase().startsWith(state.query);
+          if (!matches) {
+            if (current.containsKey(chat.id)) {
+              await (_database.delete(_database.cachedChatListEntries)..where(
+                    (t) =>
+                        t.ownerUserId.equals(owner) &
+                        t.query.equals(state.query) &
+                        t.chatId.equals(chat.id),
+                  ))
+                  .go();
+            }
+            continue;
+          }
+          final micros = activityByChatId[chat.id]!.microsecondsSinceEpoch;
+          if (current[chat.id] == micros) continue;
+          await _database
+              .into(_database.cachedChatListEntries)
+              .insertOnConflictUpdate(
+                CachedChatListEntriesCompanion.insert(
+                  ownerUserId: owner,
+                  query: state.query,
+                  chatId: chat.id,
+                  activityMicros: micros,
+                ),
+              );
+        }
+      }
+    }
+  }
+
   String _listQuery(String value) {
     final query = value.trim().toLowerCase();
     if (query.runes.length > 100) throw ArgumentError('Chat query is too long');

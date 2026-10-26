@@ -20,6 +20,7 @@ class ChatsState extends Equatable {
     this.feedbackAction,
     this.feedbackIsMuted,
     this.feedbackId = 0,
+    this.unreadTotal,
   });
 
   final ChatsStatus status;
@@ -32,6 +33,13 @@ class ChatsState extends Equatable {
   final ChatsBulkAction? feedbackAction;
   final bool? feedbackIsMuted;
   final int feedbackId;
+  final int? unreadTotal;
+
+  int get unreadCount =>
+      unreadTotal ??
+      chats
+          .where((chat) => !chat.isMuted)
+          .fold(0, (total, chat) => total + chat.unreadCount);
 
   bool get isSelectionMode => selectedChatIds.isNotEmpty;
   bool get hasMutedSelection =>
@@ -49,6 +57,8 @@ class ChatsState extends Equatable {
     bool? feedbackIsMuted,
     bool clearFeedback = false,
     int? feedbackId,
+    int? unreadTotal,
+    bool clearUnreadTotal = false,
   }) {
     return ChatsState(
       status: status ?? this.status,
@@ -66,6 +76,7 @@ class ChatsState extends Equatable {
           ? null
           : feedbackIsMuted ?? this.feedbackIsMuted,
       feedbackId: feedbackId ?? this.feedbackId,
+      unreadTotal: clearUnreadTotal ? null : unreadTotal ?? this.unreadTotal,
     );
   }
 
@@ -81,5 +92,6 @@ class ChatsState extends Equatable {
     feedbackAction,
     feedbackIsMuted,
     feedbackId,
+    unreadTotal,
   ];
 }

@@ -92,6 +92,21 @@ class ChatsCacheDataSource {
     });
   }
 
+  Stream<Chat?> watchByPeerId(String peerId, {String? ownerUserId}) {
+    final owner = ownerUserId ?? _userIdProvider();
+    final query = _database.select(_database.cachedChats)
+      ..where(
+        (table) =>
+            table.ownerUserId.equals(owner) & table.peerId.equals(peerId),
+      )
+      ..limit(1);
+    final pathsReady = _prepareAvatarPaths();
+    return query.watchSingleOrNull().asyncMap((row) async {
+      await pathsReady;
+      return row == null ? null : _mapRow(row);
+    }).distinct();
+  }
+
   Future<bool> isDeliveryBlocked(String chatId, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
     final row =
@@ -133,10 +148,12 @@ class ChatsCacheDataSource {
     Set<String> requestedIds,
     List<Chat> chats, {
     String? ownerUserId,
+    Map<String, DateTime> activityByChatId = const {},
   }) async {
     final returnedIds = chats.map((chat) => chat.id).toSet();
     if (returnedIds.length != chats.length ||
-        !requestedIds.containsAll(returnedIds)) {
+        !requestedIds.containsAll(returnedIds) ||
+        !returnedIds.containsAll(activityByChatId.keys)) {
       throw ArgumentError(
         'Summary response contains unrequested or duplicate IDs',
       );
@@ -162,6 +179,7 @@ class ChatsCacheDataSource {
             .into(_database.cachedChats)
             .insertOnConflictUpdate(_companion(chat, owner));
       }
+      await _applyListActivity(chats, activityByChatId, owner);
     });
   }
 

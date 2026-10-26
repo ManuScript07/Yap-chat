@@ -88,7 +88,7 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
   final ILocationRepository _locationRepository;
   final IBlocklistRepository _blocklistRepository;
   final IUserReportsRepository _userReportsRepository;
-  StreamSubscription<List<Chat>>? _chatsSubscription;
+  StreamSubscription<Chat?>? _chatsSubscription;
   StreamSubscription<String>? _friendsSubscription;
   StreamSubscription<List<Friend>>? _friendsCacheSubscription;
   StreamSubscription<List<FriendRequest>>? _requestsCacheSubscription;
@@ -103,10 +103,9 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     // later response of that older request must never restore private fields
     // after a realtime refresh has already received the redacted profile.
     final requestRevision = ++_profileRequestRevision;
-    _chatsSubscription ??= _chatsRepository.watchChats().listen(
-      _syncLastSeenFromChats,
-      onError: (_, _) {},
-    );
+    _chatsSubscription ??= _chatsRepository
+        .watchChatByPeerId(_userId)
+        .listen(_syncLastSeenFromChat, onError: (_, _) {});
     _friendsSubscription ??= _friendsRepository.watchProfileChanges().listen(
       _syncProfileFromFriendChange,
       onError: (_, _) {},
@@ -395,15 +394,8 @@ class ViewedProfileCubit extends Cubit<ViewedProfileState> {
     );
   }
 
-  void _syncLastSeenFromChats(List<Chat> chats) {
+  void _syncLastSeenFromChat(Chat? chat) {
     if (isClosed) return;
-    Chat? chat;
-    for (final candidate in chats) {
-      if (candidate.peerId == _userId) {
-        chat = candidate;
-        break;
-      }
-    }
     final viewedProfile = state.viewedProfile;
     if (chat == null) {
       return;

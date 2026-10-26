@@ -119,8 +119,8 @@ class ChatsRemoteDataSource {
     return chats.isEmpty ? null : chats.single;
   }
 
-  /// Prepared for the paged repository: combine metadata and the global badge
-  /// in one existing-client read, never a separate background polling loop.
+  /// Combine metadata and the global badge in one existing-client read,
+  /// never a separate background polling loop.
   Future<ChatUnreadState> fetchUnreadState({
     Set<String> conversationIds = const {},
   }) async {
