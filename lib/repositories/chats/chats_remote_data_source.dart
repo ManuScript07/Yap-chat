@@ -119,6 +119,43 @@ class ChatsRemoteDataSource {
     return chats.isEmpty ? null : chats.single;
   }
 
+  /// Prepared for the paged repository: combine metadata and the global badge
+  /// in one existing-client read, never a separate background polling loop.
+  Future<ChatUnreadState> fetchUnreadState({
+    Set<String> conversationIds = const {},
+  }) async {
+    if (conversationIds.length > summaryBatchSize ||
+        conversationIds.any((id) => id.trim().isEmpty)) {
+      throw ArgumentError('Invalid unread summary selection');
+    }
+    final ticket = _presenceStore?.captureSnapshot();
+    final response = await _readRpc<Map<String, dynamic>>(
+      'get_chat_unread_state',
+      params: {'conversation_ids': conversationIds.toList(growable: false)},
+    );
+    final total = response['unread_total'];
+    final rows = response['items'];
+    if (total is! int ||
+        total < 0 ||
+        rows is! List ||
+        rows.length > conversationIds.length) {
+      throw const FormatException('Invalid unread state');
+    }
+    final ids = <String>{};
+    for (final row in rows) {
+      if (row is! Map ||
+          row['id'] is! String ||
+          !conversationIds.contains(row['id']) ||
+          !ids.add(row['id'] as String)) {
+        throw const FormatException('Invalid unread summary rows');
+      }
+    }
+    return ChatUnreadState(
+      chats: _mapSummaries(rows, ticket),
+      unreadTotal: total,
+    );
+  }
+
   /// Prepared for the paged repository contract; the active list does not yet
   /// treat these partial results as its complete authoritative snapshot.
   Future<ChatListPage> fetchChatListPage({
@@ -147,6 +184,11 @@ class ChatsRemoteDataSource {
       },
     );
     final rawItems = response['items'];
+    final unreadTotal = response['unread_total'];
+    if (response.containsKey('unread_total') &&
+        (unreadTotal is! int || unreadTotal < 0)) {
+      throw const FormatException('Invalid page unread total');
+    }
     final more = response['has_more'];
     if (rawItems is! List ||
         rawItems.length > pageSize ||
@@ -237,6 +279,7 @@ class ChatsRemoteDataSource {
       ],
       query: query,
       nextCursor: next,
+      unreadTotal: unreadTotal as int?,
     );
   }
 
