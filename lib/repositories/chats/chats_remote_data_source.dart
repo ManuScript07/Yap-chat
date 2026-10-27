@@ -415,10 +415,12 @@ class ChatsRemoteDataSource {
   Future<String> createDirectConversation(String peerId) => measureRpc(
     _diagnostics,
     'create_direct_conversation',
-    () => _client.rpc<String>(
-      'create_direct_conversation',
-      params: {'peer_user_id': peerId},
-    ),
+    () => _client
+        .rpc<String>(
+          'create_direct_conversation',
+          params: {'peer_user_id': peerId},
+        )
+        .retry(enabled: false, requestTimeout: summaryRequestTimeout),
   );
 
   ChatPreviewType _previewType(String? value) {

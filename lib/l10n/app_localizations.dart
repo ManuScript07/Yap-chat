@@ -1358,6 +1358,30 @@ abstract class AppLocalizations {
   /// **'Действие выполнено'**
   String get chatsActionCompleted;
 
+  /// No description provided for @chatsLimitTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось начать чат'**
+  String get chatsLimitTitle;
+
+  /// No description provided for @chatsLimitContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'В списке уже {limit} или больше чатов. Удалите ненужные чаты, затем попробуйте снова. В существующих чатах можно продолжать общаться.'**
+  String chatsLimitContent(int limit);
+
+  /// No description provided for @chatsLimitDismiss.
+  ///
+  /// In ru, this message translates to:
+  /// **'Понятно'**
+  String get chatsLimitDismiss;
+
+  /// No description provided for @chatImagesPartiallySent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Некоторые фотографии не удалось добавить. Они остались выбранными — попробуйте ещё раз.'**
+  String get chatImagesPartiallySent;
+
   /// No description provided for @chatsSelectionLimit.
   ///
   /// In ru, this message translates to:

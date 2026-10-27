@@ -17,6 +17,8 @@ import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/abstract_local_media_repository.dart';
 import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
 
+import 'partial_image_send_exception.dart';
+
 class _LocalMessageDeletion {
   const _LocalMessageDeletion(this.chatId, this.messageId, this.ownerUserId);
 
@@ -536,12 +538,24 @@ class ChatRepository implements IChatRepository, IBoundedChatHistory {
     if (imagePaths.isEmpty) return;
     for (var offset = 0; offset < imagePaths.length; offset += 5) {
       final end = (offset + 5).clamp(0, imagePaths.length);
-      await _enqueue(
-        chatId: chatId,
-        type: MessageType.image,
-        imagePaths: List.unmodifiable(imagePaths.sublist(offset, end)),
-        replyToMessageId: offset == 0 ? replyToMessageId : null,
-      );
+      try {
+        await _enqueue(
+          chatId: chatId,
+          type: MessageType.image,
+          imagePaths: List.unmodifiable(imagePaths.sublist(offset, end)),
+          replyToMessageId: offset == 0 ? replyToMessageId : null,
+        );
+      } catch (error, stack) {
+        if (offset == 0) rethrow;
+        Error.throwWithStackTrace(
+          PartialImageSendException(
+            queuedPaths: imagePaths.take(offset),
+            remainingPaths: imagePaths.skip(offset),
+            cause: error,
+          ),
+          stack,
+        );
+      }
     }
   }
 

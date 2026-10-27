@@ -13,7 +13,6 @@ import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/features/settings/settings.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
-import 'package:yap_chat/ui/widgets/glass_button.dart';
 
 @RoutePage()
 class ProfilePage extends StatefulWidget {

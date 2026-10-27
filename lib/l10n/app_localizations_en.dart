@@ -733,6 +733,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsActionCompleted => 'Action completed';
 
   @override
+  String get chatsLimitTitle => 'Can\'t start a chat';
+
+  @override
+  String chatsLimitContent(int limit) {
+    return 'You already have $limit or more chats in your list. Remove chats you no longer need, then try again. You can keep messaging in existing chats.';
+  }
+
+  @override
+  String get chatsLimitDismiss => 'OK';
+
+  @override
+  String get chatImagesPartiallySent =>
+      'Some photos couldn\'t be added. They remain selected — please try again.';
+
+  @override
   String chatsSelectionLimit(int limit) {
     return 'You can select up to $limit chats';
   }

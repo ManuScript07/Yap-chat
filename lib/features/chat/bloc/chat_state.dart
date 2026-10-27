@@ -9,6 +9,7 @@ class ChatState extends Equatable {
   final List<ChatMessage> messages;
   final bool isSending;
   final int audioSendFailureCount;
+  final int chatLimitRefusalCount;
   final String chatId;
   final Set<String> initialMessageIds;
   final ChatMessage? replyToMessage;
@@ -21,6 +22,7 @@ class ChatState extends Equatable {
     this.messages = const [],
     this.isSending = false,
     this.audioSendFailureCount = 0,
+    this.chatLimitRefusalCount = 0,
     this.chatId = '',
     this.initialMessageIds = const {},
     this.replyToMessage,
@@ -34,6 +36,7 @@ class ChatState extends Equatable {
     List<ChatMessage>? messages,
     bool? isSending,
     int? audioSendFailureCount,
+    int? chatLimitRefusalCount,
     String? chatId,
     Set<String>? initialMessageIds,
     ChatMessage? replyToMessage,
@@ -48,6 +51,8 @@ class ChatState extends Equatable {
       isSending: isSending ?? this.isSending,
       audioSendFailureCount:
           audioSendFailureCount ?? this.audioSendFailureCount,
+      chatLimitRefusalCount:
+          chatLimitRefusalCount ?? this.chatLimitRefusalCount,
       chatId: chatId ?? this.chatId,
       initialMessageIds: initialMessageIds ?? this.initialMessageIds,
       replyToMessage: clearReplyToMessage
@@ -65,6 +70,7 @@ class ChatState extends Equatable {
     messages,
     isSending,
     audioSendFailureCount,
+    chatLimitRefusalCount,
     chatId,
     initialMessageIds,
     replyToMessage,

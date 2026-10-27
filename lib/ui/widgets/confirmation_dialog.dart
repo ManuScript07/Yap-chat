@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/ui/ui.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 
+/// Shared confirmation/information dialog. Existing callers retain two actions;
+/// notices can hide cancellation and opt into scrolling for larger text.
 Future<bool?> showConfirmationDialog(
   BuildContext context, {
   required String title,
   required String content,
   required String confirmLabel,
   String? cancelLabel,
+  bool showCancelButton = true,
+  bool scrollable = false,
 }) async {
   final l10n = context.l10n;
   final colorScheme = context.colorScheme;
@@ -15,6 +19,7 @@ Future<bool?> showConfirmationDialog(
   return showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
+      scrollable: scrollable,
       backgroundColor: context.scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
@@ -42,17 +47,18 @@ Future<bool?> showConfirmationDialog(
       ),
       actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          style: TextButton.styleFrom(
-            foregroundColor: colorScheme.onSurfaceVariant,
-            textStyle: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
+        if (showCancelButton)
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onSurfaceVariant,
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
+            child: Text(cancelLabel ?? l10n.cancel),
           ),
-          child: Text(cancelLabel ?? l10n.cancel),
-        ),
         FilledButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
           style: FilledButton.styleFrom(

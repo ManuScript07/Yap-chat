@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
@@ -27,7 +29,23 @@ class ChatDraftResolved extends ChatEvent {
   List<Object?> get props => [peerId, chat];
 }
 
-class ChatMessageSent extends ChatEvent {
+sealed class ChatOutgoingEvent extends ChatEvent {
+  const ChatOutgoingEvent();
+}
+
+/// UI awaits local acceptance before releasing its prepared content. Remote
+/// delivery remains owned by the existing durable outbox.
+class ChatSendRequested extends ChatEvent {
+  ChatSendRequested(this.message);
+
+  final ChatOutgoingEvent message;
+  final completion = Completer<bool>();
+
+  @override
+  List<Object?> get props => [message, completion];
+}
+
+class ChatMessageSent extends ChatOutgoingEvent {
   final String text;
   const ChatMessageSent(this.text);
 
@@ -35,7 +53,7 @@ class ChatMessageSent extends ChatEvent {
   List<Object?> get props => [text];
 }
 
-class ChatMessageImagesSent extends ChatEvent {
+class ChatMessageImagesSent extends ChatOutgoingEvent {
   final List<String> imagePaths;
   const ChatMessageImagesSent(this.imagePaths);
 
@@ -43,7 +61,7 @@ class ChatMessageImagesSent extends ChatEvent {
   List<Object?> get props => [imagePaths];
 }
 
-class ChatMessageAudioSent extends ChatEvent {
+class ChatMessageAudioSent extends ChatOutgoingEvent {
   const ChatMessageAudioSent({
     required this.audioPath,
     required this.duration,
@@ -67,7 +85,7 @@ class ChatMessageRetryRequested extends ChatEvent {
   List<Object?> get props => [message];
 }
 
-class ChatLocationSent extends ChatEvent {
+class ChatLocationSent extends ChatOutgoingEvent {
   const ChatLocationSent({required this.latitude, required this.longitude});
 
   final double latitude;

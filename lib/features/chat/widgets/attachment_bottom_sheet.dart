@@ -2,10 +2,8 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/repositories/repositories.dart';
-import 'package:yap_chat/ui/widgets/glass_button.dart';
 import 'package:yap_chat/ui/widgets/widgets.dart';
 
 class AttachmentSelection {
@@ -24,11 +22,14 @@ class ChatLocation {
   final double longitude;
 }
 
+/// Without [onSubmit], returns the selection to the caller. With [onSubmit],
+/// keeps refused selections for retry and closes with null after acceptance.
 Future<AttachmentSelection?> showAttachmentBottomSheet(
   BuildContext context, {
   required String chatId,
   required String peerName,
   String? initiallySelectedPath,
+  Future<bool> Function(AttachmentSelection)? onSubmit,
 }) {
   return showModalBottomSheet<AttachmentSelection>(
     context: context,
@@ -39,6 +40,7 @@ Future<AttachmentSelection?> showAttachmentBottomSheet(
       chatId: chatId,
       peerName: peerName,
       initiallySelectedPath: initiallySelectedPath,
+      onSubmit: onSubmit,
     ),
   );
 }
@@ -48,11 +50,13 @@ class _AttachmentBottomSheet extends StatefulWidget {
     required this.chatId,
     required this.peerName,
     this.initiallySelectedPath,
+    this.onSubmit,
   });
 
   final String chatId;
   final String peerName;
   final String? initiallySelectedPath;
+  final Future<bool> Function(AttachmentSelection)? onSubmit;
 
   @override
   State<_AttachmentBottomSheet> createState() => _AttachmentBottomSheetState();
@@ -61,6 +65,9 @@ class _AttachmentBottomSheet extends StatefulWidget {
 class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
   final Set<String> _selectedImages = {};
   bool _isLocationLoading = false;
+  bool _isSubmitting = false;
+  ChatLocation? _confirmedLocation;
+  int _locationRequestId = 0;
 
   // Список содержит только пути к локальным файлам (камера + галерея)
   final List<String> _localMedia = [];
@@ -87,7 +94,9 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
   }
 
   void _toggleSelection(String path) {
+    if (_isSubmitting) return;
     setState(() {
+      _supersedeLocation();
       if (_selectedImages.contains(path)) {
         _selectedImages.remove(path);
       } else {
@@ -96,18 +105,94 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
     });
   }
 
+  // A different attachment action invalidates both a retry and pending GPS work.
+  void _supersedeLocation() {
+    _confirmedLocation = null;
+    _locationRequestId++;
+    _isLocationLoading = false;
+  }
+
+  Future<void> _submit(AttachmentSelection selection) async {
+    if (_isSubmitting || !mounted) return;
+
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context)!;
+    if (!route.isActive) return;
+
+    final onSubmit = widget.onSubmit;
+    if (onSubmit == null) {
+      if (route.isCurrent) navigator.pop(selection);
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      if (selection.imagePaths != null) _supersedeLocation();
+    });
+
+    // Start and await the parent's operation independently of this State's life.
+    // Dismissing the sheet only prevents subsequent UI work, never submission.
+    late final bool accepted;
+    try {
+      accepted = await onSubmit(selection);
+    } on PartialImageSendException catch (error) {
+      if (!mounted || !route.isActive) return;
+      setState(() {
+        _selectedImages.removeAll(error.queuedPaths);
+        _isSubmitting = false;
+      });
+      showAppSnackBar(
+        context,
+        message: context.l10n.chatImagesPartiallySent,
+        type: SnackBarType.error,
+      );
+      return;
+    } catch (_) {
+      if (!mounted || !route.isActive) return;
+      setState(() => _isSubmitting = false);
+      showAppSnackBar(
+        context,
+        message: context.l10n.chatsActionFailed,
+        type: SnackBarType.error,
+      );
+      return;
+    }
+
+    if (!mounted || !route.isActive) return;
+    if (!accepted) {
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    // Keep submission locked throughout the closing animation. An overlay may
+    // have opened while awaiting the parent; close only this captured route.
+    if (route.isCurrent) {
+      navigator.pop<AttachmentSelection>();
+    } else {
+      navigator.removeRoute(route);
+    }
+  }
+
   Future<void> _handleCameraAction() async {
+    if (_isSubmitting) return;
+    setState(_supersedeLocation);
     final repository = context.read<ILocalMediaRepository>();
     await repository.savePendingChatId(widget.chatId);
+    if (!mounted || _isSubmitting) {
+      await repository.clearPendingChatId();
+      return;
+    }
 
     final photoPath = await MediaService.takePhoto();
     await repository.clearPendingChatId();
 
-    if (photoPath != null && mounted) {
+    if (!mounted || _isSubmitting) return;
+    if (photoPath != null) {
       final persistentPath = await repository.persistMedia(photoPath);
-      if (persistentPath == null || !mounted) return;
+      if (persistentPath == null || !mounted || _isSubmitting) return;
 
       setState(() {
+        _supersedeLocation();
         _localMedia.remove(persistentPath);
         _localMedia.insert(0, persistentPath);
         _selectedImages.add(persistentPath);
@@ -116,21 +201,24 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
     }
 
     final isPermanentlyDenied = await MediaService.isCameraPermanentlyDenied();
-    if (isPermanentlyDenied && mounted) {
+    if (isPermanentlyDenied && mounted && !_isSubmitting) {
       showPermissionDeniedDialog(context);
     }
   }
 
   Future<void> _handleGalleryAction() async {
+    if (_isSubmitting) return;
+    setState(_supersedeLocation);
     final imagePath = await MediaService.pickFromGallery();
 
-    if (imagePath != null && mounted) {
+    if (imagePath != null && mounted && !_isSubmitting) {
       final persistentPath = await context
           .read<ILocalMediaRepository>()
           .persistMedia(imagePath);
-      if (persistentPath == null || !mounted) return;
+      if (persistentPath == null || !mounted || _isSubmitting) return;
 
       setState(() {
+        _supersedeLocation();
         _localMedia.remove(persistentPath);
         _localMedia.insert(0, persistentPath);
         _selectedImages.add(persistentPath);
@@ -139,18 +227,21 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
   }
 
   Future<void> _deleteSelectedMedia() async {
+    if (_isSubmitting) return;
     final selectedPaths = _selectedImages.toList();
     if (selectedPaths.isEmpty) return;
+    setState(_supersedeLocation);
 
     final repository = context.read<ILocalMediaRepository>();
     for (final path in selectedPaths) {
       await repository.deleteMedia(path);
     }
 
-    if (!mounted) return;
+    if (!mounted || _isSubmitting) return;
     setState(() {
-      _localMedia.removeWhere(_selectedImages.contains);
-      _selectedImages.clear();
+      _supersedeLocation();
+      _localMedia.removeWhere(selectedPaths.contains);
+      _selectedImages.removeAll(selectedPaths);
     });
   }
 
@@ -207,20 +298,22 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                               icon: Icons.camera_alt_rounded,
                               label: l10n.chatActionCamera,
                               isLandscape: isLandscape,
-                              onTap: _handleCameraAction,
+                              onTap: _isSubmitting ? null : _handleCameraAction,
                             ),
                             _ActionButton(
                               icon: Icons.image_rounded,
                               label: l10n.chatActionGallery,
                               isLandscape: isLandscape,
-                              onTap: _handleGalleryAction,
+                              onTap: _isSubmitting
+                                  ? null
+                                  : _handleGalleryAction,
                             ),
                             _ActionButton(
                               icon: Icons.near_me,
                               label: l10n.chatActionLocation,
                               isLandscape: isLandscape,
                               isLoading: _isLocationLoading,
-                              onTap: _isLocationLoading
+                              onTap: _isSubmitting || _isLocationLoading
                                   ? null
                                   : _handleLocationAction,
                             ),
@@ -258,7 +351,9 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                                             path: path,
                                             isSelected: isSelected,
                                             isLandscape: isLandscape,
-                                            onTap: () => _toggleSelection(path),
+                                            onTap: _isSubmitting
+                                                ? null
+                                                : () => _toggleSelection(path),
                                           ),
                                         );
                                       },
@@ -289,9 +384,9 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                       child: SizedBox(
                         height: isLandscape ? 44 : 52,
                         child: FilledButton(
-                          onPressed: _selectedImages.isEmpty
+                          onPressed: _selectedImages.isEmpty || _isSubmitting
                               ? null
-                              : () => Navigator.of(context).pop(
+                              : () => _submit(
                                   AttachmentSelection.images(
                                     _selectedImages.toList(),
                                   ),
@@ -320,7 +415,7 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
                       const SizedBox(width: 10),
                       GlassButton(
                         icon: Icons.delete_outline_rounded,
-                        onPressed: _deleteSelectedMedia,
+                        onPressed: _isSubmitting ? null : _deleteSelectedMedia,
                         size: isLandscape ? 44 : 52,
                         iconSize: 32,
                       ),
@@ -336,18 +431,44 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
   }
 
   Future<void> _handleLocationAction() async {
-    if (_isLocationLoading) return;
+    if (_isSubmitting || _isLocationLoading) return;
 
+    final confirmedLocation = _confirmedLocation;
+    if (confirmedLocation != null) {
+      await _submit(AttachmentSelection.location(confirmedLocation));
+      return;
+    }
+
+    final requestId = ++_locationRequestId;
+    final route = ModalRoute.of(context)!;
     setState(() => _isLocationLoading = true);
 
+    bool isCurrentRequest() =>
+        requestId == _locationRequestId && route.isCurrent;
+
     final locationRepository = context.read<ILocationRepository>();
-    late final Position position;
 
     try {
-      position = await locationRepository.getCurrentPosition();
+      final position = await locationRepository.getCurrentPosition();
+      if (!mounted || !isCurrentRequest()) return;
+
+      final confirmed = await showConfirmationDialog(
+        context,
+        title: context.l10n.locationConfirmationDescription,
+        content: context.l10n.locationConfirmation(widget.peerName),
+        confirmLabel: context.l10n.locationShare,
+      );
+
+      if (confirmed != true || !mounted || !isCurrentRequest()) return;
+
+      final location = ChatLocation(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      _confirmedLocation = location;
+      await _submit(AttachmentSelection.location(location));
     } on LocationServiceDisabledFailure {
-      if (mounted) setState(() => _isLocationLoading = false);
-      if (!mounted) return;
+      if (!mounted || !isCurrentRequest()) return;
 
       await showPermissionDeniedDialog(
         context,
@@ -357,8 +478,7 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
       );
       return;
     } on LocationPermissionPermanentlyDeniedFailure {
-      if (mounted) setState(() => _isLocationLoading = false);
-      if (!mounted) return;
+      if (!mounted || !isCurrentRequest()) return;
 
       await showPermissionDeniedDialog(
         context,
@@ -368,8 +488,7 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
       );
       return;
     } on LocationPermissionDeniedFailure {
-      if (mounted) setState(() => _isLocationLoading = false);
-      if (!mounted) return;
+      if (!mounted || !isCurrentRequest()) return;
 
       showAppSnackBar(
         context,
@@ -378,30 +497,10 @@ class _AttachmentBottomSheetState extends State<_AttachmentBottomSheet> {
       );
       return;
     } finally {
-      if (mounted && _isLocationLoading) {
+      if (mounted && requestId == _locationRequestId && _isLocationLoading) {
         setState(() => _isLocationLoading = false);
       }
     }
-
-    if (!mounted) return;
-
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: context.l10n.locationConfirmationDescription,
-      content: context.l10n.locationConfirmation(widget.peerName),
-      confirmLabel: context.l10n.locationShare,
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    Navigator.of(context).pop(
-      AttachmentSelection.location(
-        ChatLocation(
-          latitude: position.latitude,
-          longitude: position.longitude,
-        ),
-      ),
-    );
   }
 }
 
@@ -477,7 +576,7 @@ class _MediaCard extends StatelessWidget {
 
   final String path;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isLandscape;
 
   @override

@@ -20,7 +20,6 @@ import 'package:yap_chat/features/settings/bloc/bloc.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
-import 'package:yap_chat/ui/widgets/glass_button.dart';
 import 'package:yap_chat/utils/utils.dart';
 
 @RoutePage()
@@ -69,6 +68,16 @@ class _ViewedProfileView extends StatelessWidget {
               previous.actionError != current.actionError &&
               current.actionError != null,
           listener: (context, state) {
+            if (state.actionError is ChatLimitReachedException) {
+              context.read<ViewedProfileCubit>().clearActionError();
+              unawaited(
+                showChatLimitReachedDialog(
+                  context,
+                  limit: ChatLimitReachedException.maximum,
+                ),
+              );
+              return;
+            }
             final message = switch (state.actionError) {
               UserReportRateLimitException() =>
                 context.l10n.viewedProfileReportRateLimited,
@@ -155,7 +164,10 @@ class _ViewedProfileView extends StatelessWidget {
             child: BlocListener<PresenceCubit, PresenceState>(
               listenWhen: (previous, current) =>
                   !viewedProfile.isBlocked &&
-                  current.hasNewOfflineEvent(viewedProfile.profile.id, previous),
+                  current.hasNewOfflineEvent(
+                    viewedProfile.profile.id,
+                    previous,
+                  ),
               listener: (context, _) =>
                   context.read<ViewedProfileCubit>().markOfflineNow(),
               child: _ProfileScaffold(

@@ -8,6 +8,7 @@ class MessageInputBar extends StatefulWidget {
   const MessageInputBar({
     super.key,
     required this.onSend,
+    this.onSubmit,
     this.onAddPhoto,
     this.onVoiceRecord,
     this.replyToMessageId,
@@ -15,6 +16,14 @@ class MessageInputBar extends StatefulWidget {
   });
 
   final ValueChanged<String> onSend;
+
+  /// When provided, replaces [onSend] and receives the trimmed draft.
+  ///
+  /// Return true only after the message has been locally enqueued. Returning
+  /// false or throwing retains the draft. The caller handles typed limit dialogs.
+  /// Accepted drafts are cleared only if no text edits occurred while awaiting.
+  final Future<bool> Function(String)? onSubmit;
+
   final VoidCallback? onAddPhoto;
   final VoidCallback? onVoiceRecord;
   final String? replyToMessageId;
@@ -33,6 +42,9 @@ class _MessageInputBarState extends State<MessageInputBar> {
       widget.focusNode ?? (_ownedFocusNode ??= FocusNode());
 
   bool _hasText = false;
+  bool _isSubmitting = false;
+  String _lastText = '';
+  int _textRevision = 0;
 
   @override
   void initState() {
@@ -44,7 +56,12 @@ class _MessageInputBarState extends State<MessageInputBar> {
   }
 
   void _handleTextChange() {
-    final hasText = _controller.text.trim().isNotEmpty;
+    final text = _controller.text;
+    if (text != _lastText) {
+      _lastText = text;
+      _textRevision++;
+    }
+    final hasText = text.trim().isNotEmpty;
 
     if (hasText == _hasText) {
       return;
@@ -58,7 +75,13 @@ class _MessageInputBarState extends State<MessageInputBar> {
   void _handleSend() {
     final text = _controller.text.trim();
 
-    if (text.isEmpty) {
+    if (_isSubmitting || text.isEmpty) {
+      return;
+    }
+
+    final onSubmit = widget.onSubmit;
+    if (onSubmit != null) {
+      _submit(text, onSubmit);
       return;
     }
 
@@ -66,7 +89,29 @@ class _MessageInputBarState extends State<MessageInputBar> {
     _controller.clear();
   }
 
+  Future<void> _submit(
+    String text,
+    Future<bool> Function(String) onSubmit,
+  ) async {
+    final revision = _textRevision;
+    _isSubmitting = true;
+    try {
+      final accepted = await onSubmit(text);
+      if (mounted && accepted && revision == _textRevision) {
+        _controller.clear();
+      }
+    } catch (_) {
+      // Submission failures leave the draft available for retry.
+    } finally {
+      _isSubmitting = false;
+    }
+  }
+
   void _handleAction() {
+    if (_isSubmitting) {
+      return;
+    }
+
     if (_hasText) {
       _handleSend();
       return;

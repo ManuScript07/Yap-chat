@@ -66,14 +66,18 @@ class ChatPage extends StatelessWidget {
               previous.resolvedChat != current.resolvedChat,
           builder: (context, state) {
             final activeChat = state.resolvedChat ?? chat;
-            if (activeChat.isDraft) return _ChatView(chat: activeChat);
-
             return StreamBuilder<Chat?>(
-              key: ValueKey(activeChat.id),
-              stream: context.read<IChatsRepository>().watchChat(activeChat.id),
+              // Keep the composer/selection mounted while a draft acquires its
+              // server ID. InitialData alone does not replace an old snapshot.
+              stream: activeChat.isDraft
+                  ? null
+                  : context.read<IChatsRepository>().watchChat(activeChat.id),
               initialData: activeChat,
-              builder: (context, snapshot) =>
-                  _ChatView(chat: snapshot.data ?? activeChat),
+              builder: (context, snapshot) => _ChatView(
+                chat: snapshot.data?.id == activeChat.id
+                    ? snapshot.data!
+                    : activeChat,
+              ),
             );
           },
         ),
@@ -349,18 +353,15 @@ class _ChatViewState extends State<_ChatView>
         .consumePendingMedia();
     if (!mounted || pendingPath == null) return;
 
-    final selection = await showAttachmentBottomSheet(
+    final bloc = context.read<ChatBloc>();
+    await showAttachmentBottomSheet(
       context,
       chatId: widget.chat.id,
       peerName: widget.chat.userName,
       initiallySelectedPath: pendingPath,
+      onSubmit: (selection) =>
+          _submitAttachment(bloc, selection, _scrollToBottom),
     );
-    if (!mounted || selection?.imagePaths == null) return;
-
-    final images = selection!.imagePaths!;
-    if (images.isEmpty) return;
-    context.read<ChatBloc>().add(ChatMessageImagesSent(images));
-    _scrollToBottom();
   }
 
   @override
@@ -401,11 +402,25 @@ class _ChatViewState extends State<_ChatView>
         (blocklistState.blocks(widget.chat.peerId) ||
             (!blocklistState.isLoaded && widget.chat.blockedByMe));
 
-    return BlocListener<ChatBloc, ChatState>(
-      listenWhen: (previous, current) =>
-          previous.audioSendFailureCount != current.audioSendFailureCount,
-      listener: (context, state) =>
-          context.read<VoiceRecorderCubit>().restoreUnsentDraft(),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ChatBloc, ChatState>(
+          listenWhen: (previous, current) =>
+              previous.chatLimitRefusalCount != current.chatLimitRefusalCount,
+          listener: (context, state) => unawaited(
+            showChatLimitReachedDialog(
+              context,
+              limit: ChatLimitReachedException.maximum,
+            ),
+          ),
+        ),
+        BlocListener<ChatBloc, ChatState>(
+          listenWhen: (previous, current) =>
+              previous.audioSendFailureCount != current.audioSendFailureCount,
+          listener: (context, state) =>
+              context.read<VoiceRecorderCubit>().restoreUnsentDraft(),
+        ),
+      ],
       child: BlocListener<PresenceCubit, PresenceState>(
         listenWhen: (previous, current) =>
             current.hasNewOfflineEvent(widget.chat.peerId, previous),
@@ -571,6 +586,27 @@ class _ChatViewState extends State<_ChatView>
   }
 }
 
+Future<bool> _submitAttachment(
+  ChatBloc bloc,
+  AttachmentSelection selection,
+  VoidCallback onSent,
+) async {
+  final ChatOutgoingEvent event;
+  if (selection.imagePaths case final paths? when paths.isNotEmpty) {
+    event = ChatMessageImagesSent(paths);
+  } else if (selection.location case final location?) {
+    event = ChatLocationSent(
+      latitude: location.latitude,
+      longitude: location.longitude,
+    );
+  } else {
+    return false;
+  }
+  final accepted = await bloc.submit(event);
+  if (accepted) onSent();
+  return accepted;
+}
+
 class _KeyboardAwareInput extends StatelessWidget {
   const _KeyboardAwareInput({
     required this.focusNode,
@@ -603,31 +639,14 @@ class _KeyboardAwareInput extends StatelessWidget {
   Future<void> _openAttachmentSheet(BuildContext context) async {
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final selection = await showAttachmentBottomSheet(
+    final bloc = context.read<ChatBloc>();
+    await showAttachmentBottomSheet(
       context,
       chatId: chatId,
       peerName: peerName,
+      onSubmit: (selection) =>
+          _submitAttachment(bloc, selection, onMessageSent),
     );
-
-    if (selection?.imagePaths != null &&
-        selection!.imagePaths!.isNotEmpty &&
-        context.mounted) {
-      context.read<ChatBloc>().add(
-        ChatMessageImagesSent(selection.imagePaths!),
-      );
-      onMessageSent();
-      return;
-    }
-
-    if (selection?.location != null && context.mounted) {
-      context.read<ChatBloc>().add(
-        ChatLocationSent(
-          latitude: selection!.location!.latitude,
-          longitude: selection.location!.longitude,
-        ),
-      );
-      onMessageSent();
-    }
   }
 
   @override
@@ -765,21 +784,23 @@ class _KeyboardAwareInput extends StatelessWidget {
                                         .finishPreviewSeeking();
                                   },
                                   onSend: () async {
-                                    final audio = await context
-                                        .read<VoiceRecorderCubit>()
+                                    final voice = context
+                                        .read<VoiceRecorderCubit>();
+                                    final bloc = context.read<ChatBloc>();
+                                    final audio = await voice
                                         .takeRecordingForSending();
-                                    if (audio == null || !context.mounted) {
+                                    if (audio == null || bloc.isClosed) {
                                       return;
                                     }
 
-                                    context.read<ChatBloc>().add(
+                                    final accepted = await bloc.submit(
                                       ChatMessageAudioSent(
                                         audioPath: audio.path,
                                         duration: audio.duration,
                                         waveform: audio.waveform,
                                       ),
                                     );
-                                    onMessageSent();
+                                    if (accepted) onMessageSent();
                                   },
                                 )
                               : MessageInputBar(
@@ -792,6 +813,13 @@ class _KeyboardAwareInput extends StatelessWidget {
                                       ChatMessageSent(text),
                                     );
                                     onMessageSent();
+                                  },
+                                  onSubmit: (text) async {
+                                    final accepted = await context
+                                        .read<ChatBloc>()
+                                        .submit(ChatMessageSent(text));
+                                    if (accepted) onMessageSent();
+                                    return accepted;
                                   },
                                   onAddPhoto: () =>
                                       _openAttachmentSheet(context),

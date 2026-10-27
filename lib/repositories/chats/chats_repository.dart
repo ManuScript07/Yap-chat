@@ -10,6 +10,7 @@ import 'package:yap_chat/repositories/chat/chat.dart';
 import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_remote_data_source.dart';
+import 'chat_limit_reached_exception.dart';
 
 part 'chats_pagination.dart';
 
@@ -690,7 +691,16 @@ class ChatsRepository
     String peerId,
     AccountSessionSnapshot scope,
   ) async {
-    final chatId = await _remote.createDirectConversation(peerId);
+    late final String chatId;
+    try {
+      chatId = await _remote.createDirectConversation(peerId);
+    } on PostgrestException catch (error) {
+      _accountSessionController.ensureCurrent(scope);
+      if (error.code == 'P0001' && error.message == 'chat_limit_reached') {
+        throw const ChatLimitReachedException();
+      }
+      rethrow;
+    }
     _accountSessionController.ensureCurrent(scope);
     final chat = await _lookupChat(chatId, byPeer: false, scope: scope);
     if (chat == null) {

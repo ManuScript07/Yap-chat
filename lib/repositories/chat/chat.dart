@@ -1,4 +1,5 @@
 export 'abstract_chat_repository.dart';
+export 'partial_image_send_exception.dart';
 export 'chat_cache_data_source.dart';
 export 'chat_history_cursor.dart';
 export 'chat_history_coverage.dart';

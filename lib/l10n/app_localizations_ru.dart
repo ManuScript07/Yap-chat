@@ -739,6 +739,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatsActionCompleted => 'Действие выполнено';
 
   @override
+  String get chatsLimitTitle => 'Не удалось начать чат';
+
+  @override
+  String chatsLimitContent(int limit) {
+    return 'В списке уже $limit или больше чатов. Удалите ненужные чаты, затем попробуйте снова. В существующих чатах можно продолжать общаться.';
+  }
+
+  @override
+  String get chatsLimitDismiss => 'Понятно';
+
+  @override
+  String get chatImagesPartiallySent =>
+      'Некоторые фотографии не удалось добавить. Они остались выбранными — попробуйте ещё раз.';
+
+  @override
   String chatsSelectionLimit(int limit) {
     return 'Можно выбрать не больше $limit чатов';
   }
