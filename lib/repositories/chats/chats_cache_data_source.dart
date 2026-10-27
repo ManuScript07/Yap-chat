@@ -7,6 +7,7 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 
 part 'chats_list_cache.dart';
+part 'chats_available_cache.dart';
 
 class ChatsCacheDataSource {
   static const _idBatchSize = 400;
@@ -124,16 +125,31 @@ class ChatsCacheDataSource {
 
   Future<bool> replaceAll(List<Chat> chats, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
-    final cachedChats = await read(ownerUserId: owner);
-    if (_sameChats(cachedChats, chats)) return false;
-    final cachedById = {for (final chat in cachedChats) chat.id: chat};
+    await _prepareAvatarPaths();
+    final cached = await (_database.select(
+      _database.cachedChats,
+    )..where((t) => t.ownerUserId.equals(owner))).get();
+    final cachedById = {for (final row in cached) row.id: row};
+    if (cached.length == chats.length &&
+        chats.every((chat) {
+          final previous = cachedById[chat.id];
+          return previous != null &&
+              _sameChat(_mapRow(previous), chat) &&
+              previous.listOrderMicros == _effectiveListOrder(chat, null);
+        })) {
+      return false;
+    }
 
     await _database.transaction(() async {
       final ids = chats.map((chat) => chat.id).toSet();
       await remove(cachedById.keys.toSet().difference(ids), ownerUserId: owner);
       for (final chat in chats) {
         final previous = cachedById[chat.id];
-        if (previous != null && _sameChat(previous, chat)) continue;
+        if (previous != null &&
+            _sameChat(_mapRow(previous), chat) &&
+            previous.listOrderMicros == _effectiveListOrder(chat, null)) {
+          continue;
+        }
         await _database
             .into(_database.cachedChats)
             .insertOnConflictUpdate(_companion(chat, owner));
@@ -162,7 +178,7 @@ class ChatsCacheDataSource {
     final owner = ownerUserId ?? _userIdProvider();
     await _database.transaction(() async {
       final current = {
-        for (final chat in await readForAction(
+        for (final chat in await _readRowsForAction(
           requestedIds,
           ownerUserId: owner,
         ))
@@ -174,22 +190,26 @@ class ChatsCacheDataSource {
       }
       for (final chat in chats) {
         final previous = current[chat.id];
-        if (previous != null && _sameChat(previous, chat)) continue;
+        if (previous != null &&
+            _sameChat(_mapRow(previous), chat) &&
+            previous.listOrderMicros ==
+                _effectiveListOrder(chat, activityByChatId[chat.id])) {
+          continue;
+        }
         await _database
             .into(_database.cachedChats)
-            .insertOnConflictUpdate(_companion(chat, owner));
+            .insertOnConflictUpdate(
+              _companion(chat, owner, activityByChatId[chat.id]),
+            );
       }
       await _applyListActivity(chats, activityByChatId, owner);
     });
   }
 
-  bool _sameChats(List<Chat> cached, List<Chat> incoming) {
-    if (cached.length != incoming.length) return false;
-    final cachedById = {for (final chat in cached) chat.id: chat};
-    return incoming.every((chat) {
-      final current = cachedById[chat.id];
-      return current != null && _sameChat(current, chat);
-    });
+  int _effectiveListOrder(Chat chat, DateTime? activityAt) {
+    final preview = chat.lastMessageTime.microsecondsSinceEpoch;
+    final activity = activityAt?.microsecondsSinceEpoch ?? preview;
+    return preview > activity ? preview : activity;
   }
 
   bool _sameChat(Chat left, Chat right) {
@@ -244,19 +264,37 @@ class ChatsCacheDataSource {
     Set<String> ids, {
     String? ownerUserId,
   }) async {
+    return (await _readRowsForAction(
+      ids,
+      ownerUserId: ownerUserId,
+    )).map(_mapRow).toList(growable: false);
+  }
+
+  Future<List<CachedChat>> _readRowsForAction(
+    Set<String> ids, {
+    String? ownerUserId,
+  }) async {
     if (ids.isEmpty) return const [];
     final owner = ownerUserId ?? _userIdProvider();
-    final chats = <Chat>[];
+    final chats = <CachedChat>[];
     final orderedIds = ids.toList(growable: false);
     for (var start = 0; start < orderedIds.length; start += _idBatchSize) {
       final batch = orderedIds.skip(start).take(_idBatchSize);
-      final rows =
-          await (_database.select(_database.cachedChats)..where(
-                (table) =>
-                    table.ownerUserId.equals(owner) & table.id.isIn(batch),
-              ))
-              .get();
-      chats.addAll(rows.map(_mapRow));
+      final rows = await _database
+          .customSelect(
+            '''
+        WITH requested(id) AS (VALUES ${List.filled(batch.length, '(?)').join(',')})
+        SELECT c.* FROM requested r CROSS JOIN cached_chats c
+        WHERE c.owner_user_id=? AND c.id=r.id
+      ''',
+            variables: [
+              ...batch.map(Variable<String>.new),
+              Variable<String>(owner),
+            ],
+            readsFrom: {_database.cachedChats},
+          )
+          .get();
+      chats.addAll(rows.map((r) => _database.cachedChats.map(r.data)));
     }
     return chats;
   }
@@ -337,6 +375,7 @@ class ChatsCacheDataSource {
             lastMessage: Value(message.text),
             lastMessageType: Value(_previewType(message.type).name),
             lastMessageTime: Value(message.timestamp),
+            listOrderMicros: Value(message.timestamp.microsecondsSinceEpoch),
             isLastMessageFromMe: Value(message.isMine),
           ),
         );
@@ -393,7 +432,11 @@ class ChatsCacheDataSource {
         : null;
   }
 
-  CachedChatsCompanion _companion(Chat chat, [String? ownerUserId]) {
+  CachedChatsCompanion _companion(
+    Chat chat, [
+    String? ownerUserId,
+    DateTime? activityAt,
+  ]) {
     return CachedChatsCompanion.insert(
       ownerUserId: ownerUserId ?? _userIdProvider(),
       id: chat.id,
@@ -407,6 +450,7 @@ class ChatsCacheDataSource {
       lastMessage: chat.lastMessage,
       lastMessageType: chat.lastMessageType.name,
       lastMessageTime: chat.lastMessageTime,
+      listOrderMicros: Value(_effectiveListOrder(chat, activityAt)),
       unreadCount: chat.unreadCount,
       isLastMessageFromMe: chat.isLastMessageFromMe,
       isMuted: chat.isMuted,

@@ -1536,6 +1536,17 @@ class $CachedChatsTable extends CachedChats
         type: DriftSqlType.dateTime,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _listOrderMicrosMeta = const VerificationMeta(
+    'listOrderMicros',
+  );
+  @override
+  late final GeneratedColumn<int> listOrderMicros = GeneratedColumn<int>(
+    'list_order_micros',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _unreadCountMeta = const VerificationMeta(
     'unreadCount',
   );
@@ -1669,6 +1680,7 @@ class $CachedChatsTable extends CachedChats
     lastMessage,
     lastMessageType,
     lastMessageTime,
+    listOrderMicros,
     unreadCount,
     isLastMessageFromMe,
     isMuted,
@@ -1805,6 +1817,15 @@ class $CachedChatsTable extends CachedChats
       );
     } else if (isInserting) {
       context.missing(_lastMessageTimeMeta);
+    }
+    if (data.containsKey('list_order_micros')) {
+      context.handle(
+        _listOrderMicrosMeta,
+        listOrderMicros.isAcceptableOrUnknown(
+          data['list_order_micros']!,
+          _listOrderMicrosMeta,
+        ),
+      );
     }
     if (data.containsKey('unread_count')) {
       context.handle(
@@ -1946,6 +1967,10 @@ class $CachedChatsTable extends CachedChats
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_message_time'],
       )!,
+      listOrderMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}list_order_micros'],
+      ),
       unreadCount: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}unread_count'],
@@ -2004,6 +2029,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
   final String lastMessage;
   final String lastMessageType;
   final DateTime lastMessageTime;
+  final int? listOrderMicros;
   final int unreadCount;
   final bool isLastMessageFromMe;
   final bool isMuted;
@@ -2026,6 +2052,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     required this.lastMessage,
     required this.lastMessageType,
     required this.lastMessageTime,
+    this.listOrderMicros,
     required this.unreadCount,
     required this.isLastMessageFromMe,
     required this.isMuted,
@@ -2057,6 +2084,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     map['last_message'] = Variable<String>(lastMessage);
     map['last_message_type'] = Variable<String>(lastMessageType);
     map['last_message_time'] = Variable<DateTime>(lastMessageTime);
+    if (!nullToAbsent || listOrderMicros != null) {
+      map['list_order_micros'] = Variable<int>(listOrderMicros);
+    }
     map['unread_count'] = Variable<int>(unreadCount);
     map['is_last_message_from_me'] = Variable<bool>(isLastMessageFromMe);
     map['is_muted'] = Variable<bool>(isMuted);
@@ -2091,6 +2121,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       lastMessage: Value(lastMessage),
       lastMessageType: Value(lastMessageType),
       lastMessageTime: Value(lastMessageTime),
+      listOrderMicros: listOrderMicros == null && nullToAbsent
+          ? const Value.absent()
+          : Value(listOrderMicros),
       unreadCount: Value(unreadCount),
       isLastMessageFromMe: Value(isLastMessageFromMe),
       isMuted: Value(isMuted),
@@ -2127,6 +2160,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       lastMessage: serializer.fromJson<String>(json['lastMessage']),
       lastMessageType: serializer.fromJson<String>(json['lastMessageType']),
       lastMessageTime: serializer.fromJson<DateTime>(json['lastMessageTime']),
+      listOrderMicros: serializer.fromJson<int?>(json['listOrderMicros']),
       unreadCount: serializer.fromJson<int>(json['unreadCount']),
       isLastMessageFromMe: serializer.fromJson<bool>(
         json['isLastMessageFromMe'],
@@ -2160,6 +2194,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       'lastMessage': serializer.toJson<String>(lastMessage),
       'lastMessageType': serializer.toJson<String>(lastMessageType),
       'lastMessageTime': serializer.toJson<DateTime>(lastMessageTime),
+      'listOrderMicros': serializer.toJson<int?>(listOrderMicros),
       'unreadCount': serializer.toJson<int>(unreadCount),
       'isLastMessageFromMe': serializer.toJson<bool>(isLastMessageFromMe),
       'isMuted': serializer.toJson<bool>(isMuted),
@@ -2185,6 +2220,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     String? lastMessage,
     String? lastMessageType,
     DateTime? lastMessageTime,
+    Value<int?> listOrderMicros = const Value.absent(),
     int? unreadCount,
     bool? isLastMessageFromMe,
     bool? isMuted,
@@ -2213,6 +2249,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     lastMessage: lastMessage ?? this.lastMessage,
     lastMessageType: lastMessageType ?? this.lastMessageType,
     lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+    listOrderMicros: listOrderMicros.present
+        ? listOrderMicros.value
+        : this.listOrderMicros,
     unreadCount: unreadCount ?? this.unreadCount,
     isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
     isMuted: isMuted ?? this.isMuted,
@@ -2257,6 +2296,9 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
       lastMessageTime: data.lastMessageTime.present
           ? data.lastMessageTime.value
           : this.lastMessageTime,
+      listOrderMicros: data.listOrderMicros.present
+          ? data.listOrderMicros.value
+          : this.listOrderMicros,
       unreadCount: data.unreadCount.present
           ? data.unreadCount.value
           : this.unreadCount,
@@ -2298,6 +2340,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           ..write('lastMessage: $lastMessage, ')
           ..write('lastMessageType: $lastMessageType, ')
           ..write('lastMessageTime: $lastMessageTime, ')
+          ..write('listOrderMicros: $listOrderMicros, ')
           ..write('unreadCount: $unreadCount, ')
           ..write('isLastMessageFromMe: $isLastMessageFromMe, ')
           ..write('isMuted: $isMuted, ')
@@ -2325,6 +2368,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
     lastMessage,
     lastMessageType,
     lastMessageTime,
+    listOrderMicros,
     unreadCount,
     isLastMessageFromMe,
     isMuted,
@@ -2351,6 +2395,7 @@ class CachedChat extends DataClass implements Insertable<CachedChat> {
           other.lastMessage == this.lastMessage &&
           other.lastMessageType == this.lastMessageType &&
           other.lastMessageTime == this.lastMessageTime &&
+          other.listOrderMicros == this.listOrderMicros &&
           other.unreadCount == this.unreadCount &&
           other.isLastMessageFromMe == this.isLastMessageFromMe &&
           other.isMuted == this.isMuted &&
@@ -2375,6 +2420,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
   final Value<String> lastMessage;
   final Value<String> lastMessageType;
   final Value<DateTime> lastMessageTime;
+  final Value<int?> listOrderMicros;
   final Value<int> unreadCount;
   final Value<bool> isLastMessageFromMe;
   final Value<bool> isMuted;
@@ -2398,6 +2444,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     this.lastMessage = const Value.absent(),
     this.lastMessageType = const Value.absent(),
     this.lastMessageTime = const Value.absent(),
+    this.listOrderMicros = const Value.absent(),
     this.unreadCount = const Value.absent(),
     this.isLastMessageFromMe = const Value.absent(),
     this.isMuted = const Value.absent(),
@@ -2422,6 +2469,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     required String lastMessage,
     required String lastMessageType,
     required DateTime lastMessageTime,
+    this.listOrderMicros = const Value.absent(),
     required int unreadCount,
     required bool isLastMessageFromMe,
     required bool isMuted,
@@ -2457,6 +2505,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Expression<String>? lastMessage,
     Expression<String>? lastMessageType,
     Expression<DateTime>? lastMessageTime,
+    Expression<int>? listOrderMicros,
     Expression<int>? unreadCount,
     Expression<bool>? isLastMessageFromMe,
     Expression<bool>? isMuted,
@@ -2483,6 +2532,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       if (lastMessage != null) 'last_message': lastMessage,
       if (lastMessageType != null) 'last_message_type': lastMessageType,
       if (lastMessageTime != null) 'last_message_time': lastMessageTime,
+      if (listOrderMicros != null) 'list_order_micros': listOrderMicros,
       if (unreadCount != null) 'unread_count': unreadCount,
       if (isLastMessageFromMe != null)
         'is_last_message_from_me': isLastMessageFromMe,
@@ -2511,6 +2561,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     Value<String>? lastMessage,
     Value<String>? lastMessageType,
     Value<DateTime>? lastMessageTime,
+    Value<int?>? listOrderMicros,
     Value<int>? unreadCount,
     Value<bool>? isLastMessageFromMe,
     Value<bool>? isMuted,
@@ -2537,6 +2588,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageType: lastMessageType ?? this.lastMessageType,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      listOrderMicros: listOrderMicros ?? this.listOrderMicros,
       unreadCount: unreadCount ?? this.unreadCount,
       isLastMessageFromMe: isLastMessageFromMe ?? this.isLastMessageFromMe,
       isMuted: isMuted ?? this.isMuted,
@@ -2593,6 +2645,9 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
     if (lastMessageTime.present) {
       map['last_message_time'] = Variable<DateTime>(lastMessageTime.value);
     }
+    if (listOrderMicros.present) {
+      map['list_order_micros'] = Variable<int>(listOrderMicros.value);
+    }
     if (unreadCount.present) {
       map['unread_count'] = Variable<int>(unreadCount.value);
     }
@@ -2645,6 +2700,7 @@ class CachedChatsCompanion extends UpdateCompanion<CachedChat> {
           ..write('lastMessage: $lastMessage, ')
           ..write('lastMessageType: $lastMessageType, ')
           ..write('lastMessageTime: $lastMessageTime, ')
+          ..write('listOrderMicros: $listOrderMicros, ')
           ..write('unreadCount: $unreadCount, ')
           ..write('isLastMessageFromMe: $isLastMessageFromMe, ')
           ..write('isMuted: $isMuted, ')
@@ -14410,6 +14466,7 @@ typedef $$CachedChatsTableCreateCompanionBuilder =
       required String lastMessage,
       required String lastMessageType,
       required DateTime lastMessageTime,
+      Value<int?> listOrderMicros,
       required int unreadCount,
       required bool isLastMessageFromMe,
       required bool isMuted,
@@ -14435,6 +14492,7 @@ typedef $$CachedChatsTableUpdateCompanionBuilder =
       Value<String> lastMessage,
       Value<String> lastMessageType,
       Value<DateTime> lastMessageTime,
+      Value<int?> listOrderMicros,
       Value<int> unreadCount,
       Value<bool> isLastMessageFromMe,
       Value<bool> isMuted,
@@ -14513,6 +14571,11 @@ class $$CachedChatsTableFilterComposer
 
   ColumnFilters<DateTime> get lastMessageTime => $composableBuilder(
     column: $table.lastMessageTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get listOrderMicros => $composableBuilder(
+    column: $table.listOrderMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14631,6 +14694,11 @@ class $$CachedChatsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get listOrderMicros => $composableBuilder(
+    column: $table.listOrderMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get unreadCount => $composableBuilder(
     column: $table.unreadCount,
     builder: (column) => ColumnOrderings(column),
@@ -14742,6 +14810,11 @@ class $$CachedChatsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get listOrderMicros => $composableBuilder(
+    column: $table.listOrderMicros,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get unreadCount => $composableBuilder(
     column: $table.unreadCount,
     builder: (column) => column,
@@ -14827,6 +14900,7 @@ class $$CachedChatsTableTableManager
                 Value<String> lastMessage = const Value.absent(),
                 Value<String> lastMessageType = const Value.absent(),
                 Value<DateTime> lastMessageTime = const Value.absent(),
+                Value<int?> listOrderMicros = const Value.absent(),
                 Value<int> unreadCount = const Value.absent(),
                 Value<bool> isLastMessageFromMe = const Value.absent(),
                 Value<bool> isMuted = const Value.absent(),
@@ -14850,6 +14924,7 @@ class $$CachedChatsTableTableManager
                 lastMessage: lastMessage,
                 lastMessageType: lastMessageType,
                 lastMessageTime: lastMessageTime,
+                listOrderMicros: listOrderMicros,
                 unreadCount: unreadCount,
                 isLastMessageFromMe: isLastMessageFromMe,
                 isMuted: isMuted,
@@ -14875,6 +14950,7 @@ class $$CachedChatsTableTableManager
                 required String lastMessage,
                 required String lastMessageType,
                 required DateTime lastMessageTime,
+                Value<int?> listOrderMicros = const Value.absent(),
                 required int unreadCount,
                 required bool isLastMessageFromMe,
                 required bool isMuted,
@@ -14898,6 +14974,7 @@ class $$CachedChatsTableTableManager
                 lastMessage: lastMessage,
                 lastMessageType: lastMessageType,
                 lastMessageTime: lastMessageTime,
+                listOrderMicros: listOrderMicros,
                 unreadCount: unreadCount,
                 isLastMessageFromMe: isLastMessageFromMe,
                 isMuted: isMuted,

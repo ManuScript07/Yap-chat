@@ -52,6 +52,7 @@ class CachedChats extends Table {
   TextColumn get lastMessage => text()();
   TextColumn get lastMessageType => text()();
   DateTimeColumn get lastMessageTime => dateTime()();
+  IntColumn get listOrderMicros => integer().nullable()();
   IntColumn get unreadCount => integer()();
   BoolColumn get isLastMessageFromMe => boolean()();
   BoolColumn get isMuted => boolean()();
@@ -419,7 +420,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 27;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -429,6 +430,16 @@ class AppDatabase extends _$AppDatabase {
       await _createChatCacheIndexes();
     },
     onUpgrade: (migrator, from, to) async {
+      if (from >= 2 && from < 28) {
+        final columns = await customSelect(
+          'PRAGMA table_info(cached_chats)',
+        ).get();
+        if (!columns.any(
+          (c) => c.read<String>('name') == 'list_order_micros',
+        )) {
+          await migrator.addColumn(cachedChats, cachedChats.listOrderMicros);
+        }
+      }
       if (from < 25) {
         await migrator.createTable(cachedMessageReactionStates);
         await migrator.createTable(pendingMessageReactions);
@@ -672,6 +683,16 @@ class AppDatabase extends _$AppDatabase {
           rowId = rows.last.read<int>('migration_rowid');
         }
       }
+      if (from < 28) {
+        // Recover exact known order without inventing remote coverage. A newer
+        // displayed pending preview retains its existing place at the top.
+        await customStatement('''
+          UPDATE cached_chats SET list_order_micros=MAX(cached_chats.last_message_time*1000000,e.activity_micros)
+          FROM cached_chat_list_entries e
+          WHERE e.owner_user_id=cached_chats.owner_user_id AND e.chat_id=cached_chats.id
+            AND e.query='' AND cached_chats.list_order_micros IS NULL
+        ''');
+      }
     },
     beforeOpen: (details) async {
       // Version 19 was briefly shipped while the blacklist cache schema was
@@ -708,6 +729,10 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _createChatCacheIndexes() async {
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS cached_chats_owner_available_order_idx
+      ON cached_chats (owner_user_id, COALESCE(list_order_micros,last_message_time * 1000000) DESC, id DESC)
+    ''');
     await customStatement('''
       CREATE INDEX IF NOT EXISTS cached_chats_owner_peer_idx
       ON cached_chats (owner_user_id, peer_id)

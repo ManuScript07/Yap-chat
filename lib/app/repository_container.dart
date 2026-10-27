@@ -132,6 +132,7 @@ class RepositoryContainer {
     return RepositoryContainer(
       mediaCache: mediaCache,
       chatsRepository: ChatsRepository(
+        enableListPagination: true,
         config: config,
         cache: chatsCache,
         remote: chatsRemote,

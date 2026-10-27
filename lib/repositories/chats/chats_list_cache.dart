@@ -359,6 +359,8 @@ extension ChatsListCache on ChatsCacheDataSource {
     ChatListCacheRequest request,
     ChatListPage page, {
     Set<String> protectedIds = const {},
+    bool pruneMissing = true,
+    bool preserveContinuation = false,
   }) async {
     _validateListPage(request, page, protectedIds);
     final owner = request.ownerUserId;
@@ -404,16 +406,18 @@ extension ChatsListCache on ChatsCacheDataSource {
         );
         variables.addAll(keep.map(Variable<String>.new));
       }
-      await _database.customUpdate(
-        'DELETE FROM cached_chat_list_entries WHERE ${conditions.join(' AND ')}',
-        variables: variables,
-        updates: {_database.cachedChatListEntries},
-      );
+      if (pruneMissing) {
+        await _database.customUpdate(
+          'DELETE FROM cached_chat_list_entries WHERE ${conditions.join(' AND ')}',
+          variables: variables,
+          updates: {_database.cachedChatListEntries},
+        );
+      }
       final items = page.items
           .where((i) => !protectedIds.contains(i.chat.id))
           .toList(growable: false);
       final cached = {
-        for (final chat in await readForAction(
+        for (final chat in await _readRowsForAction(
           items.map((i) => i.chat.id).toSet(),
           ownerUserId: owner,
         ))
@@ -444,10 +448,14 @@ extension ChatsListCache on ChatsCacheDataSource {
       };
       for (final item in items) {
         if (cached[item.chat.id] == null ||
-            !_sameChat(cached[item.chat.id]!, item.chat)) {
+            !_sameChat(_mapRow(cached[item.chat.id]!), item.chat) ||
+            cached[item.chat.id]!.listOrderMicros !=
+                _effectiveListOrder(item.chat, item.activityAt)) {
           await _database
               .into(_database.cachedChats)
-              .insertOnConflictUpdate(_companion(item.chat, owner));
+              .insertOnConflictUpdate(
+                _companion(item.chat, owner, item.activityAt),
+              );
         }
         if (activity[item.chat.id] != item.activityAt.microsecondsSinceEpoch) {
           await _database
@@ -471,9 +479,22 @@ extension ChatsListCache on ChatsCacheDataSource {
               revision: _uuid.v4(),
               hasRemotePage: const Value(true),
               nextActivityMicros: Value(
-                page.nextCursor?.activityAt.microsecondsSinceEpoch,
+                (preserveContinuation &&
+                            request.after == null &&
+                            current.hasRemotePage
+                        ? current.nextCursor
+                        : page.nextCursor)
+                    ?.activityAt
+                    .microsecondsSinceEpoch,
               ),
-              nextChatId: Value(page.nextCursor?.conversationId),
+              nextChatId: Value(
+                (preserveContinuation &&
+                            request.after == null &&
+                            current.hasRemotePage
+                        ? current.nextCursor
+                        : page.nextCursor)
+                    ?.conversationId,
+              ),
               checkedAt: Value(DateTime.now().toUtc()),
             ),
           );

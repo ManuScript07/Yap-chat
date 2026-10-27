@@ -47,11 +47,47 @@ class ChatListCacheSlice {
     required List<Chat> chats,
     required this.serverBacked,
     this.nextCursor,
+    this.orderByChatId = const {},
   }) : chats = List.unmodifiable(chats);
   final List<Chat> chats;
   final bool serverBacked;
   final ChatListLocalCursor? nextCursor;
+  final Map<String, int> orderByChatId;
   bool get hasMoreCached => nextCursor != null;
+}
+
+class ChatListLocalItem {
+  const ChatListLocalItem(this.chat, this.orderMicros);
+  final Chat chat;
+  final int orderMicros;
+}
+
+class ChatListViewState {
+  const ChatListViewState({
+    this.query = '',
+    this.chats = const [],
+    this.selectedChats = const [],
+    this.missingSelectedIds = const {},
+    this.ready = false,
+    this.hasMoreCached = false,
+    this.hasMoreRemote = true,
+    this.isLoadingCache = false,
+    this.isLoadingRemote = false,
+    this.isRefreshing = false,
+    this.error,
+  });
+  final String query;
+  final List<Chat> chats;
+  final List<Chat> selectedChats;
+  final Set<String> missingSelectedIds;
+  final bool ready,
+      hasMoreCached,
+      hasMoreRemote,
+      isLoadingCache,
+      isLoadingRemote,
+      isRefreshing;
+  final Object? error;
+  bool get hasMore => hasMoreCached || hasMoreRemote;
 }
 
 /// Capture before starting HTTP. Cache commit is compare-and-swap by query;

@@ -21,6 +21,13 @@ class ChatsState extends Equatable {
     this.feedbackIsMuted,
     this.feedbackId = 0,
     this.unreadTotal,
+    this.isPaginated = false,
+    this.hasMoreCached = false,
+    this.hasMoreRemote = false,
+    this.isLoadingMore = false,
+    this.isRefreshing = false,
+    this.paginationError,
+    this.selectedChats = const {},
   });
 
   final ChatsStatus status;
@@ -34,16 +41,30 @@ class ChatsState extends Equatable {
   final bool? feedbackIsMuted;
   final int feedbackId;
   final int? unreadTotal;
+  final bool isPaginated,
+      hasMoreCached,
+      hasMoreRemote,
+      isLoadingMore,
+      isRefreshing;
+  final Object? paginationError;
+  final Map<String, Chat> selectedChats;
+  bool get hasMoreChats => hasMoreCached || hasMoreRemote;
+  Iterable<Chat> get selectionRows => selectedChatIds
+      .map(
+        (id) => selectedChats[id] ?? chats.where((c) => c.id == id).firstOrNull,
+      )
+      .whereType<Chat>();
 
   int get unreadCount =>
       unreadTotal ??
-      chats
-          .where((chat) => !chat.isMuted)
-          .fold(0, (total, chat) => total + chat.unreadCount);
+      (isPaginated
+          ? 0
+          : chats
+                .where((chat) => !chat.isMuted)
+                .fold(0, (total, chat) => total + chat.unreadCount));
 
   bool get isSelectionMode => selectedChatIds.isNotEmpty;
-  bool get hasMutedSelection =>
-      chats.any((chat) => selectedChatIds.contains(chat.id) && chat.isMuted);
+  bool get hasMutedSelection => selectionRows.any((chat) => chat.isMuted);
 
   ChatsState copyWith({
     ChatsStatus? status,
@@ -59,6 +80,14 @@ class ChatsState extends Equatable {
     int? feedbackId,
     int? unreadTotal,
     bool clearUnreadTotal = false,
+    bool? isPaginated,
+    bool? hasMoreCached,
+    bool? hasMoreRemote,
+    bool? isLoadingMore,
+    bool? isRefreshing,
+    Object? paginationError,
+    bool clearPaginationError = false,
+    Map<String, Chat>? selectedChats,
   }) {
     return ChatsState(
       status: status ?? this.status,
@@ -77,6 +106,15 @@ class ChatsState extends Equatable {
           : feedbackIsMuted ?? this.feedbackIsMuted,
       feedbackId: feedbackId ?? this.feedbackId,
       unreadTotal: clearUnreadTotal ? null : unreadTotal ?? this.unreadTotal,
+      isPaginated: isPaginated ?? this.isPaginated,
+      hasMoreCached: hasMoreCached ?? this.hasMoreCached,
+      hasMoreRemote: hasMoreRemote ?? this.hasMoreRemote,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      paginationError: clearPaginationError
+          ? null
+          : paginationError ?? this.paginationError,
+      selectedChats: selectedChats ?? this.selectedChats,
     );
   }
 
@@ -93,5 +131,12 @@ class ChatsState extends Equatable {
     feedbackIsMuted,
     feedbackId,
     unreadTotal,
+    isPaginated,
+    hasMoreCached,
+    hasMoreRemote,
+    isLoadingMore,
+    isRefreshing,
+    paginationError,
+    selectedChats,
   ];
 }

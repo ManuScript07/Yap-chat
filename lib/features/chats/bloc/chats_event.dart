@@ -51,3 +51,19 @@ final class ChatsUnreadCountUpdated extends ChatsEvent {
   final int? total;
   final int generation;
 }
+
+final class ChatsListViewUpdated extends ChatsEvent {
+  const ChatsListViewUpdated(this.view, this.generation);
+  final ChatListViewState view;
+  final int generation;
+}
+
+final class ChatsLoadMoreRequested extends ChatsEvent {
+  const ChatsLoadMoreRequested({this.retry = false});
+  final bool retry;
+}
+
+final class ChatsVisibleIdsChanged extends ChatsEvent {
+  const ChatsVisibleIdsChanged(this.ids);
+  final Set<String> ids;
+}

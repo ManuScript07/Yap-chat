@@ -44,6 +44,14 @@ class ChatsRemoteDataSource {
   final AppDiagnostics? _diagnostics;
   final Duration summaryRequestTimeout;
   final _summaryRequests = <Completer<void>>{};
+  final _listSearchRequests = <Completer<void>>{};
+
+  /// Query changes must not abort direct navigation or the main head read.
+  void cancelListSearchRequests() {
+    for (final request in _listSearchRequests.toList(growable: false)) {
+      if (!request.isCompleted) request.complete();
+    }
+  }
 
   /// Cancels only reads owned by this source, never accepted bulk writes.
   void cancelSummaryRequests() {
@@ -52,9 +60,14 @@ class ChatsRemoteDataSource {
     }
   }
 
-  Future<T> _readRpc<T>(String rpc, {Map<String, dynamic>? params}) async {
+  Future<T> _readRpc<T>(
+    String rpc, {
+    Map<String, dynamic>? params,
+    bool listSearch = false,
+  }) async {
     final abort = Completer<void>();
     _summaryRequests.add(abort);
+    if (listSearch) _listSearchRequests.add(abort);
     try {
       return await measureRpc(
         _diagnostics,
@@ -66,6 +79,7 @@ class ChatsRemoteDataSource {
       );
     } finally {
       _summaryRequests.remove(abort);
+      _listSearchRequests.remove(abort);
     }
   }
 
@@ -156,8 +170,8 @@ class ChatsRemoteDataSource {
     );
   }
 
-  /// Prepared for the paged repository contract; the active list does not yet
-  /// treat these partial results as its complete authoritative snapshot.
+  /// Bounded server page. Missing rows are not proof that retained local chat
+  /// metadata is inaccessible; addressed synchronization handles that case.
   Future<ChatListPage> fetchChatListPage({
     ChatListPageCursor? after,
     int pageSize = summaryBatchSize,
@@ -176,6 +190,7 @@ class ChatsRemoteDataSource {
     final ticket = _presenceStore?.captureSnapshot();
     final response = await _readRpc<Map<String, dynamic>>(
       'get_chat_list_page',
+      listSearch: query.isNotEmpty,
       params: {
         'after_activity_at': after?.activityAt.toUtc().toIso8601String(),
         'after_conversation_id': after?.conversationId,

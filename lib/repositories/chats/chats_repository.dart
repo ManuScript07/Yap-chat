@@ -11,8 +11,14 @@ import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_remote_data_source.dart';
 
+part 'chats_pagination.dart';
+
 class ChatsRepository
-    implements IChatsRepository, IChatsPeerRepository, IChatsUnreadRepository {
+    implements
+        IChatsRepository,
+        IChatsPeerRepository,
+        IChatsUnreadRepository,
+        IChatsListRepository {
   ChatsRepository({
     required AppConfig config,
     required ChatsCacheDataSource cache,
@@ -22,6 +28,7 @@ class ChatsRepository
     required ConversationSyncService conversationSync,
     required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
+    this.enableListPagination = false,
   }) : _config = config,
        _cache = cache,
        _remote = remote,
@@ -43,6 +50,47 @@ class ChatsRepository
   final ConversationSyncService _conversationSync;
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
+  final bool enableListPagination;
+  bool _pagesSupported = true;
+  bool _headHasConfirmedTotal = false;
+  int _listRecoveryVersion = 0;
+  bool _pageFollowup = false;
+  bool _resetRemoteContinuation = true;
+  final _listCheckedAt = <String, int>{};
+  Set<String> _verifiedHeadIds = {};
+
+  void _markListVerified(Iterable<String> ids) {
+    for (final id in ids) {
+      _listCheckedAt.remove(id);
+      _listCheckedAt[id] = _summaryClock.elapsedMicroseconds;
+    }
+    while (_listCheckedAt.length > 512) {
+      _listCheckedAt.remove(_listCheckedAt.keys.first);
+    }
+  }
+
+  final _initializedQueries = <String>{};
+  final _listRows = <String, ChatListLocalItem>{};
+  Map<String, ChatListLocalItem>? _mainListRows;
+  ChatListLocalCursor? _mainListAfter;
+  final _selectedRows = <String, Chat>{};
+  Set<String> _visibleListIds = {},
+      _selectedListIds = {},
+      _missingSelectedIds = {};
+  String _activeListQuery = '';
+  int _listGeneration = 0, _observedGeneration = 0, _listConsumers = 0;
+  AccountSessionSnapshot? _listScope;
+  ChatListCacheSlice? _availableHead;
+  ChatListLocalCursor? _localListAfter;
+  bool _cacheListReady = false, _hasMoreLocal = false, _hasMoreRemote = true;
+  bool _loadingLocal = false, _loadingRemote = false, _refreshingList = false;
+  Object? _listError;
+  Future<void>? _cacheAppend;
+  final _pageReads = <(String, int, int, String, bool, int), Future<void>>{};
+  StreamController<ChatListViewState>? _listController;
+  StreamSubscription<ChatListCacheSlice>? _searchHeadSubscription,
+      _tailSubscription;
+  StreamSubscription<List<ChatListLocalItem>>? _observedListSubscription;
   Future<void>? _activeSync;
   Future<void>? _activeFullSync;
   AccountSessionSnapshot? _activeFullScope;
@@ -83,6 +131,204 @@ class ChatsRepository
   List<Chat>? _latestChats;
 
   @override
+  Stream<ChatListViewState> watchChatList() {
+    final scope = _accountSessionController.capture();
+    return Stream.multi((listener) {
+      if (!_accountSessionController.isCurrent(scope)) {
+        listener.close();
+        return;
+      }
+      final first = _listConsumers++ == 0;
+      _listController ??= StreamController<ChatListViewState>.broadcast();
+      if (first) {
+        _listScope = scope;
+        if (_watchScope?.userId != scope.userId) _availableHead = null;
+      }
+      final subscription = _listController!.stream.listen(
+        listener.add,
+        onError: listener.addError,
+      );
+      final lease = _ensureWatchController().stream.listen(
+        (_) {},
+        onError: (Object _) {},
+      );
+      if (first) {
+        unawaited(() async {
+          try {
+            await _restartWatcherForCurrentAccount();
+            if (_listCurrent && identical(_listScope, scope)) {
+              await _startListQuery('');
+            }
+          } catch (error, stack) {
+            if (_accountSessionController.isCurrent(scope) &&
+                identical(_listScope, scope)) {
+              _listError = error;
+              _refreshingList = false;
+              _cacheListReady = true;
+              _emitList();
+              _config.talker.handle(
+                error,
+                stack,
+                'Chat list initialization failed',
+              );
+            }
+          }
+        }());
+      } else {
+        _emitList();
+      }
+      listener.onCancel = () async {
+        if (--_listConsumers == 0) {
+          _listGeneration++;
+          _observedGeneration++;
+          _listScope = null;
+          _remote.cancelListSearchRequests();
+          final search = _searchHeadSubscription,
+              tail = _tailSubscription,
+              observed = _observedListSubscription;
+          _searchHeadSubscription = null;
+          _tailSubscription = null;
+          _observedListSubscription = null;
+          _listRows.clear();
+          _mainListRows = null;
+          _mainListAfter = null;
+          _localListAfter = null;
+          _selectedListIds = {};
+          _visibleListIds = {};
+          _selectedRows.clear();
+          _missingSelectedIds = {};
+          _activeListQuery = '';
+          await Future.wait([
+            if (search != null) search.cancel(),
+            if (tail != null) tail.cancel(),
+            if (observed != null) observed.cancel(),
+          ]);
+        }
+        await Future.wait([subscription.cancel(), lease.cancel()]);
+      };
+    });
+  }
+
+  @override
+  Future<void> setChatListQuery(String query) async {
+    query = query.trim().toLowerCase();
+    if (query.runes.length > 100) {
+      query = String.fromCharCodes(query.runes.take(100));
+    }
+    if (!_listCurrent || query == _activeListQuery) return;
+    if (_activeListQuery.isEmpty) {
+      _mainListRows = Map.of(_listRows);
+      _mainListAfter = _localListAfter;
+    }
+    await _startListQuery(query, restoreMain: query.isEmpty);
+  }
+
+  @override
+  void setChatListObservedIds(Set<String> visibleIds, Set<String> selectedIds) {
+    if (!_listCurrent) return;
+    final visible = visibleIds.take(50).toSet(),
+        selected = selectedIds.take(50).toSet();
+    if (visible.length == _visibleListIds.length &&
+        visible.containsAll(_visibleListIds) &&
+        selected.length == _selectedListIds.length &&
+        selected.containsAll(_selectedListIds)) {
+      return;
+    }
+    _visibleListIds = visible;
+    _selectedListIds = selected;
+    _watchObservedListIds();
+    if (enableListPagination && !_isRealtimePaused) {
+      final now = _summaryClock.elapsedMicroseconds;
+      _dirtyChatIds.addAll(
+        {...visible, ...selected}.where(
+          (id) =>
+              !_listCheckedAt.containsKey(id) ||
+              now - _listCheckedAt[id]! >
+                  _reconciliationInterval.inMicroseconds,
+        ),
+      );
+      _scheduleSummarySync();
+    }
+  }
+
+  @override
+  Future<void> loadMoreChatList({bool retry = false}) async {
+    if (!_listCurrent) return;
+    final active = _cacheAppend;
+    if (active != null) return active;
+    final scope = _listScope!,
+        generation = _listGeneration,
+        query = _activeListQuery;
+    late final Future<void> operation;
+    operation =
+        () async {
+          _loadingLocal = true;
+          _emitList();
+          try {
+            final slice = await _cache.readAvailableSlice(
+              query: query,
+              after: _localListAfter,
+              ownerUserId: scope.userId,
+            );
+            if (!_accountSessionController.isCurrent(scope) ||
+                generation != _listGeneration) {
+              return;
+            }
+            _mergeListItems(_sliceItems(slice));
+            if (slice.chats.isNotEmpty) {
+              final last = slice.chats.last;
+              _localListAfter = ChatListLocalCursor(
+                query: query,
+                activityMicros: slice.orderByChatId[last.id]!,
+                chatId: last.id,
+                serverBacked: false,
+              );
+            }
+            _hasMoreLocal = slice.hasMoreCached;
+            _watchListTail();
+            if (!_loadingRemote &&
+                !_isRealtimePaused &&
+                _pagesSupported &&
+                (_listError == null || retry)) {
+              final state = await _cache.readListState(
+                query: query,
+                ownerUserId: scope.userId,
+              );
+              if (generation != _listGeneration ||
+                  !_accountSessionController.isCurrent(scope)) {
+                return;
+              }
+              if (state.hasMore) {
+                _loadingRemote = true;
+                _listError = null;
+                unawaited(
+                  _requestPage(
+                    query,
+                    !state.hasRemotePage,
+                    generation,
+                  ).catchError((Object _, StackTrace _) {}).whenComplete(() {
+                    if (_listCurrent && generation == _listGeneration) {
+                      _loadingRemote = false;
+                      _emitList();
+                    }
+                  }),
+                );
+              }
+            }
+          } finally {
+            if (_listCurrent && generation == _listGeneration) {
+              _loadingLocal = false;
+              _emitList();
+            }
+          }
+        }().whenComplete(() {
+          if (identical(_cacheAppend, operation)) _cacheAppend = null;
+        });
+    _cacheAppend = operation;
+    return operation;
+  }
+
+  @override
   Stream<List<Chat>> watchChats() {
     return Stream.multi((listener) {
       StreamSubscription<List<Chat>>? subscription;
@@ -105,6 +351,8 @@ class ChatsRepository
         final scope = _accountSessionController.capture();
         final snapshot = _watchScope?.userId == scope.userId
             ? _latestChats
+            : enableListPagination
+            ? (await _cache.readAvailableSlice(ownerUserId: scope.userId)).chats
             : await _cache.read(ownerUserId: scope.userId);
         if (!cancelled && snapshot != null) listener.add(snapshot);
       }
@@ -135,9 +383,16 @@ class ChatsRepository
     if (_watchScope != null) return;
     final scope = _accountSessionController.capture();
     _watchScope = scope;
-    _cacheSubscription = _cache.watch(ownerUserId: scope.userId).listen((
-      chats,
-    ) {
+    final stream = enableListPagination
+        ? _cache.watchAvailableSlice(ownerUserId: scope.userId).map((slice) {
+            if (_accountSessionController.isCurrent(scope)) {
+              _availableHead = slice;
+              _acceptListHead(slice, '', _listGeneration);
+            }
+            return slice.chats;
+          })
+        : _cache.watch(ownerUserId: scope.userId);
+    _cacheSubscription = stream.listen((chats) {
       if (!_accountSessionController.isCurrent(scope) || controller.isClosed) {
         return;
       }
@@ -263,7 +518,12 @@ class ChatsRepository
           )
           .distinct()
           .listen(listener.add, onError: listener.addError);
-      if (_unreadConsumers == 1) _requestUnreadRefresh();
+      if (_unreadConsumers == 1 &&
+          !(enableListPagination &&
+              _pagesSupported &&
+              _headHasConfirmedTotal)) {
+        _requestUnreadRefresh();
+      }
       listener.onCancel = () async {
         _unreadConsumers--;
         try {
@@ -607,6 +867,7 @@ class ChatsRepository
       scope,
       () => _cache.remove(ids, ownerUserId: scope.userId),
     );
+    if (_accountSessionController.isCurrent(scope)) _removePresentedIds(ids);
     await _clearLocalConversations(ids, scope);
     await _accountSessionController.commit(scope, () async {
       for (final pendingId in pendingIds) {
@@ -722,7 +983,10 @@ class ChatsRepository
 
   @override
   Future<void> pauseRealtime() {
+    _resetRemoteContinuation = true;
+    _initializedQueries.clear();
     _isRealtimePaused = true;
+    _emitList();
     _activeDeletionRetry = null;
     // The SDK may keep an old HTTP future alive after the transport is lost.
     // Detach that epoch so recovery never waits for it; its commit is invalid.
@@ -761,6 +1025,7 @@ class ChatsRepository
     _realtimeListenerLease = null;
     _watchScope = null;
     _latestChats = null;
+    _availableHead = null;
     final controller = _watchController;
     if (controller != null && controller.hasListener && !controller.isClosed) {
       await _startWatching(controller);
@@ -787,6 +1052,11 @@ class ChatsRepository
       _summaryVersions[change.conversationId!] = ++_summaryVersion;
     }
     if (change.reason != 'reaction_changed') _unreadVersion++;
+    if (change.conversationId == null) {
+      _listRecoveryVersion++;
+      _resetRemoteContinuation = true;
+      _initializedQueries.clear();
+    }
     final epoch = _summaryEpoch;
     _changeQueue = _changeQueue
         .then((_) async {
@@ -820,6 +1090,10 @@ class ChatsRepository
         .whenComplete(() {
           if (identical(_reconciliationToken, token)) {
             _reconciliationToken = null;
+            if (_pageFollowup) {
+              _pageFollowup = false;
+              _enqueueReconciliation();
+            }
           }
         })
         .catchError((Object error, StackTrace stackTrace) {
@@ -867,6 +1141,9 @@ class ChatsRepository
         _ensureSummaryScope(scope, epoch);
         return _cache.remove({conversationId}, ownerUserId: scope.userId);
       });
+      if (_summaryScopeIsCurrent(scope, epoch)) {
+        _removePresentedIds({conversationId});
+      }
       await _clearLocalConversations(
         {conversationId},
         scope,
@@ -981,6 +1258,12 @@ class ChatsRepository
   }
 
   void _resetSummaryScheduling({bool clearIds = true}) {
+    _pageFollowup = false;
+    _headHasConfirmedTotal = false;
+    _listCheckedAt.clear();
+    _verifiedHeadIds = {};
+    _initializedQueries.clear();
+    _resetRemoteContinuation = true;
     _remote.cancelSummaryRequests();
     _summaryEpoch++;
     _lookupQueues.clear();
@@ -1109,6 +1392,10 @@ class ChatsRepository
     _activeFullScope = scope;
     await sync.whenComplete(() {
       if (identical(_activeFullSync, sync)) _activeFullSync = null;
+      if (_pageFollowup && _reconciliationToken == null) {
+        _pageFollowup = false;
+        _enqueueReconciliation();
+      }
     });
   }
 
@@ -1133,6 +1420,17 @@ class ChatsRepository
   }
 
   Future<void> _performSync(AccountSessionSnapshot scope, int epoch) async {
+    if (enableListPagination && _pagesSupported) {
+      try {
+        await _performPagedSync(scope, epoch);
+        return;
+      } on PostgrestException catch (error) {
+        if (error.code != 'PGRST202') rethrow;
+        _ensureSummaryScope(scope, epoch);
+        _pagesSupported = false;
+        _hasMoreRemote = false;
+      }
+    }
     _ensureSummaryScope(scope, epoch);
     final version = _summaryVersion;
     // The first request after an OAuth return may need to establish a fresh
@@ -1169,10 +1467,20 @@ class ChatsRepository
         ownerUserId: scope.userId,
       );
       _ensureSummaryScope(scope, epoch);
-      await _cache.replaceAll([
+      final accepted = [
         ...reconciled.where((chat) => !newerIds.contains(chat.id)),
         ...preserved,
-      ], ownerUserId: scope.userId);
+      ];
+      if (enableListPagination) {
+        // A capped legacy response cannot prove cached tail rows inaccessible.
+        await _cache.applySummaryBatch(
+          accepted.map((c) => c.id).toSet(),
+          accepted,
+          ownerUserId: scope.userId,
+        );
+      } else {
+        await _cache.replaceAll(accepted, ownerUserId: scope.userId);
+      }
       // Only returned, current rows are satisfied by a whole-list snapshot.
       // A row absent due to the legacy API cap still needs its targeted query.
       _dirtyChatIds.removeAll(
@@ -1187,6 +1495,11 @@ class ChatsRepository
     });
     _scheduleSummarySync();
     _requestUnreadRefresh();
+    if (enableListPagination && !_pagesSupported) {
+      _refreshingList = false;
+      _hasMoreRemote = false;
+      _emitList();
+    }
     _config.diagnostics?.recordSyncItems('chats', reconciled.length);
   }
 
@@ -1291,6 +1604,11 @@ class ChatsRepository
               chat.id: chat.lastMessageTime.toUtc(),
         },
       );
+      _markListVerified(currentIds);
+      _removePresentedIds(
+        currentIds.difference(chats.map((c) => c.id).toSet()),
+      );
+      await _refreshPresentedIds(currentIds, scope);
       if (unreadTotal != null &&
           unreadVersion == _unreadVersion &&
           !_hasUnreadMutation(scope)) {
@@ -1394,9 +1712,18 @@ class ChatsRepository
         return;
       }
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
+      if (enableListPagination) {
+        _listError = error;
+        _refreshingList = false;
+        _emitList();
+      }
       final controller = _watchController;
       if (_accountSessionController.isCurrent(scope) &&
-          (await _cache.read(ownerUserId: scope.userId)).isEmpty &&
+          (enableListPagination
+              ? (await _cache.readAvailableSlice(
+                  ownerUserId: scope.userId,
+                )).chats.isEmpty
+              : (await _cache.read(ownerUserId: scope.userId)).isEmpty) &&
           controller != null &&
           !controller.isClosed) {
         controller.addError(error, stackTrace);

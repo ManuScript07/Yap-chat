@@ -28,6 +28,24 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     on<ChatsMuteToggled>(_onMuteToggled);
     on<ChatsSubscriptionUpdated>(_onSubscriptionUpdated);
     on<ChatsSubscriptionFailed>(_onSubscriptionFailed);
+    on<ChatsListViewUpdated>(_onListViewUpdated);
+    on<ChatsLoadMoreRequested>((event, emit) async {
+      if (_loadingPage) return;
+      if (_chatsRepository case final IChatsListRepository repository) {
+        _loadingPage = true;
+        try {
+          await repository.loadMoreChatList(retry: event.retry);
+        } catch (_) {
+          // The list stream retains cached rows and publishes the retry state.
+        } finally {
+          _loadingPage = false;
+        }
+      }
+    });
+    on<ChatsVisibleIdsChanged>((event, emit) {
+      _visibleIds = event.ids;
+      _updateObserved();
+    });
     on<ChatsUnreadCountUpdated>((event, emit) {
       if (event.generation != _subscriptionGeneration) return;
       emit(
@@ -43,6 +61,55 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
   StreamSubscription<List<Chat>>? _chatsSubscription;
   StreamSubscription<int?>? _unreadSubscription;
   int _subscriptionGeneration = 0;
+  StreamSubscription<ChatListViewState>? _listSubscription;
+  Set<String> _visibleIds = {};
+  bool _loadingPage = false;
+
+  void _updateObserved() {
+    if (_chatsRepository case final IChatsListRepository repository) {
+      repository.setChatListObservedIds(_visibleIds, state.selectedChatIds);
+    }
+  }
+
+  void _onListViewUpdated(
+    ChatsListViewUpdated event,
+    Emitter<ChatsState> emit,
+  ) {
+    if (event.generation != _subscriptionGeneration ||
+        event.view.query != state.searchQuery.trim().toLowerCase()) {
+      return;
+    }
+    final view = event.view;
+    final selected = Set<String>.of(state.selectedChatIds)
+      ..removeAll(view.missingSelectedIds);
+    final selectionChanged = selected.length != state.selectedChatIds.length;
+    final snapshot = Map<String, Chat>.of(state.selectedChats)
+      ..removeWhere((id, _) => !selected.contains(id));
+    for (final chat in [...view.chats, ...view.selectedChats]) {
+      if (selected.contains(chat.id)) snapshot[chat.id] = chat;
+    }
+    emit(
+      state.copyWith(
+        status: view.ready
+            ? (view.chats.isEmpty && view.error != null
+                  ? ChatsStatus.failure
+                  : ChatsStatus.success)
+            : ChatsStatus.loading,
+        isPaginated: true,
+        chats: view.chats,
+        filteredChats: view.chats,
+        selectedChatIds: selected,
+        selectedChats: Map.unmodifiable(snapshot),
+        hasMoreCached: view.hasMoreCached,
+        hasMoreRemote: view.hasMoreRemote,
+        isLoadingMore: view.isLoadingCache || view.isLoadingRemote,
+        isRefreshing: view.isRefreshing,
+        paginationError: view.error,
+        clearPaginationError: view.error == null,
+      ),
+    );
+    if (selectionChanged) _updateObserved();
+  }
 
   Future<void> _onLoadStarted(
     ChatsLoadStarted event,
@@ -51,8 +118,22 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     emit(state.copyWith(status: ChatsStatus.loading));
     final generation = ++_subscriptionGeneration;
     await _unreadSubscription?.cancel();
+    await _listSubscription?.cancel();
     await _chatsSubscription?.cancel();
     if (isClosed || generation != _subscriptionGeneration) return;
+    if (_chatsRepository case final IChatsListRepository repository) {
+      _listSubscription = repository.watchChatList().listen(
+        (view) {
+          if (!isClosed && generation == _subscriptionGeneration) {
+            add(ChatsListViewUpdated(view, generation));
+          }
+        },
+        onError: (Object _, StackTrace _) {
+          if (!isClosed) add(const ChatsSubscriptionFailed());
+        },
+      );
+      emit(state.copyWith(isPaginated: true));
+    }
     if (_chatsRepository case final IChatsUnreadRepository repository) {
       _unreadSubscription = repository.watchUnreadCount().listen(
         (total) {
@@ -64,10 +145,12 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         onError: (Object _, StackTrace _) {},
       );
     }
-    _chatsSubscription = _chatsRepository.watchChats().listen(
-      (chats) => add(ChatsSubscriptionUpdated(chats)),
-      onError: (_, _) => add(const ChatsSubscriptionFailed()),
-    );
+    if (_listSubscription == null) {
+      _chatsSubscription = _chatsRepository.watchChats().listen(
+        (chats) => add(ChatsSubscriptionUpdated(chats)),
+        onError: (_, _) => add(const ChatsSubscriptionFailed()),
+      );
+    }
   }
 
   void _onSubscriptionUpdated(
@@ -78,6 +161,10 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
       state.copyWith(
         status: ChatsStatus.success,
         chats: event.chats,
+        selectedChats: Map.unmodifiable({
+          for (final chat in event.chats)
+            if (state.selectedChatIds.contains(chat.id)) chat.id: chat,
+        }),
         filteredChats: _filterChats(event.chats, state.searchQuery),
       ),
     );
@@ -94,6 +181,14 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     ChatsSearchChanged event,
     Emitter<ChatsState> emit,
   ) async {
+    if (_chatsRepository case final IChatsListRepository repository) {
+      final query = String.fromCharCodes(
+        event.query.trim().toLowerCase().runes.take(100),
+      );
+      emit(state.copyWith(searchQuery: query));
+      await repository.setChatListQuery(query);
+      return;
+    }
     emit(
       state.copyWith(
         searchQuery: event.query,
@@ -124,7 +219,20 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
       selectedChatIds.remove(event.id);
     }
 
-    emit(state.copyWith(selectedChatIds: selectedChatIds));
+    final snapshot = Map<String, Chat>.of(state.selectedChats);
+    if (selectedChatIds.contains(event.id)) {
+      final chat = state.chats.where((c) => c.id == event.id).firstOrNull;
+      if (chat != null) snapshot[event.id] = chat;
+    } else {
+      snapshot.remove(event.id);
+    }
+    emit(
+      state.copyWith(
+        selectedChatIds: selectedChatIds,
+        selectedChats: Map.unmodifiable(snapshot),
+      ),
+    );
+    _updateObserved();
   }
 
   void _onSelectionCleared(
@@ -132,7 +240,8 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     Emitter<ChatsState> emit,
   ) {
     if (state.isBulkActionInProgress) return;
-    emit(state.copyWith(selectedChatIds: const {}));
+    emit(state.copyWith(selectedChatIds: const {}, selectedChats: const {}));
+    _updateObserved();
   }
 
   Future<void> _onDeleted(ChatsDeleted event, Emitter<ChatsState> emit) async {
@@ -171,7 +280,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     if (state.isBulkActionInProgress) return;
     final selectedIds = Set<String>.of(state.selectedChatIds);
     final isMuted = !state.hasMutedSelection;
-    final changedIds = state.chats
+    final changedIds = state.selectionRows
         .where(
           (chat) => selectedIds.contains(chat.id) && chat.isMuted != isMuted,
         )
@@ -206,8 +315,11 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
       emit(
         state.copyWith(
           chats: chats,
-          filteredChats: _filterChats(chats, state.searchQuery),
+          filteredChats: state.isPaginated
+              ? chats
+              : _filterChats(chats, state.searchQuery),
           selectedChatIds: const {},
+          selectedChats: const {},
           isBulkActionInProgress: false,
           feedback: ChatsBulkActionFeedback.success,
           feedbackAction: action,
@@ -215,6 +327,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
           feedbackId: state.feedbackId + 1,
         ),
       );
+      _updateObserved();
     } catch (_) {
       emit(
         state.copyWith(
@@ -252,6 +365,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
   @override
   Future<void> close() async {
     _subscriptionGeneration++;
+    await _listSubscription?.cancel();
     await _unreadSubscription?.cancel();
     await _chatsSubscription?.cancel();
     return super.close();

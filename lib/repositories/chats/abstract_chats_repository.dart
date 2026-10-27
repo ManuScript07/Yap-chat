@@ -60,6 +60,13 @@ abstract interface class IChatsUnreadRepository {
   Stream<int?> watchUnreadCount();
 }
 
+abstract interface class IChatsListRepository {
+  Stream<ChatListViewState> watchChatList();
+  Future<void> setChatListQuery(String query);
+  Future<void> loadMoreChatList({bool retry = false});
+  void setChatListObservedIds(Set<String> visibleIds, Set<String> selectedIds);
+}
+
 extension ChatsPeerRepositoryAccess on IChatsRepository {
   IChatsPeerRepository get _peerRepository => this as IChatsPeerRepository;
   Stream<Chat?> watchChatByPeerId(String peerId) {
