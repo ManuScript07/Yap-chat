@@ -1,8 +1,14 @@
 -- Materialize only currently unread incoming messages, not message content.
 -- Counts and their evidence change atomically; repeated visibility changes
 -- remove/insert a key once instead of guessing a +/- delta from old snapshots.
+-- CLI runners may autocommit each top-level statement. Keep all schema changes,
+-- backfill and locks in one atomic command instead of relying on the runner.
+-- Set the statement deadline before that command starts; SET LOCAL inside it
+-- alone would not establish a deadline for an already running statement.
+set statement_timeout='120s';
+do $chat_unread_migration$
+begin
 set local lock_timeout='5s';
-set local statement_timeout='120s';
 lock table public.conversation_members,public.messages,public.message_receipts,
   public.message_hidden_for_users in share row exclusive mode;
 
@@ -171,7 +177,7 @@ end;$$;
 revoke all on function private.rebuild_chat_unread_projection(uuid[]) from public,anon,authenticated;
 grant execute on function private.rebuild_chat_unread_projection(uuid[]) to service_role;
 -- One-time backfill under this migration's write locks.
-select private.rebuild_chat_unread_projection(array(select distinct conversation_id from public.conversation_members));
+perform private.rebuild_chat_unread_projection(array(select distinct conversation_id from public.conversation_members));
 
 create or replace function private.chat_unread_members_changed()
 returns trigger language plpgsql security definer set search_path='' as $$
@@ -463,3 +469,6 @@ create or replace function public.get_chat_list_page(
   select private.get_chat_list_page_impl(after_activity_at,after_conversation_id,page_size,search_query);
 $$;
 notify pgrst,'reload schema';
+end;
+$chat_unread_migration$;
+reset statement_timeout;
