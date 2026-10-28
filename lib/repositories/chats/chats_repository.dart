@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io' show SocketException;
 
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/app/app_config.dart';
@@ -11,8 +13,10 @@ import 'package:yap_chat/repositories/chats/abstract_chats_repository.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_remote_data_source.dart';
 import 'chat_limit_reached_exception.dart';
+import 'chat_list_search_policy.dart';
 
 part 'chats_pagination.dart';
+part 'chats_search.dart';
 
 class ChatsRepository
     implements
@@ -30,6 +34,7 @@ class ChatsRepository
     required AccountSessionController accountSessionController,
     Uuid uuid = const Uuid(),
     this.enableListPagination = false,
+    ChatListSearchPolicy? searchPolicy,
   }) : _config = config,
        _cache = cache,
        _remote = remote,
@@ -37,7 +42,8 @@ class ChatsRepository
        _chatCache = chatCache,
        _conversationSync = conversationSync,
        _accountSessionController = accountSessionController,
-       _uuid = uuid;
+       _uuid = uuid,
+       _searchPolicy = searchPolicy ?? ChatListSearchPolicy();
 
   static const _reconciliationInterval = Duration(seconds: 20);
   static const _summarySyncDebounce = Duration(milliseconds: 250);
@@ -52,6 +58,8 @@ class ChatsRepository
   final AccountSessionController _accountSessionController;
   final Uuid _uuid;
   final bool enableListPagination;
+  final ChatListSearchPolicy _searchPolicy;
+  Timer? _searchTimer;
   bool _pagesSupported = true;
   bool _headHasConfirmedTotal = false;
   int _listRecoveryVersion = 0;
@@ -152,6 +160,7 @@ class ChatsRepository
             _watchScope?.generation != scope.generation) {
           _availableHead = null;
           _listRefreshError = null;
+          _searchPolicy.reset();
         }
       }
       final subscription = _listController!.stream.listen(
@@ -189,6 +198,8 @@ class ChatsRepository
       }
       listener.onCancel = () async {
         if (--_listConsumers == 0) {
+          _searchTimer?.cancel();
+          _searchTimer = null;
           _listGeneration++;
           _observedGeneration++;
           _listScope = null;
@@ -309,6 +320,7 @@ class ChatsRepository
             if (!_loadingRemote &&
                 !_isRealtimePaused &&
                 _pagesSupported &&
+                (query.isEmpty || _searchPolicy.canRequest || retry) &&
                 !_refreshingList &&
                 ((_listError == null && _listRefreshError == null) || retry)) {
               final state = await _cache.readListState(
@@ -328,11 +340,7 @@ class ChatsRepository
                 unawaited(
                   query.isEmpty
                       ? _synchronizeSafely(scope)
-                      : _requestPage(
-                          query,
-                          true,
-                          generation,
-                        ).catchError((Object _, StackTrace _) {}),
+                      : _retrySearch(query, generation),
                 );
               } else if (state.hasRemotePage && state.nextCursor != null) {
                 _loadingRemote = true;
@@ -731,6 +739,7 @@ class ChatsRepository
     String peerId,
     AccountSessionSnapshot scope,
   ) async {
+    _searchPolicy.invalidate();
     late final String chatId;
     try {
       chatId = await _remote.createDirectConversation(peerId);
@@ -1102,6 +1111,7 @@ class ChatsRepository
       _summaryVersions[change.conversationId!] = ++_summaryVersion;
     }
     if (change.reason != 'reaction_changed') _unreadVersion++;
+    if (change.reason != 'reaction_changed') _searchPolicy.invalidate();
     if (change.conversationId == null) {
       _listRecoveryVersion++;
       _resetRemoteContinuation = true;
@@ -1308,6 +1318,9 @@ class ChatsRepository
   }
 
   void _resetSummaryScheduling({bool clearIds = true}) {
+    _searchTimer?.cancel();
+    _searchTimer = null;
+    _searchPolicy.reset();
     _pageFollowup = false;
     _headHasConfirmedTotal = false;
     _listCheckedAt.clear();

@@ -5,22 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chats/bloc/bloc.dart';
 import 'package:yap_chat/features/chats/data/data.dart';
 import 'package:yap_chat/repositories/chats/chats.dart';
-import 'package:stream_transform/stream_transform.dart';
-
-EventTransformer<Event> debounce<Event>(Duration duration) {
-  return (events, mapper) {
-    return restartable<Event>().call(events.debounce(duration), mapper);
-  };
-}
 
 /// Координирует загрузку, поиск и bulk-действия над чатами.
 class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
   ChatsBloc({required this._chatsRepository}) : super(const ChatsState()) {
     on<ChatsLoadStarted>(_onLoadStarted);
-    on<ChatsSearchChanged>(
-      _onSearchChanged,
-      transformer: debounce(const Duration(milliseconds: 200)),
-    );
+    on<ChatsSearchChanged>(_onSearchChanged, transformer: restartable());
     on<ChatSelectionToggled>(_onSelectionToggled);
     on<ChatSelectionCleared>(_onSelectionCleared);
     on<ChatsDeleted>(_onDeleted);

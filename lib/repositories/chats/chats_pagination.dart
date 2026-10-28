@@ -115,7 +115,12 @@ extension _ChatsPagination on ChatsRepository {
         missingSelectedIds: Set.unmodifiable(_missingSelectedIds),
         ready: _cacheListReady && (rows.isNotEmpty || !_refreshingList),
         hasMoreCached: _hasMoreLocal,
-        hasMoreRemote: _hasMoreRemote && !_isRealtimePaused,
+        hasMoreRemote:
+            _hasMoreRemote &&
+            !_isRealtimePaused &&
+            (_activeListQuery.isEmpty ||
+                (_searchPolicy.canRequest &&
+                    !_searchPolicy.hasCompleteCatalog)),
         isLoadingCache: _loadingLocal,
         isLoadingRemote: _loadingRemote,
         isRefreshing: _refreshingList,
@@ -209,9 +214,18 @@ extension _ChatsPagination on ChatsRepository {
     final previousQuery = _activeListQuery;
     var refreshRestoredHead = false;
     _activeListQuery = query;
+    _searchTimer?.cancel();
+    _searchTimer = null;
     _remote.cancelListSearchRequests();
-    await _searchHeadSubscription?.cancel();
-    await _tailSubscription?.cancel();
+    // Detach before awaiting: an older query's slow cancellation must never
+    // cancel a newer query's subscriptions after the first await completes.
+    final search = _searchHeadSubscription, tail = _tailSubscription;
+    _searchHeadSubscription = null;
+    _tailSubscription = null;
+    await Future.wait([
+      if (search != null) search.cancel(),
+      if (tail != null) tail.cancel(),
+    ]);
     if (!_accountSessionController.isCurrent(scope) ||
         generation != _listGeneration) {
       return;
@@ -260,7 +274,10 @@ extension _ChatsPagination on ChatsRepository {
             onError: (Object error, StackTrace _) {
               if (_listCurrent && generation == _listGeneration) {
                 _listError = error;
+                _cacheListReady = true;
                 _refreshingList = false;
+                _searchTimer?.cancel();
+                _searchTimer = null;
                 _emitList();
               }
             },
@@ -277,13 +294,7 @@ extension _ChatsPagination on ChatsRepository {
       unawaited(_synchronizeSafely(scope));
     }
     if (query.isNotEmpty && !_isRealtimePaused && _pagesSupported) {
-      unawaited(
-        _requestPage(
-          query,
-          true,
-          generation,
-        ).catchError((Object _, StackTrace _) {}),
-      );
+      await _scheduleSearch(query, generation);
     }
     if (_isRealtimePaused || !_pagesSupported) {
       _refreshingList = false;
@@ -304,7 +315,14 @@ extension _ChatsPagination on ChatsRepository {
     if (query.isNotEmpty && _listConsumers > 0) {
       final generation = _listGeneration;
       try {
-        await _readPage(query, true, scope, epoch, generation: generation);
+        if (!await _useSearchCache(query, generation, scope) &&
+            _searchTimer == null) {
+          if (_searchPolicy.delay(immediate: true) > Duration.zero) {
+            await _scheduleSearch(query, generation, immediate: true);
+          } else {
+            await _readPage(query, true, scope, epoch, generation: generation);
+          }
+        }
       } catch (_) {
         // Query replacement aborts only its search read. It must not publish
         // that expected cancellation as a failure of the replacement list.
@@ -350,6 +368,13 @@ extension _ChatsPagination on ChatsRepository {
         epoch,
         generation: generation,
       );
+    } catch (error) {
+      if (_summaryScopeIsCurrent(scope, epoch) &&
+          (query.isEmpty || isCurrent()) &&
+          error is! StaleAccountSessionException) {
+        _recordListReadFailure(error);
+      }
+      rethrow;
     } finally {
       if (refresh && identical(_headReads[key], token)) _headReads.remove(key);
       if (refresh && isCurrent()) {
@@ -371,6 +396,16 @@ extension _ChatsPagination on ChatsRepository {
         (generation != _listGeneration || query != _activeListQuery)) {
       return;
     }
+    if (query.isNotEmpty &&
+        refresh &&
+        await _useSearchCache(query, generation ?? _listGeneration, scope)) {
+      return;
+    }
+    if (query.isNotEmpty && !_searchPolicy.canRequest) {
+      _listError = _searchPolicy.blockedError;
+      _emitList();
+      return;
+    }
     final request = refresh
         ? await _cache.beginListRefresh(query: query, ownerUserId: scope.userId)
         : await _cache.nextListRequest(query: query, ownerUserId: scope.userId);
@@ -382,6 +417,7 @@ extension _ChatsPagination on ChatsRepository {
       return;
     }
     final version = _summaryVersion, unreadVersion = _unreadVersion;
+    final searchVersion = _searchPolicy.version;
     final recovery = _listRecoveryVersion;
     final preserve =
         refresh &&
@@ -392,6 +428,7 @@ extension _ChatsPagination on ChatsRepository {
         (generation != _listGeneration || query != _activeListQuery)) {
       return;
     }
+    if (query.isNotEmpty) _searchPolicy.started();
     final page = await _remote.fetchChatListPage(
       after: request.after,
       searchQuery: query,
@@ -441,13 +478,39 @@ extension _ChatsPagination on ChatsRepository {
         preserveContinuation: preserve,
       );
       if (!accepted) return;
+      final committed = await _cache.readListState(
+        query: query,
+        ownerUserId: scope.userId,
+      );
+      if (query.isEmpty && refresh) {
+        _searchPolicy.confirmHead(
+          searchVersion,
+          complete:
+              page.nextCursor == null &&
+              protected.isEmpty &&
+              pending.isEmpty &&
+              version == _summaryVersion &&
+              recovery == _listRecoveryVersion,
+        );
+      } else if (query.isNotEmpty) {
+        _searchPolicy.remember(query, committed.revision!, searchVersion);
+      } else {
+        _searchPolicy.connected();
+      }
       final acceptedIds = page.items
           .map((i) => i.chat.id)
           .where((id) => !protected.contains(id))
           .toSet();
       _markListVerified(acceptedIds);
       if (query.isEmpty) _verifiedHeadIds = acceptedIds;
+      _initializedQueries.remove(query);
       _initializedQueries.add(query);
+      while (_initializedQueries.where((q) => q.isNotEmpty).length >
+          ChatListSearchPolicy.maximumQueries) {
+        _initializedQueries.remove(
+          _initializedQueries.firstWhere((q) => q.isNotEmpty),
+        );
+      }
       if (query.isEmpty && recovery == _listRecoveryVersion) {
         _resetRemoteContinuation = false;
       }
@@ -469,10 +532,7 @@ extension _ChatsPagination on ChatsRepository {
         );
         // Cache mapping preserves prepared avatar paths. No history hydration.
         _mergeListItems(rows);
-        _hasMoreRemote = (await _cache.readListState(
-          query: query,
-          ownerUserId: scope.userId,
-        )).hasMore;
+        _hasMoreRemote = committed.hasMore;
         if (refresh) {
           _listRefreshError = null;
           if (!preserve) _listError = null;
