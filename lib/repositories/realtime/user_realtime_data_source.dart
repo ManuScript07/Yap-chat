@@ -3,9 +3,8 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
-import 'package:yap_chat/features/chat/data/models/message_reaction.dart';
-import 'package:yap_chat/core/services/reconnect_backoff.dart';
-import 'package:yap_chat/core/services/app_diagnostics.dart';
+import 'package:yap_chat/features/chat/data/data.dart';
+import 'package:yap_chat/core/services/services.dart';
 
 class UserConversationRealtimeEvent {
   const UserConversationRealtimeEvent({
@@ -40,6 +39,7 @@ class UserRealtimeDataSource {
     required SupabaseClient client,
     required Talker talker,
     AppDiagnostics? diagnostics,
+    this.connectionStatus,
   }) : _client = client,
        _talker = talker,
        _diagnostics = diagnostics,
@@ -51,6 +51,8 @@ class UserRealtimeDataSource {
   final SupabaseClient _client;
   final Talker _talker;
   final AppDiagnostics? _diagnostics;
+  final AppConnectionStatus? connectionStatus;
+  ConnectionObservation? _connectionObservation;
   final ReconnectBackoff _backoff;
   final _conversationController =
       StreamController<UserConversationRealtimeEvent>.broadcast();
@@ -81,6 +83,7 @@ class UserRealtimeDataSource {
 
   Future<void> pause() {
     _paused = true;
+    connectionStatus?.realtimePaused();
     _backoff.cancel();
     return _serialize(_removeCurrentChannel);
   }
@@ -95,6 +98,7 @@ class UserRealtimeDataSource {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    connectionStatus?.realtimePaused();
     _paused = true;
     _backoff.cancel();
     await _serialize(_removeCurrentChannel);
@@ -111,6 +115,10 @@ class UserRealtimeDataSource {
     if (userId == null) return;
     if (_channel != null && _channelUserId == userId) return;
     if (_channel != null) await _removeCurrentChannel();
+
+    final observation = connectionStatus?.captureRealtime();
+    _connectionObservation = observation;
+    connectionStatus?.realtimeConnecting(observation);
 
     late final RealtimeChannel channel;
     channel = _client
@@ -130,7 +138,7 @@ class UserRealtimeDataSource {
     _diagnosticsChannel = channel;
     _channelLease = _diagnostics?.trackRealtimeChannel('user-realtime');
     _channelUserId = userId;
-    channel.subscribe((status, _) {
+    channel.subscribe((status, error) {
       if (!identical(_channel, channel) ||
           _disposed ||
           _client.auth.currentUser?.id != userId) {
@@ -138,6 +146,7 @@ class UserRealtimeDataSource {
       }
       switch (status) {
         case RealtimeSubscribeStatus.subscribed:
+          connectionStatus?.realtimeSubscribed(observation);
           _backoff.reset();
           _talker.debug('User realtime subscribed');
           _connectionController.add(true);
@@ -150,7 +159,7 @@ class UserRealtimeDataSource {
         case RealtimeSubscribeStatus.closed:
         case RealtimeSubscribeStatus.channelError:
         case RealtimeSubscribeStatus.timedOut:
-          _handleFailure(channel, status);
+          _handleFailure(channel, status, error);
       }
     });
   }
@@ -165,6 +174,7 @@ class UserRealtimeDataSource {
       return;
     }
     final payload = _payload(event);
+    connectionStatus?.realtimeSubscribed(_connectionObservation);
     final reason = payload['reason'] as String? ?? 'changed';
     final conversationId = payload['conversation_id'];
     if (conversationId is String) {
@@ -201,6 +211,7 @@ class UserRealtimeDataSource {
       return;
     }
     final payload = _payload(event);
+    connectionStatus?.realtimeSubscribed(_connectionObservation);
     // Diagnostics must never affect normal Realtime event delivery. Payloads
     // from Supabase are JSON-compatible in practice, but keep this optional
     // accounting isolated from the application path.
@@ -231,8 +242,20 @@ class UserRealtimeDataSource {
     return nested is Map ? Map<String, dynamic>.from(nested) : event;
   }
 
-  void _handleFailure(RealtimeChannel channel, RealtimeSubscribeStatus status) {
+  void _handleFailure(
+    RealtimeChannel channel,
+    RealtimeSubscribeStatus status,
+    Object? error,
+  ) {
     if (!identical(_channel, channel)) return;
+    if (status == RealtimeSubscribeStatus.channelError &&
+        _client.realtime.isConnected &&
+        !AppConnectionStatus.isConnectionFailure(error)) {
+      connectionStatus?.realtimeRejected(_connectionObservation);
+    } else {
+      connectionStatus?.realtimeUnavailable(_connectionObservation);
+    }
+    _connectionObservation = null;
     _channel = null;
     _channelUserId = null;
     _connectionController.add(false);
@@ -257,6 +280,7 @@ class UserRealtimeDataSource {
     final channel = _channel;
     _channel = null;
     _channelUserId = null;
+    _connectionObservation = null;
     if (channel != null && !_connectionController.isClosed) {
       _connectionController.add(false);
     }

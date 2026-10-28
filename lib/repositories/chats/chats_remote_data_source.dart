@@ -30,11 +30,16 @@ class ChatsRemoteDataSource {
     UserRealtimeDataSource? userRealtime,
     PresenceStatusStore? presenceStore,
     AppDiagnostics? diagnostics,
+    this.connectionStatus,
     this.summaryRequestTimeout = const Duration(seconds: 30),
   }) : _client = client,
        _userRealtime =
            userRealtime ??
-           UserRealtimeDataSource(client: client, talker: talker),
+           UserRealtimeDataSource(
+             client: client,
+             talker: talker,
+             connectionStatus: connectionStatus,
+           ),
        _presenceStore = presenceStore,
        _diagnostics = diagnostics;
 
@@ -42,6 +47,10 @@ class ChatsRemoteDataSource {
   final UserRealtimeDataSource _userRealtime;
   final PresenceStatusStore? _presenceStore;
   final AppDiagnostics? _diagnostics;
+  final AppConnectionStatus? connectionStatus;
+
+  Future<T> _rpc<T>(String name, Future<T> Function() action) =>
+      observeSupabaseRpc(connectionStatus, _diagnostics, name, action);
   final Duration summaryRequestTimeout;
   final _summaryRequests = <Completer<void>>{};
   final _listSearchRequests = <Completer<void>>{};
@@ -69,8 +78,7 @@ class ChatsRemoteDataSource {
     _summaryRequests.add(abort);
     if (listSearch) _listSearchRequests.add(abort);
     try {
-      return await measureRpc(
-        _diagnostics,
+      return await _rpc(
         rpc,
         () => _client
             .rpc<T>(rpc, params: params)
@@ -379,8 +387,7 @@ class ChatsRemoteDataSource {
   Future<void> resumeChanges() => _userRealtime.resume();
 
   Future<void> hideChats(Set<String> ids, {required DateTime clearedAt}) =>
-      measureRpc(
-        _diagnostics,
+      _rpc(
         'hide_conversations',
         () => _client.rpc<void>(
           'hide_conversations',
@@ -391,8 +398,7 @@ class ChatsRemoteDataSource {
         ),
       );
 
-  Future<void> markAsRead(Set<String> ids) => measureRpc(
-    _diagnostics,
+  Future<void> markAsRead(Set<String> ids) => _rpc(
     'mark_conversations_read',
     () => _client.rpc<void>(
       'mark_conversations_read',
@@ -400,8 +406,7 @@ class ChatsRemoteDataSource {
     ),
   );
 
-  Future<void> setMuted(Set<String> ids, {required bool isMuted}) => measureRpc(
-    _diagnostics,
+  Future<void> setMuted(Set<String> ids, {required bool isMuted}) => _rpc(
     'set_conversations_muted',
     () => _client.rpc<void>(
       'set_conversations_muted',
@@ -412,8 +417,7 @@ class ChatsRemoteDataSource {
     ),
   );
 
-  Future<String> createDirectConversation(String peerId) => measureRpc(
-    _diagnostics,
+  Future<String> createDirectConversation(String peerId) => _rpc(
     'create_direct_conversation',
     () => _client
         .rpc<String>(

@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/repositories/presence/abstract_presence_repository.dart';
-import 'package:yap_chat/core/services/app_diagnostics.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/presence/presence_status_store.dart';
 import 'package:yap_chat/repositories/presence/presence_snapshot.dart';
 import 'package:yap_chat/repositories/realtime/user_realtime_data_source.dart';
@@ -22,12 +22,17 @@ class PresenceRepository
     UserRealtimeDataSource? userRealtime,
     PresenceStatusStore? statusStore,
     AppDiagnostics? diagnostics,
+    this.connectionStatus,
     Uuid uuid = const Uuid(),
   }) : _client = client,
        _talker = talker,
        _userRealtime =
            userRealtime ??
-           UserRealtimeDataSource(client: client, talker: talker),
+           UserRealtimeDataSource(
+             client: client,
+             talker: talker,
+             connectionStatus: connectionStatus,
+           ),
        _statusStore = statusStore ?? PresenceStatusStore(),
        _diagnostics = diagnostics,
        _uuid = uuid;
@@ -42,6 +47,10 @@ class PresenceRepository
   final UserRealtimeDataSource _userRealtime;
   final PresenceStatusStore _statusStore;
   final AppDiagnostics? _diagnostics;
+  final AppConnectionStatus? connectionStatus;
+
+  Future<T> _rpc<T>(String name, Future<T> Function() action) =>
+      observeSupabaseRpc(connectionStatus, _diagnostics, name, action);
   final Uuid _uuid;
   final Map<String, Set<String>> _watchScopes = {};
   final Map<String, Future<bool>> _scopeSyncs = {};
@@ -186,8 +195,7 @@ class PresenceRepository
     }
     if (sessionId != null) {
       try {
-        await measureRpc(
-          _diagnostics,
+        await _rpc(
           'close_my_presence_session',
           () => _client
               .rpc<void>(
@@ -208,8 +216,7 @@ class PresenceRepository
     final userId = _connectedUserId;
     if (!_shouldBeConnected || sessionId == null || userId == null) return;
     try {
-      await measureRpc(
-        _diagnostics,
+      await _rpc(
         'touch_my_presence_session',
         () => _client
             .rpc<void>(
@@ -337,8 +344,7 @@ class PresenceRepository
   ) async {
     final ticket = _statusStore.captureSnapshot();
     try {
-      final response = await measureRpc(
-        _diagnostics,
+      final response = await _rpc(
         'set_my_presence_watch_scope',
         () => _client
             .rpc<List<dynamic>>(

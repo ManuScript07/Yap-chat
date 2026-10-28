@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/ui/theme/theme.dart';
-import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
-import 'package:yap_chat/ui/widgets/glass_icon_button.dart';
-import 'package:yap_chat/ui/widgets/user_avatar.dart';
+import 'package:yap_chat/ui/ui.dart';
 import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/utils/utils.dart';
 
@@ -43,14 +40,13 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     final onSurface = context.colorScheme.onSurface;
     final surface = context.colorScheme.surface;
     final statusText = _statusText(context);
-    // Keep the brand hue, but lift its luminance for this small header label.
-    // This is local to the chat and does not change primary buttons elsewhere.
-    // final onlineColor = Color.lerp(
-    //   context.colorScheme.primary,
-    //   onSurface,
-    //   0.7,
-    // )!;
     final onlineColor = AppColors.incomingBubble;
+    final statusStyle = TextStyle(
+      fontSize: 14,
+      height: 1.2,
+      color: isOnline ? onlineColor : onSurface,
+      fontWeight: isOnline ? FontWeight.w600 : FontWeight.w400,
+    );
 
     return Padding(
       padding: EdgeInsets.only(
@@ -107,24 +103,32 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                   const SizedBox(height: 2),
                   SizedBox(
                     width: double.infinity,
-                    child: AnimatedStatusSwitcher(
-                      alignment: AlignmentDirectional.centerStart,
-                      scaleAlignment: AlignmentDirectional.centerStart,
-                      scaleBegin: 0.94,
-                      duration: const Duration(milliseconds: 260),
-                      child: Text(
-                        statusText,
-                        key: ValueKey(statusText),
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.2,
-                          color: isOnline ? onlineColor : onSurface,
-                          fontWeight: isOnline
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    height: MediaQuery.textScalerOf(context).scale(14) * 1.2,
+                    child: ConnectionStatusBuilder(
+                      builder: (context, connecting) => AnimatedStatusSwitcher(
+                        alignment: AlignmentDirectional.centerStart,
+                        scaleAlignment: AlignmentDirectional.centerStart,
+                        scaleBegin: 0.94,
+                        duration: const Duration(milliseconds: 260),
+                        child: connecting
+                            ? FittedBox(
+                                key: const ValueKey('connecting-status'),
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  context.l10n.connectionConnecting,
+                                  style: statusStyle,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                ),
+                              )
+                            : Text(
+                                statusText,
+                                key: ValueKey(statusText),
+                                style: statusStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                       ),
                     ),
                   ),

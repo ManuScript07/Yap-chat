@@ -1,5 +1,7 @@
 export 'floating_navigation_bar.dart';
 export 'animated_status_switcher.dart';
+export 'connection_status_builder.dart';
+export 'connection_status_title.dart';
 export 'animated_unread_badge.dart';
 export 'bottom_ambient_glow.dart';
 export 'glass_search_bar.dart';

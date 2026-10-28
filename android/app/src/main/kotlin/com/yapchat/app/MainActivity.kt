@@ -25,6 +25,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        flutterEngine.plugins.add(NetworkStatusBridge())
         keyboardChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.yapchat.app/keyboard_resume",
@@ -32,6 +33,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        flutterEngine.plugins.remove(NetworkStatusBridge::class.java)
         keyboardChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }

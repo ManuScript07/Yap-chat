@@ -182,6 +182,12 @@ abstract class AppLocalizations {
   /// **'не удалось загрузить чаты'**
   String get failedToLoadChats;
 
+  /// No description provided for @connectionConnecting.
+  ///
+  /// In ru, this message translates to:
+  /// **'соединение…'**
+  String get connectionConnecting;
+
   /// No description provided for @noChats.
   ///
   /// In ru, this message translates to:

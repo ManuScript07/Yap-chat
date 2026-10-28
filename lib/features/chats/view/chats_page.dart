@@ -146,6 +146,9 @@ class ChatsPage extends StatelessWidget {
                               : PrimaryAppBar(
                                   key: const ValueKey('primary_app_bar'),
                                   title: context.l10n.navChats,
+                                  titleWidget: ConnectionStatusTitle(
+                                    title: context.l10n.navChats,
+                                  ),
                                   actionIcon: Icons.add_comment_rounded,
                                   onActionPressed: () {
                                     FocusManager.instance.primaryFocus
@@ -434,6 +437,20 @@ class _ChatsContentState extends State<_ChatsContent> {
               for (final e in state.filteredChats.indexed)
                 'probe:${e.$2.id}': e.$1,
             };
+            final hasConnectionStatus =
+                context.read<AppConnectionStatus?>() != null;
+            // The header replaces network error wording, but continuation
+            // failures still need explicit retry even after a head refresh.
+            // Check both errors so neither can swallow an independent failure.
+            final showLoadErrorLabel =
+                [state.paginationError, state.refreshError].any(
+                  (error) =>
+                      error != null &&
+                      (!hasConnectionStatus ||
+                          !AppConnectionStatus.isConnectionFailure(error)),
+                );
+            final hasRetryableLoadError =
+                state.paginationError != null || showLoadErrorLabel;
             return NotificationListener<ScrollNotification>(
               onNotification: (notification) {
                 if (notification.depth == 0) _scheduleViewport();
@@ -447,7 +464,7 @@ class _ChatsContentState extends State<_ChatsContent> {
                 itemCount:
                     state.filteredChats.length +
                     (state.isPaginated &&
-                            (state.isLoadingMore || state.loadError != null)
+                            (state.isLoadingMore || hasRetryableLoadError)
                         ? 1
                         : 0),
                 itemBuilder: (context, index) {
@@ -460,7 +477,8 @@ class _ChatsContentState extends State<_ChatsContent> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(context.l10n.failedToLoadChats),
+                                  if (showLoadErrorLabel)
+                                    Text(context.l10n.failedToLoadChats),
                                   TextButton(
                                     onPressed: () =>
                                         context.read<ChatsBloc>().add(

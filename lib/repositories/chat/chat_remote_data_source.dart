@@ -1,18 +1,23 @@
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:yap_chat/core/services/app_diagnostics.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 
 class ChatRemoteDataSource {
   const ChatRemoteDataSource({
     required SupabaseClient client,
     AppDiagnostics? diagnostics,
+    this.connectionStatus,
   }) : _client = client,
        _diagnostics = diagnostics;
 
   final SupabaseClient _client;
   final AppDiagnostics? _diagnostics;
+  final AppConnectionStatus? connectionStatus;
+
+  Future<T> _rpc<T>(String name, Future<T> Function() action) =>
+      observeSupabaseRpc(connectionStatus, _diagnostics, name, action);
 
   String get currentUserId {
     final id = _client.auth.currentUser?.id;
@@ -26,8 +31,7 @@ class ChatRemoteDataSource {
     String? beforeMessageId,
     int pageSize = 60,
   }) async {
-    final response = await measureRpc(
-      _diagnostics,
+    final response = await _rpc(
       'get_conversation_messages',
       () => _client.rpc<List<dynamic>>(
         'get_conversation_messages',
@@ -61,8 +65,7 @@ class ChatRemoteDataSource {
     List<String> messageIds,
   ) async {
     if (messageIds.isEmpty) return const {};
-    final rows = await measureRpc(
-      _diagnostics,
+    final rows = await _rpc(
       'get_visible_conversation_message_states',
       () => _client.rpc<List<dynamic>>(
         'get_visible_conversation_message_states',
@@ -84,8 +87,7 @@ class ChatRemoteDataSource {
     required ReactionCode? code,
     required int expectedRevision,
   }) async {
-    final result = await measureRpc(
-      _diagnostics,
+    final result = await _rpc(
       'set_message_reaction',
       () => _client.rpc<Map<String, dynamic>>(
         'set_message_reaction',
@@ -112,8 +114,7 @@ class ChatRemoteDataSource {
     DateTime? afterTimestamp,
     String? afterMessageId,
   }) async {
-    final response = await measureRpc(
-      _diagnostics,
+    final response = await _rpc(
       'get_conversation_message_window',
       () => _client.rpc<List<dynamic>>(
         'get_conversation_message_window',
@@ -167,8 +168,7 @@ class ChatRemoteDataSource {
     String? replyToMessageId,
     List<Map<String, dynamic>> attachments = const [],
   }) {
-    return measureRpc(
-      _diagnostics,
+    return _rpc(
       'send_chat_message',
       () => _client.rpc<void>(
         'send_chat_message',
@@ -187,8 +187,7 @@ class ChatRemoteDataSource {
   }
 
   Future<void> markVisibleMessagesRead(String chatId, Set<String> messageIds) =>
-      measureRpc(
-        _diagnostics,
+      _rpc(
         'mark_visible_conversation_messages_read',
         () => _client
             .rpc<int>(
@@ -204,8 +203,7 @@ class ChatRemoteDataSource {
   Future<void> deleteMessage(
     String messageId, {
     required bool deleteForEveryone,
-  }) => measureRpc(
-    _diagnostics,
+  }) => _rpc(
     'soft_delete_message',
     () => _client.rpc<void>(
       'soft_delete_message',

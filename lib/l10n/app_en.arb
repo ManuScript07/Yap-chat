@@ -16,6 +16,7 @@
   "timeHoursAgo": "{count, plural, one{{count} hour ago} other{{count} hours ago}}",
   "timeDaysAgo": "{count, plural, one{{count} day ago} other{{count} days ago}}",
   "failedToLoadChats": "Failed to load chats",
+  "connectionConnecting": "connecting…",
   "noChats": "You have no chats",
   "chatsNoSearchResults": "Nothing found",
   "chatsDeleteTitle": "{count, plural, =1{Delete chat?} other{Delete chats?}}",

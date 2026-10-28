@@ -31,7 +31,10 @@ class AppInitializer extends StatefulWidget {
   State<AppInitializer> createState() => _AppInitializerState();
 }
 
-class _AppInitializerState extends State<AppInitializer> {
+class _AppInitializerState extends State<AppInitializer>
+    with WidgetsBindingObserver {
+  late final AppConnectionStatus _connectionStatus;
+  StreamSubscription<PlatformNetworkSnapshot>? _networkSubscription;
   late final RepositoryContainer _repositories;
   late final AppConnectionCoordinator _connectionCoordinator;
   late final LocationTrackingCoordinator _locationTrackingCoordinator;
@@ -43,9 +46,33 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   void initState() {
     super.initState();
+    _connectionStatus = AppConnectionStatus(
+      accountSessionController: widget.config.accountSessionController,
+      enabled: !widget.config.isDev,
+    );
+    if (!widget.config.isDev) {
+      final client = widget.config.supabaseClient;
+      if (client != null) {
+        _connectionStatus.watchHeartbeats(client.realtime.onHeartbeat);
+      }
+      _networkSubscription = const PlatformNetworkStatus()
+          .watchSnapshots()
+          .listen(
+            (event) => _connectionStatus.reportNetworkAvailability(
+              event.available,
+              generation: event.generation,
+            ),
+          );
+    }
+    WidgetsBinding.instance.addObserver(this);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null) didChangeAppLifecycleState(lifecycle);
     _repositories = widget.config.isDev
         ? RepositoryContainer.dev(config: widget.config)
-        : RepositoryContainer.prod(config: widget.config);
+        : RepositoryContainer.prod(
+            config: widget.config,
+            connectionStatus: _connectionStatus,
+          );
     _appPublicContentRepository = widget.config.isDev
         ? const MockAppPublicContentRepository()
         : AppPublicContentRepository(
@@ -130,7 +157,21 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _connectionStatus.setForeground(
+      state == AppLifecycleState.resumed,
+      suspended:
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.detached,
+    );
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_networkSubscription?.cancel());
+    _connectionStatus.dispose();
     _releaseFirstFrame();
     unawaited(() async {
       await _connectionCoordinator.dispose();
@@ -145,6 +186,7 @@ class _AppInitializerState extends State<AppInitializer> {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppConfig>.value(value: widget.config),
+        RepositoryProvider<AppConnectionStatus>.value(value: _connectionStatus),
         if (widget.config.diagnostics != null)
           RepositoryProvider<AppDiagnostics>.value(
             value: widget.config.diagnostics!,
@@ -245,6 +287,7 @@ class _AppInitializerState extends State<AppInitializer> {
               markUserCleanupPending: _userDataCleanupCoordinator.markPending,
               clearUserCache: _userDataCleanupCoordinator.clearUser,
               beforeSignOut: (userId) async {
+                _connectionStatus.synchronizeSession(active: false);
                 await Future.wait([
                   _connectionCoordinator.setAuthenticatedUser(null),
                   _locationTrackingCoordinator.setAuthenticatedUser(null),

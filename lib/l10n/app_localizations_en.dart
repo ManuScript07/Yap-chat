@@ -77,6 +77,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get failedToLoadChats => 'Failed to load chats';
 
   @override
+  String get connectionConnecting => 'connecting…';
+
+  @override
   String get noChats => 'You have no chats';
 
   @override

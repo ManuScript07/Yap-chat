@@ -1,8 +1,5 @@
 import 'package:yap_chat/app/app_config.dart';
-import 'package:yap_chat/core/services/avatar_image_processor.dart';
-import 'package:yap_chat/core/services/chat_media_processor.dart';
-import 'package:yap_chat/core/services/contact_cache_key_service.dart';
-import 'package:yap_chat/core/services/media_cache_service.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 /// Контейнер репозиториев приложения.
@@ -30,7 +27,10 @@ class RepositoryContainer {
     required this.nearbyRepository,
   });
 
-  factory RepositoryContainer.prod({required AppConfig config}) {
+  factory RepositoryContainer.prod({
+    required AppConfig config,
+    AppConnectionStatus? connectionStatus,
+  }) {
     final client = config.requireSupabaseClient();
     final localMediaRepository = LocalMediaRepository(
       preferences: config.preferences,
@@ -59,6 +59,7 @@ class RepositoryContainer {
       client: client,
       talker: config.talker,
       diagnostics: config.diagnostics,
+      connectionStatus: connectionStatus,
     );
     final chatsRemote = ChatsRemoteDataSource(
       client: client,
@@ -66,12 +67,14 @@ class RepositoryContainer {
       userRealtime: userRealtime,
       presenceStore: presenceStore,
       diagnostics: config.diagnostics,
+      connectionStatus: connectionStatus,
     );
     final friendsRemote = FriendsRemoteDataSource(
       client: client,
       talker: config.talker,
       presenceStore: presenceStore,
       diagnostics: config.diagnostics,
+      connectionStatus: connectionStatus,
     );
     final friendsCache = FriendsCacheDataSource(
       database: config.database,
@@ -113,6 +116,7 @@ class RepositoryContainer {
     final chatRemote = ChatRemoteDataSource(
       client: client,
       diagnostics: config.diagnostics,
+      connectionStatus: connectionStatus,
     );
     final messageHydrator = ChatMessageHydrator(
       config: config,
@@ -193,6 +197,7 @@ class RepositoryContainer {
         userRealtime: userRealtime,
         statusStore: presenceStore,
         diagnostics: config.diagnostics,
+        connectionStatus: connectionStatus,
       ),
       pushNotificationsRepository:
           config.isLocal || config.firebaseMessaging == null

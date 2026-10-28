@@ -189,6 +189,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     _profileShareLinkCoordinator.onAuthenticationOrForegroundChanged();
 
     context.read<AccountSessionController>().setAuthenticatedUser(userId);
+    context.read<AppConnectionStatus>().synchronizeSession();
     _hydrateBlocklistForUser(userId);
     unawaited(
       context.read<AppConnectionCoordinator>().setAuthenticatedUser(userId),
@@ -256,6 +257,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
         inactiveSince,
         DateTime.now(),
       )) {
+        context.read<AppConnectionStatus>().invalidatePendingRequests();
         // Some devices skip `paused` when suspending an inactive app. The
         // coordinator then still believes the old channel is connected.
         // Recreate it once on a long return and catch up open conversations;
@@ -533,12 +535,16 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
               context.read<AppLanguageCubit>().setAuthenticatedUser(userId),
             );
             if (state.status == AuthStatus.authenticated && userId != null) {
+              context.read<AppConnectionStatus>().synchronizeSession();
               _startAuthenticatedServices(userId);
             } else if (state.status == AuthStatus.unauthenticated ||
                 state.status == AuthStatus.profileIncomplete ||
                 state.status == AuthStatus.banned ||
                 state.status == AuthStatus.deletionPending ||
                 state.status == AuthStatus.failure) {
+              context.read<AppConnectionStatus>().synchronizeSession(
+                active: false,
+              );
               _blocklistHydratedUserId = null;
               _servicesStartedForUserId = null;
               unawaited(
