@@ -276,7 +276,7 @@ class _ChatsContentState extends State<_ChatsContent> {
     _viewportScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _viewportScheduled = false;
-      if (!mounted || !_scroll.hasClients) return;
+      if (!mounted) return;
       final bloc = context.read<ChatsBloc>();
       if (!bloc.state.isPaginated) return;
       final visible = <String>{};
@@ -292,10 +292,14 @@ class _ChatsContentState extends State<_ChatsContent> {
       }
       bloc.add(ChatsVisibleIdsChanged(visible));
       final state = bloc.state;
-      if (_scroll.position.extentAfter < 400 &&
-          state.hasMoreChats &&
+      final nearEnd = !_scroll.hasClients
+          ? state.status == ChatsStatus.success && state.filteredChats.isEmpty
+          : _scroll.position.extentAfter < 400;
+      if (nearEnd &&
+          (state.hasMoreCached ||
+              (state.hasMoreRemote && !state.isRefreshing)) &&
           (!state.isLoadingMore || state.hasMoreCached) &&
-          (state.paginationError == null || state.hasMoreCached)) {
+          (state.loadError == null || state.hasMoreCached)) {
         bloc.add(const ChatsLoadMoreRequested());
       }
     });
@@ -360,7 +364,9 @@ class _ChatsContentState extends State<_ChatsContent> {
           previous.searchQuery != current.searchQuery ||
           previous.hasMoreChats != current.hasMoreChats ||
           previous.isLoadingMore != current.isLoadingMore ||
+          previous.isRefreshing != current.isRefreshing ||
           previous.paginationError != current.paginationError ||
+          previous.refreshError != current.refreshError ||
           previous.selectedChatIds != current.selectedChatIds ||
           previous.isSelectionMode != current.isSelectionMode,
       builder: (context, state) {
@@ -370,14 +376,19 @@ class _ChatsContentState extends State<_ChatsContent> {
         switch (state.status) {
           case ChatsStatus.initial:
           case ChatsStatus.loading:
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: _ChatsLoadingIndicator(key: ValueKey(state.searchQuery)),
+            );
           case ChatsStatus.failure:
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(context.l10n.failedToLoadChats),
-                  if (state.isPaginated)
+                  if (state.isPaginated &&
+                      (state.isRefreshing || state.isLoadingMore))
+                    const _ChatsLoadingIndicator()
+                  else if (state.isPaginated)
                     TextButton(
                       onPressed: () => context.read<ChatsBloc>().add(
                         const ChatsLoadMoreRequested(retry: true),
@@ -404,7 +415,7 @@ class _ChatsContentState extends State<_ChatsContent> {
                           ? context.l10n.chatsNoSearchResults
                           : context.l10n.noChats,
                     ),
-                    if (state.isPaginated && state.hasMoreChats)
+                    if (state.isPaginated && state.loadError != null)
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: TextButton(
@@ -436,33 +447,30 @@ class _ChatsContentState extends State<_ChatsContent> {
                 itemCount:
                     state.filteredChats.length +
                     (state.isPaginated &&
-                            (state.hasMoreChats ||
-                                state.paginationError != null)
+                            (state.isLoadingMore || state.loadError != null)
                         ? 1
                         : 0),
                 itemBuilder: (context, index) {
                   if (index == state.filteredChats.length) {
                     return Padding(
                       padding: const EdgeInsets.all(16),
-                      child: state.isLoadingMore
-                          ? const Center(
-                              child: SizedBox.square(
-                                dimension: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
+                      child: state.isLoadingMore || state.isRefreshing
+                          ? const Center(child: _ChatsLoadingIndicator())
                           : Center(
-                              child: TextButton(
-                                onPressed: () => context.read<ChatsBloc>().add(
-                                  const ChatsLoadMoreRequested(retry: true),
-                                ),
-                                child: Text(
-                                  state.paginationError == null
-                                      ? context.l10n.repeat
-                                      : '${context.l10n.failedToLoadChats}. ${context.l10n.repeat}',
-                                ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(context.l10n.failedToLoadChats),
+                                  TextButton(
+                                    onPressed: () =>
+                                        context.read<ChatsBloc>().add(
+                                          const ChatsLoadMoreRequested(
+                                            retry: true,
+                                          ),
+                                        ),
+                                    child: Text(context.l10n.repeat),
+                                  ),
+                                ],
                               ),
                             ),
                     );
@@ -517,6 +525,40 @@ class _ChatsContentState extends State<_ChatsContent> {
       },
     );
   }
+}
+
+/// Delay feedback, not cached rows. Fast SQLite/HTTP completions never flash a
+/// spinner; a genuinely slow operation still has the standard compact loader.
+class _ChatsLoadingIndicator extends StatefulWidget {
+  const _ChatsLoadingIndicator({super.key});
+
+  @override
+  State<_ChatsLoadingIndicator> createState() => _ChatsLoadingIndicatorState();
+}
+
+class _ChatsLoadingIndicatorState extends State<_ChatsLoadingIndicator> {
+  Timer? _timer;
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 24,
+    child: _visible ? const CircularProgressIndicator(strokeWidth: 2.5) : null,
+  );
 }
 
 class _ChatRowProbe extends StatefulWidget {

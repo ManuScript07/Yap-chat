@@ -79,13 +79,18 @@ class ChatsRepository
       _selectedListIds = {},
       _missingSelectedIds = {};
   String _activeListQuery = '';
-  int _listGeneration = 0, _observedGeneration = 0, _listConsumers = 0;
+  int _listGeneration = 0,
+      _observedGeneration = 0,
+      _tailGeneration = 0,
+      _listConsumers = 0;
   AccountSessionSnapshot? _listScope;
   ChatListCacheSlice? _availableHead;
   ChatListLocalCursor? _localListAfter;
-  bool _cacheListReady = false, _hasMoreLocal = false, _hasMoreRemote = true;
+  bool _cacheListReady = false, _hasMoreLocal = false, _hasMoreRemote = false;
   bool _loadingLocal = false, _loadingRemote = false, _refreshingList = false;
   Object? _listError;
+  Object? _listRefreshError;
+  final _headReads = <(String, int, int, String), Object>{};
   Future<void>? _cacheAppend;
   final _pageReads = <(String, int, int, String, bool, int), Future<void>>{};
   StreamController<ChatListViewState>? _listController;
@@ -143,7 +148,11 @@ class ChatsRepository
       _listController ??= StreamController<ChatListViewState>.broadcast();
       if (first) {
         _listScope = scope;
-        if (_watchScope?.userId != scope.userId) _availableHead = null;
+        if (_watchScope?.userId != scope.userId ||
+            _watchScope?.generation != scope.generation) {
+          _availableHead = null;
+          _listRefreshError = null;
+        }
       }
       final subscription = _listController!.stream.listen(
         listener.add,
@@ -254,7 +263,14 @@ class ChatsRepository
 
   @override
   Future<void> loadMoreChatList({bool retry = false}) async {
-    if (!_listCurrent) return;
+    if (!_listCurrent || !_cacheListReady) return;
+    // Unknown server coverage is not a next page. Initialization/recovery owns
+    // the head refresh; a short viewport must not enqueue a second one.
+    if (!_hasMoreLocal &&
+        !(_hasMoreRemote && !_refreshingList) &&
+        !(retry && (_listError != null || _listRefreshError != null))) {
+      return;
+    }
     final active = _cacheAppend;
     if (active != null) return active;
     final scope = _listScope!,
@@ -263,34 +279,38 @@ class ChatsRepository
     late final Future<void> operation;
     operation =
         () async {
-          _loadingLocal = true;
-          _emitList();
           try {
-            final slice = await _cache.readAvailableSlice(
-              query: query,
-              after: _localListAfter,
-              ownerUserId: scope.userId,
-            );
-            if (!_accountSessionController.isCurrent(scope) ||
-                generation != _listGeneration) {
-              return;
-            }
-            _mergeListItems(_sliceItems(slice));
-            if (slice.chats.isNotEmpty) {
-              final last = slice.chats.last;
-              _localListAfter = ChatListLocalCursor(
+            if (_hasMoreLocal || (retry && _listError != null)) {
+              _loadingLocal = true;
+              _listError = null;
+              _emitList();
+              final slice = await _cache.readAvailableSlice(
                 query: query,
-                activityMicros: slice.orderByChatId[last.id]!,
-                chatId: last.id,
-                serverBacked: false,
+                after: _localListAfter,
+                ownerUserId: scope.userId,
               );
+              if (!_accountSessionController.isCurrent(scope) ||
+                  generation != _listGeneration) {
+                return;
+              }
+              _mergeListItems(_sliceItems(slice));
+              if (slice.chats.isNotEmpty) {
+                final last = slice.chats.last;
+                _localListAfter = ChatListLocalCursor(
+                  query: query,
+                  activityMicros: slice.orderByChatId[last.id]!,
+                  chatId: last.id,
+                  serverBacked: false,
+                );
+              }
+              _hasMoreLocal = slice.hasMoreCached;
+              _watchListTail();
             }
-            _hasMoreLocal = slice.hasMoreCached;
-            _watchListTail();
             if (!_loadingRemote &&
                 !_isRealtimePaused &&
                 _pagesSupported &&
-                (_listError == null || retry)) {
+                !_refreshingList &&
+                ((_listError == null && _listRefreshError == null) || retry)) {
               final state = await _cache.readListState(
                 query: query,
                 ownerUserId: scope.userId,
@@ -299,13 +319,28 @@ class ChatsRepository
                   !_accountSessionController.isCurrent(scope)) {
                 return;
               }
-              if (state.hasMore) {
+              if (retry &&
+                  (_listRefreshError != null || !state.hasRemotePage)) {
+                _listRefreshError = null;
+                _refreshingList = true;
+                // Main-head retries share the same operation as initialization,
+                // periodic reconciliation and reconnect recovery.
+                unawaited(
+                  query.isEmpty
+                      ? _synchronizeSafely(scope)
+                      : _requestPage(
+                          query,
+                          true,
+                          generation,
+                        ).catchError((Object _, StackTrace _) {}),
+                );
+              } else if (state.hasRemotePage && state.nextCursor != null) {
                 _loadingRemote = true;
                 _listError = null;
                 unawaited(
                   _requestPage(
                     query,
-                    !state.hasRemotePage,
+                    false,
                     generation,
                   ).catchError((Object _, StackTrace _) {}).whenComplete(() {
                     if (_listCurrent && generation == _listGeneration) {
@@ -316,6 +351,11 @@ class ChatsRepository
                 );
               }
             }
+          } catch (error) {
+            if (_listCurrent && generation == _listGeneration) {
+              _listError = error;
+            }
+            rethrow;
           } finally {
             if (_listCurrent && generation == _listGeneration) {
               _loadingLocal = false;
@@ -1723,7 +1763,7 @@ class ChatsRepository
       }
       _config.talker.handle(error, stackTrace, 'Chats synchronization failed');
       if (enableListPagination) {
-        _listError = error;
+        _listRefreshError = error;
         _refreshingList = false;
         _emitList();
       }

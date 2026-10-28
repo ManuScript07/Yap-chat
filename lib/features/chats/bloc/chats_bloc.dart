@@ -91,7 +91,8 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
     emit(
       state.copyWith(
         status: view.ready
-            ? (view.chats.isEmpty && view.error != null
+            ? (view.chats.isEmpty &&
+                      (view.error != null || view.refreshError != null)
                   ? ChatsStatus.failure
                   : ChatsStatus.success)
             : ChatsStatus.loading,
@@ -106,6 +107,8 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         isRefreshing: view.isRefreshing,
         paginationError: view.error,
         clearPaginationError: view.error == null,
+        refreshError: view.refreshError,
+        clearRefreshError: view.refreshError == null,
       ),
     );
     if (selectionChanged) _updateObserved();

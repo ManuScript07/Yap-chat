@@ -81,6 +81,7 @@ extension _ChatsPagination on ChatsRepository {
     _cacheListReady = true;
     _mergeListItems(_sliceItems(slice));
     if (_localListAfter == null && slice.chats.isNotEmpty) {
+      _hasMoreLocal = slice.hasMoreCached;
       final last = slice.chats.last;
       _localListAfter = ChatListLocalCursor(
         query: query,
@@ -119,13 +120,15 @@ extension _ChatsPagination on ChatsRepository {
         isLoadingRemote: _loadingRemote,
         isRefreshing: _refreshingList,
         error: _listError,
+        refreshError: _listRefreshError,
       ),
     );
   }
 
   void _watchListTail() {
+    final tailGeneration = ++_tailGeneration;
     unawaited(_tailSubscription?.cancel());
-    if (!_listCurrent || _listConsumers == 0) return;
+    if (!_listCurrent || _listConsumers == 0 || _localListAfter == null) return;
     final generation = _listGeneration;
     _tailSubscription = _cache
         .watchAvailableSlice(
@@ -136,12 +139,18 @@ extension _ChatsPagination on ChatsRepository {
         )
         .listen(
           (slice) {
-            if (!_listCurrent || generation != _listGeneration) return;
+            if (!_listCurrent ||
+                generation != _listGeneration ||
+                tailGeneration != _tailGeneration) {
+              return;
+            }
             _hasMoreLocal = slice.chats.isNotEmpty;
             _emitList();
           },
           onError: (Object error, StackTrace _) {
-            if (_listCurrent && generation == _listGeneration) {
+            if (_listCurrent &&
+                generation == _listGeneration &&
+                tailGeneration == _tailGeneration) {
               _listError = error;
               _emitList();
             }
@@ -197,6 +206,8 @@ extension _ChatsPagination on ChatsRepository {
   Future<void> _startListQuery(String query, {bool restoreMain = false}) async {
     final generation = ++_listGeneration;
     final scope = _listScope!;
+    final previousQuery = _activeListQuery;
+    var refreshRestoredHead = false;
     _activeListQuery = query;
     _remote.cancelListSearchRequests();
     await _searchHeadSubscription?.cancel();
@@ -208,11 +219,12 @@ extension _ChatsPagination on ChatsRepository {
     _cacheListReady = false;
     _cacheAppend = null;
     _hasMoreLocal = false;
-    _hasMoreRemote = true;
+    _hasMoreRemote = false;
     _loadingLocal = false;
     _loadingRemote = false;
     _refreshingList = true;
     _listError = null;
+    if (query.isNotEmpty || previousQuery.isNotEmpty) _listRefreshError = null;
     _listRows.clear();
     _localListAfter = restoreMain ? _mainListAfter : null;
     if (restoreMain && _mainListRows != null) _listRows.addAll(_mainListRows!);
@@ -229,10 +241,17 @@ extension _ChatsPagination on ChatsRepository {
           await _cache.readAvailableSlice(ownerUserId: scope.userId);
       _acceptListHead(slice, query, generation);
       final state = await _cache.readListState(ownerUserId: scope.userId);
-      if (state.hasRemotePage) {
-        _refreshingList = false;
-        _hasMoreRemote = state.hasMore;
-      }
+      if (!_listCurrent || generation != _listGeneration) return;
+      _refreshingList =
+          (!state.hasRemotePage && _listRefreshError == null) ||
+          _headReads.containsKey((
+            scope.userId,
+            scope.generation,
+            _summaryEpoch,
+            query,
+          ));
+      _hasMoreRemote = state.hasRemotePage && state.nextCursor != null;
+      refreshRestoredHead = restoreMain && !state.hasRemotePage;
     } else {
       _searchHeadSubscription = _cache
           .watchAvailableSlice(query: query, ownerUserId: scope.userId)
@@ -252,6 +271,11 @@ extension _ChatsPagination on ChatsRepository {
       return;
     }
     // Initialization already refreshes the main head through the shared queue.
+    // Returning from search can restore a legacy/offline cache whose coverage
+    // has never been confirmed. It needs a head refresh, not a fake next page.
+    if (refreshRestoredHead && !_isRealtimePaused && _pagesSupported) {
+      unawaited(_synchronizeSafely(scope));
+    }
     if (query.isNotEmpty && !_isRealtimePaused && _pagesSupported) {
       unawaited(
         _requestPage(
@@ -301,6 +325,41 @@ extension _ChatsPagination on ChatsRepository {
   }
 
   Future<void> _readPage(
+    String query,
+    bool refresh,
+    AccountSessionSnapshot scope,
+    int epoch, {
+    int? generation,
+  }) async {
+    final key = (scope.userId, scope.generation, epoch, query);
+    final token = Object();
+    if (refresh) _headReads[key] = token;
+    bool isCurrent() =>
+        _summaryScopeIsCurrent(scope, epoch) &&
+        query == _activeListQuery &&
+        (generation == null || generation == _listGeneration);
+    if (refresh && isCurrent()) {
+      _refreshingList = true;
+      _emitList();
+    }
+    try {
+      await _readAndApplyPage(
+        query,
+        refresh,
+        scope,
+        epoch,
+        generation: generation,
+      );
+    } finally {
+      if (refresh && identical(_headReads[key], token)) _headReads.remove(key);
+      if (refresh && isCurrent()) {
+        _refreshingList = false;
+        _emitList();
+      }
+    }
+  }
+
+  Future<void> _readAndApplyPage(
     String query,
     bool refresh,
     AccountSessionSnapshot scope,
@@ -414,7 +473,12 @@ extension _ChatsPagination on ChatsRepository {
           query: query,
           ownerUserId: scope.userId,
         )).hasMore;
-        _listError = null;
+        if (refresh) {
+          _listRefreshError = null;
+          if (!preserve) _listError = null;
+        } else {
+          _listError = null;
+        }
         _refreshingList = false;
         _cacheListReady = true;
         _emitList();
@@ -449,7 +513,11 @@ extension _ChatsPagination on ChatsRepository {
               if (_summaryScopeIsCurrent(scope, epoch) &&
                   generation == _listGeneration &&
                   error is! StaleAccountSessionException) {
-                _listError = error;
+                if (refresh) {
+                  _listRefreshError = error;
+                } else {
+                  _listError = error;
+                }
                 _refreshingList = false;
                 _emitList();
               }

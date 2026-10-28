@@ -27,6 +27,7 @@ class ChatsState extends Equatable {
     this.isLoadingMore = false,
     this.isRefreshing = false,
     this.paginationError,
+    this.refreshError,
     this.selectedChats = const {},
   });
 
@@ -47,6 +48,8 @@ class ChatsState extends Equatable {
       isLoadingMore,
       isRefreshing;
   final Object? paginationError;
+  final Object? refreshError;
+  Object? get loadError => paginationError ?? refreshError;
   final Map<String, Chat> selectedChats;
   bool get hasMoreChats => hasMoreCached || hasMoreRemote;
   Iterable<Chat> get selectionRows => selectedChatIds
@@ -87,6 +90,8 @@ class ChatsState extends Equatable {
     bool? isRefreshing,
     Object? paginationError,
     bool clearPaginationError = false,
+    Object? refreshError,
+    bool clearRefreshError = false,
     Map<String, Chat>? selectedChats,
   }) {
     return ChatsState(
@@ -114,6 +119,9 @@ class ChatsState extends Equatable {
       paginationError: clearPaginationError
           ? null
           : paginationError ?? this.paginationError,
+      refreshError: clearRefreshError
+          ? null
+          : refreshError ?? this.refreshError,
       selectedChats: selectedChats ?? this.selectedChats,
     );
   }
@@ -137,6 +145,7 @@ class ChatsState extends Equatable {
     isLoadingMore,
     isRefreshing,
     paginationError,
+    refreshError,
     selectedChats,
   ];
 }

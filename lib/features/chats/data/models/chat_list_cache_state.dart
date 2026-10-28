@@ -70,11 +70,12 @@ class ChatListViewState {
     this.missingSelectedIds = const {},
     this.ready = false,
     this.hasMoreCached = false,
-    this.hasMoreRemote = true,
+    this.hasMoreRemote = false,
     this.isLoadingCache = false,
     this.isLoadingRemote = false,
     this.isRefreshing = false,
     this.error,
+    this.refreshError,
   });
   final String query;
   final List<Chat> chats;
@@ -87,6 +88,9 @@ class ChatListViewState {
       isLoadingRemote,
       isRefreshing;
   final Object? error;
+
+  /// A failed head/search refresh is independent of continuation loading.
+  final Object? refreshError;
   bool get hasMore => hasMoreCached || hasMoreRemote;
 }
 
