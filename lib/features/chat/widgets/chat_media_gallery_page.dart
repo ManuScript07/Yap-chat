@@ -191,8 +191,6 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                   ),
                 ),
               ),
-              if (widget.transitionGeometry case final geometry?)
-                ChatMediaGalleryShadows(geometry: geometry),
               Positioned(
                 top: systemPadding.top + 16,
                 left: systemPadding.left + 16,

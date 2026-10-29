@@ -22,7 +22,6 @@ class _ChatMediaTransitionScopeState extends State<ChatMediaTransitionScope> {
 
   @override
   void dispose() {
-    geometry.shadows.dispose();
     geometry.localFlight.dispose();
     super.dispose();
   }
@@ -45,7 +44,6 @@ enum ChatMediaChromeRegion { header, composer, scrollButton }
 
 class ChatMediaTransitionGeometry {
   final localFlight = ChatMediaLocalFlight();
-  final shadows = ValueNotifier<ChatMediaShadowStyle?>(null);
   // AnimatedSwitcher may keep an outgoing button alongside its replacement.
   // Register each mounted owner separately so disposing it cannot erase another.
   final _regions =

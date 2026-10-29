@@ -197,6 +197,7 @@ class _ChatMediaImageState extends State<ChatMediaImage> {
   ImageStreamListener? _listener;
   int _observation = 0;
   bool _sizeObserved = false;
+  bool _hasDecodedFrame = false;
 
   @override
   void didChangeDependencies() {
@@ -302,7 +303,11 @@ class _ChatMediaImageState extends State<ChatMediaImage> {
       fit: widget.fit,
       gaplessPlayback: true,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (wasSynchronouslyLoaded || frame != null) _captureAspectRatio();
+        final retainedFrame = _hasDecodedFrame;
+        if (wasSynchronouslyLoaded || frame != null) {
+          _hasDecodedFrame = true;
+          _captureAspectRatio();
+        }
         return widget.revealOnLoad
             ? _revealImageFrame(
                 context,
@@ -310,6 +315,7 @@ class _ChatMediaImageState extends State<ChatMediaImage> {
                 frame,
                 wasSynchronouslyLoaded,
                 widget.path,
+                retainedFrame: retainedFrame,
               )
             : child;
       },
@@ -323,10 +329,14 @@ Widget _revealImageFrame(
   Widget child,
   int? frame,
   bool wasSynchronouslyLoaded,
-  String path,
-) {
+  String path, {
+  bool retainedFrame = false,
+}) {
   final isReady = wasSynchronouslyLoaded || frame != null;
-  final shouldReveal = !_revealedChatMediaPaths.contains(path);
+  // Image.gaplessPlayback retains the old decoded frame while a replacement
+  // path/size is loading. Do not hide that frame by replaying a cold reveal.
+  final shouldReveal =
+      !retainedFrame && !_revealedChatMediaPaths.contains(path);
   if (isReady) _rememberRevealedChatMedia(path);
   return AnimatedOpacity(
     opacity: !shouldReveal || isReady ? 1 : 0,

@@ -10,8 +10,9 @@ typedef ChatMediaShadowStyle = ({
   Color backgroundColor,
 });
 
-/// The same edge treatment on both sides of the photo transition. Fading these
-/// gradients against an independently darkening backdrop creates a light pulse.
+/// Fixed chat gradients, with a separate fade only over the moving photo.
+/// Fading the entire overlay would briefly brighten the uncovered background
+/// against the flight's independently darkening backdrop.
 class ChatMediaTransitionShadows extends StatefulWidget {
   const ChatMediaTransitionShadows({
     super.key,
@@ -21,9 +22,7 @@ class ChatMediaTransitionShadows extends StatefulWidget {
     this.bottomOffset = 0,
   });
 
-  final double topHeight;
-  final double bottomHeight;
-  final double bottomOffset;
+  final double topHeight, bottomHeight, bottomOffset;
   final Color backgroundColor;
 
   ChatMediaShadowStyle get style => (
@@ -40,63 +39,89 @@ class ChatMediaTransitionShadows extends StatefulWidget {
 
 class _ChatMediaTransitionShadowsState
     extends State<ChatMediaTransitionShadows> {
-  ChatMediaTransitionGeometry? _geometry;
-  bool _publishScheduled = false;
+  final _viewportKey = GlobalKey();
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _geometry = ChatMediaTransitionScope.maybeOf(context);
-    _publishStyle();
+  Widget build(BuildContext context) {
+    final flight = ChatMediaTransitionScope.maybeOf(context)?.localFlight;
+    final edges = _EdgeShadows(style: widget.style);
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ClipRect(
+          key: _viewportKey,
+          child: flight == null
+              ? edges
+              : AnimatedBuilder(
+                  animation: flight,
+                  child: edges,
+                  builder: (_, edges) {
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Keep the fixed gradient elements mounted through
+                        // both handoffs, including an immediate back gesture.
+                        ClipPath(
+                          clipper: _PhotoShadowClipper(
+                            flight,
+                            _viewportKey,
+                            outside: true,
+                          ),
+                          clipBehavior: Clip.hardEdge,
+                          child: edges,
+                        ),
+                        if (flight.isFlying)
+                          ClipPath(
+                            clipper: _PhotoShadowClipper(
+                              flight,
+                              _viewportKey,
+                              outside: false,
+                            ),
+                            clipBehavior: Clip.hardEdge,
+                            child: _EdgeShadows(
+                              style: widget.style,
+                              opacity: flight.chromeOpacity.value,
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+        ),
+      ),
+    );
   }
-
-  @override
-  void didUpdateWidget(ChatMediaTransitionShadows oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.style != oldWidget.style) _publishStyle();
-  }
-
-  void _publishStyle() {
-    if (_publishScheduled ||
-        _geometry == null ||
-        _geometry!.shadows.value == widget.style) {
-      return;
-    }
-    _publishScheduled = true;
-    // Layout/theme/keyboard changes can rebuild the covered chat while the
-    // gallery is mounted. Never notify that sibling route during this build.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _publishScheduled = false;
-      if (mounted) _geometry?.shadows.value = widget.style;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      Positioned.fill(child: _EdgeShadows(style: widget.style));
 }
 
-/// Retains the chat's gradients at the route handoff, including albums/rotation.
-/// Independent of gallery control visibility: toggling buttons must not restart
-/// the edge treatment when the photo is closed.
-class ChatMediaGalleryShadows extends StatelessWidget {
-  const ChatMediaGalleryShadows({super.key, required this.geometry});
-
-  final ChatMediaTransitionGeometry geometry;
+class _PhotoShadowClipper extends CustomClipper<Path> {
+  const _PhotoShadowClipper(
+    this.flight,
+    this.viewport, {
+    required this.outside,
+  });
+  final ChatMediaLocalFlight flight;
+  final GlobalKey viewport;
+  final bool outside;
 
   @override
-  Widget build(BuildContext context) => Positioned.fill(
-    child: ValueListenableBuilder<ChatMediaShadowStyle?>(
-      valueListenable: geometry.shadows,
-      builder: (_, style, _) =>
-          style == null ? const SizedBox() : _EdgeShadows(style: style),
-    ),
-  );
+  Path getClip(Size size) {
+    final photo = flight.photoClipIn(viewport);
+    final path = Path();
+    if (outside) {
+      path.fillType = PathFillType.evenOdd;
+      path.addRect(Offset.zero & size);
+    }
+    if (photo != null) path.addRRect(photo);
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_PhotoShadowClipper oldClipper) => true;
 }
 
 class _EdgeShadows extends StatelessWidget {
-  const _EdgeShadows({required this.style});
+  const _EdgeShadows({required this.style, this.opacity = 1});
   final ChatMediaShadowStyle style;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) => IgnorePointer(
@@ -105,13 +130,18 @@ class _EdgeShadows extends StatelessWidget {
         GradientOverlay(
           height: style.topHeight,
           isTop: true,
-          backgroundColor: style.backgroundColor,
+          // Fade shader colors directly, avoiding a fullscreen opacity buffer.
+          backgroundColor: style.backgroundColor.withValues(
+            alpha: style.backgroundColor.a * opacity,
+          ),
         ),
         GradientOverlay(
           height: style.bottomHeight,
           bottomOffset: style.bottomOffset,
           isTop: false,
-          backgroundColor: style.backgroundColor,
+          backgroundColor: style.backgroundColor.withValues(
+            alpha: style.backgroundColor.a * opacity,
+          ),
         ),
       ],
     ),

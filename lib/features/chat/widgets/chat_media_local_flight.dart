@@ -196,6 +196,18 @@ class ChatMediaLocalFlight extends ChangeNotifier {
     return Rect.lerp(source ?? target, target, progress)!.shift(-origin);
   }
 
+  /// The same moving rounded image in another chat layer's coordinates.
+  /// Used to fade shadows only ON the photo; background shadows stay stable.
+  RRect? photoClipIn(GlobalKey viewportKey) {
+    if (!isFlying) return null;
+    final host = _bounds(_hostKey);
+    final viewport = _bounds(viewportKey);
+    if (host == null || viewport == null) return null;
+    return borderRadius.toRRect(
+      _flightRect(host.size).shift(host.topLeft - viewport.topLeft),
+    );
+  }
+
   @override
   void dispose() {
     _disposed = true;
