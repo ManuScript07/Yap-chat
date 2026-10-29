@@ -232,16 +232,13 @@ size.height: ${mediaQuery.size.height}
     final keyboardHeight = mediaQuery.viewInsets.bottom;
     final isKeyboardOpen = keyboardHeight > 0;
 
-    final systemBottomPadding = mediaQuery.viewPadding.bottom;
-
-    const navBarHeight = 70.0;
-    const navBarBottomOffset = 16.0;
-    const searchBarSpacing = 16.0;
+    const searchBarSpacing = FloatingNavigationGeometry.controlSpacing;
     const searchBarHeight = 50.0;
     const contentExtraPadding = 16.0;
 
-    final navigationSpace =
-        systemBottomPadding + navBarBottomOffset + navBarHeight;
+    final navigationSpace = FloatingNavigationGeometry.occupiedHeight(
+      mediaQuery,
+    );
     final restingContentBottom =
         navigationSpace +
         searchBarSpacing +

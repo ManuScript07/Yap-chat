@@ -65,25 +65,28 @@ class PrimarySegmentedControl extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.5,
                               ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (item.count != null) ...[
-                            const SizedBox(width: 6),
-                            AnimatedUnreadBadge(
-                              count: item.count!,
-                              color: textColor,
-                              textColor: context.scaffoldBackgroundColor,
-                              size: 22,
-                              maintainSize: false,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            if (item.count != null) ...[
+                              const SizedBox(width: 6),
+                              AnimatedUnreadBadge(
+                                count: item.count!,
+                                color: textColor,
+                                textColor: context.scaffoldBackgroundColor,
+                                size: 22,
+                                maintainSize: false,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),

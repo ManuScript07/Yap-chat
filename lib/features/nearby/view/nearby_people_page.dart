@@ -89,14 +89,10 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
         },
         builder: (context, state) {
           final mediaQuery = MediaQuery.of(context);
-          const navBarHeight = 70.0;
-          const navBarOffset = 16.0;
           const controlHeight = 50.0;
           final filterBottom =
-              mediaQuery.viewPadding.bottom +
-              navBarHeight +
-              navBarOffset +
-              16.0;
+              FloatingNavigationGeometry.occupiedHeight(mediaQuery) +
+              FloatingNavigationGeometry.controlSpacing;
           final contentBottom = filterBottom + controlHeight + 20;
           final blockedUserIds = context.select<BlocklistCubit, Set<String>>(
             (cubit) => cubit.state.blockedUserIds,

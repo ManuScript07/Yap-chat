@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/location_tracking_coordinator.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/chats/chats.dart';
 import 'package:yap_chat/features/friends/friends.dart';
 import 'package:yap_chat/features/nearby/nearby.dart';
+import 'package:yap_chat/features/main/widgets/widgets.dart';
+import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -57,12 +60,14 @@ class _MainView extends StatelessWidget {
       routes: const [
         ChatsRoute(),
         NearbyPeopleRoute(),
+        RecommendationsRoute(),
         FriendsRoute(),
         ProfileRoute(),
       ],
-      transitionBuilder: (context, child, animation) {
-        return FadeTransition(opacity: animation, child: child);
-      },
+      // Cached tabs switch directly; fading the entire new page from zero
+      // briefly exposes the black scaffold even when all its data is ready.
+      duration: Duration.zero,
+      transitionBuilder: (context, child, animation) => child,
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
 
@@ -78,6 +83,9 @@ class _MainView extends StatelessWidget {
         );
         final incomingFriendRequestsCount = context.select<FriendsBloc, int>(
           (bloc) => bloc.state.incomingRequestCount,
+        );
+        final profile = context.select<AuthBloc, UserProfile?>(
+          (bloc) => bloc.state.profile,
         );
 
         return PopScope(
@@ -128,14 +136,23 @@ class _MainView extends StatelessWidget {
                   label: context.l10n.navNearby,
                 ),
                 FloatingNavigationBarItem(
+                  icon: Icons.auto_awesome_outlined,
+                  activeIcon: Icons.auto_awesome_rounded,
+                  label: context.l10n.navRecommendations,
+                ),
+                FloatingNavigationBarItem(
                   icon: Icons.mood_outlined,
                   activeIcon: Icons.emoji_emotions,
                   label: context.l10n.navFriends,
                   unreadCount: incomingFriendRequestsCount,
                 ),
-                FloatingNavigationBarItem(
-                  icon: Icons.person_outline_rounded,
-                  activeIcon: Icons.person_rounded,
+                FloatingNavigationBarItem.custom(
+                  iconBuilder: (_, selected, color) => ProfileNavigationAvatar(
+                    key: ValueKey(profile?.id),
+                    photo: profile?.primaryPhoto,
+                    selected: selected,
+                    iconColor: color,
+                  ),
                   label: context.l10n.navProfile,
                 ),
               ],

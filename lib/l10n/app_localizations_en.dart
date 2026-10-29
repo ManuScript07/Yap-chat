@@ -26,6 +26,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navProfile => 'Profile';
 
   @override
+  String get navRecommendations => 'Feed';
+
+  @override
+  String get recommendationsTitle => 'Recommendations';
+
+  @override
+  String get recommendationsEmpty => 'recommendations will appear here';
+
+  @override
   String get searchHintChats => 'search chats';
 
   @override

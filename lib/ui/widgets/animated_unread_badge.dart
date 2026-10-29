@@ -11,6 +11,7 @@ class AnimatedUnreadBadge extends StatelessWidget {
     this.borderColor,
     this.borderWidth = 0,
     this.maintainSize = true,
+    this.textStyle,
   });
 
   final int count;
@@ -20,6 +21,7 @@ class AnimatedUnreadBadge extends StatelessWidget {
   final Color? borderColor;
   final double borderWidth;
   final bool maintainSize;
+  final TextStyle? textStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +50,7 @@ class AnimatedUnreadBadge extends StatelessWidget {
                     color: textColor,
                     fontSize: size <= 22 ? 10 : 12,
                     fontWeight: FontWeight.w700,
-                  ),
+                  ).merge(textStyle),
                 ),
               ),
             )

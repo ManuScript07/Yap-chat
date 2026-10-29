@@ -26,6 +26,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navProfile => 'акк';
 
   @override
+  String get navRecommendations => 'реки';
+
+  @override
+  String get recommendationsTitle => 'рекомендации';
+
+  @override
+  String get recommendationsEmpty => 'здесь будут рекомендации';
+
+  @override
   String get searchHintChats => 'поиск по чатам';
 
   @override

@@ -128,6 +128,24 @@ abstract class AppLocalizations {
   /// **'акк'**
   String get navProfile;
 
+  /// No description provided for @navRecommendations.
+  ///
+  /// In ru, this message translates to:
+  /// **'реки'**
+  String get navRecommendations;
+
+  /// No description provided for @recommendationsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'рекомендации'**
+  String get recommendationsTitle;
+
+  /// No description provided for @recommendationsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'здесь будут рекомендации'**
+  String get recommendationsEmpty;
+
   /// No description provided for @searchHintChats.
   ///
   /// In ru, this message translates to:

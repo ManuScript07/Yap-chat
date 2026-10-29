@@ -160,13 +160,12 @@ class _FriendsBodyState extends State<_FriendsBody> {
     final mediaQuery = MediaQuery.of(context);
     final keyboardHeight = mediaQuery.viewInsets.bottom;
     final isKeyboardOpen = keyboardHeight > 0;
-    const navBarHeight = 70.0;
-    const navBarBottomOffset = 16.0;
-    const searchBarSpacing = 16.0;
+    const searchBarSpacing = FloatingNavigationGeometry.controlSpacing;
     const searchBarHeight = 50.0;
     const contentExtraPadding = 16.0;
-    final navigationSpace =
-        mediaQuery.viewPadding.bottom + navBarBottomOffset + navBarHeight;
+    final navigationSpace = FloatingNavigationGeometry.occupiedHeight(
+      mediaQuery,
+    );
     final searchBarBottomOffset = isKeyboardOpen
         ? keyboardHeight + searchBarSpacing
         : navigationSpace + searchBarSpacing;

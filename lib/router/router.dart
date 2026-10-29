@@ -84,6 +84,7 @@ class AppRouter extends RootStackRouter {
           children: [
             AutoRoute(path: 'chats', page: ChatsRoute.page),
             AutoRoute(path: 'nearby', page: NearbyPeopleRoute.page),
+            AutoRoute(path: 'recommendations', page: RecommendationsRoute.page),
             AutoRoute(path: 'friends', page: FriendsRoute.page),
             AutoRoute(path: 'profile', page: ProfileRoute.page),
           ],
