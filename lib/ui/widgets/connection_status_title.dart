@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/ui/ui.dart';
 
-/// Keeps the ordinary primary title's typography and geometry during recovery.
+/// Keeps the primary title's geometry while showing a smaller recovery label.
 class ConnectionStatusTitle extends StatelessWidget {
   const ConnectionStatusTitle({super.key, required this.title});
 
@@ -21,11 +21,9 @@ class ConnectionStatusTitle extends StatelessWidget {
                 key: const ValueKey('connecting-title'),
                 fit: BoxFit.scaleDown,
                 alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  context.l10n.connectionConnecting,
-                  style: AppTextStyles.titleLargeFlex,
-                  maxLines: 1,
-                  softWrap: false,
+                child: AnimatedConnectingText(
+                  label: context.l10n.connectionConnecting,
+                  style: AppTextStyles.titleLargeFlex.copyWith(fontSize: 36),
                 ),
               )
             : SizedBox(

@@ -45,14 +45,24 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child:
-                    titleWidget ??
-                    Text(
-                      title,
-                      style: AppTextStyles.titleLargeFlex,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                // Roboto Flex's visible lowercase ink sits slightly below the
+                // line-box center. Keep the button/header geometry unchanged.
+                child: Transform.translate(
+                  offset: Offset(
+                    0,
+                    actionIcon == null
+                        ? 0
+                        : -MediaQuery.textScalerOf(context).scale(2),
+                  ),
+                  child:
+                      titleWidget ??
+                      Text(
+                        title,
+                        style: AppTextStyles.titleLargeFlex,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                ),
               ),
               if (actionIcon != null)
                 SizedBox(
