@@ -17,6 +17,21 @@ class BottomAmbientGlow extends StatelessWidget {
   final double blurSigma;
   final double opacity;
 
+  static const _coreSamples = 32;
+  static final _coreStops = <double>[
+    for (var i = 0; i <= _coreSamples; i++) .35 * i / _coreSamples,
+    1,
+  ];
+  static final _coreAlpha = <double>[
+    for (var i = 0; i <= _coreSamples; i++) _coreStrength(i / _coreSamples),
+    0,
+  ];
+
+  static double _coreStrength(double t) {
+    final remaining = 1 - t * t * (3 - 2 * t);
+    return remaining * remaining * remaining;
+  }
+
   @override
   Widget build(BuildContext context) {
     final baseColor = glowColor ?? context.colorScheme.primary;
@@ -27,50 +42,54 @@ class BottomAmbientGlow extends StatelessWidget {
         child: SizedBox(
           width: double.infinity,
           height: height,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(
-                    sigmaX: blurSigma * 1.5,
-                    sigmaY: blurSigma * 0.6,
-                    tileMode: TileMode.decal,
+          child: Opacity(
+            opacity: opacity,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  // Preserve the original broad halo and its rounded falloff.
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(
+                      sigmaX: blurSigma * 1.5,
+                      sigmaY: blurSigma * .6,
+                      tileMode: TileMode.decal,
+                    ),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            baseColor.withValues(alpha: 1),
+                            baseColor.withValues(alpha: .6),
+                            baseColor.withValues(alpha: .15),
+                            baseColor.withValues(alpha: 0),
+                          ],
+                          stops: const [0, .4, .6, 1],
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Container(
+                ),
+                Positioned.fill(
+                  // A bright core is required at the base. Its slope fades to
+                  // zero at both ends instead of ending as a narrow hard strip.
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          baseColor.withValues(alpha: opacity),
-                          baseColor.withValues(alpha: opacity * 0.6),
-                          baseColor.withValues(alpha: opacity * 0.15),
-                          baseColor.withValues(alpha: 0.0),
+                          for (final alpha in _coreAlpha)
+                            baseColor.withValues(alpha: alpha),
                         ],
-                        stops: const [0.0, 0.4, 0.6, 1.0],
+                        stops: _coreStops,
                       ),
                     ),
                   ),
                 ),
-              ),
-
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  height: height * 0.2,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        baseColor.withValues(alpha: 1.0),
-                        baseColor.withValues(alpha: 0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
