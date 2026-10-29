@@ -15,6 +15,7 @@ class ChatsState extends Equatable {
     this.filteredChats = const [],
     this.selectedChatIds = const {},
     this.searchQuery = '',
+    this.listQuery,
     this.isBulkActionInProgress = false,
     this.feedback,
     this.feedbackAction,
@@ -36,6 +37,10 @@ class ChatsState extends Equatable {
   final List<Chat> filteredChats;
   final Set<String> selectedChatIds;
   final String searchQuery;
+
+  /// Query owning the accepted rows; input can change before SQLite completes.
+  final String? listQuery;
+  String get presentedQuery => listQuery ?? searchQuery;
   final bool isBulkActionInProgress;
   final ChatsBulkActionFeedback? feedback;
   final ChatsBulkAction? feedbackAction;
@@ -75,6 +80,7 @@ class ChatsState extends Equatable {
     List<Chat>? filteredChats,
     Set<String>? selectedChatIds,
     String? searchQuery,
+    String? listQuery,
     bool? isBulkActionInProgress,
     ChatsBulkActionFeedback? feedback,
     ChatsBulkAction? feedbackAction,
@@ -100,6 +106,7 @@ class ChatsState extends Equatable {
       filteredChats: filteredChats ?? this.filteredChats,
       selectedChatIds: selectedChatIds ?? this.selectedChatIds,
       searchQuery: searchQuery ?? this.searchQuery,
+      listQuery: listQuery ?? this.listQuery,
       isBulkActionInProgress:
           isBulkActionInProgress ?? this.isBulkActionInProgress,
       feedback: clearFeedback ? null : feedback ?? this.feedback,
@@ -133,6 +140,7 @@ class ChatsState extends Equatable {
     filteredChats,
     selectedChatIds,
     searchQuery,
+    listQuery,
     isBulkActionInProgress,
     feedback,
     feedbackAction,

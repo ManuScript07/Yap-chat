@@ -89,6 +89,7 @@ class ChatsBloc extends Bloc<ChatsEvent, ChatsState> {
         isPaginated: true,
         chats: view.chats,
         filteredChats: view.chats,
+        listQuery: view.query,
         selectedChatIds: selected,
         selectedChats: Map.unmodifiable(snapshot),
         hasMoreCached: view.hasMoreCached,

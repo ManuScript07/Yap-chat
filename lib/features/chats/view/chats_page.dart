@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/app/app.dart';
 import 'package:yap_chat/core/core.dart';
@@ -241,6 +242,11 @@ size.height: ${mediaQuery.size.height}
 
     final navigationSpace =
         systemBottomPadding + navBarBottomOffset + navBarHeight;
+    final restingContentBottom =
+        navigationSpace +
+        searchBarSpacing +
+        searchBarHeight +
+        contentExtraPadding;
 
     final searchBarBottomOffset = isKeyboardOpen
         ? keyboardHeight + searchBarSpacing
@@ -264,7 +270,16 @@ size.height: ${mediaQuery.size.height}
         alignment: Alignment.bottomCenter,
         fit: StackFit.expand,
         children: [
-          _ChatsContent(bottomPadding: renderedContentBottom),
+          _ChatsContent(
+            bottomPadding: renderedContentBottom,
+            // The IME overlays this full-screen list; touching the list hides
+            // it. Keep its extent stable instead of adding a temporary tail
+            // that a dismissal swipe can enter and immediately lose again.
+            listBottomPadding: restingContentBottom,
+            suppressEdgeStretch:
+                isKeyboardOpen ||
+                (renderedContentBottom - restingContentBottom).abs() > .5,
+          ),
 
           AnimatedPositioned(
             duration: Duration.zero,
@@ -295,23 +310,220 @@ size.height: ${mediaQuery.size.height}
 }
 
 class _ChatsContent extends StatefulWidget {
-  const _ChatsContent({required this.bottomPadding});
+  const _ChatsContent({
+    required this.bottomPadding,
+    required this.listBottomPadding,
+    required this.suppressEdgeStretch,
+  });
 
   final double bottomPadding;
+  final double listBottomPadding;
+  final bool suppressEdgeStretch;
 
   @override
   State<_ChatsContent> createState() => _ChatsContentState();
 }
 
-class _ChatsContentState extends State<_ChatsContent> {
-  final _scroll = ScrollController();
+class _ChatsContentState extends State<_ChatsContent>
+    with SingleTickerProviderStateMixin {
+  final _scroll = _ChatsScrollController();
   final _rows = <String, BuildContext>{};
   bool _viewportScheduled = false;
   String _query = '';
   double _mainOffset = 0;
+  int _scrollQueryRevision = 0;
+  Set<String> _mainAvatarIds = {};
+  ChatsState? _displayedState, _preparingTarget;
+  List<String>? _preparingPaths;
+  LocalAvatarFrames? _heldFrames;
+  int _presentationEpoch = 0;
+  late final _rowMotion =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 260),
+        value: 1,
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted && _motionActive) {
+          setState(() {
+            _motionActive = false;
+            _motionDragStart = null;
+          });
+        }
+      });
+  bool _motionActive = false;
+  double? _motionDragStart;
+  Map<String, double> _motionOrigins = {};
+  Size? _motionViewport;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewport = MediaQuery.sizeOf(context);
+    if ((_motionViewport != null && _motionViewport != viewport) ||
+        MediaQuery.disableAnimationsOf(context)) {
+      _stopRowMotion();
+    }
+    _motionViewport = viewport;
+  }
+
+  void _stopRowMotion() {
+    if (!_motionActive) return;
+    _rowMotion.value = 1;
+  }
+
+  double _motionScrollDisplacement() =>
+      _motionDragStart != null && _scroll.hasClients
+      ? _scroll.offset - _motionDragStart!
+      : 0;
+
+  bool _waitingFor(ChatsState state) =>
+      state.status == ChatsStatus.initial ||
+      state.status == ChatsStatus.loading ||
+      state.searchQuery != state.presentedQuery ||
+      _preparingTarget != null;
+
+  void _commitPresentation(ChatsState state) {
+    final before = _displayedState?.filteredChats;
+    final after = state.filteredChats;
+    final changed =
+        before != null &&
+        (before.length != after.length ||
+            before.indexed.any(
+              (entry) =>
+                  entry.$2.id != after[entry.$1].id ||
+                  entry.$2.peerIsDeleted != after[entry.$1].peerIsDeleted ||
+                  entry.$2.peerIsGloballyBanned !=
+                      after[entry.$1].peerIsGloballyBanned,
+            ));
+    final scrolling =
+        _scroll.hasClients && _scroll.position.isScrollingNotifier.value;
+    if (changed &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        (!scrolling || _motionActive)) {
+      _motionOrigins = {
+        for (final entry in _rows.entries)
+          if (entry.value.findRenderObject() case final RenderBox box
+              when box.attached && box.hasSize)
+            entry.key: ChatListRowMotion.visualTopOf(box),
+      };
+      _motionActive = true;
+      _motionDragStart = scrolling ? _scroll.offset : null;
+      _rowMotion.forward(from: 0);
+    } else if (changed && MediaQuery.disableAnimationsOf(context)) {
+      _stopRowMotion();
+    }
+    _displayedState = state.copyWith(searchQuery: state.presentedQuery);
+  }
+
+  List<String> _incomingAvatarPaths(ChatsState state) {
+    final limit = ((MediaQuery.sizeOf(context).height + 250) / 76).ceil().clamp(
+      1,
+      12,
+    );
+    final rows = state.presentedQuery.isEmpty && _mainOffset > 1
+        ? state.filteredChats.where((chat) => _mainAvatarIds.contains(chat.id))
+        : state.filteredChats;
+    return rows
+        .take(limit)
+        .where(
+          (chat) =>
+              !_rows.containsKey(chat.id) &&
+              !chat.blockedByPeer &&
+              !chat.peerIsGloballyBanned &&
+              !chat.peerIsDeleted &&
+              (chat.avatarStoragePath != null || chat.avatarUrl != null) &&
+              chat.cachedAvatarPath != null,
+        )
+        .map((chat) => chat.cachedAvatarPath!)
+        .toSet()
+        .toList();
+  }
+
+  bool _hasAvatarRevocation(ChatsState state) {
+    final old = {
+      for (final chat in _displayedState?.filteredChats ?? <Chat>[])
+        chat.id: chat,
+    };
+    return state.filteredChats.any(
+      (chat) =>
+          old.containsKey(chat.id) &&
+          (chat.blockedByPeer ||
+              chat.peerIsGloballyBanned ||
+              chat.peerIsDeleted ||
+              (chat.avatarStoragePath == null &&
+                  chat.avatarUrl == null &&
+                  (old[chat.id]!.avatarStoragePath != null ||
+                      old[chat.id]!.avatarUrl != null))),
+    );
+  }
+
+  void _receivePresentation(ChatsState state) {
+    final account = context.read<AccountSessionController?>();
+    if (state.status == ChatsStatus.initial ||
+        state.status == ChatsStatus.loading ||
+        state.searchQuery != state.presentedQuery ||
+        (account != null && account.userId == null)) {
+      _presentationEpoch++;
+      _preparingTarget = null;
+      _preparingPaths = null;
+      return;
+    }
+    final paths =
+        _displayedState != null &&
+            _displayedState!.searchQuery != state.presentedQuery &&
+            !_hasAvatarRevocation(state)
+        ? _incomingAvatarPaths(state)
+        : <String>[];
+    if (paths.isEmpty) {
+      _presentationEpoch++;
+      _preparingTarget = null;
+      _preparingPaths = null;
+      _commitPresentation(state);
+      return;
+    }
+    if (_preparingTarget?.presentedQuery == state.presentedQuery &&
+        _preparingPaths?.length == paths.length &&
+        paths.indexed.every(
+          (entry) => entry.$2 == _preparingPaths![entry.$1],
+        )) {
+      _preparingTarget = state;
+      return;
+    }
+    final epoch = ++_presentationEpoch;
+    _preparingTarget = state;
+    _preparingPaths = paths;
+    final session = account?.capture();
+    bool current() =>
+        mounted &&
+        epoch == _presentationEpoch &&
+        (session == null || account!.isCurrent(session));
+    unawaited(
+      LocalAvatarFrames.prepare(context, paths, isCurrent: current).then((
+        lease,
+      ) {
+        if (!current()) {
+          lease.dispose();
+          return;
+        }
+        final target = _preparingTarget!;
+        _preparingTarget = null;
+        _preparingPaths = null;
+        _heldFrames?.dispose();
+        _heldFrames = lease;
+        setState(() => _commitPresentation(target));
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          lease.dispose();
+          if (identical(_heldFrames, lease)) _heldFrames = null;
+        });
+      }),
+    );
+  }
 
   @override
   void dispose() {
+    _presentationEpoch++;
+    _heldFrames?.dispose();
+    _rowMotion.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -323,6 +535,7 @@ class _ChatsContentState extends State<_ChatsContent> {
       _viewportScheduled = false;
       if (!mounted) return;
       final bloc = context.read<ChatsBloc>();
+      if (_waitingFor(bloc.state)) return;
       if (!bloc.state.isPaginated) return;
       final visible = <String>{};
       final screen = MediaQuery.sizeOf(context).height;
@@ -351,22 +564,43 @@ class _ChatsContentState extends State<_ChatsContent> {
   }
 
   void _preserveAnchor(ChatsState state) {
-    if (!_scroll.hasClients) return;
     if (_query != state.searchQuery) {
-      if (_query.isEmpty) _mainOffset = _scroll.offset;
+      if (_query.isEmpty && _scroll.hasClients) {
+        _mainOffset = _scroll.offset;
+        final height = MediaQuery.sizeOf(context).height;
+        _mainAvatarIds = {
+          for (final entry in _rows.entries)
+            if (entry.value.findRenderObject() case final RenderBox box
+                when box.attached &&
+                    box.hasSize &&
+                    box.localToGlobal(Offset.zero).dy + box.size.height > 130 &&
+                    box.localToGlobal(Offset.zero).dy < height)
+              entry.key,
+        };
+      }
       _query = state.searchQuery;
+      final query = _query;
+      final revision = ++_scrollQueryRevision;
+      final destination = query.isEmpty ? _mainOffset : 0.0;
+      _scroll.restoredOffset = destination;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scroll.hasClients) {
-          _scroll.jumpTo(
-            (_query.isEmpty ? _mainOffset : 0.0).clamp(
-              0,
-              _scroll.position.maxScrollExtent,
-            ),
+        if (mounted &&
+            revision == _scrollQueryRevision &&
+            _query == query &&
+            _scroll.hasClients &&
+            !_scroll.position.isScrollingNotifier.value) {
+          final target = destination.clamp(
+            0.0,
+            _scroll.position.maxScrollExtent,
           );
+          if ((_scroll.offset - target).abs() > .5) {
+            _scroll.jumpTo(target);
+          }
         }
       });
       return;
     }
+    if (!_scroll.hasClients) return;
     if (_scroll.offset <= 1 || _scroll.position.isScrollingNotifier.value) {
       return;
     }
@@ -402,11 +636,13 @@ class _ChatsContentState extends State<_ChatsContent> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ChatsBloc, ChatsState>(
+    return BlocConsumer<ChatsBloc, ChatsState>(
+      listener: (context, state) => _receivePresentation(state),
       buildWhen: (previous, current) =>
           previous.status != current.status ||
           previous.filteredChats != current.filteredChats ||
           previous.searchQuery != current.searchQuery ||
+          previous.listQuery != current.listQuery ||
           previous.hasMoreChats != current.hasMoreChats ||
           previous.isLoadingMore != current.isLoadingMore ||
           previous.isRefreshing != current.isRefreshing ||
@@ -414,134 +650,283 @@ class _ChatsContentState extends State<_ChatsContent> {
           previous.refreshError != current.refreshError ||
           previous.selectedChatIds != current.selectedChatIds ||
           previous.isSelectionMode != current.isSelectionMode,
-      builder: (context, state) {
+      builder: (context, incoming) {
+        if (_displayedState == null && !_waitingFor(incoming)) {
+          _commitPresentation(incoming);
+        }
+        final state = _displayedState ?? incoming;
+        final waiting = _waitingFor(incoming);
         _preserveAnchor(state);
         _scheduleViewport();
         final bottomPadding = widget.bottomPadding;
-        switch (state.status) {
-          case ChatsStatus.initial:
-          case ChatsStatus.loading:
-            return _ChatsFeedbackViewport(
-              bottomPadding: bottomPadding,
-              child: Center(
-                child: _ChatsLoadingIndicator(key: ValueKey(state.searchQuery)),
-              ),
-            );
-          case ChatsStatus.failure:
-            return _ChatsEmptyPresentation(
-              state: state,
-              bottomPadding: bottomPadding,
-            );
-          case ChatsStatus.success:
-            if (state.filteredChats.isEmpty) {
+        Widget content() {
+          switch (state.status) {
+            case ChatsStatus.initial:
+            case ChatsStatus.loading:
+              return _ChatsFeedbackViewport(
+                bottomPadding: bottomPadding,
+                child: Center(
+                  child: _ChatsLoadingIndicator(
+                    key: ValueKey(state.searchQuery),
+                  ),
+                ),
+              );
+            case ChatsStatus.failure:
               return _ChatsEmptyPresentation(
                 state: state,
                 bottomPadding: bottomPadding,
               );
-            }
-
-            final indexes = {
-              for (final e in state.filteredChats.indexed)
-                'probe:${e.$2.id}': e.$1,
-            };
-            final hasConnectionStatus =
-                context.read<AppConnectionStatus?>() != null;
-            // The header replaces network error wording, but continuation
-            // failures still need explicit retry even after a head refresh.
-            // Check both errors so neither can swallow an independent failure.
-            final showLoadErrorLabel =
-                [state.paginationError, state.refreshError].any(
-                  (error) =>
-                      error != null &&
-                      (!hasConnectionStatus ||
-                          !AppConnectionStatus.isConnectionFailure(error)),
+            case ChatsStatus.success:
+              if (state.filteredChats.isEmpty) {
+                return _ChatsEmptyPresentation(
+                  state: state,
+                  bottomPadding: bottomPadding,
                 );
-            final hasRetryableLoadError =
-                state.paginationError != null || showLoadErrorLabel;
-            return NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification.depth == 0) _scheduleViewport();
-                return false;
-              },
-              child: ListView.builder(
-                controller: _scroll,
-                findChildIndexCallback: (key) =>
-                    key is ValueKey<String> ? indexes[key.value] : null,
-                padding: EdgeInsets.only(top: 130, bottom: bottomPadding),
-                itemCount:
-                    state.filteredChats.length +
-                    (state.isPaginated &&
-                            (state.isLoadingMore || hasRetryableLoadError)
-                        ? 1
-                        : 0),
-                itemBuilder: (context, index) {
-                  if (index == state.filteredChats.length) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: state.isLoadingMore || state.isRefreshing
-                          ? const Center(
-                              child: _ChatsLoadingIndicator(compact: true),
-                            )
-                          : Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (showLoadErrorLabel)
-                                    Text(context.l10n.failedToLoadChats),
-                                  const _ChatsRetryButton(),
-                                ],
-                              ),
-                            ),
-                    );
-                  }
-                  final chat = state.filteredChats[index];
-                  final isSelected = state.selectedChatIds.contains(chat.id);
+              }
 
-                  return _ChatRowProbe(
-                    key: ValueKey('probe:${chat.id}'),
-                    onRegister: (rowContext) {
-                      _rows[chat.id] = rowContext;
-                      _scheduleViewport();
-                    },
-                    onUnregister: (rowContext) {
-                      if (_rows[chat.id] == rowContext) _rows.remove(chat.id);
-                    },
-                    child: ChatListItem(
-                      key: ValueKey(chat.id),
-                      chat: chat,
-                      avatarLoader: () =>
-                          context.read<IChatsRepository>().resolveAvatar(chat),
-                      isSelected: isSelected,
-                      onTap: () {
-                        FocusManager.instance.primaryFocus?.unfocus();
-                        FocusScope.of(context).unfocus();
-
-                        if (state.isSelectionMode) {
-                          context.read<ChatsBloc>().add(
-                            ChatSelectionToggled(chat.id),
-                          );
-                        } else {
-                          unawaited(
-                            context.read<ChatNavigationCoordinator>().open(
-                              chat,
-                            ),
-                          );
-                        }
-                      },
-                      onLongPress: () {
-                        if (!state.isSelectionMode) {
-                          context.read<ChatsBloc>().add(
-                            ChatSelectionToggled(chat.id),
-                          );
-                        }
-                      },
-                    ),
+              final indexes = {
+                for (final e in state.filteredChats.indexed)
+                  'probe:${e.$2.id}': e.$1,
+              };
+              final hasConnectionStatus =
+                  context.read<AppConnectionStatus?>() != null;
+              // The header replaces network error wording, but continuation
+              // failures still need explicit retry even after a head refresh.
+              // Check both errors so neither can swallow an independent failure.
+              final showLoadErrorLabel =
+                  [state.paginationError, state.refreshError].any(
+                    (error) =>
+                        error != null &&
+                        (!hasConnectionStatus ||
+                            !AppConnectionStatus.isConnectionFailure(error)),
                   );
+              final hasRetryableLoadError =
+                  state.paginationError != null || showLoadErrorLabel;
+              return NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is UserScrollNotification &&
+                      notification.direction != ScrollDirection.idle &&
+                      _motionActive &&
+                      _scroll.hasClients) {
+                    // Keep the remaining motion, but move its origin along
+                    // with the user's drag instead of snapping it to the end.
+                    _motionDragStart ??= _scroll.offset;
+                  }
+                  if (notification.depth == 0) _scheduleViewport();
+                  return false;
                 },
-              ),
-            );
+                child: ListView.builder(
+                  controller: _scroll,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  findChildIndexCallback: (key) =>
+                      key is ValueKey<String> ? indexes[key.value] : null,
+                  padding: EdgeInsets.only(
+                    top: 130,
+                    bottom: widget.listBottomPadding,
+                  ),
+                  itemCount:
+                      state.filteredChats.length +
+                      (state.isPaginated &&
+                              (state.isLoadingMore || hasRetryableLoadError)
+                          ? 1
+                          : 0),
+                  itemBuilder: (context, index) {
+                    if (index == state.filteredChats.length) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: state.isLoadingMore || state.isRefreshing
+                            ? const Center(
+                                child: _ChatsLoadingIndicator(compact: true),
+                              )
+                            : Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (showLoadErrorLabel)
+                                      Text(context.l10n.failedToLoadChats),
+                                    const _ChatsRetryButton(),
+                                  ],
+                                ),
+                              ),
+                      );
+                    }
+                    final chat = state.filteredChats[index];
+                    final isSelected = state.selectedChatIds.contains(chat.id);
+
+                    return _ChatRowProbe(
+                      key: ValueKey('probe:${chat.id}'),
+                      onRegister: (rowContext) {
+                        _rows[chat.id] = rowContext;
+                        _scheduleViewport();
+                      },
+                      onUnregister: (rowContext) {
+                        if (_rows[chat.id] == rowContext) _rows.remove(chat.id);
+                      },
+                      child: ChatListRowMotion(
+                        progress: _rowMotion,
+                        originY: _motionOrigins[chat.id],
+                        entering: !_motionOrigins.containsKey(chat.id),
+                        scrollDisplacement: _motionScrollDisplacement,
+                        // During a paint-only move the old and new hit rectangles
+                        // overlap. Block row taps briefly, but keep list scrolling.
+                        child: IgnorePointer(
+                          ignoring: _motionActive,
+                          child: ChatListItem(
+                            key: ValueKey(chat.id),
+                            chat: chat,
+                            avatarLoader: () => context
+                                .read<IChatsRepository>()
+                                .resolveAvatar(chat),
+                            isSelected: isSelected,
+                            onTap: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              FocusScope.of(context).unfocus();
+
+                              if (state.isSelectionMode) {
+                                context.read<ChatsBloc>().add(
+                                  ChatSelectionToggled(chat.id),
+                                );
+                              } else {
+                                unawaited(
+                                  context
+                                      .read<ChatNavigationCoordinator>()
+                                      .open(chat),
+                                );
+                              }
+                            },
+                            onLongPress: () {
+                              if (!state.isSelectionMode) {
+                                context.read<ChatsBloc>().add(
+                                  ChatSelectionToggled(chat.id),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+          }
         }
+
+        return NotificationListener<OverscrollIndicatorNotification>(
+          onNotification: (notification) {
+            // An edge drag also dismisses the search IME. Do not stretch the
+            // whole list while its keyboard inset is changing: it creates a
+            // small second rebound on top of the normal layout transition.
+            if (notification.depth == 0 && widget.suppressEdgeStretch) {
+              notification.disallowIndicator();
+            }
+            return false;
+          },
+          child: _ChatsPendingPresentation(
+            pending: waiting && _displayedState != null,
+            query: incoming.searchQuery,
+            hasRows: state.filteredChats.isNotEmpty,
+            bottomPadding: bottomPadding,
+            child: AbsorbPointer(absorbing: waiting, child: content()),
+          ),
+        );
       },
+    );
+  }
+}
+
+/// A newly mounted list returns to the saved main offset on its first layout,
+/// not after rendering the top page and applying a post-frame jump.
+class _ChatsScrollController extends ScrollController {
+  _ChatsScrollController() : super(keepScrollOffset: false);
+  double restoredOffset = 0;
+  @override
+  double get initialScrollOffset => restoredOffset;
+}
+
+class _ChatsPendingPresentation extends StatefulWidget {
+  const _ChatsPendingPresentation({
+    required this.pending,
+    required this.query,
+    required this.hasRows,
+    required this.bottomPadding,
+    required this.child,
+  });
+  final bool pending, hasRows;
+  final String query;
+  final double bottomPadding;
+  final Widget child;
+  @override
+  State<_ChatsPendingPresentation> createState() =>
+      _ChatsPendingPresentationState();
+}
+
+class _ChatsPendingPresentationState extends State<_ChatsPendingPresentation> {
+  Timer? _delay;
+  bool _show = false;
+  @override
+  void initState() {
+    super.initState();
+    _updateDelay();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatsPendingPresentation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pending != widget.pending ||
+        oldWidget.query != widget.query) {
+      _updateDelay();
+    }
+  }
+
+  void _updateDelay() {
+    _delay?.cancel();
+    if (widget.pending && _show) return;
+    _show = false;
+    if (widget.pending) {
+      _delay = Timer(const Duration(milliseconds: 150), () {
+        if (mounted) setState(() => _show = true);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _delay?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const spinner = SizedBox.square(
+      dimension: 36,
+      child: CircularProgressIndicator(strokeWidth: 4),
+    );
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Opacity(opacity: _show && !widget.hasRows ? 0 : 1, child: widget.child),
+        IgnorePointer(
+          child: _ChatsFeedbackViewport(
+            bottomPadding: widget.bottomPadding,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 120),
+                transitionBuilder: (child, animation) =>
+                    FadeTransition(opacity: animation, child: child),
+                child: _show
+                    ? const KeyedSubtree(
+                        key: ValueKey('pending'),
+                        child: spinner,
+                      )
+                    : const SizedBox.square(
+                        key: ValueKey('idle'),
+                        dimension: 36,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
