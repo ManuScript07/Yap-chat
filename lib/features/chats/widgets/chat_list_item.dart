@@ -147,6 +147,8 @@ class ChatListItem extends StatelessWidget {
         ),
         if (!chat.peerIsGloballyBanned && !chat.peerIsDeleted)
           AnimatedStatusSwitcher(
+            alignment: AlignmentDirectional.centerStart,
+            scaleAlignment: AlignmentDirectional.centerStart,
             child: Text(
               '$messagePrefix$preview',
               key: ValueKey('$messagePrefix$preview'),

@@ -31,6 +31,11 @@ class _GlassSearchBarState extends State<GlassSearchBar>
   bool _showClearButton = false;
   double _lastKeyboardInset = 0;
   bool _hasKeyboardInset = false;
+  Size? _lastViewSize;
+  double? _lastDevicePixelRatio;
+  bool _preserveGeometryFocus = false;
+  bool _keyboardDismissPending = false;
+  int _keyboardDismissGeneration = 0;
   bool _preserveResumeFocus = false;
   Timer? _resumeFocusDeadline;
 
@@ -42,6 +47,7 @@ class _GlassSearchBarState extends State<GlassSearchBar>
     _focusNode = widget.focusNode ?? FocusNode();
 
     _controller.addListener(_handleTextChange);
+    _focusNode.addListener(_handleFocusChanged);
   }
 
   @override
@@ -50,6 +56,8 @@ class _GlassSearchBarState extends State<GlassSearchBar>
     if (!_hasKeyboardInset) {
       final view = View.of(context);
       _lastKeyboardInset = view.viewInsets.bottom / view.devicePixelRatio;
+      _lastViewSize = view.physicalSize;
+      _lastDevicePixelRatio = view.devicePixelRatio;
       _hasKeyboardInset = true;
     }
   }
@@ -61,13 +69,37 @@ class _GlassSearchBarState extends State<GlassSearchBar>
     final view = View.maybeOf(context);
     if (view == null) return;
 
-    final keyboardInset = MediaQueryData.fromView(view).viewInsets.bottom;
-    _handleKeyboardInsetChanged(keyboardInset);
-  }
-
-  void _handleKeyboardInsetChanged(double keyboardInset) {
+    final geometryChanged =
+        _lastViewSize != view.physicalSize ||
+        _lastDevicePixelRatio != view.devicePixelRatio;
+    _lastViewSize = view.physicalSize;
+    _lastDevicePixelRatio = view.devicePixelRatio;
+    final keyboardInset = view.viewInsets.bottom / view.devicePixelRatio;
     final wasKeyboardOpen = _lastKeyboardInset > 0;
     _lastKeyboardInset = keyboardInset;
+
+    if (geometryChanged &&
+        _focusNode.hasPrimaryFocus &&
+        !_preserveResumeFocus &&
+        (WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) &&
+        (wasKeyboardOpen ||
+            _keyboardDismissPending ||
+            _preserveGeometryFocus)) {
+      // Rotation/resize can deliver the new viewport and the hidden IME in
+      // separate notifications, in either order. Keep the existing editor
+      // until a fresh positive inset, or a stable positive metrics snapshot,
+      // arrives. Frames or MediaQuery rebuilds alone do not confirm recovery.
+      _preserveGeometryFocus = true;
+    }
+    if (keyboardInset > 0 && (!geometryChanged || !wasKeyboardOpen)) {
+      _preserveGeometryFocus = false;
+    }
+
+    if (keyboardInset > 0) {
+      _cancelKeyboardDismiss();
+    }
 
     if (!wasKeyboardOpen &&
         keyboardInset > 0 &&
@@ -76,13 +108,41 @@ class _GlassSearchBarState extends State<GlassSearchBar>
     }
 
     if (wasKeyboardOpen && keyboardInset <= 0) {
-      _clearFocus();
+      _scheduleKeyboardDismiss();
     }
+  }
+
+  void _scheduleKeyboardDismiss() {
+    if (!_focusNode.hasPrimaryFocus) return;
+    _keyboardDismissPending = true;
+    final generation = ++_keyboardDismissGeneration;
+    // A zero may precede the viewport notification in this frame. Decide only
+    // after both have been observed, without a timer or an IME reopen request.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _keyboardDismissGeneration) return;
+      _keyboardDismissPending = false;
+      if (_lastKeyboardInset <= 0 && !_preserveGeometryFocus) {
+        _clearFocus();
+      }
+    });
+  }
+
+  void _cancelKeyboardDismiss() {
+    _keyboardDismissGeneration++;
+    _keyboardDismissPending = false;
+  }
+
+  void _handleFocusChanged() {
+    _cancelKeyboardDismiss();
+    _preserveGeometryFocus = false;
+    if (!_focusNode.hasFocus) _finishResumeFocusGuard();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive) {
+      _cancelKeyboardDismiss();
+      _preserveGeometryFocus = false;
       _resumeFocusDeadline?.cancel();
       if (_focusNode.hasFocus && _lastKeyboardInset > 0) {
         _preserveResumeFocus = true;
@@ -120,8 +180,10 @@ class _GlassSearchBarState extends State<GlassSearchBar>
 
   @override
   void dispose() {
+    _cancelKeyboardDismiss();
     _finishResumeFocusGuard();
     WidgetsBinding.instance.removeObserver(this);
+    _focusNode.removeListener(_handleFocusChanged);
     if (widget.controller == null) {
       _controller.dispose();
     } else {

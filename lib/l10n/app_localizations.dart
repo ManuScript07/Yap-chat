@@ -200,6 +200,12 @@ abstract class AppLocalizations {
   /// **'ничего не нашли'**
   String get chatsNoSearchResults;
 
+  /// No description provided for @chatsNoSavedSearchResults.
+  ///
+  /// In ru, this message translates to:
+  /// **'В сохранённых чатах ничего не найдено'**
+  String get chatsNoSavedSearchResults;
+
   /// No description provided for @chatsDeleteTitle.
   ///
   /// In ru, this message translates to:

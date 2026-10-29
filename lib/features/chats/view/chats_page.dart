@@ -36,10 +36,20 @@ class ChatsPage extends StatelessWidget {
             mediaQuery.viewInsets.bottom -
             searchBarSpacing -
             searchBarHeight;
+        // Leave room for readable feedback and a retry touch target before
+        // the search bar reaches the header. Waiting for overlap can leave
+        // just a few pixels of usable body height in landscape with the IME.
+        final minimumContentHeight =
+            (mediaQuery.textScaler.scale(22) * 1.2).clamp(
+              48.0,
+              double.infinity,
+            ) +
+            16;
         final hideAppBarForKeyboard =
             !state.isSelectionMode &&
             isLandscapeKeyboard &&
-            searchBarTop < appBarHeight;
+            searchBarTop <
+                appBarHeight + mediaQuery.padding.top + minimumContentHeight;
 
         return ScaffoldMessenger(
           child: Builder(
@@ -79,95 +89,120 @@ class ChatsPage extends StatelessWidget {
                   bottomMargin: notificationSnackBarBottomMargin,
                 );
               },
-              child: Scaffold(
-                resizeToAvoidBottomInset: false,
-                backgroundColor: context.scaffoldBackgroundColor,
-                extendBodyBehindAppBar: true,
-                appBar: hideAppBarForKeyboard
-                    ? null
-                    : PreferredSize(
-                        preferredSize: const Size.fromHeight(130),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          reverseDuration: const Duration(milliseconds: 180),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) {
-                            final slideAnimation = Tween<Offset>(
-                              begin: const Offset(0, -0.06),
-                              end: Offset.zero,
-                            ).animate(animation);
-
-                            return FadeTransition(
-                              opacity: animation,
-                              child: SlideTransition(
-                                position: slideAnimation,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: state.isSelectionMode
-                              ? SelectionToolbar(
-                                  key: const ValueKey('selection_toolbar'),
-                                  selectedCount: state.selectedChatIds.length,
-                                  onClose: () => context.read<ChatsBloc>().add(
-                                    const ChatSelectionCleared(),
-                                  ),
-                                  enableNotifications: state.hasMutedSelection,
-                                  isLoading: state.isBulkActionInProgress,
-                                  onToggleNotifications: () {
-                                    context.read<ChatsBloc>().add(
-                                      const ChatsMuteToggled(),
-                                    );
-                                  },
-                                  onMarkAsRead: () => context
-                                      .read<ChatsBloc>()
-                                      .add(const ChatsMarkedAsRead()),
-                                  onDelete: () async {
-                                    final count = state.selectedChatIds.length;
-                                    final confirmed =
-                                        await showConfirmationDialog(
-                                          context,
-                                          title: context.l10n.chatsDeleteTitle(
-                                            count,
-                                          ),
-                                          content: context.l10n
-                                              .chatsDeleteConfirmation(count),
-                                          confirmLabel:
-                                              context.l10n.chatActionDelete,
-                                        );
-                                    if (confirmed == true && context.mounted) {
-                                      context.read<ChatsBloc>().add(
-                                        const ChatsDeleted(),
-                                      );
-                                    }
-                                  },
-                                )
-                              : PrimaryAppBar(
-                                  key: const ValueKey('primary_app_bar'),
-                                  title: context.l10n.navChats,
-                                  titleWidget: ConnectionStatusTitle(
-                                    title: context.l10n.navChats,
-                                  ),
-                                  actionIcon: Icons.add_comment_rounded,
-                                  onActionPressed: () {
-                                    FocusManager.instance.primaryFocus
-                                        ?.unfocus();
-                                    FocusScope.of(context).unfocus();
-                                    final authRouter = context.router.root
-                                        .innerRouterOf<StackRouter>(
-                                          AuthGateRoute.name,
-                                        );
-                                    if (authRouter != null) {
-                                      unawaited(
-                                        authRouter.push(const NewChatRoute()),
-                                      );
-                                    }
-                                  },
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: hideAppBarForKeyboard ? 0 : 1),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutQuad,
+                builder: (context, headerProgress, _) => Scaffold(
+                  resizeToAvoidBottomInset: false,
+                  backgroundColor: context.scaffoldBackgroundColor,
+                  extendBodyBehindAppBar: true,
+                  appBar: headerProgress == 0
+                      ? null
+                      : PreferredSize(
+                          preferredSize: Size.fromHeight(130 * headerProgress),
+                          child: ClipRect(
+                            key: const ValueKey('chats_header_clip'),
+                            child: OverflowBox(
+                              alignment: Alignment.topCenter,
+                              minHeight: 130,
+                              maxHeight: 130,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 220),
+                                reverseDuration: const Duration(
+                                  milliseconds: 180,
                                 ),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  final slideAnimation = Tween<Offset>(
+                                    begin: const Offset(0, -0.06),
+                                    end: Offset.zero,
+                                  ).animate(animation);
+
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: slideAnimation,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: state.isSelectionMode
+                                    ? SelectionToolbar(
+                                        key: const ValueKey(
+                                          'selection_toolbar',
+                                        ),
+                                        selectedCount:
+                                            state.selectedChatIds.length,
+                                        onClose: () => context
+                                            .read<ChatsBloc>()
+                                            .add(const ChatSelectionCleared()),
+                                        enableNotifications:
+                                            state.hasMutedSelection,
+                                        isLoading: state.isBulkActionInProgress,
+                                        onToggleNotifications: () {
+                                          context.read<ChatsBloc>().add(
+                                            const ChatsMuteToggled(),
+                                          );
+                                        },
+                                        onMarkAsRead: () => context
+                                            .read<ChatsBloc>()
+                                            .add(const ChatsMarkedAsRead()),
+                                        onDelete: () async {
+                                          final count =
+                                              state.selectedChatIds.length;
+                                          final confirmed =
+                                              await showConfirmationDialog(
+                                                context,
+                                                title: context.l10n
+                                                    .chatsDeleteTitle(count),
+                                                content: context.l10n
+                                                    .chatsDeleteConfirmation(
+                                                      count,
+                                                    ),
+                                                confirmLabel: context
+                                                    .l10n
+                                                    .chatActionDelete,
+                                              );
+                                          if (confirmed == true &&
+                                              context.mounted) {
+                                            context.read<ChatsBloc>().add(
+                                              const ChatsDeleted(),
+                                            );
+                                          }
+                                        },
+                                      )
+                                    : PrimaryAppBar(
+                                        key: const ValueKey('primary_app_bar'),
+                                        title: context.l10n.navChats,
+                                        titleWidget: ConnectionStatusTitle(
+                                          title: context.l10n.navChats,
+                                        ),
+                                        actionIcon: Icons.add_comment_rounded,
+                                        onActionPressed: () {
+                                          FocusManager.instance.primaryFocus
+                                              ?.unfocus();
+                                          FocusScope.of(context).unfocus();
+                                          final authRouter = context.router.root
+                                              .innerRouterOf<StackRouter>(
+                                                AuthGateRoute.name,
+                                              );
+                                          if (authRouter != null) {
+                                            unawaited(
+                                              authRouter.push(
+                                                const NewChatRoute(),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                body: const _ChatsBody(),
+                  body: const _ChatsBody(),
+                ),
               ),
             ),
           ),
@@ -211,43 +246,50 @@ size.height: ${mediaQuery.size.height}
         ? keyboardHeight + searchBarSpacing
         : navigationSpace + searchBarSpacing;
 
-    final contentBottomPadding =
-        searchBarBottomOffset + searchBarHeight + contentExtraPadding;
-
     final glowBottomOffset = isKeyboardOpen ? keyboardHeight : 0.0;
 
     final isSelectionMode = context.select<ChatsBloc, bool>(
       (bloc) => bloc.state.isSelectionMode,
     );
 
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        _ChatsContent(bottomPadding: contentBottomPadding),
+    // Keep the original search-field motion, while feedback follows its
+    // rendered position rather than jumping immediately to the target inset.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(
+        end: searchBarBottomOffset + searchBarHeight + contentExtraPadding,
+      ),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutQuad,
+      builder: (context, renderedContentBottom, _) => Stack(
+        alignment: Alignment.bottomCenter,
+        fit: StackFit.expand,
+        children: [
+          _ChatsContent(bottomPadding: renderedContentBottom),
 
-        AnimatedPositioned(
-          duration: Duration.zero,
-          curve: Curves.easeOutQuad,
-          left: 0,
-          right: 0,
-          bottom: glowBottomOffset,
-          child: const BottomAmbientGlow(),
-        ),
-
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutQuad,
-          left: 0,
-          right: 0,
-          bottom: isSelectionMode ? -100 : searchBarBottomOffset,
-          child: GlassSearchBar(
-            hintText: context.l10n.searchHintChats,
-            onChanged: (value) {
-              context.read<ChatsBloc>().add(ChatsSearchChanged(value));
-            },
+          AnimatedPositioned(
+            duration: Duration.zero,
+            curve: Curves.easeOutQuad,
+            left: 0,
+            right: 0,
+            bottom: glowBottomOffset,
+            child: const BottomAmbientGlow(),
           ),
-        ),
-      ],
+
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutQuad,
+            left: 0,
+            right: 0,
+            bottom: isSelectionMode ? -100 : searchBarBottomOffset,
+            child: GlassSearchBar(
+              hintText: context.l10n.searchHintChats,
+              onChanged: (value) {
+                context.read<ChatsBloc>().add(ChatsSearchChanged(value));
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -379,57 +421,22 @@ class _ChatsContentState extends State<_ChatsContent> {
         switch (state.status) {
           case ChatsStatus.initial:
           case ChatsStatus.loading:
-            return Center(
-              child: _ChatsLoadingIndicator(key: ValueKey(state.searchQuery)),
+            return _ChatsFeedbackViewport(
+              bottomPadding: bottomPadding,
+              child: Center(
+                child: _ChatsLoadingIndicator(key: ValueKey(state.searchQuery)),
+              ),
             );
           case ChatsStatus.failure:
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(context.l10n.failedToLoadChats),
-                  if (state.isPaginated &&
-                      (state.isRefreshing || state.isLoadingMore))
-                    const _ChatsLoadingIndicator()
-                  else if (state.isPaginated)
-                    TextButton(
-                      onPressed: () => context.read<ChatsBloc>().add(
-                        const ChatsLoadMoreRequested(retry: true),
-                      ),
-                      child: Text(context.l10n.repeat),
-                    ),
-                ],
-              ),
+            return _ChatsEmptyPresentation(
+              state: state,
+              bottomPadding: bottomPadding,
             );
           case ChatsStatus.success:
             if (state.filteredChats.isEmpty) {
-              final isSearchResultEmpty = state.searchQuery.trim().isNotEmpty;
-
-              return AnimatedPadding(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutQuad,
-                padding: EdgeInsets.only(top: 130, bottom: bottomPadding),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    EmptyChatState(
-                      showImage: !isSearchResultEmpty,
-                      message: isSearchResultEmpty
-                          ? context.l10n.chatsNoSearchResults
-                          : context.l10n.noChats,
-                    ),
-                    if (state.isPaginated && state.loadError != null)
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: TextButton(
-                          onPressed: () => context.read<ChatsBloc>().add(
-                            const ChatsLoadMoreRequested(retry: true),
-                          ),
-                          child: Text(context.l10n.repeat),
-                        ),
-                      ),
-                  ],
-                ),
+              return _ChatsEmptyPresentation(
+                state: state,
+                bottomPadding: bottomPadding,
               );
             }
 
@@ -472,22 +479,16 @@ class _ChatsContentState extends State<_ChatsContent> {
                     return Padding(
                       padding: const EdgeInsets.all(16),
                       child: state.isLoadingMore || state.isRefreshing
-                          ? const Center(child: _ChatsLoadingIndicator())
+                          ? const Center(
+                              child: _ChatsLoadingIndicator(compact: true),
+                            )
                           : Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (showLoadErrorLabel)
                                     Text(context.l10n.failedToLoadChats),
-                                  TextButton(
-                                    onPressed: () =>
-                                        context.read<ChatsBloc>().add(
-                                          const ChatsLoadMoreRequested(
-                                            retry: true,
-                                          ),
-                                        ),
-                                    child: Text(context.l10n.repeat),
-                                  ),
+                                  const _ChatsRetryButton(),
                                 ],
                               ),
                             ),
@@ -545,10 +546,218 @@ class _ChatsContentState extends State<_ChatsContent> {
   }
 }
 
+class _ChatsEmptyPresentation extends StatelessWidget {
+  const _ChatsEmptyPresentation({
+    required this.state,
+    required this.bottomPadding,
+  });
+
+  final ChatsState state;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final isSearch = state.searchQuery.trim().isNotEmpty;
+    // A retained head transport error also accompanies local-only searches.
+    // It says nothing about server completeness. Any page/cache/data error
+    // must retain the failure presentation, including alongside network errors.
+    final isSavedSearchEmpty =
+        isSearch &&
+        state.isPaginated &&
+        state.paginationError == null &&
+        AppConnectionStatus.isConnectionFailure(state.refreshError);
+    final isFailure =
+        state.status == ChatsStatus.failure && !isSavedSearchEmpty;
+    final message = isFailure
+        ? context.l10n.failedToLoadChats
+        : isSavedSearchEmpty
+        ? context.l10n.chatsNoSavedSearchResults
+        : isSearch
+        ? context.l10n.chatsNoSearchResults
+        : context.l10n.noChats;
+    final hasAction =
+        state.isPaginated && (isFailure || state.loadError != null);
+    final isBusy = state.isRefreshing || state.isLoadingMore;
+    final style = Theme.of(context).textTheme.titleLarge!.copyWith(
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+      color: context.colorScheme.onSurface,
+    );
+
+    return LayoutBuilder(
+      builder: (context, viewport) {
+        final padding = EdgeInsets.fromLTRB(
+          media.padding.left + 16,
+          media.padding.top,
+          media.padding.right + 16,
+          bottomPadding - 8,
+        );
+        final constraints = BoxConstraints(
+          maxWidth: (viewport.maxWidth - padding.horizontal).clamp(
+            0.0,
+            double.infinity,
+          ),
+          maxHeight: (viewport.maxHeight - padding.vertical).clamp(
+            0.0,
+            double.infinity,
+          ),
+        );
+        if (!isFailure && !isSearch) {
+          return Padding(
+            padding: padding,
+            child: EmptyChatState(message: message),
+          );
+        }
+        final actionText = TextPainter(
+          text: TextSpan(
+            text: context.l10n.repeat,
+            style: _ChatsRetryButton.textStyle(context),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: media.textScaler,
+        )..layout();
+        final actionWidth = (actionText.width + 32)
+            .clamp(64.0, double.infinity)
+            .toDouble();
+        final actionHeight = (actionText.height + 16)
+            .clamp(48.0, double.infinity)
+            .toDouble();
+        actionText.dispose();
+        final action = SizedBox(
+          width: actionWidth,
+          height: actionHeight,
+          child: !hasAction
+              ? null
+              : isBusy
+              ? const Center(child: _ChatsLoadingIndicator())
+              : const _ChatsRetryButton(),
+        );
+        final label = Text(
+          message,
+          key: const ValueKey('chats_empty_label'),
+          style: style,
+          textAlign: TextAlign.center,
+        );
+        // Reserve the largest label and action for every empty-search state.
+        // Anchor their TOP, so a longer offline label grows downwards from
+        // the same line instead of shifting the shorter online label.
+        var referenceHeight = 0.0;
+        for (final text in [
+          context.l10n.chatsNoSearchResults,
+          context.l10n.chatsNoSavedSearchResults,
+          context.l10n.failedToLoadChats,
+        ]) {
+          final measure = TextPainter(
+            text: TextSpan(text: text, style: style),
+            textDirection: Directionality.of(context),
+            textScaler: media.textScaler,
+          )..layout(maxWidth: constraints.maxWidth);
+          if (measure.height > referenceHeight) {
+            referenceHeight = measure.height;
+          }
+          measure.dispose();
+        }
+        const gap = 8.0;
+        final contentTop =
+            ((constraints.maxHeight - referenceHeight - gap - actionHeight) / 2)
+                .clamp(0.0, double.infinity);
+        // Always a full-width column. Search-field geometry must not affect
+        // the label width or place retry beside it. Extremely short viewports
+        // scroll the column, preserving the system text scale and touch area.
+        return SingleChildScrollView(
+          key: const ValueKey('chats_empty_scroll'),
+          // Like the chat rows, padding belongs INSIDE the scroll viewport.
+          // Text can therefore pass under the existing chrome's gradient and
+          // BackdropFilter instead of being cut off by an opaque-looking gap.
+          padding: padding,
+          physics: hasAction
+              ? const ClampingScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+              minWidth: constraints.maxWidth,
+              maxWidth: constraints.maxWidth,
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(top: contentTop),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  label,
+                  const SizedBox(height: gap),
+                  Center(child: action),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Loading feedback is centered above the same rendered search-field inset.
+class _ChatsFeedbackViewport extends StatelessWidget {
+  const _ChatsFeedbackViewport({
+    required this.bottomPadding,
+    required this.child,
+  });
+
+  final double bottomPadding;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final bottom = bottomPadding - 8;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        media.padding.left + 16,
+        media.padding.top,
+        media.padding.right + 16,
+        bottom,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _ChatsRetryButton extends StatelessWidget {
+  const _ChatsRetryButton();
+
+  static TextStyle textStyle(BuildContext context) => Theme.of(context)
+      .textTheme
+      .labelLarge!
+      .copyWith(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: .5);
+
+  @override
+  Widget build(BuildContext context) => FilledButton(
+    style: FilledButton.styleFrom(
+      backgroundColor: context.colorScheme.primary,
+      foregroundColor: context.colorScheme.onPrimary,
+      textStyle: textStyle(context),
+      minimumSize: const Size(64, 36),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: const StadiumBorder(),
+      tapTargetSize: MaterialTapTargetSize.padded,
+      visualDensity: VisualDensity.standard,
+    ),
+    onPressed: () => context.read<ChatsBloc>().add(
+      const ChatsLoadMoreRequested(retry: true),
+    ),
+    child: Text(context.l10n.repeat),
+  );
+}
+
 /// Delay feedback, not cached rows. Fast SQLite/HTTP completions never flash a
 /// spinner; a genuinely slow operation still has the standard compact loader.
 class _ChatsLoadingIndicator extends StatefulWidget {
-  const _ChatsLoadingIndicator({super.key});
+  const _ChatsLoadingIndicator({super.key, this.compact = false});
+
+  final bool compact;
 
   @override
   State<_ChatsLoadingIndicator> createState() => _ChatsLoadingIndicatorState();
@@ -574,8 +783,10 @@ class _ChatsLoadingIndicatorState extends State<_ChatsLoadingIndicator> {
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
-    dimension: 24,
-    child: _visible ? const CircularProgressIndicator(strokeWidth: 2.5) : null,
+    dimension: widget.compact ? 24 : 36,
+    child: _visible
+        ? CircularProgressIndicator(strokeWidth: widget.compact ? 2.5 : 4)
+        : null,
   );
 }
 

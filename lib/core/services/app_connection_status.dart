@@ -82,11 +82,12 @@ class AppConnectionStatus {
     _publish();
   }
 
-  /// Short inactive intervals suppress presentation without invalidating work.
-  /// Only a true background suspension invalidates old request completions.
+  /// System overlays keep the presented status and valid work. Only a true
+  /// background suspension hides the label and invalidates old API completions.
   void setForeground(bool visible, {bool suspended = false}) {
     if (_disposed) return;
     synchronizeSession(active: _active);
+    if (!visible && !suspended) return;
     if (suspended && !_suspended) {
       _lifecycle++;
       // The coordinator may coalesce a quick pause/resume and retain the

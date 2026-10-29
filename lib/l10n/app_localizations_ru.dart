@@ -92,6 +92,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatsNoSearchResults => 'ничего не нашли';
 
   @override
+  String get chatsNoSavedSearchResults =>
+      'В сохранённых чатах ничего не найдено';
+
+  @override
   String chatsDeleteTitle(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

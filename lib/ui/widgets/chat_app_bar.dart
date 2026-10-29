@@ -117,7 +117,10 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                                 alignment: AlignmentDirectional.centerStart,
                                 child: Text(
                                   context.l10n.connectionConnecting,
-                                  style: statusStyle,
+                                  style: statusStyle.copyWith(
+                                    color: onSurface,
+                                    fontWeight: FontWeight.w400,
+                                  ),
                                   maxLines: 1,
                                   softWrap: false,
                                 ),

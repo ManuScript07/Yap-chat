@@ -19,6 +19,7 @@
   "connectionConnecting": "connecting…",
   "noChats": "You have no chats",
   "chatsNoSearchResults": "Nothing found",
+  "chatsNoSavedSearchResults": "No matches in saved chats",
   "chatsDeleteTitle": "{count, plural, =1{Delete chat?} other{Delete chats?}}",
   "@chatsDeleteTitle": {
     "placeholders": {

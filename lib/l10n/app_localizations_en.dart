@@ -86,6 +86,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsNoSearchResults => 'Nothing found';
 
   @override
+  String get chatsNoSavedSearchResults => 'No matches in saved chats';
+
+  @override
   String chatsDeleteTitle(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

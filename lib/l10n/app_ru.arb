@@ -19,6 +19,7 @@
   "connectionConnecting": "соединение…",
   "noChats": "у вас нет чатов",
   "chatsNoSearchResults": "ничего не нашли",
+  "chatsNoSavedSearchResults": "В сохранённых чатах ничего не найдено",
   "chatsDeleteTitle": "{count, plural, =1{Удалить чат?} other{Удалить чаты?}}",
   "@chatsDeleteTitle": {
     "placeholders": {
