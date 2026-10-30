@@ -207,6 +207,8 @@ class CachedFriends extends Table {
   TextColumn get avatarUrl => text().nullable()();
   TextColumn get avatarStoragePath => text().nullable()();
   DateTimeColumn get friendsSince => dateTime()();
+  // Drift's legacy DateTime storage uses seconds. Keep server ordering exact.
+  IntColumn get friendsSinceMicros => integer().nullable()();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
@@ -221,7 +223,10 @@ class CachedFriends extends Table {
 class CachedFriendListStates extends Table {
   TextColumn get ownerUserId => text()();
   DateTimeColumn get nextFriendsSince => dateTime().nullable()();
+  IntColumn get nextFriendsSinceMicros => integer().nullable()();
   TextColumn get nextFriendId => text().nullable()();
+  BoolColumn get requiresCursorRepair =>
+      boolean().withDefault(const Constant(false))();
   BoolColumn get hasMore => boolean().withDefault(const Constant(false))();
   IntColumn get totalCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get updatedAt => dateTime()();
@@ -420,7 +425,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -691,6 +696,47 @@ class AppDatabase extends _$AppDatabase {
           FROM cached_chat_list_entries e
           WHERE e.owner_user_id=cached_chats.owner_user_id AND e.chat_id=cached_chats.id
             AND e.query='' AND cached_chats.list_order_micros IS NULL
+        ''');
+      }
+      if (from < 29) {
+        final friendColumns = await customSelect(
+          'PRAGMA table_info(cached_friends)',
+        ).get();
+        if (!friendColumns.any(
+          (c) => c.read<String>('name') == 'friends_since_micros',
+        )) {
+          await migrator.addColumn(
+            cachedFriends,
+            cachedFriends.friendsSinceMicros,
+          );
+        }
+        final stateColumns = await customSelect(
+          'PRAGMA table_info(cached_friend_list_states)',
+        ).get();
+        final names = stateColumns.map((c) => c.read<String>('name')).toSet();
+        if (!names.contains('next_friends_since_micros')) {
+          await migrator.addColumn(
+            cachedFriendListStates,
+            cachedFriendListStates.nextFriendsSinceMicros,
+          );
+        }
+        if (!names.contains('requires_cursor_repair')) {
+          await migrator.addColumn(
+            cachedFriendListStates,
+            cachedFriendListStates.requiresCursorRepair,
+          );
+        }
+        // Fractions discarded by the old cache cannot be reconstructed. Keep
+        // every offline row, but restart coverage from an exact server head.
+        // Repair progresses through normal pagination, never a background scan.
+        await customStatement('''
+          UPDATE cached_friend_list_states
+          SET next_friends_since = NULL, next_friends_since_micros = NULL,
+              next_friend_id = NULL, requires_cursor_repair = 1, has_more = 1
+          WHERE total_count > 0 OR EXISTS (
+            SELECT 1 FROM cached_friends f
+            WHERE f.owner_user_id = cached_friend_list_states.owner_user_id
+          )
         ''');
       }
     },

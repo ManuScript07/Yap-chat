@@ -1108,7 +1108,13 @@ class FriendsRepository
     final state = await _cache.readFriendListState(ownerUserId: scope.userId);
     _accountSessionController.ensureCurrent(scope);
     final cursor = state.nextCursor;
-    if (!state.hasMore || cursor == null) return;
+    if (!state.hasMore) return;
+    if (cursor == null) {
+      // An upgraded/legacy cache keeps its offline rows but cannot safely
+      // continue from a timestamp that previously lost its subsecond part.
+      await _synchronize();
+      return;
+    }
     final page =
         await (_config.diagnostics?.measureSync(
               'friends-page',

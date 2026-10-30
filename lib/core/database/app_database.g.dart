@@ -5755,6 +5755,16 @@ class $CachedFriendsTable extends CachedFriends
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _friendsSinceMicrosMeta =
+      const VerificationMeta('friendsSinceMicros');
+  @override
+  late final GeneratedColumn<int> friendsSinceMicros = GeneratedColumn<int>(
+    'friends_since_micros',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _cachedAtMeta = const VerificationMeta(
     'cachedAt',
   );
@@ -5775,6 +5785,7 @@ class $CachedFriendsTable extends CachedFriends
     avatarUrl,
     avatarStoragePath,
     friendsSince,
+    friendsSinceMicros,
     cachedAt,
   ];
   @override
@@ -5853,6 +5864,15 @@ class $CachedFriendsTable extends CachedFriends
     } else if (isInserting) {
       context.missing(_friendsSinceMeta);
     }
+    if (data.containsKey('friends_since_micros')) {
+      context.handle(
+        _friendsSinceMicrosMeta,
+        friendsSinceMicros.isAcceptableOrUnknown(
+          data['friends_since_micros']!,
+          _friendsSinceMicrosMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at')) {
       context.handle(
         _cachedAtMeta,
@@ -5898,6 +5918,10 @@ class $CachedFriendsTable extends CachedFriends
         DriftSqlType.dateTime,
         data['${effectivePrefix}friends_since'],
       )!,
+      friendsSinceMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}friends_since_micros'],
+      ),
       cachedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}cached_at'],
@@ -5919,6 +5943,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
   final String? avatarUrl;
   final String? avatarStoragePath;
   final DateTime friendsSince;
+  final int? friendsSinceMicros;
   final DateTime cachedAt;
   const CachedFriend({
     required this.ownerUserId,
@@ -5928,6 +5953,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
     this.avatarUrl,
     this.avatarStoragePath,
     required this.friendsSince,
+    this.friendsSinceMicros,
     required this.cachedAt,
   });
   @override
@@ -5944,6 +5970,9 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
       map['avatar_storage_path'] = Variable<String>(avatarStoragePath);
     }
     map['friends_since'] = Variable<DateTime>(friendsSince);
+    if (!nullToAbsent || friendsSinceMicros != null) {
+      map['friends_since_micros'] = Variable<int>(friendsSinceMicros);
+    }
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -5961,6 +5990,9 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
           ? const Value.absent()
           : Value(avatarStoragePath),
       friendsSince: Value(friendsSince),
+      friendsSinceMicros: friendsSinceMicros == null && nullToAbsent
+          ? const Value.absent()
+          : Value(friendsSinceMicros),
       cachedAt: Value(cachedAt),
     );
   }
@@ -5980,6 +6012,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
         json['avatarStoragePath'],
       ),
       friendsSince: serializer.fromJson<DateTime>(json['friendsSince']),
+      friendsSinceMicros: serializer.fromJson<int?>(json['friendsSinceMicros']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -5994,6 +6027,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
       'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'avatarStoragePath': serializer.toJson<String?>(avatarStoragePath),
       'friendsSince': serializer.toJson<DateTime>(friendsSince),
+      'friendsSinceMicros': serializer.toJson<int?>(friendsSinceMicros),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -6006,6 +6040,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
     Value<String?> avatarUrl = const Value.absent(),
     Value<String?> avatarStoragePath = const Value.absent(),
     DateTime? friendsSince,
+    Value<int?> friendsSinceMicros = const Value.absent(),
     DateTime? cachedAt,
   }) => CachedFriend(
     ownerUserId: ownerUserId ?? this.ownerUserId,
@@ -6017,6 +6052,9 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
         ? avatarStoragePath.value
         : this.avatarStoragePath,
     friendsSince: friendsSince ?? this.friendsSince,
+    friendsSinceMicros: friendsSinceMicros.present
+        ? friendsSinceMicros.value
+        : this.friendsSinceMicros,
     cachedAt: cachedAt ?? this.cachedAt,
   );
   CachedFriend copyWithCompanion(CachedFriendsCompanion data) {
@@ -6036,6 +6074,9 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
       friendsSince: data.friendsSince.present
           ? data.friendsSince.value
           : this.friendsSince,
+      friendsSinceMicros: data.friendsSinceMicros.present
+          ? data.friendsSinceMicros.value
+          : this.friendsSinceMicros,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -6050,6 +6091,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
           ..write('avatarUrl: $avatarUrl, ')
           ..write('avatarStoragePath: $avatarStoragePath, ')
           ..write('friendsSince: $friendsSince, ')
+          ..write('friendsSinceMicros: $friendsSinceMicros, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -6064,6 +6106,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
     avatarUrl,
     avatarStoragePath,
     friendsSince,
+    friendsSinceMicros,
     cachedAt,
   );
   @override
@@ -6077,6 +6120,7 @@ class CachedFriend extends DataClass implements Insertable<CachedFriend> {
           other.avatarUrl == this.avatarUrl &&
           other.avatarStoragePath == this.avatarStoragePath &&
           other.friendsSince == this.friendsSince &&
+          other.friendsSinceMicros == this.friendsSinceMicros &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -6088,6 +6132,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
   final Value<String?> avatarUrl;
   final Value<String?> avatarStoragePath;
   final Value<DateTime> friendsSince;
+  final Value<int?> friendsSinceMicros;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedFriendsCompanion({
@@ -6098,6 +6143,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
     this.avatarUrl = const Value.absent(),
     this.avatarStoragePath = const Value.absent(),
     this.friendsSince = const Value.absent(),
+    this.friendsSinceMicros = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6109,6 +6155,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
     this.avatarUrl = const Value.absent(),
     this.avatarStoragePath = const Value.absent(),
     required DateTime friendsSince,
+    this.friendsSinceMicros = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   }) : ownerUserId = Value(ownerUserId),
@@ -6125,6 +6172,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
     Expression<String>? avatarUrl,
     Expression<String>? avatarStoragePath,
     Expression<DateTime>? friendsSince,
+    Expression<int>? friendsSinceMicros,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -6136,6 +6184,8 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (avatarStoragePath != null) 'avatar_storage_path': avatarStoragePath,
       if (friendsSince != null) 'friends_since': friendsSince,
+      if (friendsSinceMicros != null)
+        'friends_since_micros': friendsSinceMicros,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6149,6 +6199,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
     Value<String?>? avatarUrl,
     Value<String?>? avatarStoragePath,
     Value<DateTime>? friendsSince,
+    Value<int?>? friendsSinceMicros,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
   }) {
@@ -6160,6 +6211,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       avatarStoragePath: avatarStoragePath ?? this.avatarStoragePath,
       friendsSince: friendsSince ?? this.friendsSince,
+      friendsSinceMicros: friendsSinceMicros ?? this.friendsSinceMicros,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6189,6 +6241,9 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
     if (friendsSince.present) {
       map['friends_since'] = Variable<DateTime>(friendsSince.value);
     }
+    if (friendsSinceMicros.present) {
+      map['friends_since_micros'] = Variable<int>(friendsSinceMicros.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -6208,6 +6263,7 @@ class CachedFriendsCompanion extends UpdateCompanion<CachedFriend> {
           ..write('avatarUrl: $avatarUrl, ')
           ..write('avatarStoragePath: $avatarStoragePath, ')
           ..write('friendsSince: $friendsSince, ')
+          ..write('friendsSinceMicros: $friendsSinceMicros, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6244,6 +6300,16 @@ class $CachedFriendListStatesTable extends CachedFriendListStates
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _nextFriendsSinceMicrosMeta =
+      const VerificationMeta('nextFriendsSinceMicros');
+  @override
+  late final GeneratedColumn<int> nextFriendsSinceMicros = GeneratedColumn<int>(
+    'next_friends_since_micros',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _nextFriendIdMeta = const VerificationMeta(
     'nextFriendId',
   );
@@ -6254,6 +6320,20 @@ class $CachedFriendListStatesTable extends CachedFriendListStates
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
+  );
+  static const VerificationMeta _requiresCursorRepairMeta =
+      const VerificationMeta('requiresCursorRepair');
+  @override
+  late final GeneratedColumn<bool> requiresCursorRepair = GeneratedColumn<bool>(
+    'requires_cursor_repair',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_cursor_repair" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
   );
   static const VerificationMeta _hasMoreMeta = const VerificationMeta(
     'hasMore',
@@ -6297,7 +6377,9 @@ class $CachedFriendListStatesTable extends CachedFriendListStates
   List<GeneratedColumn> get $columns => [
     ownerUserId,
     nextFriendsSince,
+    nextFriendsSinceMicros,
     nextFriendId,
+    requiresCursorRepair,
     hasMore,
     totalCount,
     updatedAt,
@@ -6334,12 +6416,30 @@ class $CachedFriendListStatesTable extends CachedFriendListStates
         ),
       );
     }
+    if (data.containsKey('next_friends_since_micros')) {
+      context.handle(
+        _nextFriendsSinceMicrosMeta,
+        nextFriendsSinceMicros.isAcceptableOrUnknown(
+          data['next_friends_since_micros']!,
+          _nextFriendsSinceMicrosMeta,
+        ),
+      );
+    }
     if (data.containsKey('next_friend_id')) {
       context.handle(
         _nextFriendIdMeta,
         nextFriendId.isAcceptableOrUnknown(
           data['next_friend_id']!,
           _nextFriendIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_cursor_repair')) {
+      context.handle(
+        _requiresCursorRepairMeta,
+        requiresCursorRepair.isAcceptableOrUnknown(
+          data['requires_cursor_repair']!,
+          _requiresCursorRepairMeta,
         ),
       );
     }
@@ -6380,10 +6480,18 @@ class $CachedFriendListStatesTable extends CachedFriendListStates
         DriftSqlType.dateTime,
         data['${effectivePrefix}next_friends_since'],
       ),
+      nextFriendsSinceMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_friends_since_micros'],
+      ),
       nextFriendId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}next_friend_id'],
       ),
+      requiresCursorRepair: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_cursor_repair'],
+      )!,
       hasMore: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}has_more'],
@@ -6409,14 +6517,18 @@ class CachedFriendListState extends DataClass
     implements Insertable<CachedFriendListState> {
   final String ownerUserId;
   final DateTime? nextFriendsSince;
+  final int? nextFriendsSinceMicros;
   final String? nextFriendId;
+  final bool requiresCursorRepair;
   final bool hasMore;
   final int totalCount;
   final DateTime updatedAt;
   const CachedFriendListState({
     required this.ownerUserId,
     this.nextFriendsSince,
+    this.nextFriendsSinceMicros,
     this.nextFriendId,
+    required this.requiresCursorRepair,
     required this.hasMore,
     required this.totalCount,
     required this.updatedAt,
@@ -6428,9 +6540,13 @@ class CachedFriendListState extends DataClass
     if (!nullToAbsent || nextFriendsSince != null) {
       map['next_friends_since'] = Variable<DateTime>(nextFriendsSince);
     }
+    if (!nullToAbsent || nextFriendsSinceMicros != null) {
+      map['next_friends_since_micros'] = Variable<int>(nextFriendsSinceMicros);
+    }
     if (!nullToAbsent || nextFriendId != null) {
       map['next_friend_id'] = Variable<String>(nextFriendId);
     }
+    map['requires_cursor_repair'] = Variable<bool>(requiresCursorRepair);
     map['has_more'] = Variable<bool>(hasMore);
     map['total_count'] = Variable<int>(totalCount);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -6443,9 +6559,13 @@ class CachedFriendListState extends DataClass
       nextFriendsSince: nextFriendsSince == null && nullToAbsent
           ? const Value.absent()
           : Value(nextFriendsSince),
+      nextFriendsSinceMicros: nextFriendsSinceMicros == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextFriendsSinceMicros),
       nextFriendId: nextFriendId == null && nullToAbsent
           ? const Value.absent()
           : Value(nextFriendId),
+      requiresCursorRepair: Value(requiresCursorRepair),
       hasMore: Value(hasMore),
       totalCount: Value(totalCount),
       updatedAt: Value(updatedAt),
@@ -6462,7 +6582,13 @@ class CachedFriendListState extends DataClass
       nextFriendsSince: serializer.fromJson<DateTime?>(
         json['nextFriendsSince'],
       ),
+      nextFriendsSinceMicros: serializer.fromJson<int?>(
+        json['nextFriendsSinceMicros'],
+      ),
       nextFriendId: serializer.fromJson<String?>(json['nextFriendId']),
+      requiresCursorRepair: serializer.fromJson<bool>(
+        json['requiresCursorRepair'],
+      ),
       hasMore: serializer.fromJson<bool>(json['hasMore']),
       totalCount: serializer.fromJson<int>(json['totalCount']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -6474,7 +6600,9 @@ class CachedFriendListState extends DataClass
     return <String, dynamic>{
       'ownerUserId': serializer.toJson<String>(ownerUserId),
       'nextFriendsSince': serializer.toJson<DateTime?>(nextFriendsSince),
+      'nextFriendsSinceMicros': serializer.toJson<int?>(nextFriendsSinceMicros),
       'nextFriendId': serializer.toJson<String?>(nextFriendId),
+      'requiresCursorRepair': serializer.toJson<bool>(requiresCursorRepair),
       'hasMore': serializer.toJson<bool>(hasMore),
       'totalCount': serializer.toJson<int>(totalCount),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -6484,7 +6612,9 @@ class CachedFriendListState extends DataClass
   CachedFriendListState copyWith({
     String? ownerUserId,
     Value<DateTime?> nextFriendsSince = const Value.absent(),
+    Value<int?> nextFriendsSinceMicros = const Value.absent(),
     Value<String?> nextFriendId = const Value.absent(),
+    bool? requiresCursorRepair,
     bool? hasMore,
     int? totalCount,
     DateTime? updatedAt,
@@ -6493,7 +6623,11 @@ class CachedFriendListState extends DataClass
     nextFriendsSince: nextFriendsSince.present
         ? nextFriendsSince.value
         : this.nextFriendsSince,
+    nextFriendsSinceMicros: nextFriendsSinceMicros.present
+        ? nextFriendsSinceMicros.value
+        : this.nextFriendsSinceMicros,
     nextFriendId: nextFriendId.present ? nextFriendId.value : this.nextFriendId,
+    requiresCursorRepair: requiresCursorRepair ?? this.requiresCursorRepair,
     hasMore: hasMore ?? this.hasMore,
     totalCount: totalCount ?? this.totalCount,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -6508,9 +6642,15 @@ class CachedFriendListState extends DataClass
       nextFriendsSince: data.nextFriendsSince.present
           ? data.nextFriendsSince.value
           : this.nextFriendsSince,
+      nextFriendsSinceMicros: data.nextFriendsSinceMicros.present
+          ? data.nextFriendsSinceMicros.value
+          : this.nextFriendsSinceMicros,
       nextFriendId: data.nextFriendId.present
           ? data.nextFriendId.value
           : this.nextFriendId,
+      requiresCursorRepair: data.requiresCursorRepair.present
+          ? data.requiresCursorRepair.value
+          : this.requiresCursorRepair,
       hasMore: data.hasMore.present ? data.hasMore.value : this.hasMore,
       totalCount: data.totalCount.present
           ? data.totalCount.value
@@ -6524,7 +6664,9 @@ class CachedFriendListState extends DataClass
     return (StringBuffer('CachedFriendListState(')
           ..write('ownerUserId: $ownerUserId, ')
           ..write('nextFriendsSince: $nextFriendsSince, ')
+          ..write('nextFriendsSinceMicros: $nextFriendsSinceMicros, ')
           ..write('nextFriendId: $nextFriendId, ')
+          ..write('requiresCursorRepair: $requiresCursorRepair, ')
           ..write('hasMore: $hasMore, ')
           ..write('totalCount: $totalCount, ')
           ..write('updatedAt: $updatedAt')
@@ -6536,7 +6678,9 @@ class CachedFriendListState extends DataClass
   int get hashCode => Object.hash(
     ownerUserId,
     nextFriendsSince,
+    nextFriendsSinceMicros,
     nextFriendId,
+    requiresCursorRepair,
     hasMore,
     totalCount,
     updatedAt,
@@ -6547,7 +6691,9 @@ class CachedFriendListState extends DataClass
       (other is CachedFriendListState &&
           other.ownerUserId == this.ownerUserId &&
           other.nextFriendsSince == this.nextFriendsSince &&
+          other.nextFriendsSinceMicros == this.nextFriendsSinceMicros &&
           other.nextFriendId == this.nextFriendId &&
+          other.requiresCursorRepair == this.requiresCursorRepair &&
           other.hasMore == this.hasMore &&
           other.totalCount == this.totalCount &&
           other.updatedAt == this.updatedAt);
@@ -6557,7 +6703,9 @@ class CachedFriendListStatesCompanion
     extends UpdateCompanion<CachedFriendListState> {
   final Value<String> ownerUserId;
   final Value<DateTime?> nextFriendsSince;
+  final Value<int?> nextFriendsSinceMicros;
   final Value<String?> nextFriendId;
+  final Value<bool> requiresCursorRepair;
   final Value<bool> hasMore;
   final Value<int> totalCount;
   final Value<DateTime> updatedAt;
@@ -6565,7 +6713,9 @@ class CachedFriendListStatesCompanion
   const CachedFriendListStatesCompanion({
     this.ownerUserId = const Value.absent(),
     this.nextFriendsSince = const Value.absent(),
+    this.nextFriendsSinceMicros = const Value.absent(),
     this.nextFriendId = const Value.absent(),
+    this.requiresCursorRepair = const Value.absent(),
     this.hasMore = const Value.absent(),
     this.totalCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -6574,7 +6724,9 @@ class CachedFriendListStatesCompanion
   CachedFriendListStatesCompanion.insert({
     required String ownerUserId,
     this.nextFriendsSince = const Value.absent(),
+    this.nextFriendsSinceMicros = const Value.absent(),
     this.nextFriendId = const Value.absent(),
+    this.requiresCursorRepair = const Value.absent(),
     this.hasMore = const Value.absent(),
     this.totalCount = const Value.absent(),
     required DateTime updatedAt,
@@ -6584,7 +6736,9 @@ class CachedFriendListStatesCompanion
   static Insertable<CachedFriendListState> custom({
     Expression<String>? ownerUserId,
     Expression<DateTime>? nextFriendsSince,
+    Expression<int>? nextFriendsSinceMicros,
     Expression<String>? nextFriendId,
+    Expression<bool>? requiresCursorRepair,
     Expression<bool>? hasMore,
     Expression<int>? totalCount,
     Expression<DateTime>? updatedAt,
@@ -6593,7 +6747,11 @@ class CachedFriendListStatesCompanion
     return RawValuesInsertable({
       if (ownerUserId != null) 'owner_user_id': ownerUserId,
       if (nextFriendsSince != null) 'next_friends_since': nextFriendsSince,
+      if (nextFriendsSinceMicros != null)
+        'next_friends_since_micros': nextFriendsSinceMicros,
       if (nextFriendId != null) 'next_friend_id': nextFriendId,
+      if (requiresCursorRepair != null)
+        'requires_cursor_repair': requiresCursorRepair,
       if (hasMore != null) 'has_more': hasMore,
       if (totalCount != null) 'total_count': totalCount,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -6604,7 +6762,9 @@ class CachedFriendListStatesCompanion
   CachedFriendListStatesCompanion copyWith({
     Value<String>? ownerUserId,
     Value<DateTime?>? nextFriendsSince,
+    Value<int?>? nextFriendsSinceMicros,
     Value<String?>? nextFriendId,
+    Value<bool>? requiresCursorRepair,
     Value<bool>? hasMore,
     Value<int>? totalCount,
     Value<DateTime>? updatedAt,
@@ -6613,7 +6773,10 @@ class CachedFriendListStatesCompanion
     return CachedFriendListStatesCompanion(
       ownerUserId: ownerUserId ?? this.ownerUserId,
       nextFriendsSince: nextFriendsSince ?? this.nextFriendsSince,
+      nextFriendsSinceMicros:
+          nextFriendsSinceMicros ?? this.nextFriendsSinceMicros,
       nextFriendId: nextFriendId ?? this.nextFriendId,
+      requiresCursorRepair: requiresCursorRepair ?? this.requiresCursorRepair,
       hasMore: hasMore ?? this.hasMore,
       totalCount: totalCount ?? this.totalCount,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -6630,8 +6793,18 @@ class CachedFriendListStatesCompanion
     if (nextFriendsSince.present) {
       map['next_friends_since'] = Variable<DateTime>(nextFriendsSince.value);
     }
+    if (nextFriendsSinceMicros.present) {
+      map['next_friends_since_micros'] = Variable<int>(
+        nextFriendsSinceMicros.value,
+      );
+    }
     if (nextFriendId.present) {
       map['next_friend_id'] = Variable<String>(nextFriendId.value);
+    }
+    if (requiresCursorRepair.present) {
+      map['requires_cursor_repair'] = Variable<bool>(
+        requiresCursorRepair.value,
+      );
     }
     if (hasMore.present) {
       map['has_more'] = Variable<bool>(hasMore.value);
@@ -6653,7 +6826,9 @@ class CachedFriendListStatesCompanion
     return (StringBuffer('CachedFriendListStatesCompanion(')
           ..write('ownerUserId: $ownerUserId, ')
           ..write('nextFriendsSince: $nextFriendsSince, ')
+          ..write('nextFriendsSinceMicros: $nextFriendsSinceMicros, ')
           ..write('nextFriendId: $nextFriendId, ')
+          ..write('requiresCursorRepair: $requiresCursorRepair, ')
           ..write('hasMore: $hasMore, ')
           ..write('totalCount: $totalCount, ')
           ..write('updatedAt: $updatedAt, ')
@@ -16505,6 +16680,7 @@ typedef $$CachedFriendsTableCreateCompanionBuilder =
       Value<String?> avatarUrl,
       Value<String?> avatarStoragePath,
       required DateTime friendsSince,
+      Value<int?> friendsSinceMicros,
       required DateTime cachedAt,
       Value<int> rowid,
     });
@@ -16517,6 +16693,7 @@ typedef $$CachedFriendsTableUpdateCompanionBuilder =
       Value<String?> avatarUrl,
       Value<String?> avatarStoragePath,
       Value<DateTime> friendsSince,
+      Value<int?> friendsSinceMicros,
       Value<DateTime> cachedAt,
       Value<int> rowid,
     });
@@ -16562,6 +16739,11 @@ class $$CachedFriendsTableFilterComposer
 
   ColumnFilters<DateTime> get friendsSince => $composableBuilder(
     column: $table.friendsSince,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get friendsSinceMicros => $composableBuilder(
+    column: $table.friendsSinceMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16615,6 +16797,11 @@ class $$CachedFriendsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get friendsSinceMicros => $composableBuilder(
+    column: $table.friendsSinceMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
     column: $table.cachedAt,
     builder: (column) => ColumnOrderings(column),
@@ -16656,6 +16843,11 @@ class $$CachedFriendsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get friendsSince => $composableBuilder(
     column: $table.friendsSince,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get friendsSinceMicros => $composableBuilder(
+    column: $table.friendsSinceMicros,
     builder: (column) => column,
   );
 
@@ -16701,6 +16893,7 @@ class $$CachedFriendsTableTableManager
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<String?> avatarStoragePath = const Value.absent(),
                 Value<DateTime> friendsSince = const Value.absent(),
+                Value<int?> friendsSinceMicros = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedFriendsCompanion(
@@ -16711,6 +16904,7 @@ class $$CachedFriendsTableTableManager
                 avatarUrl: avatarUrl,
                 avatarStoragePath: avatarStoragePath,
                 friendsSince: friendsSince,
+                friendsSinceMicros: friendsSinceMicros,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -16723,6 +16917,7 @@ class $$CachedFriendsTableTableManager
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<String?> avatarStoragePath = const Value.absent(),
                 required DateTime friendsSince,
+                Value<int?> friendsSinceMicros = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CachedFriendsCompanion.insert(
@@ -16733,6 +16928,7 @@ class $$CachedFriendsTableTableManager
                 avatarUrl: avatarUrl,
                 avatarStoragePath: avatarStoragePath,
                 friendsSince: friendsSince,
+                friendsSinceMicros: friendsSinceMicros,
                 cachedAt: cachedAt,
                 rowid: rowid,
               ),
@@ -16774,7 +16970,9 @@ typedef $$CachedFriendListStatesTableCreateCompanionBuilder =
     CachedFriendListStatesCompanion Function({
       required String ownerUserId,
       Value<DateTime?> nextFriendsSince,
+      Value<int?> nextFriendsSinceMicros,
       Value<String?> nextFriendId,
+      Value<bool> requiresCursorRepair,
       Value<bool> hasMore,
       Value<int> totalCount,
       required DateTime updatedAt,
@@ -16784,7 +16982,9 @@ typedef $$CachedFriendListStatesTableUpdateCompanionBuilder =
     CachedFriendListStatesCompanion Function({
       Value<String> ownerUserId,
       Value<DateTime?> nextFriendsSince,
+      Value<int?> nextFriendsSinceMicros,
       Value<String?> nextFriendId,
+      Value<bool> requiresCursorRepair,
       Value<bool> hasMore,
       Value<int> totalCount,
       Value<DateTime> updatedAt,
@@ -16810,8 +17010,18 @@ class $$CachedFriendListStatesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get nextFriendsSinceMicros => $composableBuilder(
+    column: $table.nextFriendsSinceMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get nextFriendId => $composableBuilder(
     column: $table.nextFriendId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresCursorRepair => $composableBuilder(
+    column: $table.requiresCursorRepair,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16850,8 +17060,18 @@ class $$CachedFriendListStatesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get nextFriendsSinceMicros => $composableBuilder(
+    column: $table.nextFriendsSinceMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get nextFriendId => $composableBuilder(
     column: $table.nextFriendId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresCursorRepair => $composableBuilder(
+    column: $table.requiresCursorRepair,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -16890,8 +17110,18 @@ class $$CachedFriendListStatesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get nextFriendsSinceMicros => $composableBuilder(
+    column: $table.nextFriendsSinceMicros,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get nextFriendId => $composableBuilder(
     column: $table.nextFriendId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresCursorRepair => $composableBuilder(
+    column: $table.requiresCursorRepair,
     builder: (column) => column,
   );
 
@@ -16955,7 +17185,9 @@ class $$CachedFriendListStatesTableTableManager
               ({
                 Value<String> ownerUserId = const Value.absent(),
                 Value<DateTime?> nextFriendsSince = const Value.absent(),
+                Value<int?> nextFriendsSinceMicros = const Value.absent(),
                 Value<String?> nextFriendId = const Value.absent(),
+                Value<bool> requiresCursorRepair = const Value.absent(),
                 Value<bool> hasMore = const Value.absent(),
                 Value<int> totalCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -16963,7 +17195,9 @@ class $$CachedFriendListStatesTableTableManager
               }) => CachedFriendListStatesCompanion(
                 ownerUserId: ownerUserId,
                 nextFriendsSince: nextFriendsSince,
+                nextFriendsSinceMicros: nextFriendsSinceMicros,
                 nextFriendId: nextFriendId,
+                requiresCursorRepair: requiresCursorRepair,
                 hasMore: hasMore,
                 totalCount: totalCount,
                 updatedAt: updatedAt,
@@ -16973,7 +17207,9 @@ class $$CachedFriendListStatesTableTableManager
               ({
                 required String ownerUserId,
                 Value<DateTime?> nextFriendsSince = const Value.absent(),
+                Value<int?> nextFriendsSinceMicros = const Value.absent(),
                 Value<String?> nextFriendId = const Value.absent(),
+                Value<bool> requiresCursorRepair = const Value.absent(),
                 Value<bool> hasMore = const Value.absent(),
                 Value<int> totalCount = const Value.absent(),
                 required DateTime updatedAt,
@@ -16981,7 +17217,9 @@ class $$CachedFriendListStatesTableTableManager
               }) => CachedFriendListStatesCompanion.insert(
                 ownerUserId: ownerUserId,
                 nextFriendsSince: nextFriendsSince,
+                nextFriendsSinceMicros: nextFriendsSinceMicros,
                 nextFriendId: nextFriendId,
+                requiresCursorRepair: requiresCursorRepair,
                 hasMore: hasMore,
                 totalCount: totalCount,
                 updatedAt: updatedAt,

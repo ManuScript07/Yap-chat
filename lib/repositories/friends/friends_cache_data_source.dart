@@ -16,6 +16,10 @@ class FriendsCacheDataSource {
   final String Function() _userIdProvider;
   final MediaCacheService? _mediaCache;
 
+  static const _friendTimeOrder = CustomExpression<int>(
+    'COALESCE(friends_since_micros, friends_since * 1000000)',
+  );
+
   Future<void> _prepareAvatarPaths() async {
     try {
       await _mediaCache?.prepareLocalPaths();
@@ -29,7 +33,7 @@ class FriendsCacheDataSource {
     final query = _database.select(_database.cachedFriends)
       ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([
-        (table) => OrderingTerm.desc(table.friendsSince),
+        (_) => OrderingTerm.desc(_friendTimeOrder),
         (table) => OrderingTerm.desc(table.userId),
       ]);
     final pathsReady = _prepareAvatarPaths();
@@ -54,7 +58,7 @@ class FriendsCacheDataSource {
     final query = _database.select(_database.cachedFriends)
       ..where((table) => table.ownerUserId.equals(owner))
       ..orderBy([
-        (table) => OrderingTerm.desc(table.friendsSince),
+        (_) => OrderingTerm.desc(_friendTimeOrder),
         (table) => OrderingTerm.desc(table.userId),
       ]);
     final pathsReady = _prepareAvatarPaths();
@@ -103,11 +107,10 @@ class FriendsCacheDataSource {
     String? ownerUserId,
   }) async {
     final owner = ownerUserId ?? _userIdProvider();
-    final previousFriends = await readFriends(ownerUserId: owner);
-    final previousState = await readFriendListState(ownerUserId: owner);
-    final previousCount = previousFriends.length;
-
     await _database.transaction(() async {
+      final previousFriends = await readFriends(ownerUserId: owner);
+      final previousState = await readFriendListState(ownerUserId: owner);
+      final previousCount = previousFriends.length;
       // A first cursor page is authoritative for its own range. Preserve
       // cached rows behind that range for offline pagination, but remove a
       // locally optimistic row when the server proves it cannot be there.
@@ -120,20 +123,28 @@ class FriendsCacheDataSource {
       );
       await _upsertFriends(page.friends, owner);
       final cachedCount = await _countFriends(owner);
-      final hasOnlyHeadPage = previousCount <= page.friends.length;
-      final nextCursor = hasOnlyHeadPage
+      final restarting =
+          !previousState.isAuthoritative ||
+          previousCount <= page.friends.length ||
+          (previousState.requiresCursorRepair &&
+              previousState.nextCursor == null);
+      // Legacy rows may already fill totalCount while hiding gaps, so repair
+      // must follow server coverage rather than treating row count as proof.
+      final hasMore =
+          page.hasMore &&
+          (restarting || previousState.hasMore) &&
+          (previousState.requiresCursorRepair || cachedCount < page.totalCount);
+      final nextCursor = !hasMore
+          ? null
+          : restarting
           ? page.nextCursor
           : previousState.nextCursor;
-      final hasMore = cachedCount >= page.totalCount
-          ? false
-          : hasOnlyHeadPage
-          ? page.hasMore
-          : previousState.hasMore;
       await _writeFriendListState(
         owner: owner,
         cursor: nextCursor,
         hasMore: hasMore,
         totalCount: page.totalCount,
+        requiresCursorRepair: previousState.requiresCursorRepair && hasMore,
       );
     });
   }
@@ -178,13 +189,19 @@ class FriendsCacheDataSource {
   Future<void> appendFriendPage(FriendPage page, {String? ownerUserId}) async {
     final owner = ownerUserId ?? _userIdProvider();
     await _database.transaction(() async {
+      final previousState = await readFriendListState(ownerUserId: owner);
       await _upsertFriends(page.friends, owner);
       final cachedCount = await _countFriends(owner);
+      final hasMore =
+          page.hasMore &&
+          (previousState.requiresCursorRepair || cachedCount < page.totalCount);
       await _writeFriendListState(
         owner: owner,
-        cursor: page.nextCursor,
-        hasMore: cachedCount < page.totalCount && page.hasMore,
+        cursor: hasMore ? page.nextCursor : null,
+        hasMore: hasMore,
         totalCount: page.totalCount,
+        requiresCursorRepair:
+            previousState.requiresCursorRepair && page.hasMore,
       );
     });
   }
@@ -215,11 +232,12 @@ class FriendsCacheDataSource {
   }) async {
     if (friends.isEmpty) return;
     final owner = ownerUserId ?? _userIdProvider();
-    final state = await readFriendListState(ownerUserId: owner);
     await _database.transaction(() async {
+      final state = await readFriendListState(ownerUserId: owner);
       await _upsertFriends(friends, owner);
       final cachedCount = await _countFriends(owner);
-      if (state.hasMore &&
+      if (!state.requiresCursorRepair &&
+          state.hasMore &&
           state.totalCount > 0 &&
           cachedCount >= state.totalCount) {
         await _writeFriendListState(
@@ -243,17 +261,12 @@ class FriendsCacheDataSource {
   Future<FriendListCacheState> _deriveFriendListState(String owner) async {
     final friends = await readFriends(ownerUserId: owner);
     if (friends.isEmpty) return const FriendListCacheState();
-    final last = friends.last;
     return FriendListCacheState(
-      nextCursor: FriendPageCursor(
-        friendsSince: last.friendsSince,
-        friendId: last.id,
-      ),
-      // Databases created before cursor metadata may contain a complete list.
-      // One extra page read is safe and lets the server establish the exact
-      // terminal boundary without discarding that offline cache.
+      // Cached/search rows do not establish continuous server coverage, and
+      // legacy timestamps may have lost fractions. Obtain an exact head first.
       hasMore: true,
       totalCount: friends.length,
+      requiresCursorRepair: true,
     );
   }
 
@@ -262,13 +275,18 @@ class FriendsCacheDataSource {
     required FriendPageCursor? cursor,
     required bool hasMore,
     required int totalCount,
+    bool requiresCursorRepair = false,
   }) => _database
       .into(_database.cachedFriendListStates)
       .insertOnConflictUpdate(
         CachedFriendListStatesCompanion.insert(
           ownerUserId: owner,
           nextFriendsSince: Value(cursor?.friendsSince.toUtc()),
+          nextFriendsSinceMicros: Value(
+            cursor?.friendsSince.microsecondsSinceEpoch,
+          ),
           nextFriendId: Value(cursor?.friendId),
+          requiresCursorRepair: Value(requiresCursorRepair),
           hasMore: Value(hasMore),
           totalCount: Value(totalCount),
           updatedAt: DateTime.now().toUtc(),
@@ -276,15 +294,23 @@ class FriendsCacheDataSource {
       );
 
   FriendListCacheState _mapFriendListState(CachedFriendListState row) {
-    final since = row.nextFriendsSince;
+    final micros = row.nextFriendsSinceMicros;
     final id = row.nextFriendId;
     return FriendListCacheState(
-      nextCursor: since == null || id == null
+      nextCursor: micros == null || id == null
           ? null
-          : FriendPageCursor(friendsSince: since.toLocal(), friendId: id),
+          : FriendPageCursor(
+              friendsSince: DateTime.fromMicrosecondsSinceEpoch(
+                micros,
+                isUtc: true,
+              ),
+              friendId: id,
+            ),
       hasMore: row.hasMore,
       totalCount: row.totalCount,
       isAuthoritative: true,
+      requiresCursorRepair:
+          row.requiresCursorRepair || (row.hasMore && micros == null),
     );
   }
 
@@ -556,7 +582,7 @@ class FriendsCacheDataSource {
       cached.displayName == incoming.displayName &&
       cached.avatarUrl == incoming.avatarUrl &&
       cached.avatarStoragePath == incoming.avatarStoragePath &&
-      _sameSecond(cached.friendsSince, incoming.friendsSince);
+      cached.friendsSince.isAtSameMomentAs(incoming.friendsSince);
 
   bool _sameRequest(FriendRequest? cached, FriendRequest incoming) =>
       cached != null &&
@@ -598,6 +624,7 @@ class FriendsCacheDataSource {
           );
         final row = await query.getSingleOrNull();
         if (row == null) return;
+        final acceptedAt = DateTime.now();
         await (_database.delete(_database.cachedFriendRequests)..where(
               (table) =>
                   table.ownerUserId.equals(owner) &
@@ -614,7 +641,8 @@ class FriendsCacheDataSource {
                 displayName: row.peerDisplayName,
                 avatarUrl: Value(row.peerAvatarUrl),
                 avatarStoragePath: Value(row.peerAvatarStoragePath),
-                friendsSince: DateTime.now(),
+                friendsSince: acceptedAt,
+                friendsSinceMicros: Value(acceptedAt.microsecondsSinceEpoch),
                 cachedAt: DateTime.now().toUtc(),
               ),
             );
@@ -643,7 +671,12 @@ class FriendsCacheDataSource {
     avatarUrl: row.avatarUrl,
     avatarStoragePath: row.avatarStoragePath,
     cachedAvatarPath: _localAvatarPath(row),
-    friendsSince: row.friendsSince,
+    friendsSince: row.friendsSinceMicros == null
+        ? row.friendsSince
+        : DateTime.fromMicrosecondsSinceEpoch(
+            row.friendsSinceMicros!,
+            isUtc: true,
+          ).toLocal(),
   );
 
   String? _localAvatarPath(CachedFriend row) {
@@ -687,6 +720,7 @@ class FriendsCacheDataSource {
         avatarUrl: Value(friend.avatarUrl),
         avatarStoragePath: Value(friend.avatarStoragePath),
         friendsSince: friend.friendsSince,
+        friendsSinceMicros: Value(friend.friendsSince.microsecondsSinceEpoch),
         cachedAt: DateTime.now().toUtc(),
       );
 
@@ -714,6 +748,7 @@ class FriendListCacheState {
     this.hasMore = false,
     this.totalCount = 0,
     this.isAuthoritative = false,
+    this.requiresCursorRepair = false,
   });
 
   final FriendPageCursor? nextCursor;
@@ -723,4 +758,8 @@ class FriendListCacheState {
   /// False only for a best-effort state derived from a legacy cache that has
   /// no cursor metadata yet. A persisted page response is authoritative.
   final bool isAuthoritative;
+
+  /// Retain offline rows while validating the legacy list from its exact head.
+  /// Only a terminal server page completes this one-time repair.
+  final bool requiresCursorRepair;
 }
