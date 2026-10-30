@@ -22,24 +22,36 @@ Future<void> main() async {
   registerBundledAssetLicenses();
 
   await dotenv.load(isOptional: true);
+  const paginationLab = LocalPaginationLaunch.fromDefines();
+  final env = paginationLab.apply(dotenv.env, release: kReleaseMode);
   await initializeDateFormatting();
 
   final talker = Talker();
   final preferences = await SharedPreferences.getInstance();
-  final environment = _resolveEnvironment(dotenv.env);
-  final authRedirectUrl = AppConfig.resolveAuthRedirectUrl(dotenv.env);
+  final environment = _resolveEnvironment(env);
+  final authRedirectUrl = AppConfig.resolveAuthRedirectUrl(env);
   final oauthAttemptCoordinator = OAuthAttemptCoordinator(
     preferences: preferences,
     namespace: environment.name,
   );
   final database = AppDatabase(name: _databaseName(environment));
   final supabaseClient = await _initializeSupabase(
-    dotenv.env,
+    env,
     authRedirectUrl: authRedirectUrl,
     oauthAttemptCoordinator: oauthAttemptCoordinator,
     preferences: preferences,
     storageNamespace: environment.name,
   );
+  if (paginationLab.enabled &&
+      (supabaseClient!.auth.currentUser?.id != paginationLab.ownerId ||
+          (supabaseClient.auth.currentSession?.isExpired ?? true))) {
+    // A normal GoTrue refresh, issued by the local fixture tool. Never embed
+    // an admin key or manufacture a client session to bypass access checks.
+    await supabaseClient.auth.setSession(paginationLab.refreshToken);
+    if (supabaseClient.auth.currentUser?.id != paginationLab.ownerId) {
+      throw StateError('Pagination lab session belongs to a different account');
+    }
+  }
   final accountSessionController = AccountSessionController(
     initialUserId:
         environment == AppEnvironment.dev &&
@@ -114,7 +126,7 @@ Future<void> main() async {
     environment: environment,
     preferences: preferences,
     talker: talker,
-    env: Map.unmodifiable(dotenv.env),
+    env: Map.unmodifiable(env),
     database: database,
     accountSessionController: accountSessionController,
     // Do not even wire diagnostics into normal or release builds. This keeps

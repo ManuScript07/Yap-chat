@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка списков Пуньк</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#090b0d;color:#f9f9f9}body{max-width:920px;margin:40px auto;padding:0 20px}h1{font-size:30px}h2{font-size:20px;margin:0 0 12px}p,li{line-height:1.6;color:#bdc5cd}code{color:#bbeeff;overflow-wrap:anywhere}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.card{border:1px solid #30373d;border-radius:20px;padding:22px;background:#13171b}button{padding:12px 18px;border:0;border-radius:24px;background:#03a6e1;color:#001e2f;font:700 15px system-ui;cursor:pointer}button:disabled{opacity:.45;cursor:wait}#result{white-space:pre-wrap;line-height:1.6;margin:20px 0;color:#bbeeff}#counts{display:flex;gap:14px;flex-wrap:wrap;margin:24px 0}.count{padding:12px 18px;background:#192127;border-radius:14px}.count b{display:block;font-size:24px}section{margin:24px 0}.note{border-left:3px solid #03a6e1;padding-left:16px}#busy{min-height:24px}
+</style>
+<h1>Проверка прокрутки и поиска</h1>
+<p>Данные остаются в локальной Supabase. Панель не опрашивает сервер в фоне. Изменения по кнопкам выполняются обычными RPC от соответствующего тестового пользователя.</p>
+<div id="counts"></div><p id="known" class="note"></p><p id="busy" role="status"></p>
+<div class="cards">
+<article class="card"><h2>Чат из глубины списка</h2><p>Прокрутите чатикс вниз, затем отправьте сообщение в самый старый чат. Он должен переместиться наверх, без дублей и потери остальных строк.</p><button data-action="old-chat-message">Сообщение в старый чат</button></article>
+<article class="card"><h2>Совсем новый чат</h2><p>Находясь внизу списка или в поиске, создайте входящий чат от пользователя, с которым ещё нет диалога.</p><button data-action="new-chat">Создать входящий чат</button></article>
+<article class="card"><h2>Новая заявка</h2><p>Откройте вкладку заявок и прокрутите список. Новая входящая заявка должна появиться и изменить счётчик.</p><button data-action="new-request">Отправить заявку</button></article>
+<article class="card"><h2>Принятая заявка</h2><p>Тестовый собеседник примет самую старую исходящую заявку. Проверьте исчезновение заявки и появление нового друга.</p><button data-action="accept-outgoing">Принять исходящую заявку</button></article>
+<article class="card"><h2>Отмена заявки</h2><p>Отправитель отменит последнюю входящую заявку. Проверьте обновление списка без перезапуска приложения.</p><button data-action="cancel-incoming">Отменить входящую заявку</button></article>
+<article class="card"><h2>Люди рядом</h2><p>После первого открытия «рядом» и передачи геопозиции нажмите кнопку: тестовые люди переместятся вокруг текущих координат аккаунта. Затем обновите список в приложении.</p><button data-action="nearby-refresh">Обновить координаты</button></article>
+</div>
+<pre id="result" role="status"></pre>
+<section class="card"><h2>Что искать</h2><ul id="searches"></ul><p>Профиль с большим списком друзей: <code id="hub"></code>. Найдите его через поиск пользователей или среди своих друзей и откройте его список друзей.</p></section>
+<section class="card"><h2>Сценарий проверки кэша</h2><ol><li>Откройте список и запомните несколько строк первой страницы.</li><li>Пролистайте минимум три страницы; найдите отдельный результат из глубины через поиск.</li><li>Сотрите поиск, проверьте порядок и отсутствие дублей.</li><li>Отключите сеть на телефоне либо временно уберите USB-проброс порта.</li><li>Вернитесь в список, повторите поиск, перезапустите приложение: сохранённые данные должны быть доступны в пределах правил этого списка.</li><li>Восстановите соединение. Списки должны актуализироваться без дублирования страниц.</li></ol><p class="note">Кэш разных списков имеет разные правила. Рядом сервер возвращает не более 100 человек, а заявки загружаются целиком. Тестовый набор не меняет эти ограничения.</p></section>
+<script>
+const token='__LAB_CSRF__';
+function render(state){
+ const labels={profiles:'профилей',chats:'чатов',friends:'друзей',incoming:'входящих заявок',outgoing:'исходящих заявок',profileFriends:'друзей профиля'};
+ const counts=document.querySelector('#counts');counts.replaceChildren();
+ for(const [key,label]of Object.entries(labels)){const box=document.createElement('div');box.className='count';const b=document.createElement('b');b.textContent=state[key]??'—';box.append(b,document.createTextNode(label));counts.append(box);}
+ document.querySelector('#hub').textContent=state.hubUsername||'';
+ const issue=state.cacheCheck?.friendPaginationIssue;
+ document.querySelector('#known').textContent=issue?`Проверка выявила существующий дефект курсора друзей: сервер отдаёт ${issue.expected}, приложение сохраняет ${issue.actual}. Дробная часть даты курсора теряется. Данные оставлены без округления, чтобы ошибка воспроизводилась.`:'';
+ const searches=document.querySelector('#searches');searches.replaceChildren();for(const term of state.searches||[]){const li=document.createElement('li');li.textContent=term;searches.append(li);}
+}
+fetch('/state').then(async r=>{const v=await r.json();if(!r.ok)throw Error(v.error);return v;}).then(render).catch(e=>document.querySelector('#result').textContent=e.message);
+for(const button of document.querySelectorAll('[data-action]'))button.addEventListener('click',async()=>{
+ document.querySelectorAll('button').forEach(b=>b.disabled=true);document.querySelector('#busy').textContent='Выполняется…';
+ try{const response=await fetch('/action',{method:'POST',headers:{'Content-Type':'application/json','X-Pagination-Lab-Token':token},body:JSON.stringify({action:button.dataset.action})});const value=await response.json();if(!response.ok)throw Error(value.error);document.querySelector('#result').textContent=JSON.stringify(value.result,null,2);render(value.state);}catch(e){document.querySelector('#result').textContent=e.message;}finally{document.querySelectorAll('button').forEach(b=>b.disabled=false);document.querySelector('#busy').textContent='';}
+});
+</script></html>
