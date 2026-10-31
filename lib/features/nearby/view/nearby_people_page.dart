@@ -14,7 +14,7 @@ import 'package:yap_chat/features/nearby/bloc/bloc.dart';
 import 'package:yap_chat/features/nearby/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
-import 'package:yap_chat/features/profile/view/viewed_profile_navigation.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 import 'package:yap_chat/repositories/nearby/nearby.dart';
@@ -88,7 +88,9 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               _presentedFeedRevision != state.feedRevision) {
             _presentedFilters = state.filters;
             _presentedFeedRevision = state.feedRevision;
-            if (_scrollController.hasClients && _scrollController.offset != 0) {
+            // Let the existing top-edge spring finish naturally during a pull.
+            // A forced jump from a negative offset interrupts that animation.
+            if (_scrollController.hasClients && _scrollController.offset > 0) {
               _scrollController.jumpTo(0);
             }
           }
@@ -272,7 +274,8 @@ class _NearbyFeed extends StatefulWidget {
   State<_NearbyFeed> createState() => _NearbyFeedState();
 }
 
-class _NearbyFeedState extends State<_NearbyFeed> {
+class _NearbyFeedState extends State<_NearbyFeed>
+    with TickerProviderStateMixin {
   final _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
   var _pullExtent = 0.0;
   var _isRefreshRunning = false;
@@ -282,11 +285,64 @@ class _NearbyFeedState extends State<_NearbyFeed> {
   bool _userScrollSequence = false;
   bool _paginationAllowedForGesture = false;
   bool _paginationScheduled = false;
+  final _pageControllers = <AnimationController>[];
+  final _pageEntrances = <String, Animation<double>>{};
 
   static const _refreshTriggerExtent = 42.0;
   static const _refreshRevealStart = 14.0;
   static const _refreshGap = 76.0;
   static const _minimumRefreshIndicatorDuration = Duration(milliseconds: 280);
+
+  @override
+  void didUpdateWidget(covariant _NearbyFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final previous = oldWidget.state;
+    final current = widget.state;
+    final sameFeed =
+        previous.filters == current.filters &&
+        previous.feedRevision == current.feedRevision;
+    final isAppend =
+        sameFeed &&
+        previous.people.isNotEmpty &&
+        current.people.length > previous.people.length &&
+        Iterable<int>.generate(previous.people.length).every(
+          (index) => previous.people[index].id == current.people[index].id,
+        );
+    if (isAppend && !MediaQuery.disableAnimationsOf(context)) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 260),
+      );
+      _pageControllers.add(controller);
+      final opacity = controller.drive(CurveTween(curve: Curves.easeOutCubic));
+      for (final person in current.people.skip(previous.people.length)) {
+        _pageEntrances[person.id] = opacity;
+      }
+      // One clock per appended page, including its offscreen cards. Scrolling
+      // a card back into view cannot replay its entrance animation.
+      controller.forward();
+    } else if (!sameFeed ||
+        current.people.length != previous.people.length ||
+        Iterable<int>.generate(current.people.length).any(
+          (index) => current.people[index].id != previous.people[index].id,
+        )) {
+      _clearPageAnimations();
+    }
+  }
+
+  void _clearPageAnimations() {
+    for (final controller in _pageControllers) {
+      controller.dispose();
+    }
+    _pageControllers.clear();
+    _pageEntrances.clear();
+  }
+
+  @override
+  void dispose() {
+    _clearPageAnimations();
+    super.dispose();
+  }
 
   double get _dragProgress =>
       ((_pullExtent - _refreshRevealStart) /
@@ -414,6 +470,7 @@ class _NearbyFeedState extends State<_NearbyFeed> {
     if (!mounted) return;
     setState(() {
       _pullExtent = 0;
+      _isPulling = false;
       _isArmed = false;
       _hasArmedHaptic = false;
     });
@@ -426,6 +483,7 @@ class _NearbyFeedState extends State<_NearbyFeed> {
     if (mounted) {
       setState(() {
         _isRefreshRunning = true;
+        _isPulling = false;
         _isArmed = false;
         _pullExtent = _refreshTriggerExtent;
       });
@@ -440,6 +498,7 @@ class _NearbyFeedState extends State<_NearbyFeed> {
       if (mounted) {
         setState(() {
           _isRefreshRunning = false;
+          _isPulling = false;
           _pullExtent = 0;
           _isArmed = false;
           _hasArmedHaptic = false;
@@ -501,9 +560,12 @@ class _NearbyFeedState extends State<_NearbyFeed> {
                         itemCount: people.length,
                         findChildIndexCallback: (key) =>
                             key is ValueKey<String> ? indexes[key.value] : null,
-                        itemBuilder: (context, index) => _NearbyPersonTile(
+                        itemBuilder: (context, index) => FadeTransition(
                           key: ValueKey(people[index].id),
-                          person: people[index],
+                          opacity:
+                              _pageEntrances[people[index].id] ??
+                              kAlwaysCompleteAnimation,
+                          child: _NearbyPersonTile(person: people[index]),
                         ),
                       ),
               ),
@@ -538,29 +600,13 @@ class _NearbyFeedState extends State<_NearbyFeed> {
               left: 0,
               right: 0,
               child: IgnorePointer(
-                child: AnimatedOpacity(
+                child: _NearbyPullIndicator(
+                  key: const ValueKey('nearby_pull_indicator'),
                   opacity: _shouldShowIndicator
                       ? (_isRefreshRunning || _isArmed ? 1 : _dragProgress)
                       : 0,
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  child: Center(
-                    child: Transform.scale(
-                      scale:
-                          .65 +
-                          .35 *
-                              (_isRefreshRunning || _isArmed
-                                  ? 1
-                                  : _dragProgress),
-                      child: SizedBox.square(
-                        dimension: 36,
-                        child: CircularProgressIndicator(
-                          value: _isRefreshRunning ? null : _dragProgress,
-                          strokeWidth: 4,
-                        ),
-                      ),
-                    ),
-                  ),
+                  progress: _dragProgress,
+                  spinning: _isRefreshRunning,
                 ),
               ),
             ),
@@ -569,18 +615,13 @@ class _NearbyFeedState extends State<_NearbyFeed> {
               left: 0,
               right: 0,
               child: IgnorePointer(
-                child: AnimatedOpacity(
+                child: _NearbyPullIndicator(
+                  key: const ValueKey('nearby_query_indicator'),
                   opacity: widget.state.isRefreshing && !_isRefreshRunning
                       ? 1
                       : 0,
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  child: const Center(
-                    child: SizedBox.square(
-                      dimension: 36,
-                      child: CircularProgressIndicator(strokeWidth: 4),
-                    ),
-                  ),
+                  progress: 1,
+                  spinning: true,
                 ),
               ),
             ),
@@ -589,6 +630,81 @@ class _NearbyFeedState extends State<_NearbyFeed> {
       ),
     );
   }
+}
+
+/// Retains the current ring while fading out instead of replacing a spinning
+/// ring with an empty determinate one in the first dismissal frame.
+class _NearbyPullIndicator extends StatefulWidget {
+  const _NearbyPullIndicator({
+    super.key,
+    required this.opacity,
+    required this.progress,
+    required this.spinning,
+  });
+
+  final double opacity;
+  final double progress;
+  final bool spinning;
+
+  @override
+  State<_NearbyPullIndicator> createState() => _NearbyPullIndicatorState();
+}
+
+class _NearbyPullIndicatorState extends State<_NearbyPullIndicator>
+    with SingleTickerProviderStateMixin {
+  late final _visibility = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 180),
+    value: widget.opacity,
+  );
+  late bool _spinning = widget.spinning;
+
+  @override
+  void didUpdateWidget(covariant _NearbyPullIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.opacity > 0) _spinning = widget.spinning;
+    if (widget.opacity != oldWidget.opacity) {
+      _visibility.animateTo(widget.opacity, curve: Curves.easeOut);
+    }
+  }
+
+  @override
+  void dispose() {
+    _visibility.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _visibility,
+    child: Center(
+      child: SizedBox.square(
+        dimension: 36,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: CircularProgressIndicator(
+            key: ValueKey(
+              _spinning ? 'nearby_refresh_spinner' : 'nearby_refresh_progress',
+            ),
+            value: _spinning ? null : widget.progress,
+            strokeWidth: 4,
+          ),
+        ),
+      ),
+    ),
+    builder: (context, child) => TickerMode(
+      enabled: _visibility.value > 0,
+      child: Opacity(
+        opacity: _visibility.value,
+        child: Transform.scale(
+          scale: .85 + .15 * _visibility.value,
+          child: child,
+        ),
+      ),
+    ),
+  );
 }
 
 class _NearbyEmptyStateLayer extends StatelessWidget {
@@ -674,7 +790,7 @@ class _NearbyEmptyState extends StatelessWidget {
 }
 
 class _NearbyPersonTile extends StatelessWidget {
-  const _NearbyPersonTile({super.key, required this.person});
+  const _NearbyPersonTile({required this.person});
 
   final NearbyPerson person;
 
