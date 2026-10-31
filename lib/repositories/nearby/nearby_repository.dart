@@ -86,7 +86,7 @@ class NearbyRepository implements INearbyRepository {
     final scope = _accountSessionController.capture();
     final value = await _cache.read(scope.userId, filters);
     _accountSessionController.ensureCurrent(scope);
-    return value;
+    return value == null ? null : await _withLocalAvatarPaths(scope, value);
   }
 
   @override
@@ -110,11 +110,16 @@ class NearbyRepository implements INearbyRepository {
         );
       });
       _ensureGeneration(key, generation);
-      return NearbyCacheSnapshot(
-        people: List.unmodifiable(retained),
-        hasMore: page.hasMore,
-        cachedAt: DateTime.now().toUtc(),
+      final snapshot = await _withLocalAvatarPaths(
+        scope,
+        NearbyCacheSnapshot(
+          people: List.unmodifiable(retained),
+          hasMore: page.hasMore,
+          cachedAt: DateTime.now().toUtc(),
+        ),
       );
+      _ensureGeneration(key, generation);
+      return snapshot;
     });
     _activeRefreshes[key] = future;
     return future.whenComplete(() {
@@ -149,7 +154,12 @@ class NearbyRepository implements INearbyRepository {
     final cached = await _cache.read(scope.userId, filters);
     _accountSessionController.ensureCurrent(scope);
     _ensureGeneration(key, generation);
-    if (cached == null || !cached.hasMore) return cached;
+    if (cached == null) return null;
+    if (!cached.hasMore) {
+      final prepared = await _withLocalAvatarPaths(scope, cached);
+      _ensureGeneration(key, generation);
+      return prepared;
+    }
     // The activity window can age every locally saved row out. There is then
     // no safe cursor, so restart from the first server page instead of leaving
     // an empty feed with hasMore permanently set.
@@ -176,7 +186,49 @@ class NearbyRepository implements INearbyRepository {
     final snapshot = await _cache.read(scope.userId, filters);
     _accountSessionController.ensureCurrent(scope);
     _ensureGeneration(key, generation);
-    return snapshot;
+    final prepared = snapshot == null
+        ? null
+        : await _withLocalAvatarPaths(scope, snapshot);
+    _ensureGeneration(key, generation);
+    return prepared;
+  }
+
+  Future<NearbyCacheSnapshot> _withLocalAvatarPaths(
+    AccountSessionSnapshot scope,
+    NearbyCacheSnapshot snapshot,
+  ) async {
+    try {
+      await _mediaCache.prepareLocalPaths().timeout(
+        const Duration(milliseconds: 250),
+      );
+    } catch (_) {
+      // Optional local hints must not prevent displaying a usable feed.
+      _accountSessionController.ensureCurrent(scope);
+      return snapshot;
+    }
+    _accountSessionController.ensureCurrent(scope);
+    return NearbyCacheSnapshot(
+      people: List.unmodifiable(
+        snapshot.people.map((person) {
+          final storage = person.avatarStoragePath?.isNotEmpty == true;
+          final source = storage ? person.avatarStoragePath : person.avatarUrl;
+          return person.withCachedAvatarPath(
+            source == null || source.isEmpty
+                ? null
+                : _mediaCache.localStorageFilePath(
+                    ownerUserId: scope.userId,
+                    bucket: storage
+                        ? 'avatars'
+                        : MediaCacheService.externalAvatarsBucket,
+                    storagePath: source,
+                    mimeType: storage ? 'image/jpeg' : null,
+                  ),
+          );
+        }),
+      ),
+      hasMore: snapshot.hasMore,
+      cachedAt: snapshot.cachedAt,
+    );
   }
 
   @override

@@ -287,6 +287,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
   bool _paginationScheduled = false;
   final _pageControllers = <AnimationController>[];
   final _pageEntrances = <String, Animation<double>>{};
+  var _avatarRetention = _NearbyAvatarRetention();
 
   static const _refreshTriggerExtent = 42.0;
   static const _refreshRevealStart = 14.0;
@@ -327,6 +328,8 @@ class _NearbyFeedState extends State<_NearbyFeed>
           (index) => current.people[index].id != previous.people[index].id,
         )) {
       _clearPageAnimations();
+      _avatarRetention.dispose();
+      _avatarRetention = _NearbyAvatarRetention();
     }
   }
 
@@ -341,6 +344,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
   @override
   void dispose() {
     _clearPageAnimations();
+    _avatarRetention.dispose();
     super.dispose();
   }
 
@@ -576,7 +580,10 @@ class _NearbyFeedState extends State<_NearbyFeed>
                           opacity:
                               _pageEntrances[people[index].id] ??
                               kAlwaysCompleteAnimation,
-                          child: _NearbyPersonTile(person: people[index]),
+                          child: _NearbyPersonTile(
+                            person: people[index],
+                            avatarRetention: _avatarRetention,
+                          ),
                         ),
                       ),
               ),
@@ -801,9 +808,13 @@ class _NearbyEmptyState extends StatelessWidget {
 }
 
 class _NearbyPersonTile extends StatelessWidget {
-  const _NearbyPersonTile({required this.person});
+  const _NearbyPersonTile({
+    required this.person,
+    required this.avatarRetention,
+  });
 
   final NearbyPerson person;
+  final _NearbyAvatarRetention avatarRetention;
 
   @override
   Widget build(BuildContext context) {
@@ -830,20 +841,24 @@ class _NearbyPersonTile extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      ProfileAvatarHero(
-                        profileId: person.id,
-                        avatarUrl: person.avatarUrl,
-                        avatarStoragePath: person.avatarStoragePath,
-                        child: UserAvatar(
+                      _NearbyRetainedAvatar(
+                        retention: avatarRetention,
+                        child: ProfileAvatarHero(
+                          profileId: person.id,
                           avatarUrl: person.avatarUrl,
-                          avatarLoader: () => context
-                              .read<INearbyRepository>()
-                              .resolveAvatar(person),
-                          preferAvatarLoader: true,
-                          avatarRevision:
-                              person.avatarStoragePath ?? person.avatarUrl,
-                          size: constraints.maxWidth,
-                          borderRadius: 8,
+                          avatarStoragePath: person.avatarStoragePath,
+                          child: UserAvatar(
+                            initialAvatarPath: person.cachedAvatarPath,
+                            avatarUrl: person.avatarUrl,
+                            avatarLoader: () => context
+                                .read<INearbyRepository>()
+                                .resolveAvatar(person),
+                            preferAvatarLoader: true,
+                            avatarRevision:
+                                person.avatarStoragePath ?? person.avatarUrl,
+                            size: constraints.maxWidth,
+                            borderRadius: 8,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -902,6 +917,93 @@ class _NearbyPersonTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Retains only a small scrolling neighbourhood, not the entire feed. The
+/// avatar State keeps its existing decoded frame and pending loader handoff.
+class _NearbyAvatarRetention {
+  static const maximum = 48;
+  final _recent = <ValueNotifier<bool>>{};
+  final _live = <ValueNotifier<bool>>{};
+  bool _disposed = false;
+
+  ValueNotifier<bool> acquire() {
+    final lease = ValueNotifier(true);
+    _live.add(lease);
+    _recent.add(lease);
+    if (_recent.length > maximum) {
+      final oldest = _recent.first;
+      _recent.remove(oldest);
+      // Mounting a grid child happens during layout; defer keep-alive updates.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed && _live.contains(oldest)) oldest.value = false;
+      });
+    }
+    return lease;
+  }
+
+  void release(ValueNotifier<bool> lease) {
+    _recent.remove(lease);
+    _live.remove(lease);
+    lease.dispose();
+  }
+
+  void dispose() {
+    _disposed = true;
+    for (final lease in _live.toList()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_live.contains(lease)) lease.value = false;
+      });
+    }
+    _recent.clear();
+  }
+}
+
+class _NearbyRetainedAvatar extends StatefulWidget {
+  const _NearbyRetainedAvatar({required this.retention, required this.child});
+  final _NearbyAvatarRetention retention;
+  final Widget child;
+
+  @override
+  State<_NearbyRetainedAvatar> createState() => _NearbyRetainedAvatarState();
+}
+
+class _NearbyRetainedAvatarState extends State<_NearbyRetainedAvatar>
+    with AutomaticKeepAliveClientMixin {
+  late ValueNotifier<bool> _lease;
+
+  @override
+  void initState() {
+    _lease = widget.retention.acquire()..addListener(updateKeepAlive);
+    super.initState();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NearbyRetainedAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.retention != widget.retention) {
+      _lease.removeListener(updateKeepAlive);
+      oldWidget.retention.release(_lease);
+      _lease = widget.retention.acquire()..addListener(updateKeepAlive);
+      updateKeepAlive();
+    }
+  }
+
+  @override
+  bool get wantKeepAlive => _lease.value;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+
+  @override
+  void dispose() {
+    _lease.removeListener(updateKeepAlive);
+    widget.retention.release(_lease);
+    super.dispose();
   }
 }
 

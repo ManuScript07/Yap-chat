@@ -8,6 +8,7 @@ class NearbyPerson extends Equatable {
     required this.activeUntil,
     this.avatarUrl,
     this.avatarStoragePath,
+    this.cachedAvatarPath,
   });
 
   factory NearbyPerson.fromMap(Map<String, dynamic> value) => NearbyPerson(
@@ -25,7 +26,9 @@ class NearbyPerson extends Equatable {
     displayName: value['display_name'] as String? ?? '',
     avatarUrl: value['avatar_url'] as String?,
     avatarStoragePath: value['avatar_storage_path'] as String?,
-    activeUntil: DateTime.tryParse(value['active_until'] as String? ?? '')?.toUtc() ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+    activeUntil:
+        DateTime.tryParse(value['active_until'] as String? ?? '')?.toUtc() ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
   );
 
   final String id;
@@ -33,6 +36,19 @@ class NearbyPerson extends Equatable {
   final String displayName;
   final String? avatarUrl;
   final String? avatarStoragePath;
+
+  /// Account-scoped local hint; never serialized into the persistent feed.
+  final String? cachedAvatarPath;
+
+  NearbyPerson withCachedAvatarPath(String? path) => NearbyPerson(
+    id: id,
+    username: username,
+    displayName: displayName,
+    activeUntil: activeUntil,
+    avatarUrl: avatarUrl,
+    avatarStoragePath: avatarStoragePath,
+    cachedAvatarPath: path,
+  );
   final DateTime activeUntil;
 
   bool get isStillActive => activeUntil.isAfter(DateTime.now().toUtc());
@@ -47,5 +63,13 @@ class NearbyPerson extends Equatable {
   };
 
   @override
-  List<Object?> get props => [id, username, displayName, avatarUrl, avatarStoragePath, activeUntil];
+  List<Object?> get props => [
+    id,
+    username,
+    displayName,
+    avatarUrl,
+    avatarStoragePath,
+    activeUntil,
+    cachedAvatarPath,
+  ];
 }
