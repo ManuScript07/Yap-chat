@@ -71,7 +71,9 @@ class NearbyCacheDataSource {
           .toList(growable: false);
       return NearbyCacheSnapshot(
         people: List.unmodifiable(people),
-        hasMore: value['has_more'] as bool? ?? false,
+        hasMore:
+            (value['has_more'] as bool? ?? false) &&
+            people.length < maximumPeoplePerSnapshot,
         cachedAt: cachedAt.toUtc(),
       );
     } catch (_) {
@@ -158,7 +160,7 @@ class NearbyCacheDataSource {
       _feedKey(ownerUserId, filters),
       jsonEncode({
         'cached_at': DateTime.now().toUtc().toIso8601String(),
-        'has_more': hasMore,
+        'has_more': hasMore && people.length < maximumPeoplePerSnapshot,
         'people': people
             .take(maximumPeoplePerSnapshot)
             .map((person) => person.toJson())

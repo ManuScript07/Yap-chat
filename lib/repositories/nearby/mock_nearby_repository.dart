@@ -32,6 +32,9 @@ class MockNearbyRepository implements INearbyRepository {
       getCachedFeed(filters);
 
   @override
+  void invalidateFeed(NearbyFilters filters) {}
+
+  @override
   Future<void> removeCachedPeople(Set<String> userIds) async {
     if (userIds.isEmpty) return;
     for (final entry in _snapshots.entries.toList()) {

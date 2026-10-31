@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:yap_chat/app/app_config.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/nearby/data/data.dart';
-import 'package:yap_chat/repositories/nearby/abstract_nearby_repository.dart';
-import 'package:yap_chat/repositories/nearby/nearby_cache_data_source.dart';
-import 'package:yap_chat/repositories/nearby/nearby_remote_data_source.dart';
+import 'abstract_nearby_repository.dart';
+import 'nearby_cache_data_source.dart';
+import 'nearby_remote_data_source.dart';
 
 class NearbyRepository implements INearbyRepository {
   NearbyRepository({
@@ -27,6 +27,42 @@ class NearbyRepository implements INearbyRepository {
   final AppConfig _config;
   final Map<String, Future<NearbyCacheSnapshot>> _activeRefreshes = {};
   final Map<String, Future<NearbyCacheSnapshot?>> _activeLoads = {};
+  final Map<String, Object> _feedGenerations = {};
+
+  Object _newGeneration(String key) {
+    final generation = Object();
+    _feedGenerations.remove(key);
+    _feedGenerations[key] = generation;
+    // Only two filter snapshots persist; pending query bookkeeping is bounded
+    // too. Evicting a token also safely supersedes any old associated work.
+    while (_feedGenerations.length > 8) {
+      final evicted = _feedGenerations.keys.first;
+      _feedGenerations.remove(evicted);
+      _activeLoads.remove(evicted);
+      _activeRefreshes.remove(evicted);
+    }
+    _activeLoads.remove(key);
+    _activeRefreshes.remove(key);
+    return generation;
+  }
+
+  void _ensureGeneration(String key, Object generation) {
+    if (!identical(_feedGenerations[key], generation)) {
+      throw const NearbyFeedSupersededException();
+    }
+  }
+
+  @override
+  void invalidateFeed(NearbyFilters filters) {
+    if (_accountSessionController.userId == null) return;
+    _newGeneration(_key(_accountSessionController.capture(), filters));
+  }
+
+  void _invalidateOwner(String userId) {
+    for (final key in _feedGenerations.keys.toList()) {
+      if (key.split('\u0000')[1] == userId) _newGeneration(key);
+    }
+  }
 
   @override
   Future<NearbyFilters> getFilters() async {
@@ -59,19 +95,21 @@ class NearbyRepository implements INearbyRepository {
     final key = _key(scope, filters);
     final active = _activeRefreshes[key];
     if (active != null) return active;
+    final generation = _newGeneration(key);
     final future = _remote.fetch(filters: filters).then((page) async {
       final retained = page.people
           .where((person) => person.isStillActive)
           .toList(growable: false);
-      await _accountSessionController.commit(
-        scope,
-        () => _cache.replace(
+      await _accountSessionController.commit(scope, () {
+        _ensureGeneration(key, generation);
+        return _cache.replace(
           scope.userId,
           filters,
           people: retained,
           hasMore: page.hasMore,
-        ),
-      );
+        );
+      });
+      _ensureGeneration(key, generation);
       return NearbyCacheSnapshot(
         people: List.unmodifiable(retained),
         hasMore: page.hasMore,
@@ -79,26 +117,38 @@ class NearbyRepository implements INearbyRepository {
       );
     });
     _activeRefreshes[key] = future;
-    return future.whenComplete(() => _activeRefreshes.remove(key));
+    return future.whenComplete(() {
+      if (identical(_activeRefreshes[key], future)) {
+        _activeRefreshes.remove(key);
+      }
+    });
   }
 
   @override
   Future<NearbyCacheSnapshot?> loadMore(NearbyFilters filters) async {
     final scope = _accountSessionController.capture();
     final key = _key(scope, filters);
+    final refresh = _activeRefreshes[key];
+    if (refresh != null) return refresh;
     final active = _activeLoads[key];
     if (active != null) return active;
-    final future = _loadMore(scope, filters);
+    final generation = _feedGenerations[key] ?? _newGeneration(key);
+    final future = _loadMore(scope, filters, key, generation);
     _activeLoads[key] = future;
-    return future.whenComplete(() => _activeLoads.remove(key));
+    return future.whenComplete(() {
+      if (identical(_activeLoads[key], future)) _activeLoads.remove(key);
+    });
   }
 
   Future<NearbyCacheSnapshot?> _loadMore(
     AccountSessionSnapshot scope,
     NearbyFilters filters,
+    String key,
+    Object generation,
   ) async {
     final cached = await _cache.read(scope.userId, filters);
     _accountSessionController.ensureCurrent(scope);
+    _ensureGeneration(key, generation);
     if (cached == null || !cached.hasMore) return cached;
     // The activity window can age every locally saved row out. There is then
     // no safe cursor, so restart from the first server page instead of leaving
@@ -112,22 +162,28 @@ class NearbyRepository implements INearbyRepository {
     final retained = page.people
         .where((person) => person.isStillActive)
         .toList(growable: false);
-    await _accountSessionController.commit(
-      scope,
-      () => _cache.append(
+    final existingIds = cached.people.map((person) => person.id).toSet();
+    final advances = retained.any((person) => !existingIds.contains(person.id));
+    await _accountSessionController.commit(scope, () {
+      _ensureGeneration(key, generation);
+      return _cache.append(
         scope.userId,
         filters,
         people: retained,
-        hasMore: page.hasMore,
-      ),
-    );
-    return _cache.read(scope.userId, filters);
+        hasMore: page.hasMore && advances,
+      );
+    });
+    final snapshot = await _cache.read(scope.userId, filters);
+    _accountSessionController.ensureCurrent(scope);
+    _ensureGeneration(key, generation);
+    return snapshot;
   }
 
   @override
   Future<void> removeCachedPeople(Set<String> userIds) async {
     if (userIds.isEmpty) return;
     final scope = _accountSessionController.capture();
+    _invalidateOwner(scope.userId);
     await _accountSessionController.commit(
       scope,
       () => _cache.removePeople(scope.userId, userIds),
@@ -166,7 +222,10 @@ class NearbyRepository implements INearbyRepository {
   }
 
   @override
-  Future<void> clearUserCache(String userId) => _cache.clearUser(userId);
+  Future<void> clearUserCache(String userId) {
+    _invalidateOwner(userId);
+    return _cache.clearUser(userId);
+  }
 
   String _key(AccountSessionSnapshot scope, NearbyFilters filters) =>
       '${scope.generation}\u0000${scope.userId}\u0000${filters.normalized().cacheKey}';

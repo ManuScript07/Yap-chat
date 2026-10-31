@@ -1,5 +1,6 @@
 export 'yap_chat_app.dart';
 export 'local_pagination_launch.dart';
+export 'location_tracking_coordinator.dart';
 export 'chat_navigation_coordinator.dart';
 export 'app_connection_coordinator.dart';
 export 'app_config.dart';

@@ -20,11 +20,13 @@ class NearbyCubit extends Cubit<NearbyState> {
     required IBlocklistRepository blocklistRepository,
     required IProfileFriendsRepository profileFriendsRepository,
     this.refreshTimeout = defaultRefreshTimeout,
+    DateTime Function()? clock,
   }) : _repository = repository,
        _locationRepository = locationRepository,
        _locationTrackingCoordinator = locationTrackingCoordinator,
        _accountSessionController = accountSessionController,
        _profileFriendsRepository = profileFriendsRepository,
+       _clock = clock ?? DateTime.now,
        super(const NearbyState()) {
     _blocklistSubscription = blocklistRepository.watchBlockedUserIds().listen(
       (userIds) => unawaited(_removeNewlyBlockedPeople(userIds)),
@@ -38,6 +40,7 @@ class NearbyCubit extends Cubit<NearbyState> {
   final IProfileFriendsRepository _profileFriendsRepository;
   static const defaultRefreshTimeout = Duration(seconds: 12);
   final Duration refreshTimeout;
+  final DateTime Function() _clock;
   late final StreamSubscription<Set<String>> _blocklistSubscription;
   Set<String> _blockedUserIds = const {};
   Future<void>? _initialization;
@@ -46,14 +49,22 @@ class NearbyCubit extends Cubit<NearbyState> {
   final List<DateTime> _feedRequestStarts = [];
   var _queryRevision = 0;
   var _refreshOperationId = 0;
+  DateTime? _feedBlockedUntil;
+  DateTime? _paginationRetryAt;
   static const _maximumFeedRequestsPerMinute = 8;
 
   bool _tryConsumeFeedRequest() {
-    final now = DateTime.now().toUtc();
+    final now = _clock().toUtc();
+    if (_feedBlockedUntil case final until? when now.isBefore(until)) {
+      return false;
+    }
     _feedRequestStarts.removeWhere(
       (startedAt) => now.difference(startedAt) >= const Duration(minutes: 1),
     );
     if (_feedRequestStarts.length >= _maximumFeedRequestsPerMinute) {
+      _feedBlockedUntil = _feedRequestStarts.first.add(
+        const Duration(minutes: 1),
+      );
       if (!isClosed) {
         emit(
           state.copyWith(rateLimitFeedbackId: state.rateLimitFeedbackId + 1),
@@ -178,11 +189,20 @@ class NearbyCubit extends Cubit<NearbyState> {
   }) {
     final active = _feedRefresh;
     if (active != null) return active;
+    if (isClosed || (state.status == NearbyStatus.locationRequired && !force)) {
+      return Future<void>.value();
+    }
+    if (!_tryConsumeFeedRequest()) {
+      if (state.isRefreshing) emit(state.copyWith(isRefreshing: false));
+      return Future<void>.value();
+    }
     final filters = state.filters;
     final revision = _queryRevision;
     final operationId = ++_refreshOperationId;
+    _repository.invalidateFeed(filters);
+    _paginationRetryAt = null;
+    emit(state.copyWith(isRefreshing: true, isLoadingMore: false));
     final operation = _performRefresh(
-      force: force,
       refreshOwnLocation: refreshOwnLocation,
       requireLocationOnFailure: requireLocationOnFailure,
       filters: filters,
@@ -198,26 +218,12 @@ class NearbyCubit extends Cubit<NearbyState> {
   }
 
   Future<void> _performRefresh({
-    required bool force,
     required bool refreshOwnLocation,
     required bool requireLocationOnFailure,
     required NearbyFilters filters,
     required int revision,
     required int operationId,
   }) async {
-    if (state.status == NearbyStatus.locationRequired && !force) return;
-    if (!_tryConsumeFeedRequest()) {
-      // A filter change switches the UI into its loading state before it
-      // reaches this method. Do not leave that state active when the local
-      // rate limiter declines the request.
-      if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
-        emit(state.copyWith(isRefreshing: false));
-      }
-      return;
-    }
-    if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
-      emit(state.copyWith(isRefreshing: true));
-    }
     try {
       await _refreshFeedAndLocation(
         refreshOwnLocation: refreshOwnLocation,
@@ -231,6 +237,7 @@ class NearbyCubit extends Cubit<NearbyState> {
     } catch (error) {
       if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
         if (_isNearbyRateLimitedError(error)) {
+          _feedBlockedUntil = _clock().toUtc().add(const Duration(minutes: 1));
           emit(
             state.copyWith(
               status: NearbyStatus.ready,
@@ -239,15 +246,21 @@ class NearbyCubit extends Cubit<NearbyState> {
             ),
           );
         } else if (error is _NearbyRefreshDeadlineExceeded) {
-          // The deadline only controls the visible loading state. A GPS read
-          // cannot be cancelled safely and may still finish with a useful
-          // nearby result, so it must not be presented as a failed search.
+          // GPS may finish in the shared coordinator, but this completed UI
+          // attempt must not replace the list or write a late feed snapshot.
+          _repository.invalidateFeed(filters);
+          _refreshOperationId++;
           emit(
             state.copyWith(
-              status: NearbyStatus.ready,
+              status: state.people.isEmpty
+                  ? NearbyStatus.failure
+                  : NearbyStatus.ready,
               isRefreshing: false,
+              isLoadingMore: false,
             ),
           );
+        } else if (error is NearbyFeedSupersededException) {
+          emit(state.copyWith(isRefreshing: false));
         } else if (requireLocationOnFailure ||
             _isLocationRequiredError(error)) {
           _requireLocation();
@@ -269,11 +282,13 @@ class NearbyCubit extends Cubit<NearbyState> {
     if (refreshOwnLocation) {
       final locationResult = await _locationTrackingCoordinator
           .refreshSilently();
+      if (isClosed || !_isCurrentOperation(operationId, revision, filters)) {
+        return;
+      }
       if (locationResult == TrackedLocationRefreshResult.updated) {
         if (!await _invalidateDistancesAfterLocationUpdate()) return;
       }
-      if (isClosed ||
-          !_isCurrentOperation(operationId, revision, filters)) {
+      if (isClosed || !_isCurrentOperation(operationId, revision, filters)) {
         return;
       }
     }
@@ -282,10 +297,11 @@ class NearbyCubit extends Cubit<NearbyState> {
       emit(
         state.copyWith(
           status: NearbyStatus.ready,
-          people: snapshot.people,
+          people: _visiblePeople(snapshot.people),
           hasMore: snapshot.hasMore,
           isRefreshing: false,
           clearLocationIssue: true,
+          feedRevision: state.feedRevision + 1,
         ),
       );
     }
@@ -299,23 +315,35 @@ class NearbyCubit extends Cubit<NearbyState> {
         state.status != NearbyStatus.ready) {
       return;
     }
+    if (_paginationRetryAt case final until?
+        when _clock().toUtc().isBefore(until)) {
+      return;
+    }
     if (!_tryConsumeFeedRequest()) return;
     final filters = state.filters;
     final revision = _queryRevision;
+    final operationId = _refreshOperationId;
     emit(state.copyWith(isLoadingMore: true));
     try {
       final snapshot = await _repository.loadMore(filters);
-      if (!isClosed && _isCurrentQuery(revision, filters) && snapshot != null) {
+      if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
         emit(
           state.copyWith(
-            people: snapshot.people,
-            hasMore: snapshot.hasMore,
+            people: snapshot == null
+                ? state.people
+                : _visiblePeople(snapshot.people),
+            hasMore: snapshot?.hasMore ?? false,
             isLoadingMore: false,
           ),
         );
       }
-    } catch (_) {
-      if (!isClosed && _isCurrentQuery(revision, filters)) {
+    } catch (error) {
+      if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
+        if (_isNearbyRateLimitedError(error)) {
+          _feedBlockedUntil = _clock().toUtc().add(const Duration(minutes: 1));
+        } else if (error is! NearbyFeedSupersededException) {
+          _paginationRetryAt = _clock().toUtc().add(const Duration(seconds: 3));
+        }
         emit(state.copyWith(isLoadingMore: false));
       }
     }
@@ -325,11 +353,16 @@ class NearbyCubit extends Cubit<NearbyState> {
     final normalized = filters.normalized();
     if (normalized == state.filters) return;
     final revision = ++_queryRevision;
+    _refreshOperationId++;
+    _repository.invalidateFeed(state.filters);
+    _feedRefresh = null;
+    _paginationRetryAt = null;
     // Mark the transition immediately: closing the sheet must not leave a
     // short window in which a pull-to-refresh can start a competing query.
     emit(
       state.copyWith(
         status: NearbyStatus.ready,
+        filters: normalized,
         isRefreshing: true,
         isLoadingMore: false,
         clearLocationIssue: true,
@@ -350,7 +383,7 @@ class NearbyCubit extends Cubit<NearbyState> {
           // An absent snapshot for the newly selected filter must not blank a
           // usable feed while its first server query is still pending.
           people: cached?.people ?? state.people,
-          hasMore: cached?.hasMore ?? state.hasMore,
+          hasMore: cached?.hasMore ?? false,
         );
         return;
       }
@@ -362,7 +395,7 @@ class NearbyCubit extends Cubit<NearbyState> {
           // current list until a missing new snapshot is replaced by a
           // successful server result, rather than flashing an empty state.
           people: cached?.people ?? state.people,
-          hasMore: cached?.hasMore ?? state.hasMore,
+          hasMore: cached?.hasMore ?? false,
           isRefreshing: true,
           isLoadingMore: false,
           clearLocationIssue: true,
@@ -371,8 +404,6 @@ class NearbyCubit extends Cubit<NearbyState> {
       // Applying a filter is an explicit user refresh and therefore may
       // contact the server; merely changing location never invalidates stored
       // pages.
-      final active = _feedRefresh;
-      if (active != null) await active;
       if (isClosed ||
           revision != _queryRevision ||
           state.filters != normalized) {
@@ -437,9 +468,11 @@ class NearbyCubit extends Cubit<NearbyState> {
     int operationId,
     int revision,
     NearbyFilters filters,
-  ) =>
-      operationId == _refreshOperationId &&
-      _isCurrentQuery(revision, filters);
+  ) => operationId == _refreshOperationId && _isCurrentQuery(revision, filters);
+
+  List<NearbyPerson> _visiblePeople(List<NearbyPerson> people) => people
+      .where((person) => !_blockedUserIds.contains(person.id))
+      .toList(growable: false);
 
   @override
   Future<void> close() async {

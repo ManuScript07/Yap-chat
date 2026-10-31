@@ -15,7 +15,7 @@ import 'package:yap_chat/features/nearby/data/data.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/data/data.dart';
 import 'package:yap_chat/features/profile/view/viewed_profile_navigation.dart';
-import 'package:yap_chat/features/profile/widgets/profile_avatar_hero.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 import 'package:yap_chat/repositories/nearby/nearby.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -32,11 +32,12 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   final _scrollController = ScrollController();
   var _locationPromptedAutomatically = false;
   var _isPullRefreshing = false;
+  NearbyFilters _presentedFilters = const NearbyFilters();
+  int _presentedFeedRevision = 0;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(context.read<NearbyCubit>().initialize());
     });
@@ -44,9 +45,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
 
   @override
   void dispose() {
-    _scrollController
-      ..removeListener(_onScroll)
-      ..dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -79,10 +78,21 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
       listener: (context, state) => _showLocationIssue(state.locationIssue!),
       child: BlocConsumer<NearbyCubit, NearbyState>(
         listenWhen: (previous, current) =>
-            previous.status != current.status &&
-            current.status == NearbyStatus.locationRequired &&
-            current.locationIssue == null,
+            previous.filters != current.filters ||
+            previous.feedRevision != current.feedRevision ||
+            (previous.status != current.status &&
+                current.status == NearbyStatus.locationRequired &&
+                current.locationIssue == null),
         listener: (context, state) {
+          if (_presentedFilters != state.filters ||
+              _presentedFeedRevision != state.feedRevision) {
+            _presentedFilters = state.filters;
+            _presentedFeedRevision = state.feedRevision;
+            if (_scrollController.hasClients && _scrollController.offset != 0) {
+              _scrollController.jumpTo(0);
+            }
+          }
+          if (state.status != NearbyStatus.locationRequired) return;
           if (_locationPromptedAutomatically) return;
           _locationPromptedAutomatically = true;
           unawaited(_requestInitialLocation());
@@ -133,6 +143,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                     state: state,
                     bottomPadding: contentBottom,
                     onRefresh: () => context.read<NearbyCubit>().refresh(),
+                    onUserScroll: _onScroll,
                     onRefreshActivityChanged: (isActive) {
                       if (mounted && _isPullRefreshing != isActive) {
                         setState(() => _isPullRefreshing = isActive);
@@ -246,6 +257,7 @@ class _NearbyFeed extends StatefulWidget {
     required this.state,
     required this.bottomPadding,
     required this.onRefresh,
+    required this.onUserScroll,
     required this.onRefreshActivityChanged,
   });
 
@@ -253,6 +265,7 @@ class _NearbyFeed extends StatefulWidget {
   final NearbyState state;
   final double bottomPadding;
   final Future<void> Function() onRefresh;
+  final VoidCallback onUserScroll;
   final ValueChanged<bool> onRefreshActivityChanged;
 
   @override
@@ -266,6 +279,9 @@ class _NearbyFeedState extends State<_NearbyFeed> {
   var _isPulling = false;
   var _isArmed = false;
   var _hasArmedHaptic = false;
+  bool _userScrollSequence = false;
+  bool _paginationAllowedForGesture = false;
+  bool _paginationScheduled = false;
 
   static const _refreshTriggerExtent = 42.0;
   static const _refreshRevealStart = 14.0;
@@ -283,7 +299,46 @@ class _NearbyFeedState extends State<_NearbyFeed> {
   bool get _shouldShowIndicator => _isRefreshRunning || _dragProgress > 0;
 
   bool _trackPull(ScrollNotification notification) {
-    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    if (notification is ScrollStartNotification) {
+      _userScrollSequence = notification.dragDetails != null;
+      _paginationAllowedForGesture = false;
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null) {
+      _userScrollSequence = true;
+      _paginationAllowedForGesture =
+          (notification.scrollDelta ?? 0) > 0 &&
+          notification.metrics.pixels >= notification.metrics.minScrollExtent;
+    } else if (notification is OverscrollNotification &&
+        notification.dragDetails != null) {
+      _paginationAllowedForGesture = notification.overscroll > 0;
+    }
+    final towardEnd = notification is ScrollUpdateNotification
+        ? (notification.scrollDelta ?? 0) > 0
+        : notification is OverscrollNotification && notification.overscroll > 0;
+    if (_userScrollSequence &&
+        _paginationAllowedForGesture &&
+        towardEnd &&
+        notification.metrics.pixels >= notification.metrics.minScrollExtent &&
+        !_paginationScheduled) {
+      _paginationScheduled = true;
+      final filters = widget.state.filters;
+      final revision = widget.state.feedRevision;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _paginationScheduled = false;
+        if (mounted &&
+            widget.state.filters == filters &&
+            widget.state.feedRevision == revision) {
+          widget.onUserScroll();
+        }
+      });
+    }
+    if (notification is ScrollEndNotification) {
+      _userScrollSequence = false;
+      _paginationAllowedForGesture = false;
+    }
     if (_isRefreshRunning || widget.state.isRefreshing) return false;
 
     if (notification is ScrollStartNotification) {
@@ -300,10 +355,23 @@ class _NearbyFeedState extends State<_NearbyFeed> {
         _isPulling = notification.metrics.extentBefore <= 0;
       }
       if (_isPulling) {
-        var pullExtent = math.max(0.0, -notification.metrics.pixels).toDouble();
-        if (notification is OverscrollNotification) {
+        if (notification.metrics.pixels >
+            notification.metrics.minScrollExtent) {
+          _isPulling = false;
+          _resetPull();
+          return false;
+        }
+        var pullExtent = math
+            .max(
+              0.0,
+              notification.metrics.minScrollExtent -
+                  notification.metrics.pixels,
+            )
+            .toDouble();
+        if (notification is OverscrollNotification &&
+            notification.overscroll < 0) {
           pullExtent = math
-              .max(pullExtent, _pullExtent + notification.overscroll.abs())
+              .max(pullExtent, _pullExtent - notification.overscroll)
               .toDouble();
         }
         _setPullExtent(pullExtent);
@@ -352,6 +420,7 @@ class _NearbyFeedState extends State<_NearbyFeed> {
   }
 
   Future<void> _handleRefresh() async {
+    if (!mounted || _isRefreshRunning) return;
     final startedAt = DateTime.now();
     widget.onRefreshActivityChanged(true);
     if (mounted) {
@@ -389,6 +458,7 @@ class _NearbyFeedState extends State<_NearbyFeed> {
     final people = widget.state.people
         .where((person) => !blockedUserIds.contains(person.id))
         .toList(growable: false);
+    final indexes = {for (final entry in people.indexed) entry.$2.id: entry.$1};
     if (widget.state.status == NearbyStatus.initial ||
         widget.state.status == NearbyStatus.loading && people.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -404,60 +474,65 @@ class _NearbyFeedState extends State<_NearbyFeed> {
             ? Duration.zero
             : const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
-        builder: (context, animatedInset, _) => Stack(
-          children: [
-            Transform.translate(
-              offset: Offset(0, animatedInset),
-              child: NotificationListener<ScrollNotification>(
-                onNotification: _trackPull,
-                child: CustomScrollView(
-                  controller: widget.controller,
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  slivers: [
-                    SliverPadding(
-                      padding: EdgeInsets.only(
-                        top: 130,
-                        left: 16 + systemPadding.left,
-                        right: 16 + systemPadding.right,
-                        bottom: 8,
-                      ),
-                      sliver: people.isEmpty
-                          ? SliverToBoxAdapter(
-                              child: const SizedBox(height: 250),
-                            )
-                          : SliverGrid.builder(
-                              gridDelegate:
-                                  const SliverGridDelegateWithMaxCrossAxisExtent(
-                                    maxCrossAxisExtent: 150,
-                                    crossAxisSpacing: 6,
-                                    mainAxisSpacing: 6,
-                                  ),
-                              itemCount: people.length,
-                              itemBuilder: (context, index) =>
-                                  _NearbyPersonTile(person: people[index]),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _trackPull,
+          child: CustomScrollView(
+            controller: widget.controller,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  top: 130,
+                  left: 16 + systemPadding.left,
+                  right: 16 + systemPadding.right,
+                  bottom: 8,
+                ),
+                sliver: people.isEmpty
+                    ? const SliverToBoxAdapter(child: SizedBox(height: 250))
+                    : SliverGrid.builder(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 150,
+                              crossAxisSpacing: 6,
+                              mainAxisSpacing: 6,
                             ),
-                    ),
-                    if (widget.state.isLoadingMore)
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.all(18),
-                          child: Center(
-                            child: SizedBox.square(
-                              dimension: 24,
-                              child: CircularProgressIndicator(strokeWidth: 3),
-                            ),
-                          ),
+                        itemCount: people.length,
+                        findChildIndexCallback: (key) =>
+                            key is ValueKey<String> ? indexes[key.value] : null,
+                        itemBuilder: (context, index) => _NearbyPersonTile(
+                          key: ValueKey(people[index].id),
+                          person: people[index],
                         ),
                       ),
-                    SliverToBoxAdapter(
-                      child: SizedBox(height: widget.bottomPadding),
+              ),
+              // A fixed slot above the controls prevents the end extent from
+              // changing under the finger, and keeps the spinner unobscured.
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  key: const ValueKey('nearby_footer'),
+                  height: widget.bottomPadding + 48,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: widget.state.isLoadingMore
+                          ? const SizedBox.square(
+                              dimension: 24,
+                              child: CircularProgressIndicator(strokeWidth: 3),
+                            )
+                          : const SizedBox.square(dimension: 24),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+        builder: (context, animatedInset, child) => Stack(
+          children: [
+            Transform.translate(offset: Offset(0, animatedInset), child: child),
             Positioned(
               top: 130 + (animatedInset - 36) / 2,
               left: 0,
@@ -599,7 +674,7 @@ class _NearbyEmptyState extends StatelessWidget {
 }
 
 class _NearbyPersonTile extends StatelessWidget {
-  const _NearbyPersonTile({required this.person});
+  const _NearbyPersonTile({super.key, required this.person});
 
   final NearbyPerson person;
 

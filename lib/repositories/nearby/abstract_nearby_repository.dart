@@ -7,7 +7,14 @@ abstract interface class INearbyRepository {
   Future<NearbyCacheSnapshot?> getCachedFeed(NearbyFilters filters);
   Future<NearbyCacheSnapshot> refreshFeed(NearbyFilters filters);
   Future<NearbyCacheSnapshot?> loadMore(NearbyFilters filters);
+
+  /// Supersedes pending work without removing the last usable snapshot.
+  void invalidateFeed(NearbyFilters filters);
   Future<void> removeCachedPeople(Set<String> userIds);
   Future<String?> resolveAvatar(NearbyPerson person);
   Future<void> clearUserCache(String userId);
+}
+
+class NearbyFeedSupersededException implements Exception {
+  const NearbyFeedSupersededException();
 }

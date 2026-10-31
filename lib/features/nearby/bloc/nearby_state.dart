@@ -3,7 +3,12 @@ import 'package:yap_chat/features/nearby/data/data.dart';
 
 enum NearbyStatus { initial, loading, ready, failure, locationRequired }
 
-enum NearbyLocationIssue { denied, permanentlyDenied, serviceDisabled, unavailable }
+enum NearbyLocationIssue {
+  denied,
+  permanentlyDenied,
+  serviceDisabled,
+  unavailable,
+}
 
 class NearbyState extends Equatable {
   const NearbyState({
@@ -16,6 +21,7 @@ class NearbyState extends Equatable {
     this.locationIssue,
     this.locationFeedbackId = 0,
     this.rateLimitFeedbackId = 0,
+    this.feedRevision = 0,
   });
 
   final NearbyStatus status;
@@ -28,7 +34,12 @@ class NearbyState extends Equatable {
   final int locationFeedbackId;
   final int rateLimitFeedbackId;
 
-  bool get shouldObscureContent => status == NearbyStatus.locationRequired || isRefreshing && locationIssue != null;
+  /// Changes only when a first-page snapshot replaces the current feed.
+  final int feedRevision;
+
+  bool get shouldObscureContent =>
+      status == NearbyStatus.locationRequired ||
+      isRefreshing && locationIssue != null;
 
   NearbyState copyWith({
     NearbyStatus? status,
@@ -41,6 +52,7 @@ class NearbyState extends Equatable {
     bool clearLocationIssue = false,
     int? locationFeedbackId,
     int? rateLimitFeedbackId,
+    int? feedRevision,
   }) => NearbyState(
     status: status ?? this.status,
     filters: filters ?? this.filters,
@@ -48,9 +60,12 @@ class NearbyState extends Equatable {
     hasMore: hasMore ?? this.hasMore,
     isRefreshing: isRefreshing ?? this.isRefreshing,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-    locationIssue: clearLocationIssue ? null : locationIssue ?? this.locationIssue,
+    locationIssue: clearLocationIssue
+        ? null
+        : locationIssue ?? this.locationIssue,
     locationFeedbackId: locationFeedbackId ?? this.locationFeedbackId,
     rateLimitFeedbackId: rateLimitFeedbackId ?? this.rateLimitFeedbackId,
+    feedRevision: feedRevision ?? this.feedRevision,
   );
 
   @override
@@ -64,5 +79,6 @@ class NearbyState extends Equatable {
     locationIssue,
     locationFeedbackId,
     rateLimitFeedbackId,
+    feedRevision,
   ];
 }
