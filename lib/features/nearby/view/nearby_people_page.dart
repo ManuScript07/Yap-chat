@@ -276,7 +276,7 @@ class _NearbyFeed extends StatefulWidget {
 
 class _NearbyFeedState extends State<_NearbyFeed>
     with TickerProviderStateMixin {
-  final _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
+  bool _isSnapping = false;
   var _pullExtent = 0.0;
   var _isRefreshRunning = false;
   var _isPulling = false;
@@ -344,15 +344,39 @@ class _NearbyFeedState extends State<_NearbyFeed>
     super.dispose();
   }
 
-  double get _dragProgress =>
-      ((_pullExtent - _refreshRevealStart) /
-              (_refreshTriggerExtent - _refreshRevealStart))
-          .clamp(0.0, 1.0);
+  double get _dragProgress => _isArmed || _isSnapping
+      ? 1
+      : 1 -
+            math.exp(
+              -math.max(0.0, _pullExtent - _refreshRevealStart) /
+                  (_refreshTriggerExtent - _refreshRevealStart),
+            );
 
-  double get _refreshInset =>
-      _isRefreshRunning || _isArmed ? _refreshGap : _refreshGap * _dragProgress;
+  double get _refreshInset => _isRefreshRunning || _isArmed || _isSnapping
+      ? _refreshGap
+      : _refreshGap * _dragProgress;
 
-  bool get _shouldShowIndicator => _isRefreshRunning || _dragProgress > 0;
+  bool get _shouldShowIndicator =>
+      _isRefreshRunning || _isSnapping || _dragProgress > 0;
+
+  void _onRefreshStatusChanged(RefreshIndicatorStatus? status) {
+    if (!mounted) return;
+    if (status == RefreshIndicatorStatus.armed) {
+      if (!_hasArmedHaptic) {
+        _hasArmedHaptic = true;
+        unawaited(HapticFeedback.mediumImpact());
+      }
+      setState(() => _isArmed = true);
+    } else if (status == RefreshIndicatorStatus.snap) {
+      setState(() {
+        _isSnapping = true;
+        _isPulling = false;
+        _pullExtent = _refreshTriggerExtent;
+      });
+    } else if (status == RefreshIndicatorStatus.canceled || status == null) {
+      if (!_isRefreshRunning) _resetPull();
+    }
+  }
 
   bool _trackPull(ScrollNotification notification) {
     if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
@@ -395,7 +419,9 @@ class _NearbyFeedState extends State<_NearbyFeed>
       _userScrollSequence = false;
       _paginationAllowedForGesture = false;
     }
-    if (_isRefreshRunning || widget.state.isRefreshing) return false;
+    if (_isRefreshRunning || _isSnapping || widget.state.isRefreshing) {
+      return false;
+    }
 
     if (notification is ScrollStartNotification) {
       _isPulling =
@@ -433,35 +459,18 @@ class _NearbyFeedState extends State<_NearbyFeed>
         _setPullExtent(pullExtent);
       }
     } else if (notification is ScrollEndNotification && _isPulling) {
-      final shouldRefresh = _isArmed;
       _isPulling = false;
-      if (shouldRefresh) {
-        final indicator = _refreshIndicatorKey.currentState;
-        if (indicator != null) {
-          unawaited(indicator.show());
-        } else {
-          unawaited(_handleRefresh());
-        }
-      } else {
-        _resetPull();
-      }
+      // The standard indicator alone decides whether releasing starts refresh.
+      if (!_isArmed) _resetPull();
     }
     return false;
   }
 
   void _setPullExtent(double pullExtent) {
-    final normalized = pullExtent.clamp(0.0, _refreshTriggerExtent).toDouble();
-    final isArmed = normalized >= _refreshTriggerExtent;
-    if (isArmed && !_hasArmedHaptic) {
-      _hasArmedHaptic = true;
-      unawaited(HapticFeedback.mediumImpact());
-    } else if (!isArmed) {
-      _hasArmedHaptic = false;
-    }
-    if ((_pullExtent != normalized || _isArmed != isArmed) && mounted) {
+    final normalized = math.max(0.0, pullExtent);
+    if (_pullExtent != normalized && mounted) {
       setState(() {
         _pullExtent = normalized;
-        _isArmed = isArmed;
       });
     }
   }
@@ -472,6 +481,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
       _pullExtent = 0;
       _isPulling = false;
       _isArmed = false;
+      _isSnapping = false;
       _hasArmedHaptic = false;
     });
   }
@@ -483,6 +493,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
     if (mounted) {
       setState(() {
         _isRefreshRunning = true;
+        _isSnapping = false;
         _isPulling = false;
         _isArmed = false;
         _pullExtent = _refreshTriggerExtent;
@@ -523,7 +534,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
       return const Center(child: CircularProgressIndicator());
     }
     return RefreshIndicator.noSpinner(
-      key: _refreshIndicatorKey,
+      onStatusChange: _onRefreshStatusChanged,
       onRefresh: _handleRefresh,
       notificationPredicate: (_) =>
           !widget.state.isRefreshing || _isRefreshRunning,
