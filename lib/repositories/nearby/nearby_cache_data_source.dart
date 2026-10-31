@@ -156,8 +156,9 @@ class NearbyCacheDataSource {
     required List<NearbyPerson> people,
     required bool hasMore,
   }) async {
+    final writtenKey = _feedKey(ownerUserId, filters);
     await _preferences.setString(
-      _feedKey(ownerUserId, filters),
+      writtenKey,
       jsonEncode({
         'cached_at': DateTime.now().toUtc().toIso8601String(),
         'has_more': hasMore && people.length < maximumPeoplePerSnapshot,
@@ -167,10 +168,13 @@ class NearbyCacheDataSource {
             .toList(growable: false),
       }),
     );
-    await _trimSnapshots(ownerUserId);
+    await _trimSnapshots(ownerUserId, writtenKey: writtenKey);
   }
 
-  Future<void> _trimSnapshots(String ownerUserId) async {
+  Future<void> _trimSnapshots(
+    String ownerUserId, {
+    required String writtenKey,
+  }) async {
     final prefix = '$_keyPrefix$ownerUserId.feed.';
     final snapshots = <({String key, DateTime cachedAt})>[];
     for (final key in _preferences.getKeys().where(
@@ -193,7 +197,14 @@ class NearbyCacheDataSource {
         ));
       }
     }
-    snapshots.sort((left, right) => right.cachedAt.compareTo(left.cachedAt));
+    snapshots.sort((left, right) {
+      // A successful write must remain readable even when clock values collide
+      // or move backwards. Keep one other snapshot by the existing time order.
+      if (left.key == writtenKey) return right.key == writtenKey ? 0 : -1;
+      if (right.key == writtenKey) return 1;
+      final byTime = right.cachedAt.compareTo(left.cachedAt);
+      return byTime != 0 ? byTime : left.key.compareTo(right.key);
+    });
     await Future.wait(
       snapshots
           .skip(_maximumSnapshotsPerUser)
