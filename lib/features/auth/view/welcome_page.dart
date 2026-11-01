@@ -181,18 +181,18 @@ class _WelcomeTitle extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(top: topPadding),
       child: SizedBox(
-        width: math.min(295, math.max(0, maxWidth - 32)),
+        width: math.max(0, maxWidth - 32),
         height: 20,
-        child: Text(
-          context.l10n.authWelcomeTitle,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          style: context.textTheme.headlineMedium?.copyWith(
-            color: context.colorScheme.onPrimary,
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            height: 0.63,
-            letterSpacing: 0.32,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            context.l10n.authWelcomeTitle,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            softWrap: false,
+            style: context.textTheme.headlineMedium
+                ?.merge(AppTextStyles.authWelcome)
+                .copyWith(color: context.colorScheme.onPrimary),
           ),
         ),
       ),
@@ -220,7 +220,9 @@ class _WelcomeLogo extends StatelessWidget {
           maxWidth: logoWidth,
           alignment: Alignment.center,
           child: SvgPicture.asset(
-            'assets/logo/welcome_big_logo.svg',
+            Localizations.localeOf(context).languageCode == 'ru'
+                ? 'assets/logo/welcome_big_logo.svg'
+                : 'assets/logo/YAPCHAT_welcome_big_logo.svg',
             width: logoWidth,
             fit: BoxFit.contain,
           ),
@@ -272,13 +274,9 @@ class _WelcomeAuthPanel extends StatelessWidget {
                     child: Text(
                       context.l10n.authSignInWith,
                       textAlign: TextAlign.center,
-                      style: context.textTheme.titleLarge?.copyWith(
-                        color: context.colorScheme.onSurface,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
-                        height: 0.91,
-                        letterSpacing: 0.1,
-                      ),
+                      style: context.textTheme.titleLarge
+                          ?.merge(AppTextStyles.authSignInWith)
+                          .copyWith(color: context.colorScheme.onSurface),
                     ),
                   ),
                   Positioned(

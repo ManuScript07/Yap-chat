@@ -50,10 +50,6 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
           _contentTop = null;
         }
 
-        final titleSize = math.min(
-          42.0,
-          math.max(30.0, constraints.maxWidth * .1),
-        );
         final contentBody = SizedBox(
           width: math.min(448, constraints.maxWidth - 72),
           child: Column(
@@ -62,13 +58,9 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
               Text(
                 widget.title,
                 textAlign: TextAlign.center,
-                style: context.textTheme.displaySmall?.copyWith(
-                  color: context.colorScheme.onSurface,
-                  fontSize: titleSize,
-                  fontWeight: FontWeight.w800,
-                  height: 1.24,
-                  letterSpacing: .42,
-                ),
+                style: context.textTheme.displaySmall
+                    ?.merge(AppTextStyles.onboardingTitle)
+                    .copyWith(color: context.colorScheme.onSurface),
               ),
               if (widget.subtitle != null) ...[
                 const SizedBox(height: 4),

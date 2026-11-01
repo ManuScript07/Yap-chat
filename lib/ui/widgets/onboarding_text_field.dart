@@ -203,6 +203,7 @@ class OnboardingBirthDateFields extends StatelessWidget {
     return Row(
       children: [
         Expanded(
+          flex: 5,
           child: _OnboardingDateField(
             controller: dayController,
             focusNode: dayFocusNode,
@@ -214,6 +215,7 @@ class OnboardingBirthDateFields extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
+          flex: 5,
           child: _OnboardingDateField(
             controller: monthController,
             focusNode: monthFocusNode,
@@ -225,7 +227,7 @@ class OnboardingBirthDateFields extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          flex: 2,
+          flex: 6,
           child: _OnboardingDateField(
             controller: yearController,
             focusNode: yearFocusNode,
@@ -283,6 +285,7 @@ class _OnboardingDateFieldState extends State<_OnboardingDateField> {
       onTap: widget.focusNode.requestFocus,
       child: _OnboardingInputFrame(
         height: 61,
+        horizontalPadding: 4,
         isFocused: widget.focusNode.hasFocus,
         child: Align(
           alignment: Alignment.center,
@@ -299,7 +302,9 @@ class _OnboardingDateFieldState extends State<_OnboardingDateField> {
               textAlign: TextAlign.center,
               textAlignVertical: TextAlignVertical.center,
               strutStyle: const StrutStyle(
-                fontSize: 18,
+                // Figma's 18px text line is shorter than its 32px glyphs.
+                // Keep full glyph metrics inside EditableText's clipping area.
+                fontSize: 32,
                 height: 1.15,
                 forceStrutHeight: true,
               ),
@@ -312,24 +317,18 @@ class _OnboardingDateFieldState extends State<_OnboardingDateField> {
                   widget.onCompleted?.call();
                 }
               },
-              style: context.textTheme.titleMedium?.copyWith(
-                color: context.colorScheme.onSurface,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                height: 1.15,
-                letterSpacing: .5,
-              ),
+              style: context.textTheme.titleMedium
+                  ?.merge(AppTextStyles.onboardingDate)
+                  .copyWith(color: context.colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: widget.placeholder,
-                hintStyle: context.textTheme.bodyMedium?.copyWith(
-                  color: context.colorScheme.onSurfaceVariant.withValues(
-                    alpha: .78,
-                  ),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  height: 1.15,
-                  letterSpacing: .5,
-                ),
+                hintStyle: context.textTheme.bodyMedium
+                    ?.merge(AppTextStyles.onboardingDate)
+                    .copyWith(
+                      color: context.colorScheme.onSurfaceVariant.withValues(
+                        alpha: .78,
+                      ),
+                    ),
                 counterText: '',
                 filled: false,
                 border: InputBorder.none,
@@ -444,11 +443,13 @@ class _OnboardingInputFrame extends StatelessWidget {
     required this.child,
     required this.isFocused,
     this.height,
+    this.horizontalPadding = 15,
   });
 
   final Widget child;
   final bool isFocused;
   final double? height;
+  final double horizontalPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -456,7 +457,7 @@ class _OnboardingInputFrame extends StatelessWidget {
       width: double.infinity,
       constraints: BoxConstraints(minHeight: height ?? 61),
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       decoration: BoxDecoration(
         color: context.colorScheme.onSurface.withValues(alpha: .2),
         borderRadius: BorderRadius.circular(12),
