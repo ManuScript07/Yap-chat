@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -45,7 +46,11 @@ class MainPage extends StatelessWidget {
           ),
         ),
       ],
-      child: const _MainView(),
+      child: RepositoryProvider(
+        create: (_) => NavigationScrollToTopController(),
+        dispose: (controller) => controller.dispose(),
+        child: const _MainView(),
+      ),
     );
   }
 }
@@ -109,6 +114,7 @@ class _MainView extends StatelessWidget {
             }
 
             if (tabsRouter.activeIndex != chatsTabIndex) {
+              context.read<NavigationScrollToTopController>().cancel();
               tabsRouter.setActiveIndex(chatsTabIndex);
             }
           },
@@ -123,7 +129,21 @@ class _MainView extends StatelessWidget {
 
             bottomNavigationBar: FloatingNavigationBar(
               activeIndex: tabsRouter.activeIndex,
-              onTap: tabsRouter.setActiveIndex,
+              onTap: (index) {
+                final scroll = context.read<NavigationScrollToTopController>();
+                if (index == tabsRouter.activeIndex) {
+                  final target = switch (index) {
+                    0 => NavigationScrollTarget.chats,
+                    1 => NavigationScrollTarget.nearby,
+                    3 => NavigationScrollTarget.friends,
+                    _ => null,
+                  };
+                  if (target != null) unawaited(scroll.scrollToTop(target));
+                  return;
+                }
+                scroll.cancel();
+                tabsRouter.setActiveIndex(index);
+              },
               items: [
                 FloatingNavigationBarItem(
                   icon: Icons.sms_outlined,

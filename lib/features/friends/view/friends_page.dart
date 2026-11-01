@@ -169,11 +169,16 @@ class _FriendsBody extends StatefulWidget {
 class _FriendsBodyState extends State<_FriendsBody> {
   final _friendsSearchController = TextEditingController();
   final _requestsSearchController = TextEditingController();
+  final _friendsScroll = ScrollController();
+  final _requestsScroll = ScrollController();
+  bool _returningToTop = false;
 
   @override
   void dispose() {
     _friendsSearchController.dispose();
     _requestsSearchController.dispose();
+    _friendsScroll.dispose();
+    _requestsScroll.dispose();
     super.dispose();
   }
 
@@ -218,68 +223,80 @@ class _FriendsBodyState extends State<_FriendsBody> {
     return BlocBuilder<FriendsBloc, FriendsState>(
       builder: (context, state) {
         final activeIndex = state.activeTab.index;
-        return Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            Positioned.fill(
-              child: IndexedStack(
-                index: activeIndex,
-                children: [
-                  _FriendsList(
-                    isLandscape: widget.isLandscape,
-                    topPadding: listTopPadding,
-                    bottomPadding: contentBottomPadding,
-                  ),
-                  _RequestsList(
-                    isLandscape: widget.isLandscape,
-                    topPadding: listTopPadding,
-                    bottomPadding: contentBottomPadding,
-                  ),
-                ],
+        return NavigationScrollToTopTarget(
+          target: NavigationScrollTarget.friends,
+          controller: state.activeTab == FriendsTab.friends
+              ? _friendsScroll
+              : _requestsScroll,
+          onActivityChanged: (active) => _returningToTop = active,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              Positioned.fill(
+                child: IndexedStack(
+                  index: activeIndex,
+                  children: [
+                    _FriendsList(
+                      controller: _friendsScroll,
+                      isReturningToTop: () => _returningToTop,
+                      isLandscape: widget.isLandscape,
+                      topPadding: listTopPadding,
+                      bottomPadding: contentBottomPadding,
+                    ),
+                    _RequestsList(
+                      controller: _requestsScroll,
+                      isLandscape: widget.isLandscape,
+                      topPadding: listTopPadding,
+                      bottomPadding: contentBottomPadding,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // One header fade: lists use internal padding and can scroll below
-            // both the app bar and tabs instead of being clipped beneath them.
-            GradientOverlay(
-              height: listTopPadding,
-              isTop: true,
-              backgroundColor: context.scaffoldBackgroundColor,
-            ),
-            if (showBodyTabs)
-              Positioned(
-                top: tabsTop,
+              // One header fade: lists use internal padding and can scroll below
+              // both the app bar and tabs instead of being clipped beneath them.
+              GradientOverlay(
+                height: listTopPadding,
+                isTop: true,
+                backgroundColor: context.scaffoldBackgroundColor,
+              ),
+              if (showBodyTabs)
+                Positioned(
+                  top: tabsTop,
+                  left: 0,
+                  right: 0,
+                  child: _FriendsTabs(state: state),
+                ),
+              AnimatedPositioned(
+                duration: Duration.zero,
                 left: 0,
                 right: 0,
-                child: _FriendsTabs(state: state),
+                bottom: glowBottomOffset,
+                child: const BottomAmbientGlow(),
               ),
-            AnimatedPositioned(
-              duration: Duration.zero,
-              left: 0,
-              right: 0,
-              bottom: glowBottomOffset,
-              child: const BottomAmbientGlow(),
-            ),
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutQuad,
-              left: 0,
-              right: 0,
-              bottom: searchBarBottomOffset,
-              child: GlassSearchBar(
-                key: ValueKey(state.activeTab),
-                controller: state.activeTab == FriendsTab.friends
-                    ? _friendsSearchController
-                    : _requestsSearchController,
-                hintText: context.l10n.friendsSearchHint,
-                onChanged: (value) {
-                  context.read<FriendsBloc>().add(FriendsSearchChanged(value));
-                  if (state.activeTab == FriendsTab.friends) {
-                    context.read<FriendSearchCubit>().queryChanged(value);
-                  }
-                },
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutQuad,
+                left: 0,
+                right: 0,
+                bottom: searchBarBottomOffset,
+                child: GlassSearchBar(
+                  key: ValueKey(state.activeTab),
+                  controller: state.activeTab == FriendsTab.friends
+                      ? _friendsSearchController
+                      : _requestsSearchController,
+                  hintText: context.l10n.friendsSearchHint,
+                  onChanged: (value) {
+                    context.read<FriendsBloc>().add(
+                      FriendsSearchChanged(value),
+                    );
+                    if (state.activeTab == FriendsTab.friends) {
+                      context.read<FriendSearchCubit>().queryChanged(value);
+                    }
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -317,6 +334,8 @@ class _FriendsTabs extends StatelessWidget {
 
 class _FriendsList extends StatefulWidget {
   const _FriendsList({
+    required this.controller,
+    required this.isReturningToTop,
     required this.bottomPadding,
     this.topPadding = 0,
     this.isLandscape = false,
@@ -325,6 +344,8 @@ class _FriendsList extends StatefulWidget {
   final double topPadding;
   final double bottomPadding;
   final bool isLandscape;
+  final ScrollController controller;
+  final ValueGetter<bool> isReturningToTop;
 
   @override
   State<_FriendsList> createState() => _FriendsListState();
@@ -365,6 +386,7 @@ class _FriendsListState extends State<_FriendsList> {
                 );
                 if (widget.isLandscape) {
                   return ListView(
+                    controller: widget.controller,
                     key: const PageStorageKey('friends-empty-state'),
                     padding: EdgeInsets.only(
                       top: widget.topPadding,
@@ -385,7 +407,8 @@ class _FriendsListState extends State<_FriendsList> {
               }
               return NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
-                  if (query.isEmpty &&
+                  if (!widget.isReturningToTop() &&
+                      query.isEmpty &&
                       !showGlobal &&
                       notification.metrics.extentAfter < 320) {
                     context.read<FriendsBloc>().add(
@@ -395,6 +418,7 @@ class _FriendsListState extends State<_FriendsList> {
                   return false;
                 },
                 child: ListView(
+                  controller: widget.controller,
                   key: const PageStorageKey('friends-list'),
                   padding: EdgeInsets.only(
                     top: widget.topPadding,
@@ -661,6 +685,7 @@ class _FriendsListState extends State<_FriendsList> {
 
 class _RequestsList extends StatelessWidget {
   const _RequestsList({
+    required this.controller,
     required this.bottomPadding,
     this.topPadding = 0,
     this.isLandscape = false,
@@ -669,6 +694,7 @@ class _RequestsList extends StatelessWidget {
   final double topPadding;
   final double bottomPadding;
   final bool isLandscape;
+  final ScrollController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -696,6 +722,7 @@ class _RequestsList extends StatelessWidget {
           );
           if (isLandscape) {
             return ListView(
+              controller: controller,
               key: const PageStorageKey('friend-requests-empty-state'),
               padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
               children: [emptyState],
@@ -709,6 +736,7 @@ class _RequestsList extends StatelessWidget {
           );
         }
         return ListView(
+          controller: controller,
           key: const PageStorageKey('friend-requests-list'),
           padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
           children: [

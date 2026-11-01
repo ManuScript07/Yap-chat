@@ -27,4 +27,5 @@ export 'glass_text_button.dart';
 export 'keyboard_dismiss_pop_scope.dart';
 export 'keyboard_resume_scope.dart';
 export 'primary_segmented_control.dart';
+export 'navigation_scroll_to_top.dart';
 export 'glass_button.dart';

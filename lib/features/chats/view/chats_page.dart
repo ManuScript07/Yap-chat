@@ -333,6 +333,7 @@ class _ChatsContentState extends State<_ChatsContent>
   final _scroll = _ChatsScrollController();
   final _rows = <String, BuildContext>{};
   bool _viewportScheduled = false;
+  bool _returningToTop = false;
   String _query = '';
   double _mainOffset = 0;
   int _scrollQueryRevision = 0;
@@ -534,6 +535,9 @@ class _ChatsContentState extends State<_ChatsContent>
 
   void _scheduleViewport() {
     if (_viewportScheduled) return;
+    // A final scroll notification can be handled after animateTo completes.
+    // Keep viewport observation active, but do not paginate on that frame.
+    final allowPagination = !_returningToTop;
     _viewportScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _viewportScheduled = false;
@@ -557,7 +561,9 @@ class _ChatsContentState extends State<_ChatsContent>
       final nearEnd = !_scroll.hasClients
           ? state.status == ChatsStatus.success && state.filteredChats.isEmpty
           : _scroll.position.extentAfter < 400;
-      if (nearEnd &&
+      if (allowPagination &&
+          !_returningToTop &&
+          nearEnd &&
           (state.hasMoreCached ||
               (state.hasMoreRemote && !state.isRefreshing)) &&
           (!state.isLoadingMore || state.hasMoreCached) &&
@@ -642,200 +648,209 @@ class _ChatsContentState extends State<_ChatsContent>
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<ChatsBloc, ChatsState>(
-      listener: (context, state) => _receivePresentation(state),
-      buildWhen: (previous, current) =>
-          previous.status != current.status ||
-          previous.filteredChats != current.filteredChats ||
-          previous.searchQuery != current.searchQuery ||
-          previous.listQuery != current.listQuery ||
-          previous.hasMoreChats != current.hasMoreChats ||
-          previous.isLoadingMore != current.isLoadingMore ||
-          previous.isRefreshing != current.isRefreshing ||
-          previous.paginationError != current.paginationError ||
-          previous.refreshError != current.refreshError ||
-          previous.selectedChatIds != current.selectedChatIds ||
-          previous.isSelectionMode != current.isSelectionMode,
-      builder: (context, incoming) {
-        if (_displayedState == null && !_waitingFor(incoming)) {
-          _commitPresentation(incoming);
-        }
-        final state = _displayedState ?? incoming;
-        final waiting = _waitingFor(incoming);
-        _preserveAnchor(state);
-        _scheduleViewport();
-        final bottomPadding = widget.bottomPadding;
-        Widget content() {
-          switch (state.status) {
-            case ChatsStatus.initial:
-            case ChatsStatus.loading:
-              return _ChatsFeedbackViewport(
-                bottomPadding: bottomPadding,
-                child: Center(
-                  child: _ChatsLoadingIndicator(
-                    key: ValueKey(state.searchQuery),
+    return NavigationScrollToTopTarget(
+      target: NavigationScrollTarget.chats,
+      controller: _scroll,
+      onActivityChanged: (active) => _returningToTop = active,
+      child: BlocConsumer<ChatsBloc, ChatsState>(
+        listener: (context, state) => _receivePresentation(state),
+        buildWhen: (previous, current) =>
+            previous.status != current.status ||
+            previous.filteredChats != current.filteredChats ||
+            previous.searchQuery != current.searchQuery ||
+            previous.listQuery != current.listQuery ||
+            previous.hasMoreChats != current.hasMoreChats ||
+            previous.isLoadingMore != current.isLoadingMore ||
+            previous.isRefreshing != current.isRefreshing ||
+            previous.paginationError != current.paginationError ||
+            previous.refreshError != current.refreshError ||
+            previous.selectedChatIds != current.selectedChatIds ||
+            previous.isSelectionMode != current.isSelectionMode,
+        builder: (context, incoming) {
+          if (_displayedState == null && !_waitingFor(incoming)) {
+            _commitPresentation(incoming);
+          }
+          final state = _displayedState ?? incoming;
+          final waiting = _waitingFor(incoming);
+          _preserveAnchor(state);
+          _scheduleViewport();
+          final bottomPadding = widget.bottomPadding;
+          Widget content() {
+            switch (state.status) {
+              case ChatsStatus.initial:
+              case ChatsStatus.loading:
+                return _ChatsFeedbackViewport(
+                  bottomPadding: bottomPadding,
+                  child: Center(
+                    child: _ChatsLoadingIndicator(
+                      key: ValueKey(state.searchQuery),
+                    ),
                   ),
-                ),
-              );
-            case ChatsStatus.failure:
-              return _ChatsEmptyPresentation(
-                state: state,
-                bottomPadding: bottomPadding,
-              );
-            case ChatsStatus.success:
-              if (state.filteredChats.isEmpty) {
+                );
+              case ChatsStatus.failure:
                 return _ChatsEmptyPresentation(
                   state: state,
                   bottomPadding: bottomPadding,
                 );
-              }
-
-              final indexes = {
-                for (final e in state.filteredChats.indexed)
-                  'probe:${e.$2.id}': e.$1,
-              };
-              final hasConnectionStatus =
-                  context.read<AppConnectionStatus?>() != null;
-              // The header replaces network error wording, but continuation
-              // failures still need explicit retry even after a head refresh.
-              // Check both errors so neither can swallow an independent failure.
-              final showLoadErrorLabel =
-                  [state.paginationError, state.refreshError].any(
-                    (error) =>
-                        error != null &&
-                        (!hasConnectionStatus ||
-                            !AppConnectionStatus.isConnectionFailure(error)),
+              case ChatsStatus.success:
+                if (state.filteredChats.isEmpty) {
+                  return _ChatsEmptyPresentation(
+                    state: state,
+                    bottomPadding: bottomPadding,
                   );
-              final hasRetryableLoadError =
-                  state.paginationError != null || showLoadErrorLabel;
-              return NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  if (notification is UserScrollNotification &&
-                      notification.direction != ScrollDirection.idle &&
-                      _motionActive &&
-                      _scroll.hasClients) {
-                    // Keep the remaining motion, but move its origin along
-                    // with the user's drag instead of snapping it to the end.
-                    _motionDragStart ??= _scroll.offset;
-                  }
-                  if (notification.depth == 0) _scheduleViewport();
-                  return false;
-                },
-                child: ListView.builder(
-                  controller: _scroll,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  findChildIndexCallback: (key) =>
-                      key is ValueKey<String> ? indexes[key.value] : null,
-                  padding: EdgeInsets.only(
-                    top: PrimaryHeaderGeometry.compactHeight,
-                    bottom: widget.listBottomPadding,
-                  ),
-                  itemCount:
-                      state.filteredChats.length +
-                      (state.isPaginated &&
-                              (state.isLoadingMore || hasRetryableLoadError)
-                          ? 1
-                          : 0),
-                  itemBuilder: (context, index) {
-                    if (index == state.filteredChats.length) {
-                      return Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: state.isLoadingMore || state.isRefreshing
-                            ? const Center(
-                                child: _ChatsLoadingIndicator(compact: true),
-                              )
-                            : Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (showLoadErrorLabel)
-                                      Text(context.l10n.failedToLoadChats),
-                                    const _ChatsRetryButton(),
-                                  ],
-                                ),
-                              ),
-                      );
+                }
+
+                final indexes = {
+                  for (final e in state.filteredChats.indexed)
+                    'probe:${e.$2.id}': e.$1,
+                };
+                final hasConnectionStatus =
+                    context.read<AppConnectionStatus?>() != null;
+                // The header replaces network error wording, but continuation
+                // failures still need explicit retry even after a head refresh.
+                // Check both errors so neither can swallow an independent failure.
+                final showLoadErrorLabel =
+                    [state.paginationError, state.refreshError].any(
+                      (error) =>
+                          error != null &&
+                          (!hasConnectionStatus ||
+                              !AppConnectionStatus.isConnectionFailure(error)),
+                    );
+                final hasRetryableLoadError =
+                    state.paginationError != null || showLoadErrorLabel;
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is UserScrollNotification &&
+                        notification.direction != ScrollDirection.idle &&
+                        _motionActive &&
+                        _scroll.hasClients) {
+                      // Keep the remaining motion, but move its origin along
+                      // with the user's drag instead of snapping it to the end.
+                      _motionDragStart ??= _scroll.offset;
                     }
-                    final chat = state.filteredChats[index];
-                    final isSelected = state.selectedChatIds.contains(chat.id);
+                    if (notification.depth == 0) _scheduleViewport();
+                    return false;
+                  },
+                  child: ListView.builder(
+                    controller: _scroll,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    findChildIndexCallback: (key) =>
+                        key is ValueKey<String> ? indexes[key.value] : null,
+                    padding: EdgeInsets.only(
+                      top: PrimaryHeaderGeometry.compactHeight,
+                      bottom: widget.listBottomPadding,
+                    ),
+                    itemCount:
+                        state.filteredChats.length +
+                        (state.isPaginated &&
+                                (state.isLoadingMore || hasRetryableLoadError)
+                            ? 1
+                            : 0),
+                    itemBuilder: (context, index) {
+                      if (index == state.filteredChats.length) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: state.isLoadingMore || state.isRefreshing
+                              ? const Center(
+                                  child: _ChatsLoadingIndicator(compact: true),
+                                )
+                              : Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (showLoadErrorLabel)
+                                        Text(context.l10n.failedToLoadChats),
+                                      const _ChatsRetryButton(),
+                                    ],
+                                  ),
+                                ),
+                        );
+                      }
+                      final chat = state.filteredChats[index];
+                      final isSelected = state.selectedChatIds.contains(
+                        chat.id,
+                      );
 
-                    return _ChatRowProbe(
-                      key: ValueKey('probe:${chat.id}'),
-                      onRegister: (rowContext) {
-                        _rows[chat.id] = rowContext;
-                        _scheduleViewport();
-                      },
-                      onUnregister: (rowContext) {
-                        if (_rows[chat.id] == rowContext) _rows.remove(chat.id);
-                      },
-                      child: ChatListRowMotion(
-                        progress: _rowMotion,
-                        originY: _motionOrigins[chat.id],
-                        entering: !_motionOrigins.containsKey(chat.id),
-                        scrollDisplacement: _motionScrollDisplacement,
-                        // During a paint-only move the old and new hit rectangles
-                        // overlap. Block row taps briefly, but keep list scrolling.
-                        child: IgnorePointer(
-                          ignoring: _motionActive,
-                          child: ChatListItem(
-                            key: ValueKey(chat.id),
-                            chat: chat,
-                            avatarLoader: () => context
-                                .read<IChatsRepository>()
-                                .resolveAvatar(chat),
-                            isSelected: isSelected,
-                            onTap: () {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              FocusScope.of(context).unfocus();
+                      return _ChatRowProbe(
+                        key: ValueKey('probe:${chat.id}'),
+                        onRegister: (rowContext) {
+                          _rows[chat.id] = rowContext;
+                          _scheduleViewport();
+                        },
+                        onUnregister: (rowContext) {
+                          if (_rows[chat.id] == rowContext) {
+                            _rows.remove(chat.id);
+                          }
+                        },
+                        child: ChatListRowMotion(
+                          progress: _rowMotion,
+                          originY: _motionOrigins[chat.id],
+                          entering: !_motionOrigins.containsKey(chat.id),
+                          scrollDisplacement: _motionScrollDisplacement,
+                          // During a paint-only move the old and new hit rectangles
+                          // overlap. Block row taps briefly, but keep list scrolling.
+                          child: IgnorePointer(
+                            ignoring: _motionActive,
+                            child: ChatListItem(
+                              key: ValueKey(chat.id),
+                              chat: chat,
+                              avatarLoader: () => context
+                                  .read<IChatsRepository>()
+                                  .resolveAvatar(chat),
+                              isSelected: isSelected,
+                              onTap: () {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                FocusScope.of(context).unfocus();
 
-                              if (state.isSelectionMode) {
-                                context.read<ChatsBloc>().add(
-                                  ChatSelectionToggled(chat.id),
-                                );
-                              } else {
-                                unawaited(
-                                  context
-                                      .read<ChatNavigationCoordinator>()
-                                      .open(chat),
-                                );
-                              }
-                            },
-                            onLongPress: () {
-                              if (!state.isSelectionMode) {
-                                context.read<ChatsBloc>().add(
-                                  ChatSelectionToggled(chat.id),
-                                );
-                              }
-                            },
+                                if (state.isSelectionMode) {
+                                  context.read<ChatsBloc>().add(
+                                    ChatSelectionToggled(chat.id),
+                                  );
+                                } else {
+                                  unawaited(
+                                    context
+                                        .read<ChatNavigationCoordinator>()
+                                        .open(chat),
+                                  );
+                                }
+                              },
+                              onLongPress: () {
+                                if (!state.isSelectionMode) {
+                                  context.read<ChatsBloc>().add(
+                                    ChatSelectionToggled(chat.id),
+                                  );
+                                }
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              );
-          }
-        }
-
-        return NotificationListener<OverscrollIndicatorNotification>(
-          onNotification: (notification) {
-            // An edge drag also dismisses the search IME. Do not stretch the
-            // whole list while its keyboard inset is changing: it creates a
-            // small second rebound on top of the normal layout transition.
-            if (notification.depth == 0 && widget.suppressEdgeStretch) {
-              notification.disallowIndicator();
+                      );
+                    },
+                  ),
+                );
             }
-            return false;
-          },
-          child: _ChatsPendingPresentation(
-            pending: waiting && _displayedState != null,
-            query: incoming.searchQuery,
-            hasRows: state.filteredChats.isNotEmpty,
-            bottomPadding: bottomPadding,
-            child: AbsorbPointer(absorbing: waiting, child: content()),
-          ),
-        );
-      },
+          }
+
+          return NotificationListener<OverscrollIndicatorNotification>(
+            onNotification: (notification) {
+              // An edge drag also dismisses the search IME. Do not stretch the
+              // whole list while its keyboard inset is changing: it creates a
+              // small second rebound on top of the normal layout transition.
+              if (notification.depth == 0 && widget.suppressEdgeStretch) {
+                notification.disallowIndicator();
+              }
+              return false;
+            },
+            child: _ChatsPendingPresentation(
+              pending: waiting && _displayedState != null,
+              query: incoming.searchQuery,
+              hasRows: state.filteredChats.isNotEmpty,
+              bottomPadding: bottomPadding,
+              child: AbsorbPointer(absorbing: waiting, child: content()),
+            ),
+          );
+        },
+      ),
     );
   }
 }

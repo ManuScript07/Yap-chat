@@ -35,6 +35,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   final _scrollController = ScrollController();
   var _locationPromptedAutomatically = false;
   var _isPullRefreshing = false;
+  var _returningToTop = false;
   NearbyFilters _presentedFilters = const NearbyFilters();
   int _presentedFeedRevision = 0;
   Timer? _quotaPageRetry;
@@ -55,7 +56,9 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   }
 
   void _onScroll({bool allowQuotaRetry = true}) {
-    if (!_scrollController.hasClients || (_quotaPageRetry?.isActive ?? false)) {
+    if (_returningToTop ||
+        !_scrollController.hasClients ||
+        (_quotaPageRetry?.isActive ?? false)) {
       return;
     }
     final nearby = context.read<NearbyCubit>();
@@ -176,82 +179,92 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               state.status != NearbyStatus.loading &&
               !state.shouldObscureContent;
 
-          return PresenceWatchScope(
-            scopeName: 'nearby',
-            userIds: state.people
-                .where((person) => !blockedUserIds.contains(person.id))
-                .map((person) => person.id),
-            child: Scaffold(
-              extendBodyBehindAppBar: true,
-              backgroundColor: context.scaffoldBackgroundColor,
-              appBar: PrimaryAppBar(
-                compact: true,
-                title: context.l10n.nearbyTitle,
-                titleWidget: ConnectionStatusTitle(
+          return NavigationScrollToTopTarget(
+            target: NavigationScrollTarget.nearby,
+            controller: _scrollController,
+            enabled:
+                !state.shouldObscureContent &&
+                !state.isRefreshing &&
+                !_isPullRefreshing,
+            onActivityChanged: (active) => _returningToTop = active,
+            child: PresenceWatchScope(
+              scopeName: 'nearby',
+              userIds: state.people
+                  .where((person) => !blockedUserIds.contains(person.id))
+                  .map((person) => person.id),
+              child: Scaffold(
+                extendBodyBehindAppBar: true,
+                backgroundColor: context.scaffoldBackgroundColor,
+                appBar: PrimaryAppBar(
                   compact: true,
                   title: context.l10n.nearbyTitle,
+                  titleWidget: ConnectionStatusTitle(
+                    compact: true,
+                    title: context.l10n.nearbyTitle,
+                  ),
                 ),
-              ),
-              body: Stack(
-                children: [
-                  _NearbyFeed(
-                    routeTransition: routeTransition,
-                    openProfile: widget.openProfile,
-                    controller: _scrollController,
-                    state: state,
-                    bottomPadding: contentBottom,
-                    onRefresh: () => context.read<NearbyCubit>().refresh(),
-                    onUserScroll: _onScroll,
-                    onRefreshActivityChanged: (isActive) {
-                      if (mounted && _isPullRefreshing != isActive) {
-                        setState(() => _isPullRefreshing = isActive);
-                      }
-                    },
-                  ),
-                  if (state.shouldObscureContent)
-                    const Positioned.fill(child: _LocationRequiredBackdrop()),
-                  if (state.shouldObscureContent)
-                    Positioned.fill(
-                      child: _LocationRequiredOverlay(
-                        bottomInset: contentBottom,
-                        hidden: state.status == NearbyStatus.visibilityDisabled,
-                        busy: state.isVisibilitySaving,
-                        onRetry: () =>
-                            state.status == NearbyStatus.visibilityDisabled
-                            ? context.read<NearbyCubit>().enableVisibility()
-                            : context.read<NearbyCubit>().requestLocation(),
+                body: Stack(
+                  children: [
+                    _NearbyFeed(
+                      routeTransition: routeTransition,
+                      openProfile: widget.openProfile,
+                      controller: _scrollController,
+                      state: state,
+                      bottomPadding: contentBottom,
+                      onRefresh: () => context.read<NearbyCubit>().refresh(),
+                      onUserScroll: _onScroll,
+                      onRefreshActivityChanged: (isActive) {
+                        if (mounted && _isPullRefreshing != isActive) {
+                          setState(() => _isPullRefreshing = isActive);
+                        }
+                      },
+                    ),
+                    if (state.shouldObscureContent)
+                      const Positioned.fill(child: _LocationRequiredBackdrop()),
+                    if (state.shouldObscureContent)
+                      Positioned.fill(
+                        child: _LocationRequiredOverlay(
+                          bottomInset: contentBottom,
+                          hidden:
+                              state.status == NearbyStatus.visibilityDisabled,
+                          busy: state.isVisibilitySaving,
+                          onRetry: () =>
+                              state.status == NearbyStatus.visibilityDisabled
+                              ? context.read<NearbyCubit>().enableVisibility()
+                              : context.read<NearbyCubit>().requestLocation(),
+                        ),
+                      ),
+                    if (shouldShowEmptyState)
+                      Positioned.fill(
+                        child: _NearbyEmptyStateLayer(
+                          bottomPadding: contentBottom,
+                          failed: state.status == NearbyStatus.failure,
+                        ),
+                      ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: const BottomAmbientGlow(),
+                    ),
+                    if (state.isRefreshing &&
+                        state.status == NearbyStatus.locationRequired)
+                      const Positioned.fill(child: _LocationUpdatingOverlay()),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: filterBottom,
+                      child: _FiltersButton(
+                        onPressed:
+                            state.shouldObscureContent ||
+                                state.isRefreshing ||
+                                _isPullRefreshing
+                            ? null
+                            : () => _openFilters(state.filters),
                       ),
                     ),
-                  if (shouldShowEmptyState)
-                    Positioned.fill(
-                      child: _NearbyEmptyStateLayer(
-                        bottomPadding: contentBottom,
-                        failed: state.status == NearbyStatus.failure,
-                      ),
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: const BottomAmbientGlow(),
-                  ),
-                  if (state.isRefreshing &&
-                      state.status == NearbyStatus.locationRequired)
-                    const Positioned.fill(child: _LocationUpdatingOverlay()),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: filterBottom,
-                    child: _FiltersButton(
-                      onPressed:
-                          state.shouldObscureContent ||
-                              state.isRefreshing ||
-                              _isPullRefreshing
-                          ? null
-                          : () => _openFilters(state.filters),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
