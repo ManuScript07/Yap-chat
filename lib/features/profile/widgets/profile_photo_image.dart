@@ -31,37 +31,7 @@ class ProfilePhotoHero extends StatelessWidget {
       tag: profilePhotoHeroTag(photo),
       transitionOnUserGestures: true,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
-      flightShuttleBuilder:
-          (_, animation, flightDirection, fromHeroContext, toHeroContext) {
-            final fromChild = (fromHeroContext.widget as Hero).child;
-            final toChild = (toHeroContext.widget as Hero).child;
-            final fromRadius = _heroBorderRadius(
-              fromChild,
-              fallback: borderRadius,
-            );
-            final toRadius = _heroBorderRadius(toChild, fallback: borderRadius);
-            final radius = Tween<double>(
-              begin: flightDirection == HeroFlightDirection.push
-                  ? fromRadius
-                  : toRadius,
-              end: flightDirection == HeroFlightDirection.push
-                  ? toRadius
-                  : fromRadius,
-            ).animate(animation);
-
-            final targetChild = _buildFlightChild(
-              toChild,
-              flightPhoto: _flightPhoto(fromChild),
-            );
-            return AnimatedBuilder(
-              animation: radius,
-              builder: (context, child) => ClipRRect(
-                borderRadius: BorderRadius.circular(radius.value),
-                child: child,
-              ),
-              child: targetChild,
-            );
-          },
+      flightShuttleBuilder: buildProfilePhotoHeroFlight,
       child: borderRadius == 0
           ? image
           : ClipRRect(
@@ -72,13 +42,70 @@ class ProfilePhotoHero extends StatelessWidget {
   }
 }
 
-double _heroBorderRadius(Widget child, {required double fallback}) {
+/// Both endpoints use this builder: Flutter gives the destination Hero's
+/// builder priority, which must not change the flight's corner semantics.
+Widget buildProfilePhotoHeroFlight(
+  BuildContext context,
+  Animation<double> animation,
+  HeroFlightDirection direction,
+  BuildContext fromContext,
+  BuildContext toContext,
+) {
+  final fromChild = (fromContext.widget as Hero).child;
+  final toChild = (toContext.widget as Hero).child;
+  final fromRadius = _heroBorderRadius(fromChild);
+  final toRadius = _heroBorderRadius(toChild);
+  final fromBadge =
+      fromChild is UserAvatar &&
+      fromChild.showOnlineBadge &&
+      fromChild.isOnline;
+  final toBadge =
+      toChild is UserAvatar && toChild.showOnlineBadge && toChild.isOnline;
+  final badgeAvatar = fromBadge
+      ? fromChild
+      : toBadge
+      ? toChild
+      : null;
+  final flightChild = fromChild is UserAvatar
+      ? _buildFlightChild(fromChild)
+      : _buildFlightChild(toChild, flightPhoto: _flightPhoto(fromChild));
+  return AnimatedBuilder(
+    animation: animation,
+    child: flightChild,
+    builder: (_, child) {
+      final progress = direction == HeroFlightDirection.push
+          ? animation.value
+          : 1 - animation.value;
+      return Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            key: const ValueKey('profile-photo-flight-clip'),
+            borderRadius: BorderRadius.circular(
+              fromRadius + (toRadius - fromRadius) * progress,
+            ),
+            child: child,
+          ),
+          if (badgeAvatar is UserAvatar)
+            _HeroOnlineBadge(
+              referenceSize: badgeAvatar.size,
+              opacity:
+                  (fromBadge ? 1.0 : 0.0) +
+                  ((toBadge ? 1.0 : 0.0) - (fromBadge ? 1.0 : 0.0)) * progress,
+            ),
+        ],
+      );
+    },
+  );
+}
+
+double _heroBorderRadius(Widget child) {
   if (child is UserAvatar) return child.borderRadius;
   if (child is ClipRRect) {
     return child.borderRadius.resolve(TextDirection.ltr).topLeft.x;
   }
-  if (child is ProfilePhotoImage) return 0;
-  return fallback;
+  return 0;
 }
 
 ProfilePhoto? _flightPhoto(Widget child) {
@@ -90,19 +117,31 @@ ProfilePhoto? _flightPhoto(Widget child) {
 
 Widget _buildFlightChild(Widget child, {ProfilePhoto? flightPhoto}) {
   if (child is UserAvatar) {
-    return FittedBox(fit: BoxFit.fill, child: child);
+    return FittedBox(
+      fit: BoxFit.fill,
+      child: UserAvatar(
+        // A shuttle only reuses the row's warmed cache/provider. In particular,
+        // opening a profile before its row finishes loading must not start a
+        // second resolver or bypass preferAvatarLoader with a network fallback.
+        avatarUrl: child.preferAvatarLoader ? null : child.avatarUrl,
+        avatarImage: child.avatarImage,
+        preferAvatarLoader: child.preferAvatarLoader,
+        avatarRevision: child.avatarRevision ?? child.avatarUrl,
+        initialAvatarPath: child.initialAvatarPath,
+        size: child.size,
+        // The outer flight clip is the only owner of animated corners.
+        borderRadius: 0,
+      ),
+    );
   }
   if (child is ClipRRect && child.child is ProfilePhotoImage) {
     final image = child.child as ProfilePhotoImage;
-    return ClipRRect(
-      borderRadius: child.borderRadius,
-      child: ProfilePhotoImage(
-        photo: flightPhoto ?? image.photo,
-        fit: image.fit,
-        placeholderIconSize: image.placeholderIconSize,
-        cacheWidth: image.cacheWidth,
-        revealOnLoad: false,
-      ),
+    return ProfilePhotoImage(
+      photo: flightPhoto ?? image.photo,
+      fit: image.fit,
+      placeholderIconSize: image.placeholderIconSize,
+      cacheWidth: image.cacheWidth,
+      revealOnLoad: false,
     );
   }
   if (child is ProfilePhotoImage) {
@@ -213,4 +252,45 @@ ImageProvider<Object>? profilePhotoImageProvider(
   return url == null || url.isEmpty
       ? null
       : ResizeImage.resizeIfNeeded(cacheWidth, null, NetworkImage(url));
+}
+
+class _HeroOnlineBadge extends StatelessWidget {
+  const _HeroOnlineBadge({required this.opacity, required this.referenceSize});
+
+  final double opacity;
+  final double referenceSize;
+
+  @override
+  Widget build(BuildContext context) => Positioned.fill(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final avatarSize = constraints.biggest.shortestSide;
+        final scale = avatarSize / referenceSize;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: -2 * scale,
+              bottom: -2 * scale,
+              child: Opacity(
+                opacity: opacity,
+                child: Container(
+                  width: avatarSize * 0.32,
+                  height: avatarSize * 0.32,
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: context.scaffoldBackgroundColor,
+                      width: 2 * scale,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

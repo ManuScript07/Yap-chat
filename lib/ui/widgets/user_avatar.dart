@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
-import 'package:yap_chat/ui/widgets/animated_status_switcher.dart';
+import 'animated_status_switcher.dart';
+import 'avatar_geometry.dart';
 
 class UserAvatar extends StatefulWidget {
   const UserAvatar({
@@ -15,10 +16,10 @@ class UserAvatar extends StatefulWidget {
     this.avatarRevision,
     this.initialAvatarPath,
     this.size = 48,
-    this.borderRadius = 10,
+    double? borderRadius,
     this.isOnline = false,
     this.showOnlineBadge = false,
-  });
+  }) : borderRadius = borderRadius ?? size * AvatarGeometry.cornerFraction;
 
   final String? avatarUrl;
   final ImageProvider? avatarImage;

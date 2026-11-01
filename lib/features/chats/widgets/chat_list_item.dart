@@ -75,7 +75,6 @@ class ChatListItem extends StatelessWidget {
                       ? chat.avatarStoragePath ?? chat.avatarUrl
                       : null,
                   size: 56,
-                  borderRadius: 10,
                   isOnline: isOnline,
                   showOnlineBadge: true,
                 ),

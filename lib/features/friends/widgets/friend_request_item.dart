@@ -51,7 +51,6 @@ class FriendRequestItem extends StatelessWidget {
                 avatarRevision:
                     request.peerAvatarStoragePath ?? request.peerAvatarUrl,
                 size: 54,
-                borderRadius: 12,
               ),
             ),
             const SizedBox(width: 12),

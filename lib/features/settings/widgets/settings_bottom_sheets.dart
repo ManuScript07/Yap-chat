@@ -504,7 +504,6 @@ class _BlacklistBody extends StatelessWidget {
                 avatarUrl: user.avatarUrl,
                 avatarRevision: user.avatarStoragePath ?? user.avatarUrl,
                 size: 54,
-                borderRadius: 12,
               ),
               name: user.displayName,
               username: user.username,

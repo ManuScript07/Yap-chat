@@ -241,7 +241,7 @@ class _LoadingProfileAvatar extends StatelessWidget {
                   avatarRevision:
                       snapshot.avatarStoragePath ?? snapshot.avatarUrl,
                   size: 176,
-                  borderRadius: 32,
+                  borderRadius: AvatarGeometry.profileRadiusFor(176),
                 ),
               ),
             ),
@@ -784,7 +784,9 @@ class _BlockedProfileContent extends StatelessWidget {
               SizedBox.square(
                 dimension: 176,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(32),
+                  borderRadius: BorderRadius.circular(
+                    AvatarGeometry.profileRadiusFor(176),
+                  ),
                   child: ColoredBox(
                     color: context.colorScheme.primary,
                     child: Icon(
@@ -843,7 +845,9 @@ class _ProfilePhotoCard extends StatelessWidget {
                   children: [
                     if (primary == null)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(32),
+                        borderRadius: BorderRadius.circular(
+                          AvatarGeometry.profileRadiusFor(176),
+                        ),
                         child: ColoredBox(
                           color: context.colorScheme.primary,
                           child: Icon(
@@ -856,14 +860,16 @@ class _ProfilePhotoCard extends StatelessWidget {
                     else
                       ProfilePhotoHero(
                         photo: primary,
-                        borderRadius: 32,
+                        borderRadius: AvatarGeometry.profileRadiusFor(176),
                         cacheWidth: 352,
                       ),
                     Material(
                       color: context.colorScheme.surface.withValues(alpha: 0),
                       child: InkWell(
                         onTap: primary == null ? null : onTap,
-                        borderRadius: BorderRadius.circular(32),
+                        borderRadius: BorderRadius.circular(
+                          AvatarGeometry.profileRadiusFor(176),
+                        ),
                       ),
                     ),
                   ],
@@ -1328,7 +1334,7 @@ class _MiniFriendAvatar extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
       border: Border.all(color: context.scaffoldBackgroundColor, width: 2),
-      borderRadius: BorderRadius.circular(9),
+      borderRadius: BorderRadius.circular(AvatarGeometry.radiusFor(30) + 2),
     ),
     child: UserAvatar(
       avatarUrl: friend.avatarUrl,
@@ -1337,7 +1343,6 @@ class _MiniFriendAvatar extends StatelessWidget {
           .resolveViewedProfileFriendAvatar(friend),
       avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
       size: 30,
-      borderRadius: 7,
     ),
   );
 }

@@ -13,6 +13,7 @@ export 'chat_app_bar.dart';
 export 'chat_glass_surface.dart';
 export 'message_input_bar.dart';
 export 'user_avatar.dart';
+export 'avatar_geometry.dart';
 export 'local_avatar_frames.dart';
 export 'glass_icon_button.dart';
 export 'permission_denied_dialog.dart';

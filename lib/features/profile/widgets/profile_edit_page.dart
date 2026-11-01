@@ -381,7 +381,9 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
         children: [
           Positioned.fill(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(
+                AvatarGeometry.radiusFor(112),
+              ),
               child: ProfilePhotoImage(photo: photo, cacheWidth: 224),
             ),
           ),
@@ -442,7 +444,7 @@ class _ProfileEditPageState extends State<_ProfileEditPage> {
       dimension: 112,
       child: Material(
         color: context.colorScheme.onSurface.withValues(alpha: .22),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AvatarGeometry.radiusFor(112)),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: isEnabled ? _pickPhoto : null,

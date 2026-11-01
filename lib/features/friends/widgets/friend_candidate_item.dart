@@ -56,7 +56,6 @@ class FriendCandidateItem extends StatelessWidget {
                 avatarRevision:
                     candidate.avatarStoragePath ?? candidate.avatarUrl,
                 size: 54,
-                borderRadius: 12,
               ),
             ),
             const SizedBox(width: 12),

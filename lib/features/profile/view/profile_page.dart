@@ -363,20 +363,24 @@ class _ProfilePhotoCard extends StatelessWidget {
                   children: [
                     if (primary == null)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(32),
+                        borderRadius: BorderRadius.circular(
+                          AvatarGeometry.profileRadiusFor(176),
+                        ),
                         child: const _ProfilePhotoPlaceholder(),
                       )
                     else
                       ProfilePhotoHero(
                         photo: primary,
-                        borderRadius: 32,
+                        borderRadius: AvatarGeometry.profileRadiusFor(176),
                         cacheWidth: 352,
                       ),
                     Material(
                       color: context.colorScheme.surface.withValues(alpha: 0),
                       child: InkWell(
                         onTap: primary == null ? null : onTap,
-                        borderRadius: BorderRadius.circular(32),
+                        borderRadius: BorderRadius.circular(
+                          AvatarGeometry.profileRadiusFor(176),
+                        ),
                       ),
                     ),
                   ],

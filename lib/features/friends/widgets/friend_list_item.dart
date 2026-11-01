@@ -52,7 +52,6 @@ class FriendListItem extends StatelessWidget {
                 avatarLoader: avatarLoader,
                 avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
                 size: 54,
-                borderRadius: 12,
                 isOnline: isOnline,
                 showOnlineBadge: true,
               ),

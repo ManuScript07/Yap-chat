@@ -56,7 +56,9 @@ class ContactDiscoveryItem extends StatelessWidget {
                 height: 54,
                 decoration: BoxDecoration(
                   color: context.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    AvatarGeometry.radiusFor(54),
+                  ),
                 ),
                 child: Icon(
                   Icons.person_rounded,
@@ -75,7 +77,6 @@ class ContactDiscoveryItem extends StatelessWidget {
                   avatarRevision:
                       candidate.avatarStoragePath ?? candidate.avatarUrl,
                   size: 54,
-                  borderRadius: 12,
                 ),
               ),
             const SizedBox(width: 12),

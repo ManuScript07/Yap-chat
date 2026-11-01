@@ -220,7 +220,6 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                           avatarImage: widget.senderAvatarImage,
                           avatarRevision: widget.senderAvatarUrl,
                           size: 44,
-                          borderRadius: 14,
                         ),
                         const SizedBox(width: 10),
                         Expanded(

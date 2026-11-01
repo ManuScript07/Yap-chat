@@ -5,6 +5,9 @@ import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/utils/utils.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
+  static const controlSize = 50.0;
+  static const contentHeight = controlSize + 16;
+
   const ChatAppBar({
     super.key,
     required this.userName,
@@ -58,6 +61,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: Row(
         children: [
           GlassIconButton(
+            width: controlSize,
+            height: controlSize,
             chatStyle: true,
             icon: Icons.arrow_back_rounded,
             onTap: onBack ?? () => Navigator.of(context).pop(),
@@ -75,8 +80,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 preferAvatarLoader: true,
                 avatarLoader: avatarLoader,
                 avatarRevision: avatarRevision,
-                size: 48,
-                borderRadius: 10,
+                size: controlSize,
               ),
             ),
           ),
@@ -151,5 +155,5 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(64);
+  Size get preferredSize => const Size.fromHeight(contentHeight);
 }

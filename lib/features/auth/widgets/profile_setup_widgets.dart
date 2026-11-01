@@ -92,11 +92,7 @@ class _ProfileSetupStepState extends State<ProfileSetupStep> {
                   widget.errorText!,
                   textAlign: TextAlign.center,
                   style: context.textTheme.bodySmall?.copyWith(
-                    color: Color.lerp(
-                      context.colorScheme.error,
-                      Colors.red,
-                      1,
-                    ),
+                    color: Color.lerp(context.colorScheme.error, Colors.red, 1),
                     fontWeight: FontWeight.w700,
                     height: 1.2,
                   ),
@@ -290,14 +286,15 @@ class ProfileAvatarPicker extends StatelessWidget {
                 ? null
                 : MemoryImage(localAvatarBytes!),
             size: 220,
-            borderRadius: 28,
           )
         : Container(
             width: 220,
             height: 220,
             decoration: BoxDecoration(
               color: context.colorScheme.primary,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(
+                AvatarGeometry.radiusFor(220),
+              ),
             ),
             child: Icon(
               Icons.add_a_photo_rounded,
@@ -310,7 +307,7 @@ class ProfileAvatarPicker extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         InkWell(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(AvatarGeometry.radiusFor(220)),
           onTap: onPick,
           child: avatar,
         ),

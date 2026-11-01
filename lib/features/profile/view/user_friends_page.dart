@@ -311,7 +311,6 @@ class _FriendRow extends StatelessWidget {
               preferAvatarLoader: true,
               avatarRevision: friend.avatarStoragePath ?? friend.avatarUrl,
               size: 54,
-              borderRadius: 12,
             ),
           ),
           const SizedBox(width: 12),
