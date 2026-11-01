@@ -28,7 +28,7 @@ class ChatsPage extends StatelessWidget {
         final isLandscapeKeyboard =
             mediaQuery.orientation == Orientation.landscape &&
             mediaQuery.viewInsets.bottom > 0;
-        const appBarHeight = 130.0;
+        const appBarHeight = PrimaryHeaderGeometry.compactHeight;
         const searchBarHeight = 50.0;
         const searchBarSpacing = 16.0;
         const notificationSnackBarBottomMargin = 156.0;
@@ -101,13 +101,16 @@ class ChatsPage extends StatelessWidget {
                   appBar: headerProgress == 0
                       ? null
                       : PreferredSize(
-                          preferredSize: Size.fromHeight(130 * headerProgress),
+                          preferredSize: Size.fromHeight(
+                            PrimaryHeaderGeometry.compactHeight *
+                                headerProgress,
+                          ),
                           child: ClipRect(
                             key: const ValueKey('chats_header_clip'),
                             child: OverflowBox(
                               alignment: Alignment.topCenter,
-                              minHeight: 130,
-                              maxHeight: 130,
+                              minHeight: PrimaryHeaderGeometry.compactHeight,
+                              maxHeight: PrimaryHeaderGeometry.compactHeight,
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 220),
                                 reverseDuration: const Duration(
@@ -131,6 +134,8 @@ class ChatsPage extends StatelessWidget {
                                 },
                                 child: state.isSelectionMode
                                     ? SelectionToolbar(
+                                        height:
+                                            PrimaryHeaderGeometry.compactHeight,
                                         key: const ValueKey(
                                           'selection_toolbar',
                                         ),
@@ -175,9 +180,11 @@ class ChatsPage extends StatelessWidget {
                                         },
                                       )
                                     : PrimaryAppBar(
+                                        compact: true,
                                         key: const ValueKey('primary_app_bar'),
                                         title: context.l10n.navChats,
                                         titleWidget: ConnectionStatusTitle(
+                                          compact: true,
                                           title: context.l10n.navChats,
                                         ),
                                         actionIcon: Icons.add_comment_rounded,
@@ -570,7 +577,8 @@ class _ChatsContentState extends State<_ChatsContent>
             if (entry.value.findRenderObject() case final RenderBox box
                 when box.attached &&
                     box.hasSize &&
-                    box.localToGlobal(Offset.zero).dy + box.size.height > 130 &&
+                    box.localToGlobal(Offset.zero).dy + box.size.height >
+                        PrimaryHeaderGeometry.compactHeight &&
                     box.localToGlobal(Offset.zero).dy < height)
               entry.key,
         };
@@ -607,7 +615,8 @@ class _ChatsContentState extends State<_ChatsContent>
       final box = entry.value.findRenderObject();
       if (box is! RenderBox || !box.attached || !box.hasSize) continue;
       final top = box.localToGlobal(Offset.zero).dy;
-      if (top + box.size.height > 130 && (y == null || top < y)) {
+      if (top + box.size.height > PrimaryHeaderGeometry.compactHeight &&
+          (y == null || top < y)) {
         anchor = entry.key;
         y = top;
       }
@@ -718,7 +727,7 @@ class _ChatsContentState extends State<_ChatsContent>
                   findChildIndexCallback: (key) =>
                       key is ValueKey<String> ? indexes[key.value] : null,
                   padding: EdgeInsets.only(
-                    top: 130,
+                    top: PrimaryHeaderGeometry.compactHeight,
                     bottom: widget.listBottomPadding,
                   ),
                   itemCount:

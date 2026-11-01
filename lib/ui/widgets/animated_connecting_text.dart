@@ -50,6 +50,10 @@ class _AnimatedConnectingTextState extends State<AnimatedConnectingText>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!Visibility.of(context) || !TickerMode.valuesOf(context).enabled) {
+      _controller.stop();
+      return;
+    }
     if (MediaQuery.disableAnimationsOf(context)) {
       _controller.stop();
       _controller.value = .7;

@@ -185,14 +185,11 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               extendBodyBehindAppBar: true,
               backgroundColor: context.scaffoldBackgroundColor,
               appBar: PrimaryAppBar(
+                compact: true,
                 title: context.l10n.nearbyTitle,
-                titleWidget: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    context.l10n.nearbyTitle,
-                    style: AppTextStyles.titleLargeFlex,
-                  ),
+                titleWidget: ConnectionStatusTitle(
+                  compact: true,
+                  title: context.l10n.nearbyTitle,
                 ),
               ),
               body: Stack(
@@ -666,7 +663,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
             slivers: [
               SliverPadding(
                 padding: EdgeInsets.only(
-                  top: 130,
+                  top: PrimaryHeaderGeometry.compactHeight,
                   left: 16 + systemPadding.left,
                   right: 16 + systemPadding.right,
                   bottom: 8,
@@ -703,7 +700,9 @@ class _NearbyFeedState extends State<_NearbyFeed>
           children: [
             Transform.translate(offset: Offset(0, animatedInset), child: child),
             Positioned(
-              top: 130 + (animatedInset - 36) / 2,
+              top:
+                  PrimaryHeaderGeometry.compactHeight +
+                  (animatedInset - 36) / 2,
               left: 0,
               right: 0,
               child: IgnorePointer(

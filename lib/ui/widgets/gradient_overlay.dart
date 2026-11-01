@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 
 class GradientOverlay extends StatelessWidget {
+  /// No opaque plateau: the top protection fades smoothly into the content.
+  static LinearGradient topGradient(Color color) => LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      color,
+      color.withValues(alpha: color.a * .78),
+      color.withValues(alpha: color.a * .28),
+      color.withValues(alpha: 0),
+    ],
+    stops: const [0, .22, .62, 1],
+  );
   const GradientOverlay({
     super.key,
     required this.height,
@@ -25,11 +37,16 @@ class GradientOverlay extends StatelessWidget {
       child: IgnorePointer(
         child: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: isTop ? Alignment.topCenter : Alignment.bottomCenter,
-              end: isTop ? Alignment.bottomCenter : Alignment.topCenter,
-              colors: [backgroundColor, backgroundColor.withValues(alpha: 0.0)],
-            ),
+            gradient: isTop
+                ? topGradient(backgroundColor)
+                : LinearGradient(
+                    begin: isTop ? Alignment.topCenter : Alignment.bottomCenter,
+                    end: isTop ? Alignment.bottomCenter : Alignment.topCenter,
+                    colors: [
+                      backgroundColor,
+                      backgroundColor.withValues(alpha: 0.0),
+                    ],
+                  ),
           ),
         ),
       ),

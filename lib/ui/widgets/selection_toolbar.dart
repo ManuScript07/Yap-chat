@@ -12,6 +12,7 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
     this.onMarkAsRead,
     this.onDelete,
     this.isLoading = false,
+    this.height = 130,
   });
 
   final int selectedCount;
@@ -23,6 +24,7 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onMarkAsRead;
   final VoidCallback? onDelete;
   final bool isLoading;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -99,5 +101,5 @@ class SelectionToolbar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(130);
+  Size get preferredSize => Size.fromHeight(height);
 }

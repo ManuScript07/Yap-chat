@@ -159,8 +159,8 @@ class _NewChatPageState extends State<NewChatPage> {
     final hideAppBar =
         mediaQuery.orientation == Orientation.landscape &&
         isKeyboardOpen &&
-        searchTop < 130;
-    const listTop = 146.0;
+        searchTop < PrimaryHeaderGeometry.compactHeight;
+    const listTop = PrimaryHeaderGeometry.compactHeight + 16;
     final listBottom = searchBottom + 66;
 
     return KeyboardDismissPopScope(
@@ -170,7 +170,7 @@ class _NewChatPageState extends State<NewChatPage> {
         extendBodyBehindAppBar: true,
         appBar: hideAppBar
             ? null
-            : PrimaryAppBar(title: context.l10n.newChatTitle),
+            : PrimaryAppBar(compact: true, title: context.l10n.newChatTitle),
         body: Stack(
           children: [
             StreamBuilder<List<Friend>>(
@@ -189,7 +189,7 @@ class _NewChatPageState extends State<NewChatPage> {
                 if (snapshot.hasError) {
                   return _StatusText(
                     message: context.l10n.friendsLoadFailed,
-                    topPadding: 130,
+                    topPadding: PrimaryHeaderGeometry.compactHeight,
                   );
                 }
                 if (allFriends.isEmpty) {
@@ -198,7 +198,7 @@ class _NewChatPageState extends State<NewChatPage> {
                     findUserTop: listTop,
                     onFindUser: _openAddFriendPage,
                     child: _StableEmptyFriendsState(
-                      topPadding: 130,
+                      topPadding: PrimaryHeaderGeometry.compactHeight,
                       bottomPadding: mediaQuery.viewPadding.bottom + 82,
                     ),
                   );
@@ -209,7 +209,7 @@ class _NewChatPageState extends State<NewChatPage> {
                     findUserTop: listTop,
                     onFindUser: _openAddFriendPage,
                     child: _NoSearchResults(
-                      topPadding: 130,
+                      topPadding: PrimaryHeaderGeometry.compactHeight,
                       bottomPadding: mediaQuery.viewPadding.bottom + 82,
                     ),
                   );

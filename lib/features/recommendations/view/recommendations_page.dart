@@ -15,20 +15,17 @@ class RecommendationsPage extends StatelessWidget {
       backgroundColor: context.scaffoldBackgroundColor,
       extendBodyBehindAppBar: true,
       appBar: PrimaryAppBar(
+        compact: true,
         title: context.l10n.recommendationsTitle,
-        titleWidget: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            context.l10n.recommendationsTitle,
-            style: AppTextStyles.titleLargeFlex,
-          ),
+        titleWidget: ConnectionStatusTitle(
+          compact: true,
+          title: context.l10n.recommendationsTitle,
         ),
       ),
       body: Padding(
         padding: EdgeInsets.fromLTRB(
           24 + media.padding.left,
-          130,
+          PrimaryHeaderGeometry.compactHeight,
           24 + media.padding.right,
           FloatingNavigationGeometry.occupiedHeight(media) + 24,
         ),

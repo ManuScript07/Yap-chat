@@ -16,12 +16,14 @@ class PrimarySegmentedControl extends StatelessWidget {
     required this.selectedIndex,
     required this.onChanged,
     this.horizontalPadding = 16,
+    this.compact = false,
   });
 
   final List<PrimarySegmentItem> items;
   final int selectedIndex;
   final ValueChanged<int> onChanged;
   final double horizontalPadding;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +35,13 @@ class PrimarySegmentedControl extends StatelessWidget {
         right: horizontalPadding + systemPadding.right,
       ),
       child: Container(
-        height: 50,
+        height: compact ? 44 : 50,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
+          // Keep labels readable as rows pass below the compact tab strip.
+          color: compact
+              ? context.scaffoldBackgroundColor.withValues(alpha: .65)
+              : null,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withValues(alpha: 0.6), width: 2),
         ),
@@ -64,6 +70,7 @@ class PrimarySegmentedControl extends StatelessWidget {
                                 color: textColor,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.5,
+                                fontSize: compact ? 16 : null,
                               ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,

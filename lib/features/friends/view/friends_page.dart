@@ -45,7 +45,7 @@ class _FriendsPageView extends StatelessWidget {
         final isLandscapeKeyboard =
             mediaQuery.orientation == Orientation.landscape &&
             mediaQuery.viewInsets.bottom > 0;
-        const appBarHeight = 130.0;
+        const appBarHeight = PrimaryHeaderGeometry.compactHeight;
         const searchBarHeight = 50.0;
         const searchBarSpacing = 16.0;
         final searchBarTop =
@@ -53,7 +53,8 @@ class _FriendsPageView extends StatelessWidget {
             mediaQuery.viewInsets.bottom -
             searchBarSpacing -
             searchBarHeight;
-        final hideAppBar = isLandscapeKeyboard && searchBarTop < appBarHeight;
+        final hideAppBar =
+            isLandscapeKeyboard && searchBarTop < appBarHeight + 56;
 
         return ScaffoldMessenger(
           child: Builder(
@@ -93,18 +94,39 @@ class _FriendsPageView extends StatelessWidget {
                       appBar: hideAppBar
                           ? null
                           : PrimaryAppBar(
+                              compact: true,
+                              showGradient: false,
                               title: context.l10n.navFriends,
                               titleWidget:
                                   mediaQuery.orientation ==
                                       Orientation.landscape
-                                  ? Padding(
-                                      padding: const EdgeInsets.only(right: 12),
-                                      child: _FriendsTabs(
-                                        state: state,
-                                        horizontalPadding: 0,
-                                      ),
+                                  ? Row(
+                                      children: [
+                                        Expanded(
+                                          child: ConnectionStatusTitle(
+                                            compact: true,
+                                            title: context.l10n.navFriends,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 12,
+                                            ),
+                                            child: _FriendsTabs(
+                                              state: state,
+                                              horizontalPadding: 0,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     )
-                                  : null,
+                                  : ConnectionStatusTitle(
+                                      compact: true,
+                                      title: context.l10n.navFriends,
+                                    ),
                               actionIcon: Icons.person_add_alt_1_rounded,
                               onActionPressed: () {
                                 FocusManager.instance.primaryFocus?.unfocus();
@@ -172,9 +194,26 @@ class _FriendsBodyState extends State<_FriendsBody> {
     final contentBottomPadding =
         searchBarBottomOffset + searchBarHeight + contentExtraPadding;
     final glowBottomOffset = isKeyboardOpen ? keyboardHeight : 0.0;
-    final listTopPadding = widget.isLandscape && widget.contentTop > 0
-        ? 104.0
+    const tabsExtent =
+        PrimaryHeaderGeometry.tabsTopSpacing +
+        PrimaryHeaderGeometry.compactTabsHeight +
+        PrimaryHeaderGeometry.tabsBottomSpacing;
+    final showBodyTabs = !widget.isLandscape || widget.contentTop == 0;
+    final tabsTop = widget.contentTop + PrimaryHeaderGeometry.tabsTopSpacing;
+    // Inline landscape tabs do not need the portrait header's trailing space.
+    // Reserve the scaled title's lower edge so larger text stays unobscured.
+    final headerContentTop = widget.isLandscape && widget.contentTop > 0
+        ? ((widget.contentTop +
+                          mediaQuery.textScaler.scale(
+                            PrimaryHeaderGeometry.compactTitleSize,
+                          )) /
+                      2 -
+                  mediaQuery.textScaler.scale(2) +
+                  7)
+              .clamp(0.0, widget.contentTop)
+              .toDouble()
         : widget.contentTop;
+    final listTopPadding = headerContentTop + (showBodyTabs ? tabsExtent : 0);
 
     return BlocBuilder<FriendsBloc, FriendsState>(
       builder: (context, state) {
@@ -182,55 +221,36 @@ class _FriendsBodyState extends State<_FriendsBody> {
         return Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            if (widget.isLandscape) ...[
-              Positioned.fill(
-                child: IndexedStack(
-                  index: activeIndex,
-                  children: [
-                    _FriendsList(
-                      isLandscape: widget.isLandscape,
-                      topPadding: listTopPadding,
-                      bottomPadding: contentBottomPadding,
-                    ),
-                    _RequestsList(
-                      isLandscape: widget.isLandscape,
-                      topPadding: listTopPadding,
-                      bottomPadding: contentBottomPadding,
-                    ),
-                  ],
-                ),
+            Positioned.fill(
+              child: IndexedStack(
+                index: activeIndex,
+                children: [
+                  _FriendsList(
+                    isLandscape: widget.isLandscape,
+                    topPadding: listTopPadding,
+                    bottomPadding: contentBottomPadding,
+                  ),
+                  _RequestsList(
+                    isLandscape: widget.isLandscape,
+                    topPadding: listTopPadding,
+                    bottomPadding: contentBottomPadding,
+                  ),
+                ],
               ),
-              GradientOverlay(
-                height: listTopPadding + (widget.contentTop == 0 ? 90 : 20),
-                isTop: true,
-                backgroundColor: context.scaffoldBackgroundColor,
-              ),
-              if (widget.contentTop == 0)
-                Positioned(
-                  top: 16,
-                  left: 0,
-                  right: 0,
-                  child: _FriendsTabs(state: state),
-                ),
-            ] else
-              Positioned.fill(
-                top: widget.contentTop,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _FriendsTabs(state: state),
-                    const SizedBox(height: 4),
-                    Expanded(
-                      child: IndexedStack(
-                        index: activeIndex,
-                        children: [
-                          _FriendsList(bottomPadding: contentBottomPadding),
-                          _RequestsList(bottomPadding: contentBottomPadding),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            // One header fade: lists use internal padding and can scroll below
+            // both the app bar and tabs instead of being clipped beneath them.
+            GradientOverlay(
+              height: listTopPadding,
+              isTop: true,
+              backgroundColor: context.scaffoldBackgroundColor,
+            ),
+            if (showBodyTabs)
+              Positioned(
+                top: tabsTop,
+                left: 0,
+                right: 0,
+                child: _FriendsTabs(state: state),
               ),
             AnimatedPositioned(
               duration: Duration.zero,
@@ -275,6 +295,7 @@ class _FriendsTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PrimarySegmentedControl(
+      compact: true,
       horizontalPadding: horizontalPadding,
       items: [
         PrimarySegmentItem(label: context.l10n.friendsTabFriends),
