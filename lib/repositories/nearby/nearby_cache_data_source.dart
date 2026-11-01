@@ -23,7 +23,7 @@ class NearbyCacheSnapshot {
 /// never erases a previously loaded feed.
 class NearbyCacheDataSource {
   static const _maximumSnapshotsPerUser = 2;
-  static const maximumPeoplePerSnapshot = 100;
+  static const maximumPeoplePerSnapshot = 150;
 
   NearbyCacheDataSource({
     required SharedPreferences preferences,

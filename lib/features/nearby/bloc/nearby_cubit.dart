@@ -51,7 +51,20 @@ class NearbyCubit extends Cubit<NearbyState> {
   var _refreshOperationId = 0;
   DateTime? _feedBlockedUntil;
   DateTime? _paginationRetryAt;
+  bool _needsHeadRefresh = false;
+  bool get needsHeadRefresh => _needsHeadRefresh;
   static const _maximumFeedRequestsPerMinute = 8;
+
+  /// A denied page may be retried once when the quota window ends. Network
+  /// failures use gesture-driven backoff and must not start an automatic poll.
+  Duration? get paginationQuotaRetryDelay {
+    final until = _feedBlockedUntil;
+    if (until == null) return null;
+    final remaining = until.difference(_clock().toUtc());
+    return remaining.isNegative || remaining == Duration.zero
+        ? null
+        : remaining;
+  }
 
   bool _tryConsumeFeedRequest() {
     final now = _clock().toUtc();
@@ -193,10 +206,12 @@ class NearbyCubit extends Cubit<NearbyState> {
       return Future<void>.value();
     }
     if (!_tryConsumeFeedRequest()) {
+      _needsHeadRefresh = true;
       if (state.isRefreshing) emit(state.copyWith(isRefreshing: false));
       return Future<void>.value();
     }
     final filters = state.filters;
+    _needsHeadRefresh = false;
     final revision = _queryRevision;
     final operationId = ++_refreshOperationId;
     _repository.invalidateFeed(filters);
@@ -237,6 +252,7 @@ class NearbyCubit extends Cubit<NearbyState> {
     } catch (error) {
       if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
         if (_isNearbyRateLimitedError(error)) {
+          _needsHeadRefresh = true;
           _feedBlockedUntil = _clock().toUtc().add(const Duration(minutes: 1));
           emit(
             state.copyWith(
@@ -308,6 +324,13 @@ class NearbyCubit extends Cubit<NearbyState> {
   }
 
   Future<void> loadMore() async {
+    if (_needsHeadRefresh &&
+        !state.isRefreshing &&
+        !isClosed &&
+        state.status == NearbyStatus.ready) {
+      await refresh();
+      return;
+    }
     if (state.isRefreshing ||
         state.isLoadingMore ||
         state.people.isEmpty ||
@@ -352,6 +375,7 @@ class NearbyCubit extends Cubit<NearbyState> {
   Future<void> applyFilters(NearbyFilters filters) async {
     final normalized = filters.normalized();
     if (normalized == state.filters) return;
+    _needsHeadRefresh = false;
     final revision = ++_queryRevision;
     _refreshOperationId++;
     _repository.invalidateFeed(state.filters);

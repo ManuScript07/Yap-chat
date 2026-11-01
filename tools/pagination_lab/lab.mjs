@@ -187,7 +187,7 @@ export class PaginationLab {
         return `('${u.id}',${Math.max(-89,Math.min(89,anchor.lat+distance))},${Math.max(-179,Math.min(179,anchor.lon+distance))},statement_timestamp())`;
       }).join(',')} on conflict(user_id) do update set latitude=excluded.latitude,longitude=excluded.longitude,updated_at=excluded.updated_at;
       commit;`);
-    return {anchor, nearbyLimit:100, message:'Координаты привязаны к текущему положению тестового аккаунта'};
+    return {anchor, nearbyLimit:150, message:'Координаты привязаны к текущему положению тестового аккаунта'};
   }
   status() {
     if (!this.state?.seeded) return {seeded:false};
@@ -262,8 +262,8 @@ export class PaginationLab {
       for(const row of rows){assert(!nearby.has(row.id),'duplicate nearby person across cursor pages');nearby.add(row.id);}
       pages++;assert(pages<10);after=rows.length&&rows[0].has_more?rows.at(-1).id:null;
     }while(after);
-    assert.equal(nearby.size,100);
-    report.nearby={pages,total:nearby.size,serverLimit:100};
+    assert.equal(nearby.size,150);
+    report.nearby={pages,total:nearby.size,serverLimit:150};
     report.searchTargetsFound=true;
     report.realGoTrueSessions=true;
     writeFileSync(join(this.directory,'verification.json'),JSON.stringify(report,null,2));

@@ -34,6 +34,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   var _isPullRefreshing = false;
   NearbyFilters _presentedFilters = const NearbyFilters();
   int _presentedFeedRevision = 0;
+  Timer? _quotaPageRetry;
 
   @override
   void initState() {
@@ -45,12 +46,15 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
 
   @override
   void dispose() {
+    _quotaPageRetry?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
+  void _onScroll({bool allowQuotaRetry = true}) {
+    if (!_scrollController.hasClients || (_quotaPageRetry?.isActive ?? false)) {
+      return;
+    }
     final nearby = context.read<NearbyCubit>();
     final state = nearby.state;
     // An empty viewport is always at its bottom edge. It must not turn that
@@ -58,14 +62,48 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
     // pull-to-refresh is already fetching the first page.
     if (state.isRefreshing ||
         state.isLoadingMore ||
-        state.people.isEmpty ||
-        !state.hasMore ||
+        (state.people.isEmpty && !nearby.needsHeadRefresh) ||
+        (!state.hasMore && !nearby.needsHeadRefresh) ||
         state.status != NearbyStatus.ready) {
       return;
     }
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - 360) {
-      unawaited(nearby.loadMore());
+      final filters = state.filters;
+      final revision = state.feedRevision;
+      unawaited(
+        nearby.loadMore().then((_) {
+          if (!allowQuotaRetry) return;
+          if (!mounted ||
+              !identical(context.read<NearbyCubit>(), nearby) ||
+              nearby.state.filters != filters ||
+              nearby.state.feedRevision != revision) {
+            return;
+          }
+          final delay = nearby.paginationQuotaRetryDelay;
+          if (delay == null ||
+              (!nearby.state.hasMore && !nearby.needsHeadRefresh)) {
+            return;
+          }
+          _quotaPageRetry?.cancel();
+          _quotaPageRetry = Timer(delay + const Duration(milliseconds: 50), () {
+            _quotaPageRetry = null;
+            if (!mounted ||
+                !identical(context.read<NearbyCubit>(), nearby) ||
+                nearby.state.filters != filters ||
+                nearby.state.feedRevision != revision ||
+                !TickerMode.valuesOf(context).enabled ||
+                !Visibility.of(context)) {
+              return;
+            }
+            final lifecycle = WidgetsBinding.instance.lifecycleState;
+            if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+              return;
+            }
+            _onScroll(allowQuotaRetry: false);
+          });
+        }),
+      );
     }
   }
 
@@ -88,6 +126,8 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               _presentedFeedRevision != state.feedRevision) {
             _presentedFilters = state.filters;
             _presentedFeedRevision = state.feedRevision;
+            _quotaPageRetry?.cancel();
+            _quotaPageRetry = null;
             // Let the existing top-edge spring finish naturally during a pull.
             // A forced jump from a negative offset interrupts that animation.
             if (_scrollController.hasClients && _scrollController.offset > 0) {
@@ -288,6 +328,11 @@ class _NearbyFeedState extends State<_NearbyFeed>
   final _pageControllers = <AnimationController>[];
   final _pageEntrances = <String, Animation<double>>{};
   var _avatarRetention = _NearbyAvatarRetention();
+  List<NearbyPerson>? _gridSource;
+  Set<String> _gridBlocked = const {};
+  _NearbyAvatarRetention? _gridRetention;
+  List<NearbyPerson> _gridPeople = const [];
+  Widget? _grid;
 
   static const _refreshTriggerExtent = 42.0;
   static const _refreshRevealStart = 14.0;
@@ -529,10 +574,38 @@ class _NearbyFeedState extends State<_NearbyFeed>
     final blockedUserIds = context.select<BlocklistCubit, Set<String>>(
       (cubit) => cubit.state.blockedUserIds,
     );
-    final people = widget.state.people
-        .where((person) => !blockedUserIds.contains(person.id))
-        .toList(growable: false);
-    final indexes = {for (final entry in people.indexed) entry.$2.id: entry.$1};
+    if (!identical(_gridSource, widget.state.people) ||
+        _gridRetention != _avatarRetention ||
+        _gridBlocked.length != blockedUserIds.length ||
+        !_gridBlocked.containsAll(blockedUserIds)) {
+      _gridSource = widget.state.people;
+      _gridBlocked = Set.of(blockedUserIds);
+      _gridRetention = _avatarRetention;
+      _gridPeople = widget.state.people
+          .where((person) => !blockedUserIds.contains(person.id))
+          .toList(growable: false);
+      final rows = _gridPeople;
+      final indexes = {for (final entry in rows.indexed) entry.$2.id: entry.$1};
+      _grid = SliverGrid.builder(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 150,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 6,
+        ),
+        itemCount: rows.length,
+        findChildIndexCallback: (key) =>
+            key is ValueKey<String> ? indexes[key.value] : null,
+        itemBuilder: (context, index) => FadeTransition(
+          key: ValueKey(rows[index].id),
+          opacity: _pageEntrances[rows[index].id] ?? kAlwaysCompleteAnimation,
+          child: _NearbyPersonTile(
+            person: rows[index],
+            avatarRetention: _avatarRetention,
+          ),
+        ),
+      );
+    }
+    final people = _gridPeople;
     if (widget.state.status == NearbyStatus.initial ||
         widget.state.status == NearbyStatus.loading && people.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -565,27 +638,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
                 ),
                 sliver: people.isEmpty
                     ? const SliverToBoxAdapter(child: SizedBox(height: 250))
-                    : SliverGrid.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 150,
-                              crossAxisSpacing: 6,
-                              mainAxisSpacing: 6,
-                            ),
-                        itemCount: people.length,
-                        findChildIndexCallback: (key) =>
-                            key is ValueKey<String> ? indexes[key.value] : null,
-                        itemBuilder: (context, index) => FadeTransition(
-                          key: ValueKey(people[index].id),
-                          opacity:
-                              _pageEntrances[people[index].id] ??
-                              kAlwaysCompleteAnimation,
-                          child: _NearbyPersonTile(
-                            person: people[index],
-                            avatarRetention: _avatarRetention,
-                          ),
-                        ),
-                      ),
+                    : _grid!,
               ),
               // A fixed slot above the controls prevents the end extent from
               // changing under the finger, and keeps the spinner unobscured.
@@ -597,12 +650,13 @@ class _NearbyFeedState extends State<_NearbyFeed>
                     alignment: Alignment.topCenter,
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: widget.state.isLoadingMore
-                          ? const SizedBox.square(
-                              dimension: 24,
-                              child: CircularProgressIndicator(strokeWidth: 3),
-                            )
-                          : const SizedBox.square(dimension: 24),
+                      child: _NearbyPullIndicator(
+                        opacity: widget.state.isLoadingMore ? 1 : 0,
+                        progress: 1,
+                        spinning: true,
+                        size: 24,
+                        strokeWidth: 3,
+                      ),
                     ),
                   ),
                 ),
@@ -658,11 +712,15 @@ class _NearbyPullIndicator extends StatefulWidget {
     required this.opacity,
     required this.progress,
     required this.spinning,
+    this.size = 36,
+    this.strokeWidth = 4,
   });
 
   final double opacity;
   final double progress;
   final bool spinning;
+  final double size;
+  final double strokeWidth;
 
   @override
   State<_NearbyPullIndicator> createState() => _NearbyPullIndicatorState();
@@ -696,8 +754,9 @@ class _NearbyPullIndicatorState extends State<_NearbyPullIndicator>
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _visibility,
     child: Center(
+      heightFactor: 1,
       child: SizedBox.square(
-        dimension: 36,
+        dimension: widget.size,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
           switchInCurve: Curves.easeOut,
@@ -707,7 +766,7 @@ class _NearbyPullIndicatorState extends State<_NearbyPullIndicator>
               _spinning ? 'nearby_refresh_spinner' : 'nearby_refresh_progress',
             ),
             value: _spinning ? null : widget.progress,
-            strokeWidth: 4,
+            strokeWidth: widget.strokeWidth,
           ),
         ),
       ),
