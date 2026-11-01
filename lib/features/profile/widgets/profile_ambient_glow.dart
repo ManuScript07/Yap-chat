@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 
 class ProfileAmbientGlow extends StatelessWidget {
   const ProfileAmbientGlow({super.key, required this.height});
@@ -11,7 +12,6 @@ class ProfileAmbientGlow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = context.colorScheme.primary;
-    final transparent = color.withValues(alpha: 0);
     return IgnorePointer(
       child: SizedBox(
         width: double.infinity,
@@ -23,6 +23,8 @@ class ProfileAmbientGlow extends StatelessWidget {
               imageFilter: ui.ImageFilter.blur(
                 sigmaX: 42,
                 sigmaY: 18,
+                // This is the original broad halo. Its uncut blurred tail
+                // owns the lower contour and the visible height of the glow.
                 tileMode: ui.TileMode.decal,
               ),
               child: DecoratedBox(
@@ -47,11 +49,10 @@ class ProfileAmbientGlow extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    color.withValues(alpha: .34),
-                    color.withValues(alpha: .22),
-                    transparent,
+                    for (final alpha in AmbientGlowStyle.profileCoreAlpha)
+                      color.withValues(alpha: alpha),
                   ],
-                  stops: const [0, .42, 1],
+                  stops: AmbientGlowStyle.profileCoreStops,
                 ),
               ),
             ),

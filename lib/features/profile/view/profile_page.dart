@@ -42,80 +42,89 @@ class _ProfilePageState extends State<ProfilePage> {
     final mediaQuery = MediaQuery.of(context);
     return Scaffold(
       backgroundColor: context.scaffoldBackgroundColor,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isLandscape = mediaQuery.orientation == Orientation.landscape;
-          final glowHeight = constraints.maxHeight * .45;
-          return Stack(
-            children: [
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: glowHeight,
-                child: ProfileAmbientGlow(height: glowHeight),
-              ),
-              Positioned.fill(
-                child: _ProfileScrollContent(
-                  profile: profile,
-                  topPadding: mediaQuery.padding.top + (isLandscape ? 88 : 98),
-                  onPhotoTap: (index) => _openGallery(profile, index),
+      body: ProfilePhotoTransitionScope(
+        builder: (context) => LayoutBuilder(
+          builder: (context, constraints) {
+            final isLandscape = mediaQuery.orientation == Orientation.landscape;
+            final glowHeight = constraints.maxHeight * .45;
+            return Stack(
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: glowHeight,
+                  child: ProfileAmbientGlow(height: glowHeight),
                 ),
-              ),
-              Positioned(
-                top: mediaQuery.padding.top + 16,
-                left: mediaQuery.padding.left + 16,
-                right: mediaQuery.padding.right + 16,
-                child: Row(
-                  children: [
-                    GlassButton(
-                      frostedStyle: true,
-                      icon: Icons.edit_rounded,
-                      size: 50,
-                      iconSize: 28,
-                      borderRadius: 20,
-                      onPressed: () =>
-                          showProfileEditPage(context, profile: profile),
-                    ),
-                    const SizedBox(width: 12),
-                    GlassButton(
-                      frostedStyle: true,
-                      icon: Icons.settings_rounded,
-                      size: 50,
-                      iconSize: 29,
-                      borderRadius: 20,
-                      onPressed: () => showSettingsPage(context),
-                    ),
-                    const Spacer(),
-                    GlassButton(
-                      frostedStyle: true,
-                      icon: Icons.share_rounded,
-                      size: 50,
-                      iconSize: 28,
-                      borderRadius: 20,
-                      onPressed: _isSharing ? null : () => _share(profile),
-                    ),
-                  ],
+                Positioned.fill(
+                  child: _ProfileScrollContent(
+                    profile: profile,
+                    topPadding:
+                        mediaQuery.padding.top + (isLandscape ? 88 : 98),
+                    onPhotoTap: (index) =>
+                        _openGallery(context, profile, index),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+                Positioned(
+                  top: mediaQuery.padding.top + 16,
+                  left: mediaQuery.padding.left + 16,
+                  right: mediaQuery.padding.right + 16,
+                  child: Row(
+                    children: [
+                      GlassButton(
+                        frostedStyle: true,
+                        icon: Icons.edit_rounded,
+                        size: 50,
+                        iconSize: 28,
+                        borderRadius: 20,
+                        onPressed: () =>
+                            showProfileEditPage(context, profile: profile),
+                      ),
+                      const SizedBox(width: 12),
+                      GlassButton(
+                        frostedStyle: true,
+                        icon: Icons.settings_rounded,
+                        size: 50,
+                        iconSize: 29,
+                        borderRadius: 20,
+                        onPressed: () => showSettingsPage(context),
+                      ),
+                      const Spacer(),
+                      GlassButton(
+                        frostedStyle: true,
+                        icon: Icons.share_rounded,
+                        size: 50,
+                        iconSize: 28,
+                        borderRadius: 20,
+                        onPressed: _isSharing ? null : () => _share(profile),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Future<void> _openGallery(UserProfile profile, int index) async {
+  Future<void> _openGallery(
+    BuildContext context,
+    UserProfile profile,
+    int index,
+  ) async {
     final photos = profile.effectivePhotos;
     if (photos.isEmpty) return;
     final provider = profilePhotoImageProvider(photos[index], cacheWidth: 352);
     final aspectRatio = provider == null
         ? null
         : await resolveImageAspectRatio(context, provider);
-    if (!mounted) return;
+    if (!context.mounted) return;
     final aspectRatios = List<double?>.filled(photos.length, null);
     aspectRatios[index] = aspectRatio;
-    await Navigator.of(context).push(
+    await ProfilePhotoTransitionScope.openGallery(
+      context,
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 260),
         reverseTransitionDuration: const Duration(milliseconds: 180),
@@ -393,38 +402,40 @@ class _ProfilePhotoCard extends StatelessWidget {
             right: 0,
             bottom: 10,
             child: Center(
-              child: GestureDetector(
-                onLongPress: () => _copyUsername(context, profile.username),
-                child: Transform.rotate(
-                  angle: -0.09,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.sizeOf(context).width - 32,
-                    ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: surfaceColor,
-                        borderRadius: BorderRadius.circular(12),
+              child: ProfilePhotoUsernameTransition(
+                child: GestureDetector(
+                  onLongPress: () => _copyUsername(context, profile.username),
+                  child: Transform.rotate(
+                    angle: -0.09,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width - 32,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 5,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: Text(
-                            '@${profile.username}',
-                            maxLines: 1,
-                            softWrap: false,
-                            style: TextStyle(
-                              color: usernameTextColor,
-                              fontSize: 24,
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w500,
-                              height: 1,
-                              letterSpacing: .50,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 5,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '@${profile.username}',
+                              maxLines: 1,
+                              softWrap: false,
+                              style: TextStyle(
+                                color: usernameTextColor,
+                                fontSize: 24,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w500,
+                                height: 1,
+                                letterSpacing: .50,
+                              ),
                             ),
                           ),
                         ),

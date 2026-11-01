@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/theme/theme.dart';
 
 /// Виджет мягкого атмосферного свечения внизу экрана.
 class BottomAmbientGlow extends StatelessWidget {
@@ -16,21 +17,6 @@ class BottomAmbientGlow extends StatelessWidget {
   final double height;
   final double blurSigma;
   final double opacity;
-
-  static const _coreSamples = 32;
-  static final _coreStops = <double>[
-    for (var i = 0; i <= _coreSamples; i++) .35 * i / _coreSamples,
-    1,
-  ];
-  static final _coreAlpha = <double>[
-    for (var i = 0; i <= _coreSamples; i++) _coreStrength(i / _coreSamples),
-    0,
-  ];
-
-  static double _coreStrength(double t) {
-    final remaining = 1 - t * t * (3 - 2 * t);
-    return remaining * remaining * remaining;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,10 +66,10 @@ class BottomAmbientGlow extends StatelessWidget {
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          for (final alpha in _coreAlpha)
+                          for (final alpha in AmbientGlowStyle.coreAlpha)
                             baseColor.withValues(alpha: alpha),
                         ],
-                        stops: _coreStops,
+                        stops: AmbientGlowStyle.coreStops,
                       ),
                     ),
                   ),

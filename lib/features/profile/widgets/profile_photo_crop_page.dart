@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/ui.dart';
 
 Future<Uint8List?> openProfilePhotoCropper(
   BuildContext context,
@@ -252,7 +253,10 @@ class _CropOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final crop = RRect.fromRectAndRadius(cropRect, const Radius.circular(24));
+    final crop = RRect.fromRectAndRadius(
+      cropRect,
+      Radius.circular(AvatarGeometry.profileRadiusFor(cropRect.shortestSide)),
+    );
     final outside = Path()..addRect(Offset.zero & size);
     final hole = Path()..addRRect(crop);
     canvas.drawPath(

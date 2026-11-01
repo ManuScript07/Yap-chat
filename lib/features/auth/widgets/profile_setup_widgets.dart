@@ -286,6 +286,7 @@ class ProfileAvatarPicker extends StatelessWidget {
                 ? null
                 : MemoryImage(localAvatarBytes!),
             size: 220,
+            borderRadius: AvatarGeometry.profileRadiusFor(220),
           )
         : Container(
             width: 220,
@@ -293,7 +294,7 @@ class ProfileAvatarPicker extends StatelessWidget {
             decoration: BoxDecoration(
               color: context.colorScheme.primary,
               borderRadius: BorderRadius.circular(
-                AvatarGeometry.radiusFor(220),
+                AvatarGeometry.profileRadiusFor(220),
               ),
             ),
             child: Icon(
@@ -307,7 +308,9 @@ class ProfileAvatarPicker extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         InkWell(
-          borderRadius: BorderRadius.circular(AvatarGeometry.radiusFor(220)),
+          borderRadius: BorderRadius.circular(
+            AvatarGeometry.profileRadiusFor(220),
+          ),
           onTap: onPick,
           child: avatar,
         ),

@@ -362,133 +362,137 @@ class _ProfileScaffoldState extends State<_ProfileScaffold>
     final mediaQuery = MediaQuery.of(context);
     return Scaffold(
       backgroundColor: context.scaffoldBackgroundColor,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isLandscape = mediaQuery.orientation == Orientation.landscape;
-          final glowHeight = constraints.maxHeight * .45;
-          return Stack(
-            children: [
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: glowHeight,
-                child: FadeTransition(
-                  opacity: _opacity,
-                  child: ProfileAmbientGlow(height: glowHeight),
+      body: ProfilePhotoTransitionScope(
+        builder: (context) => LayoutBuilder(
+          builder: (context, constraints) {
+            final isLandscape = mediaQuery.orientation == Orientation.landscape;
+            final glowHeight = constraints.maxHeight * .45;
+            return Stack(
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: glowHeight,
+                  child: FadeTransition(
+                    opacity: _opacity,
+                    child: ProfileAmbientGlow(height: glowHeight),
+                  ),
                 ),
-              ),
-              Positioned.fill(
-                child: _ProfileContent(
-                  viewedProfile: viewedProfile,
-                  opacity: _opacity,
-                  state: state,
-                  topPadding: mediaQuery.padding.top + (isLandscape ? 88 : 98),
-                  isBlockedByMe: isBlockedByMe,
-                  onPhotoTap: (index) =>
-                      _openGallery(context, viewedProfile.profile, index),
-                  onChat: () => _openChat(context),
-                  onUnblock: isBlockedByMe
-                      ? () => _confirmUnblock(context)
-                      : null,
-                  onLocation:
-                      !viewedProfile.isFriend ||
-                          state.location == null ||
-                          isBlockedByMe
-                      ? null
-                      : () => _openLocation(context, state.location!),
-                  onFriends: () => _openFriends(context),
-                ),
-              ),
-              if (_showLoader && !viewedProfile.isBlocked)
                 Positioned.fill(
-                  child: IgnorePointer(
-                    child: FadeTransition(
-                      opacity: ReverseAnimation(_opacity),
-                      child: _ProfileLoadingBody(
-                        reserveAvatarSpace:
-                            ProfileAvatarHero.snapshotFor(
-                              viewedProfile.profile.id,
-                            ) !=
-                            null,
+                  child: _ProfileContent(
+                    viewedProfile: viewedProfile,
+                    opacity: _opacity,
+                    state: state,
+                    topPadding:
+                        mediaQuery.padding.top + (isLandscape ? 88 : 98),
+                    isBlockedByMe: isBlockedByMe,
+                    onPhotoTap: (index) =>
+                        _openGallery(context, viewedProfile.profile, index),
+                    onChat: () => _openChat(context),
+                    onUnblock: isBlockedByMe
+                        ? () => _confirmUnblock(context)
+                        : null,
+                    onLocation:
+                        !viewedProfile.isFriend ||
+                            state.location == null ||
+                            isBlockedByMe
+                        ? null
+                        : () => _openLocation(context, state.location!),
+                    onFriends: () => _openFriends(context),
+                  ),
+                ),
+                if (_showLoader && !viewedProfile.isBlocked)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: FadeTransition(
+                        opacity: ReverseAnimation(_opacity),
+                        child: _ProfileLoadingBody(
+                          reserveAvatarSpace:
+                              ProfileAvatarHero.snapshotFor(
+                                viewedProfile.profile.id,
+                              ) !=
+                              null,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              Positioned(
-                top: mediaQuery.padding.top + 16,
-                left: mediaQuery.padding.left + 16,
-                right: mediaQuery.padding.right + 16,
-                child: Row(
-                  children: [
-                    GlassButton(
-                      frostedStyle: true,
-                      icon: Icons.arrow_back_rounded,
-                      size: 50,
-                      iconSize: 28,
-                      borderRadius: 20,
-                      onPressed: () => context.router.maybePop(),
-                    ),
-                    const Spacer(),
-                    FadeTransition(
-                      opacity: _opacity,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (viewedProfile.isFriend && !isBlockedByMe) ...[
-                            BlocBuilder<
-                              LocationVisibilityCubit,
-                              LocationVisibilityState
-                            >(
-                              builder: (context, visibilityState) {
-                                final globalVisible =
-                                    visibilityState
-                                        .settings
-                                        ?.sharePreciseLocation ??
-                                    false;
-                                final isExcluded = visibilityState
-                                    .excludedFriendIds
-                                    .contains(viewedProfile.profile.id);
-                                final visible = globalVisible && !isExcluded;
-                                return GlassButton(
-                                  frostedStyle: true,
-                                  icon: visible
-                                      ? Icons.visibility_rounded
-                                      : Icons.visibility_off_rounded,
-                                  size: 50,
-                                  iconSize: 28,
-                                  borderRadius: 20,
-                                  onPressed:
-                                      visibilityState.isSaving || !globalVisible
-                                      ? null
-                                      : () => context
-                                            .read<LocationVisibilityCubit>()
-                                            .setFriendExcluded(
-                                              viewedProfile.profile.id,
-                                              excluded: visible,
-                                            ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 12),
-                          ],
-                          GlassButton(
-                            frostedStyle: true,
-                            icon: Icons.settings_rounded,
-                            size: 50,
-                            iconSize: 29,
-                            borderRadius: 20,
-                            onPressed: () => _showActions(context),
-                          ),
-                        ],
+                Positioned(
+                  top: mediaQuery.padding.top + 16,
+                  left: mediaQuery.padding.left + 16,
+                  right: mediaQuery.padding.right + 16,
+                  child: Row(
+                    children: [
+                      GlassButton(
+                        frostedStyle: true,
+                        icon: Icons.arrow_back_rounded,
+                        size: 50,
+                        iconSize: 28,
+                        borderRadius: 20,
+                        onPressed: () => context.router.maybePop(),
                       ),
-                    ),
-                  ],
+                      const Spacer(),
+                      FadeTransition(
+                        opacity: _opacity,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (viewedProfile.isFriend && !isBlockedByMe) ...[
+                              BlocBuilder<
+                                LocationVisibilityCubit,
+                                LocationVisibilityState
+                              >(
+                                builder: (context, visibilityState) {
+                                  final globalVisible =
+                                      visibilityState
+                                          .settings
+                                          ?.sharePreciseLocation ??
+                                      false;
+                                  final isExcluded = visibilityState
+                                      .excludedFriendIds
+                                      .contains(viewedProfile.profile.id);
+                                  final visible = globalVisible && !isExcluded;
+                                  return GlassButton(
+                                    frostedStyle: true,
+                                    icon: visible
+                                        ? Icons.visibility_rounded
+                                        : Icons.visibility_off_rounded,
+                                    size: 50,
+                                    iconSize: 28,
+                                    borderRadius: 20,
+                                    onPressed:
+                                        visibilityState.isSaving ||
+                                            !globalVisible
+                                        ? null
+                                        : () => context
+                                              .read<LocationVisibilityCubit>()
+                                              .setFriendExcluded(
+                                                viewedProfile.profile.id,
+                                                excluded: visible,
+                                              ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            GlassButton(
+                              frostedStyle: true,
+                              icon: Icons.settings_rounded,
+                              size: 50,
+                              iconSize: 29,
+                              borderRadius: 20,
+                              onPressed: () => _showActions(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -1025,39 +1029,41 @@ class _ProfilePhotoCard extends StatelessWidget {
             child: Center(
               child: FadeTransition(
                 opacity: opacity,
-                child: GestureDetector(
-                  onTap: () => _copyUsername(context, profile.username),
-                  onLongPress: () => _copyUsername(context, profile.username),
-                  child: Transform.rotate(
-                    angle: -.09,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.sizeOf(context).width - 32,
-                      ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: context.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(12),
+                child: ProfilePhotoUsernameTransition(
+                  child: GestureDetector(
+                    onTap: () => _copyUsername(context, profile.username),
+                    onLongPress: () => _copyUsername(context, profile.username),
+                    child: Transform.rotate(
+                      angle: -.09,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width - 32,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 5,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: context.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.center,
-                            child: Text(
-                              '@${profile.username}',
-                              maxLines: 1,
-                              softWrap: false,
-                              style: TextStyle(
-                                color: context.colorScheme.onPrimary,
-                                fontSize: 24,
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w500,
-                                height: 1,
-                                letterSpacing: .50,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 5,
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.center,
+                              child: Text(
+                                '@${profile.username}',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  color: context.colorScheme.onPrimary,
+                                  fontSize: 24,
+                                  fontFamily: 'Roboto',
+                                  fontWeight: FontWeight.w500,
+                                  height: 1,
+                                  letterSpacing: .50,
+                                ),
                               ),
                             ),
                           ),
@@ -1762,7 +1768,8 @@ Future<void> _openGallery(
   if (!context.mounted) return;
   final ratios = List<double?>.filled(photos.length, null);
   ratios[index] = aspectRatio;
-  await Navigator.of(context).push(
+  await ProfilePhotoTransitionScope.openGallery(
+    context,
     PageRouteBuilder<void>(
       transitionDuration: const Duration(milliseconds: 260),
       reverseTransitionDuration: const Duration(milliseconds: 180),
