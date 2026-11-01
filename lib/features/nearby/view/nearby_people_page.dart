@@ -22,7 +22,10 @@ import 'package:yap_chat/ui/ui.dart';
 
 @RoutePage()
 class NearbyPeoplePage extends StatefulWidget {
-  const NearbyPeoplePage({super.key});
+  const NearbyPeoplePage({super.key, this.openProfile});
+
+  @visibleForTesting
+  final Future<void> Function(BuildContext context, String userId)? openProfile;
 
   @override
   State<NearbyPeoplePage> createState() => _NearbyPeoplePageState();
@@ -109,6 +112,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
 
   @override
   Widget build(BuildContext context) {
+    final routeTransition = ModalRoute.of(context)?.secondaryAnimation;
     return BlocListener<NearbyCubit, NearbyState>(
       listenWhen: (previous, current) =>
           previous.visibilityFeedbackId != current.visibilityFeedbackId ||
@@ -194,6 +198,8 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               body: Stack(
                 children: [
                   _NearbyFeed(
+                    routeTransition: routeTransition,
+                    openProfile: widget.openProfile,
                     controller: _scrollController,
                     state: state,
                     bottomPadding: contentBottom,
@@ -315,6 +321,8 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
 
 class _NearbyFeed extends StatefulWidget {
   const _NearbyFeed({
+    required this.routeTransition,
+    required this.openProfile,
     required this.controller,
     required this.state,
     required this.bottomPadding,
@@ -324,6 +332,8 @@ class _NearbyFeed extends StatefulWidget {
   });
 
   final ScrollController controller;
+  final Animation<double>? routeTransition;
+  final Future<void> Function(BuildContext, String)? openProfile;
   final NearbyState state;
   final double bottomPadding;
   final Future<void> Function() onRefresh;
@@ -351,6 +361,7 @@ class _NearbyFeedState extends State<_NearbyFeed>
   List<NearbyPerson>? _gridSource;
   Set<String> _gridBlocked = const {};
   _NearbyAvatarRetention? _gridRetention;
+  Animation<double>? _gridRouteTransition;
   List<NearbyPerson> _gridPeople = const [];
   Widget? _grid;
 
@@ -595,12 +606,14 @@ class _NearbyFeedState extends State<_NearbyFeed>
       (cubit) => cubit.state.blockedUserIds,
     );
     if (!identical(_gridSource, widget.state.people) ||
+        _gridRouteTransition != widget.routeTransition ||
         _gridRetention != _avatarRetention ||
         _gridBlocked.length != blockedUserIds.length ||
         !_gridBlocked.containsAll(blockedUserIds)) {
       _gridSource = widget.state.people;
       _gridBlocked = Set.of(blockedUserIds);
       _gridRetention = _avatarRetention;
+      _gridRouteTransition = widget.routeTransition;
       _gridPeople = widget.state.people
           .where((person) => !blockedUserIds.contains(person.id))
           .toList(growable: false);
@@ -619,6 +632,8 @@ class _NearbyFeedState extends State<_NearbyFeed>
           key: ValueKey(rows[index].id),
           opacity: _pageEntrances[rows[index].id] ?? kAlwaysCompleteAnimation,
           child: _NearbyPersonTile(
+            routeTransition: widget.routeTransition,
+            openProfile: widget.openProfile,
             person: rows[index],
             avatarRetention: _avatarRetention,
           ),
@@ -886,17 +901,122 @@ class _NearbyEmptyState extends StatelessWidget {
   }
 }
 
-class _NearbyPersonTile extends StatelessWidget {
+class _NearbyPersonTile extends StatefulWidget {
   const _NearbyPersonTile({
+    required this.routeTransition,
     required this.person,
     required this.avatarRetention,
+    required this.openProfile,
   });
 
   final NearbyPerson person;
+  final Animation<double>? routeTransition;
   final _NearbyAvatarRetention avatarRetention;
+  final Future<void> Function(BuildContext, String)? openProfile;
+
+  @override
+  State<_NearbyPersonTile> createState() => _NearbyPersonTileState();
+}
+
+class _NearbyPersonTileState extends State<_NearbyPersonTile>
+    with SingleTickerProviderStateMixin {
+  bool _selected = false;
+  bool _returning = false;
+  bool _hadFlight = false;
+  double _departureOpacity = 1;
+  Animation<double>? _transition;
+  AnimationController? _detailsRestoration;
+  NearbyPerson get person => widget.person;
+  _NearbyAvatarRetention get avatarRetention => widget.avatarRetention;
+
+  void _onTransition(AnimationStatus status) {
+    if (!mounted || !_selected) return;
+    if (status != AnimationStatus.dismissed) _hadFlight = true;
+    if (status == AnimationStatus.reverse && !_returning) {
+      setState(() => _returning = true);
+    } else if (status == AnimationStatus.dismissed) {
+      _restoreDetails();
+    }
+  }
+
+  Animation<double> get _detailsOpacity {
+    if (!_selected) {
+      return _detailsRestoration?.drive(CurveTween(curve: Curves.easeInOut)) ??
+          kAlwaysCompleteAnimation;
+    }
+    if (_returning) return kAlwaysDismissedAnimation;
+    return _transition?.drive(
+          Tween<double>(begin: _departureOpacity, end: 0).chain(
+            CurveTween(
+              curve: const Interval(0, .12, curve: Curves.easeOutCubic),
+            ),
+          ),
+        ) ??
+        kAlwaysCompleteAnimation;
+  }
+
+  void _restoreDetails() {
+    if (!mounted || !_selected) return;
+    _transition?.removeStatusListener(_onTransition);
+    if (_hadFlight && !MediaQuery.disableAnimationsOf(context)) {
+      final restoration = _detailsRestoration ??= AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 220),
+      );
+      restoration.forward(from: 0);
+    } else if (MediaQuery.disableAnimationsOf(context)) {
+      _detailsRestoration?.value = 1;
+    } else {
+      _detailsRestoration?.forward();
+    }
+    setState(() {
+      _selected = false;
+      _returning = false;
+    });
+  }
+
+  Future<void> _open() async {
+    if (_selected) return;
+    _departureOpacity = _detailsOpacity.value;
+    _detailsRestoration?.stop();
+    _returning = false;
+    _hadFlight = false;
+    // The page owns the single route dependency. Tiles receive its animation
+    // without subscribing their avatar subtrees to route-state rebuilds.
+    _transition?.removeStatusListener(_onTransition);
+    _transition = widget.routeTransition;
+    _transition?.addStatusListener(_onTransition);
+    setState(() => _selected = true);
+    try {
+      final open = widget.openProfile;
+      if (open != null) {
+        await open(context, person.id);
+      } else {
+        await openViewedProfile(context, userId: person.id, waitForClose: true);
+      }
+    } finally {
+      // If navigation did not start, restore the tile on the next frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _selected &&
+            (_transition == null ||
+                _transition!.status == AnimationStatus.dismissed)) {
+          _restoreDetails();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _transition?.removeStatusListener(_onTransition);
+    _detailsRestoration?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final detailsOpacity = _detailsOpacity;
     final isOnline = context.select<PresenceCubit, bool>(
       (cubit) => cubit.state.isOnline(person.id),
     );
@@ -904,7 +1024,9 @@ class _NearbyPersonTile extends StatelessWidget {
       button: true,
       label: person.displayName,
       child: InkWell(
-        onTap: () => unawaited(openViewedProfile(context, userId: person.id)),
+        onTap: () => unawaited(_open()),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         borderRadius: BorderRadius.circular(8),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -944,18 +1066,22 @@ class _NearbyPersonTile extends StatelessWidget {
                         left: 8,
                         right: 8,
                         bottom: 7,
-                        child: Text(
-                          person.displayName,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            shadows: [
-                              Shadow(color: Colors.black54, blurRadius: 4),
-                            ],
+                        child: _NearbyProfileDetailsFade(
+                          key: ValueKey('nearby-name-${person.id}'),
+                          opacity: detailsOpacity,
+                          child: Text(
+                            person.displayName,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              shadows: [
+                                Shadow(color: Colors.black54, blurRadius: 4),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -965,29 +1091,35 @@ class _NearbyPersonTile extends StatelessWidget {
                 Positioned(
                   top: -2,
                   left: -2,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    switchInCurve: Curves.easeOutBack,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(scale: animation, child: child),
-                    ),
-                    child: isOnline
-                        ? Container(
-                            key: const ValueKey('online-badge'),
-                            width: onlineBadgeSize,
-                            height: onlineBadgeSize,
-                            decoration: BoxDecoration(
-                              color: context.colorScheme.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: context.scaffoldBackgroundColor,
-                                width: 2,
+                  child: _NearbyProfileDetailsFade(
+                    key: ValueKey('nearby-presence-${person.id}'),
+                    opacity: detailsOpacity,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      switchInCurve: Curves.easeOutBack,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(scale: animation, child: child),
+                      ),
+                      child: isOnline
+                          ? Container(
+                              key: const ValueKey('online-badge'),
+                              width: onlineBadgeSize,
+                              height: onlineBadgeSize,
+                              decoration: BoxDecoration(
+                                color: context.colorScheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: context.scaffoldBackgroundColor,
+                                  width: 2,
+                                ),
                               ),
+                            )
+                          : const SizedBox(
+                              key: ValueKey('online-badge-hidden'),
                             ),
-                          )
-                        : const SizedBox(key: ValueKey('online-badge-hidden')),
+                    ),
                   ),
                 ),
               ],
@@ -997,6 +1129,23 @@ class _NearbyPersonTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Keep decorations outside the avatar flight, but hide them while the page
+/// above is covering the feed. On return they fade in after the avatar lands.
+class _NearbyProfileDetailsFade extends StatelessWidget {
+  const _NearbyProfileDetailsFade({
+    super.key,
+    required this.child,
+    required this.opacity,
+  });
+
+  final Widget child;
+  final Animation<double> opacity;
+
+  @override
+  Widget build(BuildContext context) =>
+      FadeTransition(opacity: opacity, child: child);
 }
 
 /// Retains only a small scrolling neighbourhood, not the entire feed. The

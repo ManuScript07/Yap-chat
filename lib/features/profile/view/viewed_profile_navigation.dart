@@ -8,14 +8,18 @@ Future<void> openViewedProfile(
   BuildContext context, {
   required String userId,
   String? originChatId,
+  bool waitForClose = false,
 }) async {
   final authRouter = context.router.root.innerRouterOf<StackRouter>(
     AuthGateRoute.name,
   );
   if (authRouter == null) return;
-  unawaited(
-    authRouter.push(
-      ViewedProfileRoute(userId: userId, originChatId: originChatId),
-    ),
+  final navigation = authRouter.push(
+    ViewedProfileRoute(userId: userId, originChatId: originChatId),
   );
+  if (waitForClose) {
+    await navigation;
+  } else {
+    unawaited(navigation);
+  }
 }
