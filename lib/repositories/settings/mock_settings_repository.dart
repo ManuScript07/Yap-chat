@@ -1,7 +1,15 @@
+import 'dart:async';
 import 'package:yap_chat/features/settings/data/data.dart';
 import 'package:yap_chat/repositories/settings/abstract_settings_repository.dart';
 
 class MockSettingsRepository implements ISettingsRepository {
+  final _visibility = StreamController<bool>.broadcast();
+  @override
+  Stream<bool> watchNearbyVisibility() async* {
+    yield _settings.nearbyVisible;
+    yield* _visibility.stream;
+  }
+
   AppLanguage? _appLanguage;
   SearchPrivacySettings _settings = const SearchPrivacySettings();
   final Set<String> _preciseLocationExclusions = {};
@@ -30,6 +38,7 @@ class MockSettingsRepository implements ISettingsRepository {
     bool value,
   ) async {
     _settings = _settings.withValue(key, value);
+    _visibility.add(_settings.nearbyVisible);
     return _settings;
   }
 

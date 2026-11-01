@@ -111,15 +111,28 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
   Widget build(BuildContext context) {
     return BlocListener<NearbyCubit, NearbyState>(
       listenWhen: (previous, current) =>
+          previous.visibilityFeedbackId != current.visibilityFeedbackId ||
           previous.locationFeedbackId != current.locationFeedbackId &&
-          current.locationIssue != null,
-      listener: (context, state) => _showLocationIssue(state.locationIssue!),
+              current.locationIssue != null,
+      listener: (context, state) {
+        if (state.locationIssue != null) {
+          _showLocationIssue(state.locationIssue!);
+        }
+        if (state.visibilityFeedbackId > 0) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.nearbyVisibilitySaveFailed,
+            type: SnackBarType.error,
+          );
+        }
+      },
       child: BlocConsumer<NearbyCubit, NearbyState>(
         listenWhen: (previous, current) =>
             previous.filters != current.filters ||
             previous.feedRevision != current.feedRevision ||
             (previous.status != current.status &&
                 current.status == NearbyStatus.locationRequired &&
+                previous.status != NearbyStatus.visibilityDisabled &&
                 current.locationIssue == null),
         listener: (context, state) {
           if (_presentedFilters != state.filters ||
@@ -157,7 +170,7 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
               !state.isRefreshing &&
               state.status != NearbyStatus.initial &&
               state.status != NearbyStatus.loading &&
-              state.status != NearbyStatus.locationRequired;
+              !state.shouldObscureContent;
 
           return PresenceWatchScope(
             scopeName: 'nearby',
@@ -192,14 +205,18 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                       }
                     },
                   ),
-                  if (state.status == NearbyStatus.locationRequired)
+                  if (state.shouldObscureContent)
                     const Positioned.fill(child: _LocationRequiredBackdrop()),
-                  if (state.status == NearbyStatus.locationRequired)
+                  if (state.shouldObscureContent)
                     Positioned.fill(
                       child: _LocationRequiredOverlay(
                         bottomInset: contentBottom,
+                        hidden: state.status == NearbyStatus.visibilityDisabled,
+                        busy: state.isVisibilitySaving,
                         onRetry: () =>
-                            context.read<NearbyCubit>().requestLocation(),
+                            state.status == NearbyStatus.visibilityDisabled
+                            ? context.read<NearbyCubit>().enableVisibility()
+                            : context.read<NearbyCubit>().requestLocation(),
                       ),
                     ),
                   if (shouldShowEmptyState)
@@ -223,7 +240,10 @@ class _NearbyPeoplePageState extends State<NearbyPeoplePage> {
                     right: 0,
                     bottom: filterBottom,
                     child: _FiltersButton(
-                      onPressed: state.isRefreshing || _isPullRefreshing
+                      onPressed:
+                          state.shouldObscureContent ||
+                              state.isRefreshing ||
+                              _isPullRefreshing
                           ? null
                           : () => _openFilters(state.filters),
                     ),
@@ -1128,10 +1148,14 @@ class _LocationRequiredOverlay extends StatelessWidget {
   const _LocationRequiredOverlay({
     required this.bottomInset,
     required this.onRetry,
+    this.hidden = false,
+    this.busy = false,
   });
 
   final double bottomInset;
   final VoidCallback onRetry;
+  final bool hidden;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -1143,7 +1167,10 @@ class _LocationRequiredOverlay extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Padding(
           padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
-          child: _LocationRequiredPanel(onRetry: onRetry),
+          child: _LocationRequiredPanel(
+            onRetry: busy ? null : onRetry,
+            hidden: hidden,
+          ),
         ),
       );
     }
@@ -1165,7 +1192,10 @@ class _LocationRequiredOverlay extends StatelessWidget {
                 alignment: Alignment.center,
                 child: SizedBox(
                   width: panelWidth,
-                  child: _LocationRequiredPanel(onRetry: onRetry),
+                  child: _LocationRequiredPanel(
+                    onRetry: busy ? null : onRetry,
+                    hidden: hidden,
+                  ),
                 ),
               ),
             ),
@@ -1177,9 +1207,10 @@ class _LocationRequiredOverlay extends StatelessWidget {
 }
 
 class _LocationRequiredPanel extends StatelessWidget {
-  const _LocationRequiredPanel({required this.onRetry});
+  const _LocationRequiredPanel({required this.onRetry, this.hidden = false});
 
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
+  final bool hidden;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -1192,13 +1223,17 @@ class _LocationRequiredPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            context.l10n.nearbyLocationRequiredTitle,
+            hidden
+                ? context.l10n.nearbyHiddenTitle
+                : context.l10n.nearbyLocationRequiredTitle,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            context.l10n.nearbyLocationRequiredContent,
+            hidden
+                ? context.l10n.nearbyHiddenContent
+                : context.l10n.nearbyLocationRequiredContent,
             textAlign: TextAlign.center,
             style: TextStyle(color: context.colorScheme.onSurfaceVariant),
           ),
@@ -1216,7 +1251,9 @@ class _LocationRequiredPanel extends StatelessWidget {
                   shape: const StadiumBorder(),
                 ),
                 child: Text(
-                  context.l10n.nearbyLocationUpdateShort,
+                  hidden
+                      ? context.l10n.nearbyEnableVisibility
+                      : context.l10n.nearbyLocationUpdateShort,
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,

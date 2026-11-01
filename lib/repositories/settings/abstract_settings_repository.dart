@@ -10,6 +10,8 @@ abstract interface class ISettingsRepository {
   /// Persists the selected language and refreshes its local account cache.
   Future<AppLanguage> updateAppLanguage(AppLanguage language);
 
+  Stream<bool> watchNearbyVisibility();
+
   /// Returns the last account-scoped value, if any, without network access.
   Future<SearchPrivacySettings?> readCachedSearchPrivacySettings();
 

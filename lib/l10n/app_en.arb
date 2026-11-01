@@ -501,5 +501,10 @@
   "nearbyLocationUnavailable": "Couldn't get your location. Try again.",
   "nearbyRateLimited": "Too many updates. Try again in a minute.",
   "messageNotAvailable": "This message is no longer available.",
-  "messageJumpFailed": "Couldn't open this message. Try again."
+  "messageJumpFailed": "Couldn't open this message. Try again.",
+  "settingsNearbyVisibility": "people nearby",
+  "nearbyHiddenTitle": "You are hidden from people nearby",
+  "nearbyHiddenContent": "Enable visibility to see people nearby.",
+  "nearbyEnableVisibility": "enable",
+  "nearbyVisibilitySaveFailed": "Couldn't change visibility. Try again."
 }

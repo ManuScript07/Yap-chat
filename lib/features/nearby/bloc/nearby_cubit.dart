@@ -10,6 +10,8 @@ import 'package:yap_chat/repositories/chat/abstract_location_repository.dart';
 import 'package:yap_chat/repositories/blocks/abstract_blocklist_repository.dart';
 import 'package:yap_chat/repositories/friends/abstract_friends_repository.dart';
 import 'package:yap_chat/repositories/nearby/nearby.dart';
+import 'package:yap_chat/repositories/settings/settings.dart';
+import 'package:yap_chat/features/settings/data/data.dart';
 
 class NearbyCubit extends Cubit<NearbyState> {
   NearbyCubit({
@@ -19,20 +21,32 @@ class NearbyCubit extends Cubit<NearbyState> {
     required AccountSessionController accountSessionController,
     required IBlocklistRepository blocklistRepository,
     required IProfileFriendsRepository profileFriendsRepository,
+    ISettingsRepository? settingsRepository,
     this.refreshTimeout = defaultRefreshTimeout,
     DateTime Function()? clock,
   }) : _repository = repository,
+       _settingsRepository = settingsRepository,
        _locationRepository = locationRepository,
        _locationTrackingCoordinator = locationTrackingCoordinator,
        _accountSessionController = accountSessionController,
        _profileFriendsRepository = profileFriendsRepository,
        _clock = clock ?? DateTime.now,
        super(const NearbyState()) {
+    _visibilitySubscription = settingsRepository
+        ?.watchNearbyVisibility()
+        .listen(
+          (value) => unawaited(_onVisibilityChanged(value)),
+          onError: (Object _) {},
+        );
     _blocklistSubscription = blocklistRepository.watchBlockedUserIds().listen(
       (userIds) => unawaited(_removeNewlyBlockedPeople(userIds)),
     );
   }
 
+  final ISettingsRepository? _settingsRepository;
+  StreamSubscription<bool>? _visibilitySubscription;
+  bool _nearbyVisible = true;
+  bool _didRefreshVisibility = false;
   final INearbyRepository _repository;
   final ILocationRepository _locationRepository;
   final LocationTrackingCoordinator _locationTrackingCoordinator;
@@ -92,7 +106,11 @@ class NearbyCubit extends Cubit<NearbyState> {
   Future<void> initialize() {
     final active = _initialization;
     if (active != null) return active;
-    final future = _initialize();
+    final future = _initialize().whenComplete(() {
+      if (!isClosed && _settingsRepository != null && !_didRefreshVisibility) {
+        unawaited(_refreshVisibility());
+      }
+    });
     _initialization = future;
     return future;
   }
@@ -100,12 +118,43 @@ class NearbyCubit extends Cubit<NearbyState> {
   Future<void> _initialize() async {
     emit(state.copyWith(status: NearbyStatus.loading));
     try {
+      final initialRevision = _queryRevision;
+      var settings = await _settingsRepository
+          ?.readCachedSearchPrivacySettings();
+      if (isClosed) return;
+      if (settings == null && _settingsRepository != null) {
+        // A new installation may belong to an already hidden account. Read
+        // that preference before prompting for GPS or requesting the feed.
+        _didRefreshVisibility = true;
+        try {
+          settings = await _settingsRepository
+              .refreshSearchPrivacySettings()
+              .timeout(refreshTimeout);
+        } catch (_) {
+          // Without a saved preference, preserve the existing offline flow.
+        }
+      }
+      if (settings != null && initialRevision == _queryRevision) {
+        _nearbyVisible = settings.nearbyVisible;
+      }
+      final revision = _queryRevision;
       final filters = await _repository.getFilters();
       final cached = await _repository.getCachedFeed(filters);
       final ownLocation = await _locationRepository.getCachedCurrentLocation(
         maxAge: const Duration(hours: 12),
       );
-      if (isClosed) return;
+      if (isClosed || revision != _queryRevision) return;
+      if (!_nearbyVisible) {
+        emit(
+          state.copyWith(
+            status: NearbyStatus.visibilityDisabled,
+            filters: filters,
+            people: cached?.people ?? const [],
+            hasMore: cached?.hasMore ?? false,
+          ),
+        );
+        return;
+      }
       if (ownLocation == null) {
         // The persisted publication timestamp is the only offline source of
         // truth. A feed's cache time merely says when people were loaded; it
@@ -145,7 +194,7 @@ class NearbyCubit extends Cubit<NearbyState> {
   }
 
   Future<void> _requestLocation() async {
-    if (isClosed) return;
+    if (isClosed || !_nearbyVisible) return;
     emit(state.copyWith(isRefreshing: true, clearLocationIssue: true));
     try {
       final scope = _accountSessionController.capture();
@@ -172,7 +221,7 @@ class NearbyCubit extends Cubit<NearbyState> {
       final ownLocation = await _locationRepository.getCachedCurrentLocation(
         maxAge: const Duration(hours: 12),
       );
-      if (isClosed) return;
+      if (isClosed || !_nearbyVisible) return;
       if (ownLocation == null) {
         _requireLocation(issue: NearbyLocationIssue.unavailable);
       } else {
@@ -202,7 +251,9 @@ class NearbyCubit extends Cubit<NearbyState> {
   }) {
     final active = _feedRefresh;
     if (active != null) return active;
-    if (isClosed || (state.status == NearbyStatus.locationRequired && !force)) {
+    if (isClosed ||
+        !_nearbyVisible ||
+        (state.status == NearbyStatus.locationRequired && !force)) {
       return Future<void>.value();
     }
     if (!_tryConsumeFeedRequest()) {
@@ -251,7 +302,9 @@ class NearbyCubit extends Cubit<NearbyState> {
       );
     } catch (error) {
       if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
-        if (_isNearbyRateLimitedError(error)) {
+        if (_isVisibilityDisabledError(error)) {
+          await _onVisibilityChanged(false);
+        } else if (_isNearbyRateLimitedError(error)) {
           _needsHeadRefresh = true;
           _feedBlockedUntil = _clock().toUtc().add(const Duration(minutes: 1));
           emit(
@@ -362,7 +415,9 @@ class NearbyCubit extends Cubit<NearbyState> {
       }
     } catch (error) {
       if (!isClosed && _isCurrentOperation(operationId, revision, filters)) {
-        if (_isNearbyRateLimitedError(error)) {
+        if (_isVisibilityDisabledError(error)) {
+          await _onVisibilityChanged(false);
+        } else if (_isNearbyRateLimitedError(error)) {
           _feedBlockedUntil = _clock().toUtc().add(const Duration(minutes: 1));
         } else if (error is! NearbyFeedSupersededException) {
           _paginationRetryAt = _clock().toUtc().add(const Duration(seconds: 3));
@@ -373,6 +428,7 @@ class NearbyCubit extends Cubit<NearbyState> {
   }
 
   Future<void> applyFilters(NearbyFilters filters) async {
+    if (!_nearbyVisible) return;
     final normalized = filters.normalized();
     if (normalized == state.filters) return;
     _needsHeadRefresh = false;
@@ -477,6 +533,86 @@ class NearbyCubit extends Cubit<NearbyState> {
     }
   }
 
+  Future<void> _refreshVisibility() async {
+    _didRefreshVisibility = true;
+    try {
+      // The repository stream publishes confirmed settings. Applying this
+      // return value again could overwrite a newer concurrent setting write.
+      await _settingsRepository!.refreshSearchPrivacySettings();
+    } catch (_) {
+      // Retain the account-scoped offline preference on network failure.
+    }
+  }
+
+  Future<void> _onVisibilityChanged(bool visible) async {
+    if (isClosed || visible == _nearbyVisible) return;
+    _nearbyVisible = visible;
+    final revision = ++_queryRevision;
+    _refreshOperationId++;
+    _repository.invalidateFeed(state.filters);
+    _feedRefresh = null;
+    _needsHeadRefresh = false;
+    _paginationRetryAt = null;
+    emit(
+      state.copyWith(
+        status: NearbyStatus.visibilityDisabled,
+        isRefreshing: false,
+        isLoadingMore: false,
+        feedRevision: state.feedRevision + 1,
+        clearLocationIssue: true,
+      ),
+    );
+    if (!visible) return;
+    CachedTrackedLocation? location;
+    try {
+      location = await _locationRepository.getCachedCurrentLocation(
+        maxAge: const Duration(hours: 12),
+      );
+    } catch (_) {
+      if (!isClosed && revision == _queryRevision && _nearbyVisible) {
+        _requireLocation(issue: NearbyLocationIssue.unavailable);
+      }
+      return;
+    }
+    if (isClosed || revision != _queryRevision || !_nearbyVisible) return;
+    if (location == null) {
+      _requireLocation();
+    } else {
+      emit(state.copyWith(status: NearbyStatus.ready));
+      if (state.people.isEmpty) await _refresh(force: false);
+    }
+  }
+
+  Future<void> enableVisibility() async {
+    final repository = _settingsRepository;
+    if (repository == null ||
+        state.isVisibilitySaving ||
+        _nearbyVisible ||
+        isClosed) {
+      return;
+    }
+    emit(state.copyWith(isVisibilitySaving: true));
+    try {
+      final updated = await repository.updateSearchPrivacySetting(
+        SearchPrivacySettingKey.nearby,
+        true,
+      );
+      await _onVisibilityChanged(updated.nearbyVisible);
+    } catch (_) {
+      if (!isClosed) {
+        emit(
+          state.copyWith(visibilityFeedbackId: state.visibilityFeedbackId + 1),
+        );
+      }
+    } finally {
+      if (!isClosed) emit(state.copyWith(isVisibilitySaving: false));
+    }
+  }
+
+  bool _isVisibilityDisabledError(Object error) =>
+      error is PostgrestException &&
+      error.message.contains('nearby_visibility_disabled');
+
   bool _isLocationRequiredError(Object error) =>
       error is PostgrestException &&
       error.message.contains('nearby_location_required');
@@ -500,6 +636,7 @@ class NearbyCubit extends Cubit<NearbyState> {
 
   @override
   Future<void> close() async {
+    await _visibilitySubscription?.cancel();
     await _blocklistSubscription.cancel();
     return super.close();
   }
@@ -510,7 +647,7 @@ class NearbyCubit extends Cubit<NearbyState> {
     List<NearbyPerson>? people,
     bool? hasMore,
   }) {
-    if (isClosed) return;
+    if (isClosed || !_nearbyVisible) return;
     emit(
       state.copyWith(
         status: NearbyStatus.locationRequired,

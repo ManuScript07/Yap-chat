@@ -2251,6 +2251,36 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Не удалось открыть сообщение. Попробуйте ещё раз.'**
   String get messageJumpFailed;
+
+  /// No description provided for @settingsNearbyVisibility.
+  ///
+  /// In ru, this message translates to:
+  /// **'люди рядом'**
+  String get settingsNearbyVisibility;
+
+  /// No description provided for @nearbyHiddenTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'вы скрыты из людей рядом'**
+  String get nearbyHiddenTitle;
+
+  /// No description provided for @nearbyHiddenContent.
+  ///
+  /// In ru, this message translates to:
+  /// **'Включите видимость, чтобы видеть людей рядом.'**
+  String get nearbyHiddenContent;
+
+  /// No description provided for @nearbyEnableVisibility.
+  ///
+  /// In ru, this message translates to:
+  /// **'включить'**
+  String get nearbyEnableVisibility;
+
+  /// No description provided for @nearbyVisibilitySaveFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось изменить видимость. Попробуйте ещё раз.'**
+  String get nearbyVisibilitySaveFailed;
 }
 
 class _AppLocalizationsDelegate

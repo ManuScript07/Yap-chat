@@ -2,7 +2,7 @@ import 'package:equatable/equatable.dart';
 
 /// A single discovery setting. This is shared by the UI and repository so a
 /// write never needs to send a stale snapshot of the other settings.
-enum SearchPrivacySettingKey { username, phone, name }
+enum SearchPrivacySettingKey { username, phone, name, nearby }
 
 /// Controls who may receive the precise last-seen timestamp.
 enum LastSeenVisibility { all, friends, nobody }
@@ -17,6 +17,7 @@ class SearchPrivacySettings extends Equatable {
     this.searchByUsername = true,
     this.searchByPhone = true,
     this.searchByName = true,
+    this.nearbyVisible = true,
     this.lastSeenVisibility = LastSeenVisibility.all,
     this.sharePreciseLocation = true,
     this.shareDistance = true,
@@ -25,6 +26,7 @@ class SearchPrivacySettings extends Equatable {
   final bool searchByUsername;
   final bool searchByPhone;
   final bool searchByName;
+  final bool nearbyVisible;
   final LastSeenVisibility lastSeenVisibility;
   final bool sharePreciseLocation;
   final bool shareDistance;
@@ -33,6 +35,7 @@ class SearchPrivacySettings extends Equatable {
     bool? searchByUsername,
     bool? searchByPhone,
     bool? searchByName,
+    bool? nearbyVisible,
     LastSeenVisibility? lastSeenVisibility,
     bool? sharePreciseLocation,
     bool? shareDistance,
@@ -40,6 +43,7 @@ class SearchPrivacySettings extends Equatable {
     searchByUsername: searchByUsername ?? this.searchByUsername,
     searchByPhone: searchByPhone ?? this.searchByPhone,
     searchByName: searchByName ?? this.searchByName,
+    nearbyVisible: nearbyVisible ?? this.nearbyVisible,
     lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
     sharePreciseLocation: sharePreciseLocation ?? this.sharePreciseLocation,
     shareDistance: shareDistance ?? this.shareDistance,
@@ -49,6 +53,7 @@ class SearchPrivacySettings extends Equatable {
     SearchPrivacySettingKey.username => searchByUsername,
     SearchPrivacySettingKey.phone => searchByPhone,
     SearchPrivacySettingKey.name => searchByName,
+    SearchPrivacySettingKey.nearby => nearbyVisible,
   };
 
   SearchPrivacySettings withValue(SearchPrivacySettingKey key, bool value) =>
@@ -56,6 +61,7 @@ class SearchPrivacySettings extends Equatable {
         SearchPrivacySettingKey.username => copyWith(searchByUsername: value),
         SearchPrivacySettingKey.phone => copyWith(searchByPhone: value),
         SearchPrivacySettingKey.name => copyWith(searchByName: value),
+        SearchPrivacySettingKey.nearby => copyWith(nearbyVisible: value),
       };
 
   @override
@@ -63,6 +69,7 @@ class SearchPrivacySettings extends Equatable {
     searchByUsername,
     searchByPhone,
     searchByName,
+    nearbyVisible,
     lastSeenVisibility,
     sharePreciseLocation,
     shareDistance,

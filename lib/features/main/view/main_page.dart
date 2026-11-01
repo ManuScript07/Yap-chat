@@ -34,6 +34,7 @@ class MainPage extends StatelessWidget {
         BlocProvider<NearbyCubit>(
           create: (context) => NearbyCubit(
             repository: context.read<INearbyRepository>(),
+            settingsRepository: context.read<ISettingsRepository>(),
             locationRepository: context.read<ILocationRepository>(),
             locationTrackingCoordinator: context
                 .read<LocationTrackingCoordinator>(),

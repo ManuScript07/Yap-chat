@@ -1252,4 +1252,21 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get messageJumpFailed =>
       'Не удалось открыть сообщение. Попробуйте ещё раз.';
+
+  @override
+  String get settingsNearbyVisibility => 'люди рядом';
+
+  @override
+  String get nearbyHiddenTitle => 'вы скрыты из людей рядом';
+
+  @override
+  String get nearbyHiddenContent =>
+      'Включите видимость, чтобы видеть людей рядом.';
+
+  @override
+  String get nearbyEnableVisibility => 'включить';
+
+  @override
+  String get nearbyVisibilitySaveFailed =>
+      'Не удалось изменить видимость. Попробуйте ещё раз.';
 }

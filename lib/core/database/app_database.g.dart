@@ -8739,6 +8739,21 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _nearbyVisibleMeta = const VerificationMeta(
+    'nearbyVisible',
+  );
+  @override
+  late final GeneratedColumn<bool> nearbyVisible = GeneratedColumn<bool>(
+    'nearby_visible',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("nearby_visible" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _shareDistanceMeta = const VerificationMeta(
     'shareDistance',
   );
@@ -8773,6 +8788,7 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
     searchByName,
     lastSeenVisibility,
     sharePreciseLocation,
+    nearbyVisible,
     shareDistance,
     cachedAt,
   ];
@@ -8850,6 +8866,15 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
         ),
       );
     }
+    if (data.containsKey('nearby_visible')) {
+      context.handle(
+        _nearbyVisibleMeta,
+        nearbyVisible.isAcceptableOrUnknown(
+          data['nearby_visible']!,
+          _nearbyVisibleMeta,
+        ),
+      );
+    }
     if (data.containsKey('share_distance')) {
       context.handle(
         _shareDistanceMeta,
@@ -8903,6 +8928,10 @@ class $CachedSearchPrivacySettingsTable extends CachedSearchPrivacySettings
         DriftSqlType.bool,
         data['${effectivePrefix}share_precise_location'],
       )!,
+      nearbyVisible: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}nearby_visible'],
+      )!,
       shareDistance: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}share_distance'],
@@ -8928,6 +8957,7 @@ class CachedSearchPrivacySetting extends DataClass
   final bool searchByName;
   final String lastSeenVisibility;
   final bool sharePreciseLocation;
+  final bool nearbyVisible;
   final bool shareDistance;
   final DateTime cachedAt;
   const CachedSearchPrivacySetting({
@@ -8937,6 +8967,7 @@ class CachedSearchPrivacySetting extends DataClass
     required this.searchByName,
     required this.lastSeenVisibility,
     required this.sharePreciseLocation,
+    required this.nearbyVisible,
     required this.shareDistance,
     required this.cachedAt,
   });
@@ -8949,6 +8980,7 @@ class CachedSearchPrivacySetting extends DataClass
     map['search_by_name'] = Variable<bool>(searchByName);
     map['last_seen_visibility'] = Variable<String>(lastSeenVisibility);
     map['share_precise_location'] = Variable<bool>(sharePreciseLocation);
+    map['nearby_visible'] = Variable<bool>(nearbyVisible);
     map['share_distance'] = Variable<bool>(shareDistance);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
@@ -8962,6 +8994,7 @@ class CachedSearchPrivacySetting extends DataClass
       searchByName: Value(searchByName),
       lastSeenVisibility: Value(lastSeenVisibility),
       sharePreciseLocation: Value(sharePreciseLocation),
+      nearbyVisible: Value(nearbyVisible),
       shareDistance: Value(shareDistance),
       cachedAt: Value(cachedAt),
     );
@@ -8983,6 +9016,7 @@ class CachedSearchPrivacySetting extends DataClass
       sharePreciseLocation: serializer.fromJson<bool>(
         json['sharePreciseLocation'],
       ),
+      nearbyVisible: serializer.fromJson<bool>(json['nearbyVisible']),
       shareDistance: serializer.fromJson<bool>(json['shareDistance']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
@@ -8997,6 +9031,7 @@ class CachedSearchPrivacySetting extends DataClass
       'searchByName': serializer.toJson<bool>(searchByName),
       'lastSeenVisibility': serializer.toJson<String>(lastSeenVisibility),
       'sharePreciseLocation': serializer.toJson<bool>(sharePreciseLocation),
+      'nearbyVisible': serializer.toJson<bool>(nearbyVisible),
       'shareDistance': serializer.toJson<bool>(shareDistance),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
@@ -9009,6 +9044,7 @@ class CachedSearchPrivacySetting extends DataClass
     bool? searchByName,
     String? lastSeenVisibility,
     bool? sharePreciseLocation,
+    bool? nearbyVisible,
     bool? shareDistance,
     DateTime? cachedAt,
   }) => CachedSearchPrivacySetting(
@@ -9018,6 +9054,7 @@ class CachedSearchPrivacySetting extends DataClass
     searchByName: searchByName ?? this.searchByName,
     lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
     sharePreciseLocation: sharePreciseLocation ?? this.sharePreciseLocation,
+    nearbyVisible: nearbyVisible ?? this.nearbyVisible,
     shareDistance: shareDistance ?? this.shareDistance,
     cachedAt: cachedAt ?? this.cachedAt,
   );
@@ -9043,6 +9080,9 @@ class CachedSearchPrivacySetting extends DataClass
       sharePreciseLocation: data.sharePreciseLocation.present
           ? data.sharePreciseLocation.value
           : this.sharePreciseLocation,
+      nearbyVisible: data.nearbyVisible.present
+          ? data.nearbyVisible.value
+          : this.nearbyVisible,
       shareDistance: data.shareDistance.present
           ? data.shareDistance.value
           : this.shareDistance,
@@ -9059,6 +9099,7 @@ class CachedSearchPrivacySetting extends DataClass
           ..write('searchByName: $searchByName, ')
           ..write('lastSeenVisibility: $lastSeenVisibility, ')
           ..write('sharePreciseLocation: $sharePreciseLocation, ')
+          ..write('nearbyVisible: $nearbyVisible, ')
           ..write('shareDistance: $shareDistance, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
@@ -9073,6 +9114,7 @@ class CachedSearchPrivacySetting extends DataClass
     searchByName,
     lastSeenVisibility,
     sharePreciseLocation,
+    nearbyVisible,
     shareDistance,
     cachedAt,
   );
@@ -9086,6 +9128,7 @@ class CachedSearchPrivacySetting extends DataClass
           other.searchByName == this.searchByName &&
           other.lastSeenVisibility == this.lastSeenVisibility &&
           other.sharePreciseLocation == this.sharePreciseLocation &&
+          other.nearbyVisible == this.nearbyVisible &&
           other.shareDistance == this.shareDistance &&
           other.cachedAt == this.cachedAt);
 }
@@ -9098,6 +9141,7 @@ class CachedSearchPrivacySettingsCompanion
   final Value<bool> searchByName;
   final Value<String> lastSeenVisibility;
   final Value<bool> sharePreciseLocation;
+  final Value<bool> nearbyVisible;
   final Value<bool> shareDistance;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
@@ -9108,6 +9152,7 @@ class CachedSearchPrivacySettingsCompanion
     this.searchByName = const Value.absent(),
     this.lastSeenVisibility = const Value.absent(),
     this.sharePreciseLocation = const Value.absent(),
+    this.nearbyVisible = const Value.absent(),
     this.shareDistance = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -9119,6 +9164,7 @@ class CachedSearchPrivacySettingsCompanion
     required bool searchByName,
     this.lastSeenVisibility = const Value.absent(),
     this.sharePreciseLocation = const Value.absent(),
+    this.nearbyVisible = const Value.absent(),
     this.shareDistance = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
@@ -9134,6 +9180,7 @@ class CachedSearchPrivacySettingsCompanion
     Expression<bool>? searchByName,
     Expression<String>? lastSeenVisibility,
     Expression<bool>? sharePreciseLocation,
+    Expression<bool>? nearbyVisible,
     Expression<bool>? shareDistance,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
@@ -9147,6 +9194,7 @@ class CachedSearchPrivacySettingsCompanion
         'last_seen_visibility': lastSeenVisibility,
       if (sharePreciseLocation != null)
         'share_precise_location': sharePreciseLocation,
+      if (nearbyVisible != null) 'nearby_visible': nearbyVisible,
       if (shareDistance != null) 'share_distance': shareDistance,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
@@ -9160,6 +9208,7 @@ class CachedSearchPrivacySettingsCompanion
     Value<bool>? searchByName,
     Value<String>? lastSeenVisibility,
     Value<bool>? sharePreciseLocation,
+    Value<bool>? nearbyVisible,
     Value<bool>? shareDistance,
     Value<DateTime>? cachedAt,
     Value<int>? rowid,
@@ -9171,6 +9220,7 @@ class CachedSearchPrivacySettingsCompanion
       searchByName: searchByName ?? this.searchByName,
       lastSeenVisibility: lastSeenVisibility ?? this.lastSeenVisibility,
       sharePreciseLocation: sharePreciseLocation ?? this.sharePreciseLocation,
+      nearbyVisible: nearbyVisible ?? this.nearbyVisible,
       shareDistance: shareDistance ?? this.shareDistance,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
@@ -9200,6 +9250,9 @@ class CachedSearchPrivacySettingsCompanion
         sharePreciseLocation.value,
       );
     }
+    if (nearbyVisible.present) {
+      map['nearby_visible'] = Variable<bool>(nearbyVisible.value);
+    }
     if (shareDistance.present) {
       map['share_distance'] = Variable<bool>(shareDistance.value);
     }
@@ -9221,6 +9274,7 @@ class CachedSearchPrivacySettingsCompanion
           ..write('searchByName: $searchByName, ')
           ..write('lastSeenVisibility: $lastSeenVisibility, ')
           ..write('sharePreciseLocation: $sharePreciseLocation, ')
+          ..write('nearbyVisible: $nearbyVisible, ')
           ..write('shareDistance: $shareDistance, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
@@ -18219,6 +18273,7 @@ typedef $$CachedSearchPrivacySettingsTableCreateCompanionBuilder =
       required bool searchByName,
       Value<String> lastSeenVisibility,
       Value<bool> sharePreciseLocation,
+      Value<bool> nearbyVisible,
       Value<bool> shareDistance,
       required DateTime cachedAt,
       Value<int> rowid,
@@ -18231,6 +18286,7 @@ typedef $$CachedSearchPrivacySettingsTableUpdateCompanionBuilder =
       Value<bool> searchByName,
       Value<String> lastSeenVisibility,
       Value<bool> sharePreciseLocation,
+      Value<bool> nearbyVisible,
       Value<bool> shareDistance,
       Value<DateTime> cachedAt,
       Value<int> rowid,
@@ -18272,6 +18328,11 @@ class $$CachedSearchPrivacySettingsTableFilterComposer
 
   ColumnFilters<bool> get sharePreciseLocation => $composableBuilder(
     column: $table.sharePreciseLocation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get nearbyVisible => $composableBuilder(
+    column: $table.nearbyVisible,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -18325,6 +18386,11 @@ class $$CachedSearchPrivacySettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get nearbyVisible => $composableBuilder(
+    column: $table.nearbyVisible,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get shareDistance => $composableBuilder(
     column: $table.shareDistance,
     builder: (column) => ColumnOrderings(column),
@@ -18372,6 +18438,11 @@ class $$CachedSearchPrivacySettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get sharePreciseLocation => $composableBuilder(
     column: $table.sharePreciseLocation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get nearbyVisible => $composableBuilder(
+    column: $table.nearbyVisible,
     builder: (column) => column,
   );
 
@@ -18436,6 +18507,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 Value<bool> searchByName = const Value.absent(),
                 Value<String> lastSeenVisibility = const Value.absent(),
                 Value<bool> sharePreciseLocation = const Value.absent(),
+                Value<bool> nearbyVisible = const Value.absent(),
                 Value<bool> shareDistance = const Value.absent(),
                 Value<DateTime> cachedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -18446,6 +18518,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 searchByName: searchByName,
                 lastSeenVisibility: lastSeenVisibility,
                 sharePreciseLocation: sharePreciseLocation,
+                nearbyVisible: nearbyVisible,
                 shareDistance: shareDistance,
                 cachedAt: cachedAt,
                 rowid: rowid,
@@ -18458,6 +18531,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 required bool searchByName,
                 Value<String> lastSeenVisibility = const Value.absent(),
                 Value<bool> sharePreciseLocation = const Value.absent(),
+                Value<bool> nearbyVisible = const Value.absent(),
                 Value<bool> shareDistance = const Value.absent(),
                 required DateTime cachedAt,
                 Value<int> rowid = const Value.absent(),
@@ -18468,6 +18542,7 @@ class $$CachedSearchPrivacySettingsTableTableManager
                 searchByName: searchByName,
                 lastSeenVisibility: lastSeenVisibility,
                 sharePreciseLocation: sharePreciseLocation,
+                nearbyVisible: nearbyVisible,
                 shareDistance: shareDistance,
                 cachedAt: cachedAt,
                 rowid: rowid,

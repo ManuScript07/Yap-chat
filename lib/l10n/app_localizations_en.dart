@@ -1236,4 +1236,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageJumpFailed => 'Couldn\'t open this message. Try again.';
+
+  @override
+  String get settingsNearbyVisibility => 'people nearby';
+
+  @override
+  String get nearbyHiddenTitle => 'You are hidden from people nearby';
+
+  @override
+  String get nearbyHiddenContent => 'Enable visibility to see people nearby.';
+
+  @override
+  String get nearbyEnableVisibility => 'enable';
+
+  @override
+  String get nearbyVisibilitySaveFailed =>
+      'Couldn\'t change visibility. Try again.';
 }

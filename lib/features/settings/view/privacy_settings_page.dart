@@ -117,6 +117,18 @@ class _PrivacySettingsView extends StatelessWidget {
                             .read<PrivacySettingsCubit>()
                             .setValue(SearchPrivacySettingKey.name, value),
                 ),
+                SettingsToggleRow(
+                  icon: Icons.near_me_outlined,
+                  title: context.l10n.settingsNearbyVisibility,
+                  value: settings.nearbyVisible,
+                  isLoading: isLoading,
+                  isSaving: state.isSaving,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => context
+                            .read<PrivacySettingsCubit>()
+                            .setValue(SearchPrivacySettingKey.nearby, value),
+                ),
                 const SizedBox(height: 28),
                 Padding(
                   padding: EdgeInsets.symmetric(

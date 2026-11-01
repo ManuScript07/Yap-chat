@@ -1,7 +1,14 @@
 import 'package:equatable/equatable.dart';
 import 'package:yap_chat/features/nearby/data/data.dart';
 
-enum NearbyStatus { initial, loading, ready, failure, locationRequired }
+enum NearbyStatus {
+  initial,
+  loading,
+  ready,
+  failure,
+  locationRequired,
+  visibilityDisabled,
+}
 
 enum NearbyLocationIssue {
   denied,
@@ -18,6 +25,8 @@ class NearbyState extends Equatable {
     this.hasMore = false,
     this.isRefreshing = false,
     this.isLoadingMore = false,
+    this.isVisibilitySaving = false,
+    this.visibilityFeedbackId = 0,
     this.locationIssue,
     this.locationFeedbackId = 0,
     this.rateLimitFeedbackId = 0,
@@ -30,6 +39,8 @@ class NearbyState extends Equatable {
   final bool hasMore;
   final bool isRefreshing;
   final bool isLoadingMore;
+  final bool isVisibilitySaving;
+  final int visibilityFeedbackId;
   final NearbyLocationIssue? locationIssue;
   final int locationFeedbackId;
   final int rateLimitFeedbackId;
@@ -38,6 +49,7 @@ class NearbyState extends Equatable {
   final int feedRevision;
 
   bool get shouldObscureContent =>
+      status == NearbyStatus.visibilityDisabled ||
       status == NearbyStatus.locationRequired ||
       isRefreshing && locationIssue != null;
 
@@ -48,6 +60,8 @@ class NearbyState extends Equatable {
     bool? hasMore,
     bool? isRefreshing,
     bool? isLoadingMore,
+    bool? isVisibilitySaving,
+    int? visibilityFeedbackId,
     NearbyLocationIssue? locationIssue,
     bool clearLocationIssue = false,
     int? locationFeedbackId,
@@ -60,6 +74,8 @@ class NearbyState extends Equatable {
     hasMore: hasMore ?? this.hasMore,
     isRefreshing: isRefreshing ?? this.isRefreshing,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    isVisibilitySaving: isVisibilitySaving ?? this.isVisibilitySaving,
+    visibilityFeedbackId: visibilityFeedbackId ?? this.visibilityFeedbackId,
     locationIssue: clearLocationIssue
         ? null
         : locationIssue ?? this.locationIssue,
@@ -76,6 +92,8 @@ class NearbyState extends Equatable {
     hasMore,
     isRefreshing,
     isLoadingMore,
+    isVisibilitySaving,
+    visibilityFeedbackId,
     locationIssue,
     locationFeedbackId,
     rateLimitFeedbackId,

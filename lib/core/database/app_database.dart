@@ -292,6 +292,7 @@ class CachedSearchPrivacySettings extends Table {
       text().withDefault(const Constant('all'))();
   BoolColumn get sharePreciseLocation =>
       boolean().withDefault(const Constant(true))();
+  BoolColumn get nearbyVisible => boolean().withDefault(const Constant(true))();
   BoolColumn get shareDistance => boolean().withDefault(const Constant(true))();
   DateTimeColumn get cachedAt => dateTime()();
 
@@ -425,7 +426,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 29;
+  int get schemaVersion => 30;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -738,6 +739,17 @@ class AppDatabase extends _$AppDatabase {
             WHERE f.owner_user_id = cached_friend_list_states.owner_user_id
           )
         ''');
+      }
+      if (from >= 11 && from < 30) {
+        final columns = await customSelect(
+          'PRAGMA table_info(cached_search_privacy_settings)',
+        ).get();
+        if (!columns.any((row) => row.read<String>('name') == 'nearby_visible')) {
+          await migrator.addColumn(
+            cachedSearchPrivacySettings,
+            cachedSearchPrivacySettings.nearbyVisible,
+          );
+        }
       }
     },
     beforeOpen: (details) async {

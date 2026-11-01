@@ -501,5 +501,10 @@
   "nearbyLocationUnavailable": "Не удалось получить геолокацию. Попробуйте ещё раз.",
   "nearbyRateLimited": "Слишком много обновлений. Попробуйте через минуту.",
   "messageNotAvailable": "Это сообщение больше недоступно.",
-  "messageJumpFailed": "Не удалось открыть сообщение. Попробуйте ещё раз."
+  "messageJumpFailed": "Не удалось открыть сообщение. Попробуйте ещё раз.",
+  "settingsNearbyVisibility": "люди рядом",
+  "nearbyHiddenTitle": "вы скрыты из людей рядом",
+  "nearbyHiddenContent": "Включите видимость, чтобы видеть людей рядом.",
+  "nearbyEnableVisibility": "включить",
+  "nearbyVisibilitySaveFailed": "Не удалось изменить видимость. Попробуйте ещё раз."
 }

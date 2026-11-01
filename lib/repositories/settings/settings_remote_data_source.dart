@@ -94,6 +94,7 @@ class SettingsRemoteDataSource {
       searchByUsername: row['search_by_username'] as bool? ?? true,
       searchByPhone: row['search_by_phone'] as bool? ?? true,
       searchByName: row['search_by_name'] as bool? ?? true,
+      nearbyVisible: row['nearby_visible'] as bool? ?? true,
       lastSeenVisibility:
           LastSeenVisibility.values
               .where((item) => item.name == row['last_seen_visibility'])

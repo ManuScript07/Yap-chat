@@ -27,6 +27,13 @@ class SettingsCacheDataSource {
             ),
           );
 
+  Stream<bool> watchNearbyVisibility(String ownerUserId) =>
+      (_database.select(_database.cachedSearchPrivacySettings)
+            ..where((table) => table.ownerUserId.equals(ownerUserId)))
+          .watchSingleOrNull()
+          .map((row) => row?.nearbyVisible ?? true)
+          .distinct();
+
   Future<SearchPrivacySettings?> read(String ownerUserId) async {
     final row =
         await (_database.select(_database.cachedSearchPrivacySettings)
@@ -37,6 +44,7 @@ class SettingsCacheDataSource {
       searchByUsername: row.searchByUsername,
       searchByPhone: row.searchByPhone,
       searchByName: row.searchByName,
+      nearbyVisible: row.nearbyVisible,
       lastSeenVisibility: _lastSeenVisibility(row.lastSeenVisibility),
       sharePreciseLocation: row.sharePreciseLocation,
       shareDistance: row.shareDistance,
@@ -52,6 +60,7 @@ class SettingsCacheDataSource {
             searchByUsername: settings.searchByUsername,
             searchByPhone: settings.searchByPhone,
             searchByName: settings.searchByName,
+            nearbyVisible: Value(settings.nearbyVisible),
             lastSeenVisibility: Value(settings.lastSeenVisibility.name),
             sharePreciseLocation: Value(settings.sharePreciseLocation),
             shareDistance: Value(settings.shareDistance),
