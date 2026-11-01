@@ -53,11 +53,20 @@ class ViewedProfilePage extends StatelessWidget {
   );
 }
 
-class _ViewedProfileView extends StatelessWidget {
+class _ViewedProfileView extends StatefulWidget {
   const _ViewedProfileView({required this.userId, this.originChatId});
 
   final String userId;
   final String? originChatId;
+
+  @override
+  State<_ViewedProfileView> createState() => _ViewedProfileViewState();
+}
+
+class _ViewedProfileViewState extends State<_ViewedProfileView> {
+  bool _wasLoading = false;
+  String get userId => widget.userId;
+  String? get originChatId => widget.originChatId;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +74,7 @@ class _ViewedProfileView extends StatelessWidget {
       listeners: [
         BlocListener<ViewedProfileCubit, ViewedProfileState>(
           listenWhen: (previous, current) =>
+              current.viewedProfile != null &&
               previous.actionError != current.actionError &&
               current.actionError != null,
           listener: (context, state) {
@@ -120,13 +130,18 @@ class _ViewedProfileView extends StatelessWidget {
         builder: (context, state) {
           final viewedProfile = state.viewedProfile;
           if (viewedProfile == null) {
+            _wasLoading = true;
             final avatarSnapshot = ProfileAvatarHero.snapshotFor(userId);
             return Scaffold(
               backgroundColor: context.scaffoldBackgroundColor,
               body: Stack(
                 children: [
-                  if (avatarSnapshot != null)
-                    _LoadingProfileAvatar(snapshot: avatarSnapshot),
+                  _ProfileLoadingBody(
+                    snapshot: avatarSnapshot,
+                    message: state.status == ViewedProfileStatus.failure
+                        ? context.l10n.viewedProfileLoadFailed
+                        : null,
+                  ),
                   Positioned(
                     top: MediaQuery.paddingOf(context).top + 16,
                     left: MediaQuery.paddingOf(context).left + 16,
@@ -139,16 +154,6 @@ class _ViewedProfileView extends StatelessWidget {
                       onPressed: () => context.router.maybePop(),
                     ),
                   ),
-                  if (state.status == ViewedProfileStatus.failure)
-                    _ProfileLoadFailedState(
-                      message: context.l10n.viewedProfileLoadFailed,
-                    )
-                  else
-                    Center(
-                      child: CircularProgressIndicator(
-                        color: context.colorScheme.primary,
-                      ),
-                    ),
                 ],
               ),
             );
@@ -171,6 +176,7 @@ class _ViewedProfileView extends StatelessWidget {
               listener: (context, _) =>
                   context.read<ViewedProfileCubit>().markOfflineNow(),
               child: _ProfileScaffold(
+                animateEntrance: _wasLoading,
                 viewedProfile: viewedProfile,
                 state: state,
                 isBlockedByMe: isBlockedByMe,
@@ -184,29 +190,78 @@ class _ViewedProfileView extends StatelessWidget {
   }
 }
 
+/// The ready screen reuses this feedback layout while fading out its loader.
+/// Keeping the avatar slot and padding identical prevents an indicator jump.
+class _ProfileLoadingBody extends StatelessWidget {
+  const _ProfileLoadingBody({
+    this.snapshot,
+    this.message,
+    this.reserveAvatarSpace = false,
+  });
+  final ProfileAvatarHeroSnapshot? snapshot;
+  final String? message;
+  final bool reserveAvatarSpace;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final top =
+        media.padding.top +
+        (media.orientation == Orientation.landscape ? 88 : 98);
+    return CustomScrollView(
+      key: const ValueKey('profile-loading-viewport'),
+      physics: message == null
+          ? const NeverScrollableScrollPhysics()
+          : const ClampingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(16, top, 16, 0),
+          sliver: SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: media.padding.bottom + 24),
+              child: Column(
+                children: [
+                  if (snapshot case final snapshot?)
+                    Center(child: _LoadingProfileAvatar(snapshot: snapshot))
+                  else if (reserveAvatarSpace)
+                    const SizedBox(height: 204),
+                  if (message case final message?) ...[
+                    const SizedBox(height: 24),
+                    _ProfileLoadFailedState(message: message),
+                  ] else
+                    const Expanded(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ProfileLoadFailedState extends StatelessWidget {
   const _ProfileLoadFailedState({required this.message});
 
   final String message;
 
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.topCenter,
-    child: Padding(
-      padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 156,
-        left: 24,
-        right: 24,
-      ),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: context.colorScheme.onSurfaceVariant,
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-          height: 1.2,
-        ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    child: Text(
+      key: const ValueKey('profile-load-error'),
+      message,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: context.colorScheme.onSurfaceVariant,
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
       ),
     ),
   );
@@ -219,31 +274,22 @@ class _LoadingProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
-    return Positioned(
-      top: MediaQuery.paddingOf(context).top + (isLandscape ? 88 : 98),
-      left: 0,
-      right: 0,
-      child: Center(
-        child: SizedBox(
-          width: 270,
-          height: 204,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox.square(
-              dimension: 176,
-              child: ProfileAvatarHero(
-                avatarUrl: snapshot.avatarUrl,
-                avatarStoragePath: snapshot.avatarStoragePath,
-                child: UserAvatar(
-                  avatarUrl: snapshot.avatarUrl,
-                  avatarRevision:
-                      snapshot.avatarStoragePath ?? snapshot.avatarUrl,
-                  size: 176,
-                  borderRadius: AvatarGeometry.profileRadiusFor(176),
-                ),
-              ),
+    return SizedBox(
+      width: 270,
+      height: 204,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: SizedBox.square(
+          dimension: 176,
+          child: ProfileAvatarHero(
+            avatarUrl: snapshot.avatarUrl,
+            avatarStoragePath: snapshot.avatarStoragePath,
+            child: UserAvatar(
+              key: const ValueKey('profile-loading-avatar'),
+              avatarUrl: snapshot.avatarUrl,
+              avatarRevision: snapshot.avatarStoragePath ?? snapshot.avatarUrl,
+              size: 176,
+              borderRadius: AvatarGeometry.profileRadiusFor(176),
             ),
           ),
         ),
@@ -252,18 +298,64 @@ class _LoadingProfileAvatar extends StatelessWidget {
   }
 }
 
-class _ProfileScaffold extends StatelessWidget {
+class _ProfileScaffold extends StatefulWidget {
   const _ProfileScaffold({
     required this.viewedProfile,
     required this.state,
     required this.isBlockedByMe,
+    required this.animateEntrance,
     this.originChatId,
   });
 
   final ViewedProfile viewedProfile;
   final ViewedProfileState state;
   final bool isBlockedByMe;
+  final bool animateEntrance;
   final String? originChatId;
+
+  @override
+  State<_ProfileScaffold> createState() => _ProfileScaffoldState();
+}
+
+class _ProfileScaffoldState extends State<_ProfileScaffold>
+    with SingleTickerProviderStateMixin {
+  late final _entrance = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+    value: widget.animateEntrance ? 0 : 1,
+  );
+  late final _opacity = CurvedAnimation(
+    parent: _entrance,
+    curve: Curves.easeOutCubic,
+  );
+  bool _started = false;
+  bool _showLoader = false;
+  ViewedProfile get viewedProfile => widget.viewedProfile;
+  ViewedProfileState get state => widget.state;
+  bool get isBlockedByMe => widget.isBlockedByMe;
+  String? get originChatId => widget.originChatId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _entrance.value = 1;
+      _showLoader = false;
+    } else if (!_started && widget.animateEntrance) {
+      _showLoader = true;
+      _entrance.forward().whenCompleteOrCancel(() {
+        if (mounted && _showLoader) setState(() => _showLoader = false);
+      });
+    }
+    _started = true;
+  }
+
+  @override
+  void dispose() {
+    _opacity.dispose();
+    _entrance.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,11 +373,15 @@ class _ProfileScaffold extends StatelessWidget {
                 left: 0,
                 right: 0,
                 height: glowHeight,
-                child: ProfileAmbientGlow(height: glowHeight),
+                child: FadeTransition(
+                  opacity: _opacity,
+                  child: ProfileAmbientGlow(height: glowHeight),
+                ),
               ),
               Positioned.fill(
                 child: _ProfileContent(
                   viewedProfile: viewedProfile,
+                  opacity: _opacity,
                   state: state,
                   topPadding: mediaQuery.padding.top + (isLandscape ? 88 : 98),
                   isBlockedByMe: isBlockedByMe,
@@ -304,6 +400,21 @@ class _ProfileScaffold extends StatelessWidget {
                   onFriends: () => _openFriends(context),
                 ),
               ),
+              if (_showLoader && !viewedProfile.isBlocked)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: FadeTransition(
+                      opacity: ReverseAnimation(_opacity),
+                      child: _ProfileLoadingBody(
+                        reserveAvatarSpace:
+                            ProfileAvatarHero.snapshotFor(
+                              viewedProfile.profile.id,
+                            ) !=
+                            null,
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 top: mediaQuery.padding.top + 16,
                 left: mediaQuery.padding.left + 16,
@@ -319,47 +430,58 @@ class _ProfileScaffold extends StatelessWidget {
                       onPressed: () => context.router.maybePop(),
                     ),
                     const Spacer(),
-                    if (viewedProfile.isFriend && !isBlockedByMe) ...[
-                      BlocBuilder<
-                        LocationVisibilityCubit,
-                        LocationVisibilityState
-                      >(
-                        builder: (context, visibilityState) {
-                          final globalVisible =
-                              visibilityState.settings?.sharePreciseLocation ??
-                              false;
-                          final isExcluded = visibilityState.excludedFriendIds
-                              .contains(viewedProfile.profile.id);
-                          final visible = globalVisible && !isExcluded;
-                          return GlassButton(
+                    FadeTransition(
+                      opacity: _opacity,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (viewedProfile.isFriend && !isBlockedByMe) ...[
+                            BlocBuilder<
+                              LocationVisibilityCubit,
+                              LocationVisibilityState
+                            >(
+                              builder: (context, visibilityState) {
+                                final globalVisible =
+                                    visibilityState
+                                        .settings
+                                        ?.sharePreciseLocation ??
+                                    false;
+                                final isExcluded = visibilityState
+                                    .excludedFriendIds
+                                    .contains(viewedProfile.profile.id);
+                                final visible = globalVisible && !isExcluded;
+                                return GlassButton(
+                                  frostedStyle: true,
+                                  icon: visible
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded,
+                                  size: 50,
+                                  iconSize: 28,
+                                  borderRadius: 20,
+                                  onPressed:
+                                      visibilityState.isSaving || !globalVisible
+                                      ? null
+                                      : () => context
+                                            .read<LocationVisibilityCubit>()
+                                            .setFriendExcluded(
+                                              viewedProfile.profile.id,
+                                              excluded: visible,
+                                            ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          GlassButton(
                             frostedStyle: true,
-                            icon: visible
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
+                            icon: Icons.settings_rounded,
                             size: 50,
-                            iconSize: 28,
+                            iconSize: 29,
                             borderRadius: 20,
-                            onPressed:
-                                visibilityState.isSaving || !globalVisible
-                                ? null
-                                : () => context
-                                      .read<LocationVisibilityCubit>()
-                                      .setFriendExcluded(
-                                        viewedProfile.profile.id,
-                                        excluded: visible,
-                                      ),
-                          );
-                        },
+                            onPressed: () => _showActions(context),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                    ],
-                    GlassButton(
-                      frostedStyle: true,
-                      icon: Icons.settings_rounded,
-                      size: 50,
-                      iconSize: 29,
-                      borderRadius: 20,
-                      onPressed: () => _showActions(context),
                     ),
                   ],
                 ),
@@ -600,6 +722,7 @@ class _ProfileScaffold extends StatelessWidget {
 class _ProfileContent extends StatelessWidget {
   const _ProfileContent({
     required this.viewedProfile,
+    required this.opacity,
     required this.state,
     required this.topPadding,
     required this.isBlockedByMe,
@@ -611,6 +734,7 @@ class _ProfileContent extends StatelessWidget {
   });
 
   final ViewedProfile viewedProfile;
+  final Animation<double> opacity;
   final ViewedProfileState state;
   final double topPadding;
   final bool isBlockedByMe;
@@ -655,80 +779,89 @@ class _ProfileContent extends StatelessWidget {
                   children: [
                     _ProfilePhotoCard(
                       profile: profile,
+                      opacity: opacity,
                       onTap: () => onPhotoTap(0),
                     ),
-                    const SizedBox(height: 4),
-                    AnimatedStatusSwitcher(
-                      child: Text(
-                        status,
-                        key: ValueKey(status),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: context.colorScheme.onSurfaceVariant,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text.rich(
-                      TextSpan(
+                    FadeTransition(
+                      key: const ValueKey('profile-metadata-reveal'),
+                      opacity: opacity,
+                      child: Column(
                         children: [
-                          TextSpan(
-                            text: profile.displayName,
-                            style: TextStyle(
-                              color: context.colorScheme.onSurface,
-                              fontSize: 32,
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w600,
-                              height: 1,
-                              letterSpacing: 1,
+                          const SizedBox(height: 4),
+                          AnimatedStatusSwitcher(
+                            child: Text(
+                              status,
+                              key: ValueKey(status),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: context.colorScheme.onSurfaceVariant,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                          if (age != null)
+                          const SizedBox(height: 18),
+                          Text.rich(
                             TextSpan(
-                              text: '  $age',
+                              children: [
+                                TextSpan(
+                                  text: profile.displayName,
+                                  style: TextStyle(
+                                    color: context.colorScheme.onSurface,
+                                    fontSize: 32,
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w600,
+                                    height: 1,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                if (age != null)
+                                  TextSpan(
+                                    text: '  $age',
+                                    style: TextStyle(
+                                      color: context.colorScheme.onSurface,
+                                      fontSize: 24,
+                                      fontFamily: 'Roboto',
+                                      fontWeight: FontWeight.w400,
+                                      height: .67,
+                                      letterSpacing: .5,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (profile.bio.trim().isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            Text(
+                              profile.bio.trim(),
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: context.colorScheme.onSurface,
-                                fontSize: 24,
+                                fontSize: 18,
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w400,
-                                height: .67,
+                                height: 1,
                                 letterSpacing: .5,
                               ),
                             ),
+                          ],
+                          const SizedBox(height: 24),
+                          _ProfileActions(
+                            viewedProfile: viewedProfile,
+                            state: state,
+                            isBlockedByMe: isBlockedByMe,
+                            onChat: onChat,
+                            onUnblock: onUnblock,
+                            onLocation: onLocation,
+                          ),
+                          const SizedBox(height: 24),
+                          _ProfileStats(
+                            viewedProfile: viewedProfile,
+                            onFriends: onFriends,
+                          ),
                         ],
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (profile.bio.trim().isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      Text(
-                        profile.bio.trim(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: context.colorScheme.onSurface,
-                          fontSize: 18,
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w400,
-                          height: 1,
-                          letterSpacing: .5,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    _ProfileActions(
-                      viewedProfile: viewedProfile,
-                      state: state,
-                      isBlockedByMe: isBlockedByMe,
-                      onChat: onChat,
-                      onUnblock: onUnblock,
-                      onLocation: onLocation,
-                    ),
-                    const SizedBox(height: 24),
-                    _ProfileStats(
-                      viewedProfile: viewedProfile,
-                      onFriends: onFriends,
                     ),
                   ],
                 ),
@@ -751,7 +884,10 @@ class _ProfileContent extends StatelessWidget {
             ),
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: ProfileDaysLabel(days: days),
+              child: FadeTransition(
+                opacity: opacity,
+                child: ProfileDaysLabel(days: days),
+              ),
             ),
           ),
         ),
@@ -819,9 +955,14 @@ class _BlockedProfileContent extends StatelessWidget {
 }
 
 class _ProfilePhotoCard extends StatelessWidget {
-  const _ProfilePhotoCard({required this.profile, required this.onTap});
+  const _ProfilePhotoCard({
+    required this.profile,
+    required this.onTap,
+    required this.opacity,
+  });
 
   final UserProfile profile;
+  final Animation<double> opacity;
   final VoidCallback onTap;
 
   @override
@@ -882,39 +1023,42 @@ class _ProfilePhotoCard extends StatelessWidget {
             right: 0,
             bottom: 10,
             child: Center(
-              child: GestureDetector(
-                onTap: () => _copyUsername(context, profile.username),
-                onLongPress: () => _copyUsername(context, profile.username),
-                child: Transform.rotate(
-                  angle: -.09,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.sizeOf(context).width - 32,
-                    ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
+              child: FadeTransition(
+                opacity: opacity,
+                child: GestureDetector(
+                  onTap: () => _copyUsername(context, profile.username),
+                  onLongPress: () => _copyUsername(context, profile.username),
+                  child: Transform.rotate(
+                    angle: -.09,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width - 32,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 5,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: context.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: Text(
-                            '@${profile.username}',
-                            maxLines: 1,
-                            softWrap: false,
-                            style: TextStyle(
-                              color: context.colorScheme.onPrimary,
-                              fontSize: 24,
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w500,
-                              height: 1,
-                              letterSpacing: .50,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 5,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '@${profile.username}',
+                              maxLines: 1,
+                              softWrap: false,
+                              style: TextStyle(
+                                color: context.colorScheme.onPrimary,
+                                fontSize: 24,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w500,
+                                height: 1,
+                                letterSpacing: .50,
+                              ),
                             ),
                           ),
                         ),
@@ -928,6 +1072,60 @@ class _ProfilePhotoCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Size follows the latest state; fading old controls never remain interactive.
+class _ProfileContentSwitch extends StatelessWidget {
+  const _ProfileContentSwitch({
+    super.key,
+    required this.child,
+    this.immediate = false,
+    this.animateSize = true,
+  });
+  final Widget child;
+  final bool immediate;
+  final bool animateSize;
+
+  @override
+  Widget build(BuildContext context) {
+    // Replacing an in-flight AnimatedSize with a zero-duration size update can
+    // synchronously mutate its RenderObject during layout. Restricted/reduced
+    // motion states bypass the animation subtree and discard outgoing content.
+    if (immediate || MediaQuery.disableAnimationsOf(context)) return child;
+    const duration = Duration(milliseconds: 220);
+    final content = AnimatedSwitcher(
+      duration: duration,
+      reverseDuration: duration,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          for (final old in previous)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(child: ExcludeSemantics(child: old)),
+            ),
+          ?current,
+        ],
+      ),
+      child: child,
+    );
+    return animateSize
+        ? AnimatedSize(
+            duration: duration,
+            curve: Curves.easeInOutCubic,
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            child: content,
+          )
+        : content;
   }
 }
 
@@ -999,24 +1197,31 @@ class _ProfileActions extends StatelessWidget {
           onTap: onLocation,
         ),
     ];
-    return LayoutBuilder(
-      builder: (context, constraints) => Wrap(
-        alignment: WrapAlignment.center,
-        runAlignment: WrapAlignment.center,
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          for (final button in buttons)
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: 70,
-                maxWidth: constraints.maxWidth < 390
-                    ? constraints.maxWidth
-                    : 190,
-              ),
-              child: button,
-            ),
-        ],
+    return _ProfileContentSwitch(
+      key: const ValueKey('profile-actions-switch'),
+      immediate: isBlockedByMe,
+      child: KeyedSubtree(
+        key: ValueKey((viewedProfile.relationship, isBlockedByMe)),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            alignment: WrapAlignment.center,
+            runAlignment: WrapAlignment.center,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final button in buttons)
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: 70,
+                    maxWidth: constraints.maxWidth < 390
+                        ? constraints.maxWidth
+                        : 190,
+                  ),
+                  child: button,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1169,22 +1374,33 @@ class _LocationAction extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      _ActionButton(icon: Icons.near_me_rounded, label: distance, onTap: onTap),
-      if (age != null) ...[
-        const SizedBox(height: 5),
-        Text(
-          age!,
-          style: TextStyle(
-            color: context.colorScheme.onSurfaceVariant,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+  Widget build(BuildContext context) => _ProfileContentSwitch(
+    key: const ValueKey('profile-distance-switch'),
+    animateSize: false,
+    child: KeyedSubtree(
+      key: ValueKey((distance, age)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ActionButton(
+            icon: Icons.near_me_rounded,
+            label: distance,
+            onTap: onTap,
           ),
-        ),
-      ],
-    ],
+          if (age != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              age!,
+              style: TextStyle(
+                color: context.colorScheme.onSurfaceVariant,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
   );
 }
 

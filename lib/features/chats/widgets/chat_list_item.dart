@@ -53,8 +53,8 @@ class ChatListItem extends StatelessWidget {
           padding: EdgeInsets.only(
             left: 16 + systemPadding.left,
             right: 16 + systemPadding.right,
-            top: 14,
-            bottom: 14,
+            top: 12,
+            bottom: 12,
           ),
           child: Row(
             children: [
