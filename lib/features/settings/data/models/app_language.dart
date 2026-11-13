@@ -20,5 +20,5 @@ enum AppLanguage {
       .firstOrNull;
 
   static AppLanguage fromSystemLocale(Locale locale) =>
-      locale.languageCode == english.code ? english : russian;
+      locale.languageCode == russian.code ? russian : english;
 }

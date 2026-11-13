@@ -15,7 +15,7 @@ import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/profile.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
-import 'package:yap_chat/features/settings/bloc/bloc.dart';
+import 'package:yap_chat/features/settings/settings.dart';
 import 'package:yap_chat/repositories/repositories.dart';
 
 /// Центральная точка Dependency Injection.
@@ -320,6 +320,9 @@ class _AppInitializerState extends State<AppInitializer>
           BlocProvider<AppLanguageCubit>(
             create: (context) => AppLanguageCubit(
               repository: context.read<ISettingsRepository>(),
+              initialLanguage: AppLanguage.tryParse(
+                widget.config.startupLanguageCode,
+              ),
             ),
           ),
           BlocProvider<AppPublicContentCubit>(

@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/settings/data/data.dart';
-import 'package:yap_chat/repositories/settings/abstract_settings_repository.dart';
+import 'package:yap_chat/repositories/settings/settings.dart';
 
 enum AppLanguageFeedback { success, failure }
 
@@ -12,30 +12,40 @@ class AppLanguageState extends Equatable {
   const AppLanguageState({
     required this.language,
     this.isSaving = false,
+    this.isLoading = false,
     this.feedback,
     this.feedbackId = 0,
   });
 
   final AppLanguage language;
   final bool isSaving;
+  final bool isLoading;
   final AppLanguageFeedback? feedback;
   final int feedbackId;
 
   AppLanguageState copyWith({
     AppLanguage? language,
     bool? isSaving,
+    bool? isLoading,
     AppLanguageFeedback? feedback,
     bool clearFeedback = false,
     int? feedbackId,
   }) => AppLanguageState(
     language: language ?? this.language,
     isSaving: isSaving ?? this.isSaving,
+    isLoading: isLoading ?? this.isLoading,
     feedback: clearFeedback ? null : feedback ?? this.feedback,
     feedbackId: feedbackId ?? this.feedbackId,
   );
 
   @override
-  List<Object?> get props => [language, isSaving, feedback, feedbackId];
+  List<Object?> get props => [
+    language,
+    isSaving,
+    isLoading,
+    feedback,
+    feedbackId,
+  ];
 }
 
 /// Keeps the Material locale and the persisted account preference in sync.
@@ -44,15 +54,17 @@ class AppLanguageState extends Equatable {
 /// reflects the user's action. While the server write is pending the picker is
 /// inert; a failed write restores the confirmed language.
 class AppLanguageCubit extends Cubit<AppLanguageState> {
-  AppLanguageCubit({required ISettingsRepository repository})
-    : _repository = repository,
-      super(
-        AppLanguageState(
-          language: AppLanguage.fromSystemLocale(
-            PlatformDispatcher.instance.locale,
-          ),
-        ),
-      );
+  AppLanguageCubit({
+    required ISettingsRepository repository,
+    AppLanguage? initialLanguage,
+  }) : _repository = repository,
+       super(
+         AppLanguageState(
+           language:
+               initialLanguage ??
+               AppLanguage.fromSystemLocale(PlatformDispatcher.instance.locale),
+         ),
+       );
 
   final ISettingsRepository _repository;
   int _accountGeneration = 0;
@@ -61,12 +73,19 @@ class AppLanguageCubit extends Cubit<AppLanguageState> {
 
   Future<void> setAuthenticatedUser(String? userId) async {
     final generation = ++_accountGeneration;
+    final refreshWriteGeneration = _writeGeneration;
     _confirmedLanguage = null;
     final systemLanguage = AppLanguage.fromSystemLocale(
       PlatformDispatcher.instance.locale,
     );
     emit(
-      AppLanguageState(language: systemLanguage, feedbackId: state.feedbackId),
+      AppLanguageState(
+        language: userId != null && userId.isNotEmpty
+            ? state.language
+            : systemLanguage,
+        isLoading: userId != null && userId.isNotEmpty,
+        feedbackId: state.feedbackId,
+      ),
     );
     if (userId == null || userId.isEmpty) return;
 
@@ -77,12 +96,11 @@ class AppLanguageCubit extends Cubit<AppLanguageState> {
       // A server read may still restore the language after local cache damage.
     }
     if (isClosed || generation != _accountGeneration) return;
-    if (cached != null) {
+    if (cached != null && refreshWriteGeneration == _writeGeneration) {
       _confirmedLanguage = cached;
-      emit(state.copyWith(language: cached));
+      emit(state.copyWith(language: cached, isLoading: false));
     }
 
-    final refreshWriteGeneration = _writeGeneration;
     try {
       final remote = await _repository.refreshAppLanguage();
       if (isClosed || generation != _accountGeneration) return;
@@ -93,6 +111,10 @@ class AppLanguageCubit extends Cubit<AppLanguageState> {
       }
     } catch (_) {
       // The cache (or system default) remains a valid offline value.
+    } finally {
+      if (!isClosed && generation == _accountGeneration && state.isLoading) {
+        emit(state.copyWith(isLoading: false));
+      }
     }
   }
 
@@ -120,6 +142,7 @@ class AppLanguageCubit extends Cubit<AppLanguageState> {
         state.copyWith(
           language: saved,
           isSaving: false,
+          isLoading: false,
           feedback: AppLanguageFeedback.success,
           feedbackId: state.feedbackId + 1,
         ),
@@ -131,6 +154,7 @@ class AppLanguageCubit extends Cubit<AppLanguageState> {
         state.copyWith(
           language: rollbackLanguage,
           isSaving: false,
+          isLoading: false,
           feedback: AppLanguageFeedback.failure,
           feedbackId: state.feedbackId + 1,
         ),

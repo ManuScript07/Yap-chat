@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- Before Android 12 the OS cannot persist a custom splash theme. Flutter
+     draws the cached-language logo over this matching neutral background. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/yap_splash_primary" />
-    <item
-        android:drawable="@drawable/splash_icon"
-        android:gravity="center" />
 </layer-list>

@@ -28,6 +28,7 @@ Future<void> main() async {
 
   final talker = Talker();
   final preferences = await SharedPreferences.getInstance();
+  final startupLanguageCode = await NativeAppBranding.readStartupLanguage();
   final environment = _resolveEnvironment(env);
   final authRedirectUrl = AppConfig.resolveAuthRedirectUrl(env);
   final oauthAttemptCoordinator = OAuthAttemptCoordinator(
@@ -126,6 +127,7 @@ Future<void> main() async {
     environment: environment,
     preferences: preferences,
     talker: talker,
+    startupLanguageCode: startupLanguageCode,
     env: Map.unmodifiable(env),
     database: database,
     accountSessionController: accountSessionController,

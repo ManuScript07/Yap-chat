@@ -5,13 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:yap_chat/features/notifications/data/data.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yap_chat/core/core.dart';
 
 class AndroidNotificationService {
   AndroidNotificationService({
     FlutterLocalNotificationsPlugin? plugin,
     bool readLaunchDetails = true,
+    Future<String?> Function()? languageReader,
+    Locale Function()? deviceLocale,
   }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
-       _readLaunchDetails = readLaunchDetails;
+       _readLaunchDetails = readLaunchDetails,
+       _deviceLocale =
+           deviceLocale ?? (() => PlatformDispatcher.instance.locale),
+       _languageReader =
+           languageReader ??
+           (() => SharedPreferencesAsync().getString(
+             NativeAppBranding.languagePreferenceKey,
+           ));
 
   static const channelId = 'chat_messages';
   static const groupKey = 'com.yapchat.app.chat_messages';
@@ -19,6 +30,8 @@ class AndroidNotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final bool _readLaunchDetails;
+  final Future<String?> Function() _languageReader;
+  final Locale Function() _deviceLocale;
   final StreamController<PushNotificationPayload> _openedController =
       StreamController.broadcast(sync: true);
   Future<void>? _initialization;
@@ -40,7 +53,7 @@ class AndroidNotificationService {
       },
     );
 
-    final l10n = _localizations();
+    final l10n = await _localizations();
     await _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -66,7 +79,7 @@ class AndroidNotificationService {
     if (!_isAndroid || !payload.isValid) return;
     await initialize();
 
-    final l10n = _localizations();
+    final l10n = await _localizations();
     final notificationId = notificationIdFor(
       payload.isChatMessage ? payload.conversationId : payload.friendRequestId,
     );
@@ -107,7 +120,9 @@ class AndroidNotificationService {
       channelId,
       l10n.notificationsChannelName,
       channelDescription: l10n.notificationsChannelDescription,
-      icon: 'ic_notification',
+      icon: l10n.localeName == 'ru'
+          ? 'ic_notification_ru'
+          : 'ic_notification_en',
       importance: Importance.high,
       priority: Priority.high,
       category: AndroidNotificationCategory.message,
@@ -156,15 +171,17 @@ class AndroidNotificationService {
     }
   }
 
-  AppLocalizations _localizations() {
-    final locale = PlatformDispatcher.instance.locale;
-    final supportedLocale =
-        AppLocalizations.supportedLocales.any(
-          (item) => item.languageCode == locale.languageCode,
-        )
-        ? Locale(locale.languageCode)
-        : const Locale('ru');
-    return lookupAppLocalizations(supportedLocale);
+  Future<AppLocalizations> _localizations() async {
+    String? language;
+    try {
+      language = await _languageReader();
+    } catch (_) {
+      /* Use device language on storage failure. */
+    }
+    if (language != 'ru' && language != 'en') {
+      language = _deviceLocale().languageCode == 'ru' ? 'ru' : 'en';
+    }
+    return lookupAppLocalizations(Locale(language!));
   }
 
   bool get _isAndroid =>

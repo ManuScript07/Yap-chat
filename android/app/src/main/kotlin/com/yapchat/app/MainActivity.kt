@@ -8,6 +8,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private val branding = AppBrandingBridge(this)
     private var resumed = false
     private var keyboardChannel: MethodChannel? = null
     private val insetsRecovery = ResumeInsetsRecovery(
@@ -26,6 +27,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(NetworkStatusBridge())
+        flutterEngine.plugins.add(branding)
         keyboardChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.yapchat.app/keyboard_resume",
@@ -34,6 +36,7 @@ class MainActivity : FlutterActivity() {
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         flutterEngine.plugins.remove(NetworkStatusBridge::class.java)
+        flutterEngine.plugins.remove(AppBrandingBridge::class.java)
         keyboardChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
@@ -42,6 +45,16 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         resumed = true
         insetsRecovery.onForeground()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        branding.onHostStarted()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) branding.onHostStopped()
     }
 
     override fun onPause() {

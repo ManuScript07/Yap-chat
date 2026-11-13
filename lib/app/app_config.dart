@@ -24,6 +24,7 @@ class AppConfig {
     this.diagnostics,
     this.supabaseClient,
     this.firebaseMessaging,
+    this.startupLanguageCode,
   });
 
   final AppEnvironment environment;
@@ -36,6 +37,7 @@ class AppConfig {
   final AppDiagnostics? diagnostics;
   final SupabaseClient? supabaseClient;
   final FirebaseMessaging? firebaseMessaging;
+  final String? startupLanguageCode;
 
   bool get isDev => environment == AppEnvironment.dev;
 

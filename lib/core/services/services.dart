@@ -13,3 +13,4 @@ export 'app_connection_status.dart';
 export 'platform_network_status.dart';
 export 'secure_supabase_storage.dart';
 export 'bundled_asset_licenses.dart';
+export 'native_app_branding.dart';

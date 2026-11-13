@@ -72,6 +72,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   late final ProfileNavigationCoordinator _profileNavigator;
   late final ProfileShareLinkCoordinator _profileShareLinkCoordinator;
   bool _dependenciesInitialized = false;
+  final _branding = NativeAppBranding();
   String? _activeUserId;
   String? _servicesStartedForUserId;
   String? _blocklistHydratedUserId;
@@ -89,6 +90,12 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     super.didChangeDependencies();
     if (_dependenciesInitialized) return;
     _dependenciesInitialized = true;
+    unawaited(
+      _branding.initialize(
+        context.read<AppLanguageCubit>().state.language.code,
+        cachedLanguage: context.read<AppConfig>().startupLanguageCode,
+      ),
+    );
 
     final chatsRepository = context.read<IChatsRepository>();
     final talker = context.read<AppConfig>().talker;
@@ -250,6 +257,10 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
     final locationTracking = context.read<LocationTrackingCoordinator>();
     final notifications = context.read<NotificationsCubit>();
     if (state == AppLifecycleState.resumed) {
+      final language = context.read<AppLanguageCubit>().state;
+      if (!language.isSaving && !language.isLoading) {
+        unawaited(_branding.applyLanguage(language.language.code));
+      }
       final inactiveSince = _inactiveSince;
       _inactiveSince = null;
       _isForeground = true;
@@ -513,6 +524,16 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MultiBlocListener(
       listeners: [
+        BlocListener<AppLanguageCubit, AppLanguageState>(
+          listenWhen: (previous, current) =>
+              !current.isSaving &&
+              !current.isLoading &&
+              (previous.language != current.language ||
+                  previous.isSaving ||
+                  previous.isLoading),
+          listener: (_, state) =>
+              unawaited(_branding.applyLanguage(state.language.code)),
+        ),
         BlocListener<AuthBloc, AuthState>(
           listenWhen: (previous, current) =>
               previous.status != current.status ||

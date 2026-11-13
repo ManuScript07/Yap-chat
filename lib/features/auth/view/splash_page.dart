@@ -13,7 +13,6 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   static const _nativeSplashCanvasSize = 288.0;
-  static const _logoScale = 0.86624205;
 
   var _isProgressVisible = false;
 
@@ -27,6 +26,9 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
+    final language = Localizations.localeOf(context).languageCode == 'ru'
+        ? 'ru'
+        : 'en';
     return Scaffold(
       backgroundColor: context.colorScheme.primary,
       body: Center(
@@ -36,14 +38,21 @@ class _SplashPageState extends State<SplashPage> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Transform.scale(
-                scale: _logoScale,
-                child: SvgPicture.asset(
-                  'assets/logo/icon_yapchat_foregraund.svg',
-                  width: 157,
-                  height: 137,
+              if (language == 'ru')
+                Transform.scale(
+                  scale: 0.86624205,
+                  child: SvgPicture.asset(
+                    'assets/logo/icon_yapchat_foregraund.svg',
+                    width: 157,
+                    height: 137,
+                  ),
+                )
+              else
+                SvgPicture.asset(
+                  'assets/logo/splash_logo_en.svg',
+                  width: _nativeSplashCanvasSize,
+                  height: _nativeSplashCanvasSize,
                 ),
-              ),
               Positioned(
                 top: 218,
                 left: 0,
