@@ -1,0 +1,11 @@
+<resources>
+    <!-- Stable names: Android 12+ persists the selected splash theme by name. -->
+    <style name="LaunchThemeRussian" parent="LaunchTheme">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_ru</item>
+        <item name="android:windowBackground">@drawable/launch_background_ru</item>
+    </style>
+    <style name="LaunchThemeEnglish" parent="LaunchTheme">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_en</item>
+        <item name="android:windowBackground">@drawable/launch_background_en</item>
+    </style>
+</resources>

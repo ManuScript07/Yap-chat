@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">YapChat</string>
+    <item type="mipmap" name="launcher_icon_system">@mipmap/ic_launcher_en</item>
+</resources>

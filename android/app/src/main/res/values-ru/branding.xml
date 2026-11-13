@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Пуньк</string>
+    <item type="mipmap" name="launcher_icon_system">@mipmap/ic_launcher</item>
+</resources>
