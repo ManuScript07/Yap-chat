@@ -58,3 +58,20 @@ graphify-out
 # Widget Preview related
 .widget_preview/
 /.local/
+
+# Local build and diagnostic output
+/android/build/
+/.codex-remote-attachments/
+/output/
+/tmp/*
+!/tmp/.gitkeep
+/supabase/snippets/
+/assets/chicken/
+
+# Selected test reports are maintained in the repository
+/docs/testing/*.md
+!/docs/testing/android_branding_2026-11-02.md
+!/docs/testing/chat_network_limits_audit_2026-10-29.md
+!/docs/testing/chat_unread_migration_autocommit_2026-10-28.md
+!/docs/testing/friends_cursor_precision_2026-10-30.md
+!/docs/testing/nearby_visibility_2026-11-01.md
