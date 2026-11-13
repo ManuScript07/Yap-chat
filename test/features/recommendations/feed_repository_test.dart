@@ -38,6 +38,12 @@ void main() {
                     'author_id': 'author',
                     'author': {'display_name': ' Name ', 'username': 'handle'},
                     'text': 'Text',
+                    'formatting': {
+                      'version': 1,
+                      'spans': [
+                        {'start': 0, 'end': 4, 'style': 'bold'},
+                      ],
+                    },
                     'created_at': '2026-11-13T20:00:00Z',
                     'photos': [
                       {
@@ -93,6 +99,9 @@ void main() {
       final last = await repository.fetch(tab, account: account, cursor: next);
       expect(last.nextCursor, isNull);
       expect(last.posts.single.authorName, 'Name');
+      expect(last.posts.single.formatting, [
+        (start: 0, end: 4, style: FeedTextStyle.bold),
+      ]);
       expect(last.posts.single.createdAt, DateTime.utc(2026, 11, 13, 20));
       expect(
         last.posts.single.photos.single.thumbnailPath,

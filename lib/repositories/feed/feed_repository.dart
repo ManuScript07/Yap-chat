@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/core/services/services.dart';
 
+import 'feed_formatting.dart';
+
 enum FeedTab {
   forYou('get_for_you_feed_v2'),
   nearby('get_nearby_feed'),
@@ -32,6 +34,7 @@ class FeedPost {
     required this.text,
     required this.createdAt,
     this.photos = const [],
+    this.formatting = const [],
   });
 
   final String id;
@@ -40,6 +43,7 @@ class FeedPost {
   final String text;
   final DateTime createdAt;
   final List<FeedPhoto> photos;
+  final List<FeedTextRange> formatting;
 }
 
 class FeedPageResult {
@@ -178,13 +182,15 @@ class FeedRepository implements IFeedRepository {
               (item as Map<String, dynamic>)['post'] as Map<String, dynamic>;
           final author = post['author'] as Map<String, dynamic>?;
           final displayName = (author?['display_name'] as String?)?.trim();
+          final text = post['text'] as String;
           return FeedPost(
             id: post['id'] as String,
             authorId: post['author_id'] as String,
             authorName: displayName == null || displayName.isEmpty
                 ? (author?['username'] as String?)
                 : displayName,
-            text: post['text'] as String,
+            text: text,
+            formatting: decodeFeedFormatting(text, post['formatting']),
             createdAt: DateTime.parse(post['created_at'] as String),
             photos: List.unmodifiable(
               (post['photos'] as List<dynamic>).map((item) {

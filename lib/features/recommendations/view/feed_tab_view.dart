@@ -9,6 +9,8 @@ import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
 
+import 'feed_post_text.dart';
+
 class FeedTabView extends StatefulWidget {
   const FeedTabView({
     super.key,
@@ -213,6 +215,7 @@ class _FeedCard extends StatelessWidget {
     final localizations = MaterialLocalizations.of(context);
     final date = post.createdAt.toLocal();
     final textStyle = context.textTheme.bodyLarge ?? const TextStyle();
+    final body = feedPostText(post, textStyle);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Card(
@@ -238,7 +241,7 @@ class _FeedCard extends StatelessWidget {
                   builder: (context, constraints) {
                     const collapsedLines = 5;
                     final painter = TextPainter(
-                      text: TextSpan(text: post.text, style: textStyle),
+                      text: body,
                       textDirection: Directionality.of(context),
                       textScaler: MediaQuery.textScalerOf(context),
                       maxLines: collapsedLines,
@@ -251,12 +254,19 @@ class _FeedCard extends StatelessWidget {
                       builder: (context, expanded) => Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            post.text,
-                            style: textStyle,
-                            maxLines: expanded ? null : collapsedLines,
-                            overflow: expanded ? null : TextOverflow.ellipsis,
-                          ),
+                          if (post.formatting.isEmpty)
+                            Text(
+                              post.text,
+                              style: textStyle,
+                              maxLines: expanded ? null : collapsedLines,
+                              overflow: expanded ? null : TextOverflow.ellipsis,
+                            )
+                          else
+                            Text.rich(
+                              body,
+                              maxLines: expanded ? null : collapsedLines,
+                              overflow: expanded ? null : TextOverflow.ellipsis,
+                            ),
                           if (canExpand)
                             TextButton(
                               onPressed: () => timeline.toggleExpanded(post.id),
