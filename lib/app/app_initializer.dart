@@ -194,6 +194,10 @@ class _AppInitializerState extends State<AppInitializer>
         RepositoryProvider<AccountSessionController>.value(
           value: widget.config.accountSessionController,
         ),
+        if (widget.config.feedEnabled)
+          RepositoryProvider<IFeedRepository>.value(
+            value: _repositories.feedRepository,
+          ),
         RepositoryProvider<AppConnectionCoordinator>.value(
           value: _connectionCoordinator,
         ),

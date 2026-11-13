@@ -137,7 +137,7 @@ abstract class AppLocalizations {
   /// No description provided for @recommendationsTitle.
   ///
   /// In ru, this message translates to:
-  /// **'рекомендации'**
+  /// **'реки'**
   String get recommendationsTitle;
 
   /// No description provided for @recommendationsEmpty.
@@ -145,6 +145,96 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'здесь будут рекомендации'**
   String get recommendationsEmpty;
+
+  /// No description provided for @feedForYou.
+  ///
+  /// In ru, this message translates to:
+  /// **'для вас'**
+  String get feedForYou;
+
+  /// No description provided for @feedNearby.
+  ///
+  /// In ru, this message translates to:
+  /// **'рядом'**
+  String get feedNearby;
+
+  /// No description provided for @feedFriends.
+  ///
+  /// In ru, this message translates to:
+  /// **'друзья'**
+  String get feedFriends;
+
+  /// No description provided for @feedInbox.
+  ///
+  /// In ru, this message translates to:
+  /// **'входящие'**
+  String get feedInbox;
+
+  /// No description provided for @feedNewPost.
+  ///
+  /// In ru, this message translates to:
+  /// **'новый пост'**
+  String get feedNewPost;
+
+  /// No description provided for @feedComingSoon.
+  ///
+  /// In ru, this message translates to:
+  /// **'скоро появится'**
+  String get feedComingSoon;
+
+  /// No description provided for @feedEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'пока нет публикаций'**
+  String get feedEmpty;
+
+  /// No description provided for @feedLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось загрузить публикации'**
+  String get feedLoadFailed;
+
+  /// No description provided for @feedRetry.
+  ///
+  /// In ru, this message translates to:
+  /// **'повторить'**
+  String get feedRetry;
+
+  /// No description provided for @feedLoadMore.
+  ///
+  /// In ru, this message translates to:
+  /// **'загрузить ещё'**
+  String get feedLoadMore;
+
+  /// No description provided for @feedLocationRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'обновите геопозицию, чтобы увидеть публикации поблизости.'**
+  String get feedLocationRequired;
+
+  /// No description provided for @feedLocationUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось получить геопозицию. попробуйте ещё раз.'**
+  String get feedLocationUnavailable;
+
+  /// No description provided for @feedUnknownAuthor.
+  ///
+  /// In ru, this message translates to:
+  /// **'автор'**
+  String get feedUnknownAuthor;
+
+  /// No description provided for @feedShowMore.
+  ///
+  /// In ru, this message translates to:
+  /// **'показать ещё'**
+  String get feedShowMore;
+
+  /// No description provided for @feedShowLess.
+  ///
+  /// In ru, this message translates to:
+  /// **'свернуть'**
+  String get feedShowLess;
 
   /// No description provided for @searchHintChats.
   ///

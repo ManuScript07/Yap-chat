@@ -200,11 +200,10 @@ class _FriendsBodyState extends State<_FriendsBody> {
         searchBarBottomOffset + searchBarHeight + contentExtraPadding;
     final glowBottomOffset = isKeyboardOpen ? keyboardHeight : 0.0;
     const tabsExtent =
-        PrimaryHeaderGeometry.tabsTopSpacing +
         PrimaryHeaderGeometry.compactTabsHeight +
         PrimaryHeaderGeometry.tabsBottomSpacing;
     final showBodyTabs = !widget.isLandscape || widget.contentTop == 0;
-    final tabsTop = widget.contentTop + PrimaryHeaderGeometry.tabsTopSpacing;
+    final tabsTop = widget.contentTop;
     // Inline landscape tabs do not need the portrait header's trailing space.
     // Reserve the scaled title's lower edge so larger text stays unobscured.
     final headerContentTop = widget.isLandscape && widget.contentTop > 0

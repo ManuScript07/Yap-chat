@@ -4,6 +4,7 @@ import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'no
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
+import {seedFeed, verifyFeed} from './feed.mjs';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const marker = 'yap-pagination-lab-v1';
@@ -212,6 +213,14 @@ export class PaginationLab {
     writeFileSync(path,JSON.stringify({PAGINATION_LAB_URL:this.api,PAGINATION_LAB_KEY:this.clientKey,
       PAGINATION_LAB_OWNER_ID:this.state.owner.id,PAGINATION_LAB_REFRESH_TOKEN:session.refresh_token},null,2),{mode:0o600});
     return {file:path, owner:this.state.owner.id};
+  }
+  seedFeed() {
+    this.requireSeed();
+    return seedFeed(this);
+  }
+  verifyFeed() {
+    this.requireSeed();
+    return verifyFeed(this);
   }
   async verify() {
     this.requireSeed();

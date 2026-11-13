@@ -42,6 +42,7 @@ class AppConfig {
   bool get isDev => environment == AppEnvironment.dev;
 
   bool get isLocal => environment == AppEnvironment.local;
+  bool get feedEnabled => isDev || isLocal || env['FEED_ENABLED'] == 'true';
 
   String? get backendBaseUrl => env['BACKEND_BASE_URL'];
 

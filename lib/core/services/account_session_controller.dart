@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 /// Immutable identity of an authenticated account at the moment an operation
 /// starts. The generation also changes when the same account signs out and in
 /// again, so work from the previous session cannot commit into the new one.
@@ -30,6 +32,8 @@ class AccountSessionController {
   String? _userId;
   int _generation = 0;
   Future<void> _commitQueue = Future<void>.value();
+  final _generationChanges = ValueNotifier<int>(0);
+  ValueListenable<int> get generationChanges => _generationChanges;
 
   String? get userId => _userId;
 
@@ -38,6 +42,7 @@ class AccountSessionController {
     if (_userId == normalized) return;
     _userId = normalized;
     _generation++;
+    _generationChanges.value = _generation;
   }
 
   AccountSessionSnapshot capture() {

@@ -25,6 +25,7 @@ class RepositoryContainer {
     required this.contactsRepository,
     required this.settingsRepository,
     required this.nearbyRepository,
+    required this.feedRepository,
   });
 
   factory RepositoryContainer.prod({
@@ -244,6 +245,12 @@ class RepositoryContainer {
       contactsRepository: ContactsRepository(),
       settingsRepository: settingsRepository,
       nearbyRepository: nearbyRepository,
+      feedRepository: FeedRepository(
+        client: client,
+        accounts: config.accountSessionController,
+        connection: connectionStatus,
+        diagnostics: config.diagnostics,
+      ),
     );
   }
 
@@ -283,6 +290,7 @@ class RepositoryContainer {
       contactsRepository: const MockContactsRepository(),
       settingsRepository: MockSettingsRepository(),
       nearbyRepository: MockNearbyRepository(),
+      feedRepository: const MockFeedRepository(),
     );
   }
 
@@ -303,6 +311,7 @@ class RepositoryContainer {
   final IContactsRepository contactsRepository;
   final ISettingsRepository settingsRepository;
   final INearbyRepository nearbyRepository;
+  final IFeedRepository feedRepository;
 
   Future<void> dispose() async {
     mediaCache.dispose();

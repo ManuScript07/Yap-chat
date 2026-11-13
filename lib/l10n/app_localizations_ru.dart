@@ -29,10 +29,57 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navRecommendations => 'реки';
 
   @override
-  String get recommendationsTitle => 'рекомендации';
+  String get recommendationsTitle => 'реки';
 
   @override
   String get recommendationsEmpty => 'здесь будут рекомендации';
+
+  @override
+  String get feedForYou => 'для вас';
+
+  @override
+  String get feedNearby => 'рядом';
+
+  @override
+  String get feedFriends => 'друзья';
+
+  @override
+  String get feedInbox => 'входящие';
+
+  @override
+  String get feedNewPost => 'новый пост';
+
+  @override
+  String get feedComingSoon => 'скоро появится';
+
+  @override
+  String get feedEmpty => 'пока нет публикаций';
+
+  @override
+  String get feedLoadFailed => 'не удалось загрузить публикации';
+
+  @override
+  String get feedRetry => 'повторить';
+
+  @override
+  String get feedLoadMore => 'загрузить ещё';
+
+  @override
+  String get feedLocationRequired =>
+      'обновите геопозицию, чтобы увидеть публикации поблизости.';
+
+  @override
+  String get feedLocationUnavailable =>
+      'не удалось получить геопозицию. попробуйте ещё раз.';
+
+  @override
+  String get feedUnknownAuthor => 'автор';
+
+  @override
+  String get feedShowMore => 'показать ещё';
+
+  @override
+  String get feedShowLess => 'свернуть';
 
   @override
   String get searchHintChats => 'поиск по чатам';

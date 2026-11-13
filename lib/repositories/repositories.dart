@@ -11,4 +11,5 @@ export 'app_content/app_content.dart';
 export 'blocks/blocks.dart';
 export 'reports/reports.dart';
 export 'nearby/nearby.dart';
+export 'feed/feed.dart';
 export 'realtime/realtime.dart';

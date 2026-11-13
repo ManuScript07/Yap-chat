@@ -6,7 +6,9 @@ abstract final class PrimaryHeaderGeometry {
   static const compactHeight = 106.0;
   static const compactTitleSize = 44.0;
   static const compactTabsHeight = 44.0;
-  static const tabsTopSpacing = 4.0;
+  static const compactTabsTop = compactHeight;
+  static const compactTabsContentTop =
+      compactTabsTop + compactTabsHeight + tabsBottomSpacing;
   static const tabsBottomSpacing = 8.0;
 }
 
@@ -16,6 +18,7 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.titleWidget,
     this.actionIcon,
+    this.actionTooltip,
     this.onActionPressed,
     this.compact = false,
     this.showGradient = true,
@@ -24,6 +27,7 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final Widget? titleWidget;
   final IconData? actionIcon;
+  final String? actionTooltip;
   final VoidCallback? onActionPressed;
   final bool compact;
   final bool showGradient;
@@ -67,6 +71,7 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
                   width: 42,
                   height: 42,
                   child: IconButton(
+                    tooltip: actionTooltip,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     icon: Icon(actionIcon, color: iconColor, size: 42),

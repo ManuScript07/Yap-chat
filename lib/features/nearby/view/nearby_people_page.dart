@@ -356,12 +356,6 @@ class _NearbyFeed extends StatefulWidget {
 
 class _NearbyFeedState extends State<_NearbyFeed>
     with TickerProviderStateMixin {
-  bool _isSnapping = false;
-  var _pullExtent = 0.0;
-  var _isRefreshRunning = false;
-  var _isPulling = false;
-  var _isArmed = false;
-  var _hasArmedHaptic = false;
   bool _userScrollSequence = false;
   bool _paginationAllowedForGesture = false;
   bool _paginationScheduled = false;
@@ -374,11 +368,6 @@ class _NearbyFeedState extends State<_NearbyFeed>
   Animation<double>? _gridRouteTransition;
   List<NearbyPerson> _gridPeople = const [];
   Widget? _grid;
-
-  static const _refreshTriggerExtent = 42.0;
-  static const _refreshRevealStart = 14.0;
-  static const _refreshGap = 76.0;
-  static const _minimumRefreshIndicatorDuration = Duration(milliseconds: 280);
 
   @override
   void didUpdateWidget(covariant _NearbyFeed oldWidget) {
@@ -434,43 +423,9 @@ class _NearbyFeedState extends State<_NearbyFeed>
     super.dispose();
   }
 
-  double get _dragProgress => _isArmed || _isSnapping
-      ? 1
-      : 1 -
-            math.exp(
-              -math.max(0.0, _pullExtent - _refreshRevealStart) /
-                  (_refreshTriggerExtent - _refreshRevealStart),
-            );
-
-  double get _refreshInset => _isRefreshRunning || _isArmed || _isSnapping
-      ? _refreshGap
-      : _refreshGap * _dragProgress;
-
-  bool get _shouldShowIndicator =>
-      _isRefreshRunning || _isSnapping || _dragProgress > 0;
-
-  void _onRefreshStatusChanged(RefreshIndicatorStatus? status) {
-    if (!mounted) return;
-    if (status == RefreshIndicatorStatus.armed) {
-      if (!_hasArmedHaptic) {
-        _hasArmedHaptic = true;
-        unawaited(HapticFeedback.mediumImpact());
-      }
-      setState(() => _isArmed = true);
-    } else if (status == RefreshIndicatorStatus.snap) {
-      setState(() {
-        _isSnapping = true;
-        _isPulling = false;
-        _pullExtent = _refreshTriggerExtent;
-      });
-    } else if (status == RefreshIndicatorStatus.canceled || status == null) {
-      if (!_isRefreshRunning) _resetPull();
-    }
-  }
-
-  bool _trackPull(ScrollNotification notification) {
+  void _trackPagination(ScrollNotification notification) {
     if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
-      return false;
+      return;
     }
     if (notification is ScrollStartNotification) {
       _userScrollSequence = notification.dragDetails != null;
@@ -508,104 +463,6 @@ class _NearbyFeedState extends State<_NearbyFeed>
     if (notification is ScrollEndNotification) {
       _userScrollSequence = false;
       _paginationAllowedForGesture = false;
-    }
-    if (_isRefreshRunning || _isSnapping || widget.state.isRefreshing) {
-      return false;
-    }
-
-    if (notification is ScrollStartNotification) {
-      _isPulling =
-          notification.dragDetails != null &&
-          notification.metrics.extentBefore <= 0;
-      return false;
-    }
-    if (notification is ScrollUpdateNotification ||
-        notification is OverscrollNotification) {
-      if (!_isPulling &&
-          notification is ScrollUpdateNotification &&
-          notification.dragDetails != null) {
-        _isPulling = notification.metrics.extentBefore <= 0;
-      }
-      if (_isPulling) {
-        if (notification.metrics.pixels >
-            notification.metrics.minScrollExtent) {
-          _isPulling = false;
-          _resetPull();
-          return false;
-        }
-        var pullExtent = math
-            .max(
-              0.0,
-              notification.metrics.minScrollExtent -
-                  notification.metrics.pixels,
-            )
-            .toDouble();
-        if (notification is OverscrollNotification &&
-            notification.overscroll < 0) {
-          pullExtent = math
-              .max(pullExtent, _pullExtent - notification.overscroll)
-              .toDouble();
-        }
-        _setPullExtent(pullExtent);
-      }
-    } else if (notification is ScrollEndNotification && _isPulling) {
-      _isPulling = false;
-      // The standard indicator alone decides whether releasing starts refresh.
-      if (!_isArmed) _resetPull();
-    }
-    return false;
-  }
-
-  void _setPullExtent(double pullExtent) {
-    final normalized = math.max(0.0, pullExtent);
-    if (_pullExtent != normalized && mounted) {
-      setState(() {
-        _pullExtent = normalized;
-      });
-    }
-  }
-
-  void _resetPull() {
-    if (!mounted) return;
-    setState(() {
-      _pullExtent = 0;
-      _isPulling = false;
-      _isArmed = false;
-      _isSnapping = false;
-      _hasArmedHaptic = false;
-    });
-  }
-
-  Future<void> _handleRefresh() async {
-    if (!mounted || _isRefreshRunning) return;
-    final startedAt = DateTime.now();
-    widget.onRefreshActivityChanged(true);
-    if (mounted) {
-      setState(() {
-        _isRefreshRunning = true;
-        _isSnapping = false;
-        _isPulling = false;
-        _isArmed = false;
-        _pullExtent = _refreshTriggerExtent;
-      });
-    }
-    try {
-      await widget.onRefresh();
-    } finally {
-      final remaining =
-          _minimumRefreshIndicatorDuration -
-          DateTime.now().difference(startedAt);
-      if (!remaining.isNegative) await Future<void>.delayed(remaining);
-      if (mounted) {
-        setState(() {
-          _isRefreshRunning = false;
-          _isPulling = false;
-          _pullExtent = 0;
-          _isArmed = false;
-          _hasArmedHaptic = false;
-        });
-      }
-      widget.onRefreshActivityChanged(false);
     }
   }
 
@@ -655,180 +512,66 @@ class _NearbyFeedState extends State<_NearbyFeed>
         widget.state.status == NearbyStatus.loading && people.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    return RefreshIndicator.noSpinner(
-      onStatusChange: _onRefreshStatusChanged,
-      onRefresh: _handleRefresh,
-      notificationPredicate: (_) =>
-          !widget.state.isRefreshing || _isRefreshRunning,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(end: _refreshInset),
-        duration: _isPulling
-            ? Duration.zero
-            : const Duration(milliseconds: 240),
-        curve: Curves.easeOutCubic,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _trackPull,
-          child: CustomScrollView(
-            controller: widget.controller,
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
+    return PullRefresh(
+      refreshing: widget.state.isRefreshing,
+      indicatorTop: PrimaryHeaderGeometry.compactHeight,
+      indicatorKey: const ValueKey('nearby_pull_indicator'),
+      onRefresh: widget.onRefresh,
+      onActivityChanged: widget.onRefreshActivityChanged,
+      onScroll: _trackPagination,
+      overlayBuilder: (pullingToRefresh) => Positioned(
+        top: 142,
+        left: 0,
+        right: 0,
+        child: IgnorePointer(
+          child: PullRefreshIndicator(
+            key: const ValueKey('nearby_query_indicator'),
+            opacity: widget.state.isRefreshing && !pullingToRefresh ? 1 : 0,
+            progress: 1,
+            spinning: true,
+          ),
+        ),
+      ),
+      child: CustomScrollView(
+        controller: widget.controller,
+        physics: PullRefresh.physics,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.only(
+              top: PrimaryHeaderGeometry.compactHeight,
+              left: 16 + systemPadding.left,
+              right: 16 + systemPadding.right,
+              bottom: 8,
             ),
-            slivers: [
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  top: PrimaryHeaderGeometry.compactHeight,
-                  left: 16 + systemPadding.left,
-                  right: 16 + systemPadding.right,
-                  bottom: 8,
-                ),
-                sliver: people.isEmpty
-                    ? const SliverToBoxAdapter(child: SizedBox(height: 250))
-                    : _grid!,
-              ),
-              // A fixed slot above the controls prevents the end extent from
-              // changing under the finger, and keeps the spinner unobscured.
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  key: const ValueKey('nearby_footer'),
-                  height: widget.bottomPadding + 48,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: _NearbyPullIndicator(
-                        opacity: widget.state.isLoadingMore ? 1 : 0,
-                        progress: 1,
-                        spinning: true,
-                        size: 24,
-                        strokeWidth: 3,
-                      ),
-                    ),
+            sliver: people.isEmpty
+                ? const SliverToBoxAdapter(child: SizedBox(height: 250))
+                : _grid!,
+          ),
+          // A fixed slot above the controls prevents the end extent from
+          // changing under the finger, and keeps the spinner unobscured.
+          SliverToBoxAdapter(
+            child: SizedBox(
+              key: const ValueKey('nearby_footer'),
+              height: widget.bottomPadding + 48,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: PullRefreshIndicator(
+                    opacity: widget.state.isLoadingMore ? 1 : 0,
+                    progress: 1,
+                    spinning: true,
+                    size: 24,
+                    strokeWidth: 3,
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-        builder: (context, animatedInset, child) => Stack(
-          children: [
-            Transform.translate(offset: Offset(0, animatedInset), child: child),
-            Positioned(
-              top:
-                  PrimaryHeaderGeometry.compactHeight +
-                  (animatedInset - 36) / 2,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                child: _NearbyPullIndicator(
-                  key: const ValueKey('nearby_pull_indicator'),
-                  opacity: _shouldShowIndicator
-                      ? (_isRefreshRunning || _isArmed ? 1 : _dragProgress)
-                      : 0,
-                  progress: _dragProgress,
-                  spinning: _isRefreshRunning,
-                ),
-              ),
-            ),
-            Positioned(
-              top: 142,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                child: _NearbyPullIndicator(
-                  key: const ValueKey('nearby_query_indicator'),
-                  opacity: widget.state.isRefreshing && !_isRefreshRunning
-                      ? 1
-                      : 0,
-                  progress: 1,
-                  spinning: true,
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
-}
-
-/// Retains the current ring while fading out instead of replacing a spinning
-/// ring with an empty determinate one in the first dismissal frame.
-class _NearbyPullIndicator extends StatefulWidget {
-  const _NearbyPullIndicator({
-    super.key,
-    required this.opacity,
-    required this.progress,
-    required this.spinning,
-    this.size = 36,
-    this.strokeWidth = 4,
-  });
-
-  final double opacity;
-  final double progress;
-  final bool spinning;
-  final double size;
-  final double strokeWidth;
-
-  @override
-  State<_NearbyPullIndicator> createState() => _NearbyPullIndicatorState();
-}
-
-class _NearbyPullIndicatorState extends State<_NearbyPullIndicator>
-    with SingleTickerProviderStateMixin {
-  late final _visibility = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 180),
-    value: widget.opacity,
-  );
-  late bool _spinning = widget.spinning;
-
-  @override
-  void didUpdateWidget(covariant _NearbyPullIndicator oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.opacity > 0) _spinning = widget.spinning;
-    if (widget.opacity != oldWidget.opacity) {
-      _visibility.animateTo(widget.opacity, curve: Curves.easeOut);
-    }
-  }
-
-  @override
-  void dispose() {
-    _visibility.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _visibility,
-    child: Center(
-      heightFactor: 1,
-      child: SizedBox.square(
-        dimension: widget.size,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: CircularProgressIndicator(
-            key: ValueKey(
-              _spinning ? 'nearby_refresh_spinner' : 'nearby_refresh_progress',
-            ),
-            value: _spinning ? null : widget.progress,
-            strokeWidth: widget.strokeWidth,
-          ),
-        ),
-      ),
-    ),
-    builder: (context, child) => TickerMode(
-      enabled: _visibility.value > 0,
-      child: Opacity(
-        opacity: _visibility.value,
-        child: Transform.scale(
-          scale: .85 + .15 * _visibility.value,
-          child: child,
-        ),
-      ),
-    ),
-  );
 }
 
 class _NearbyEmptyStateLayer extends StatelessWidget {

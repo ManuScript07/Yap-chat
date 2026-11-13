@@ -29,10 +29,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navRecommendations => 'Feed';
 
   @override
-  String get recommendationsTitle => 'Recommendations';
+  String get recommendationsTitle => 'feed';
 
   @override
   String get recommendationsEmpty => 'recommendations will appear here';
+
+  @override
+  String get feedForYou => 'for you';
+
+  @override
+  String get feedNearby => 'nearby';
+
+  @override
+  String get feedFriends => 'friends';
+
+  @override
+  String get feedInbox => 'inbox';
+
+  @override
+  String get feedNewPost => 'new post';
+
+  @override
+  String get feedComingSoon => 'coming soon';
+
+  @override
+  String get feedEmpty => 'no posts yet';
+
+  @override
+  String get feedLoadFailed => 'couldn’t load posts';
+
+  @override
+  String get feedRetry => 'try again';
+
+  @override
+  String get feedLoadMore => 'load more';
+
+  @override
+  String get feedLocationRequired =>
+      'update your location to see nearby posts.';
+
+  @override
+  String get feedLocationUnavailable =>
+      'couldn’t get your location. try again.';
+
+  @override
+  String get feedUnknownAuthor => 'author';
+
+  @override
+  String get feedShowMore => 'show more';
+
+  @override
+  String get feedShowLess => 'show less';
 
   @override
   String get searchHintChats => 'search chats';
