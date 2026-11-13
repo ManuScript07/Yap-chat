@@ -98,7 +98,7 @@ class BlocklistCacheDataSource {
         await _deleteRows(ownerUserId);
         await _database.customStatement(
           'DELETE FROM cached_blocklist_snapshots WHERE owner_user_id = ?',
-          [_variable(ownerUserId)],
+          [ownerUserId],
         );
       });
       cleared = true;
@@ -127,7 +127,7 @@ class BlocklistCacheDataSource {
             FROM cached_blocklist_snapshots
             WHERE owner_user_id = ?
           ''',
-          variables: [_variable(ownerUserId)],
+          variables: [Variable<String>(ownerUserId)],
         )
         .getSingleOrNull();
     if (snapshot == null) return null;
@@ -141,7 +141,7 @@ class BlocklistCacheDataSource {
             WHERE owner_user_id = ?
             ORDER BY blocked_at_ms DESC, user_id ASC
           ''',
-          variables: [_variable(ownerUserId)],
+          variables: [Variable<String>(ownerUserId)],
         )
         .get();
     return BlocklistCacheSnapshot(
@@ -226,14 +226,14 @@ class BlocklistCacheDataSource {
             cached_at_ms = excluded.cached_at_ms
         ''',
         [
-          _variable(ownerUserId),
-          _variable(cachedAt.toUtc().millisecondsSinceEpoch),
+          ownerUserId,
+          cachedAt.toUtc().millisecondsSinceEpoch,
         ],
       );
 
   Future<void> _deleteRows(String ownerUserId) => _database.customStatement(
     'DELETE FROM cached_blocked_users WHERE owner_user_id = ?',
-    [_variable(ownerUserId)],
+    [ownerUserId],
   );
 
   Future<void> _upsert(String ownerUserId, BlockedUser user) =>
@@ -251,13 +251,13 @@ class BlocklistCacheDataSource {
             blocked_at_ms = excluded.blocked_at_ms
         ''',
         [
-          _variable(ownerUserId),
-          _variable(user.id),
-          _variable(user.username),
-          _variable(user.displayName),
-          _variable(user.avatarUrl),
-          _variable(user.avatarStoragePath),
-          _variable(user.blockedAt.toUtc().millisecondsSinceEpoch),
+          ownerUserId,
+          user.id,
+          user.username,
+          user.displayName,
+          user.avatarUrl,
+          user.avatarStoragePath,
+          user.blockedAt.toUtc().millisecondsSinceEpoch,
         ],
       );
 
@@ -284,6 +284,4 @@ class BlocklistCacheDataSource {
         millisecondsSinceEpoch,
         isUtc: true,
       ).toLocal();
-
-  Variable<Object> _variable(Object? value) => Variable<Object>(value);
 }
