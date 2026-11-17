@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -114,6 +115,7 @@ class FeedRepository
   });
 
   static const _timeout = Duration(seconds: 10);
+  static const _mediaBucket = 'feed-media';
   static const _maxThumbnailDownloads = 4;
   final SupabaseClient _client;
   final AccountSessionController _accounts;
@@ -469,11 +471,19 @@ class FeedRepository
     if (!stillNeeded()) throw const StaleAccountSessionException();
     _ensureAccount(account);
     final pending = inFlight[key];
-    if (pending != null) return pending;
-    final download = _download(path, account, metric);
+    if (pending != null) {
+      final bytes = await pending;
+      _ensureAccount(account);
+      if (!stillNeeded()) throw const StaleAccountSessionException();
+      return bytes;
+    }
+    final download = _download(path, account, metric, stillNeeded);
     inFlight[key] = download;
     try {
-      return await download;
+      final bytes = await download;
+      _ensureAccount(account);
+      if (!stillNeeded()) throw const StaleAccountSessionException();
+      return bytes;
     } finally {
       inFlight.remove(key);
     }
@@ -483,14 +493,81 @@ class FeedRepository
     String path,
     AccountSessionSnapshot account,
     String metric,
+    bool Function() stillNeeded,
   ) async {
+    final cache = _mediaCache;
+    if (cache != null) {
+      try {
+        final local = await cache.findStorageFile(
+          ownerUserId: account.userId,
+          bucket: _mediaBucket,
+          storagePath: path,
+          mimeType: 'image/jpeg',
+        );
+        if (local != null) {
+          final bytes = await File(local).readAsBytes();
+          _ensureAccount(account);
+          if (bytes.isNotEmpty) return bytes;
+        }
+      } on StaleAccountSessionException {
+        rethrow;
+      } catch (_) {
+        // A missing or evicted file is a cache miss.
+      }
+    }
+    _ensureAccount(account);
     final bytes = await measureRpc(
       _diagnostics,
       metric,
-      () => _client.storage.from('feed-media').download(path).timeout(_timeout),
+      () => _client.storage.from(_mediaBucket).download(path).timeout(_timeout),
     );
     _ensureAccount(account);
+    if (cache != null && stillNeeded()) {
+      try {
+        await _accounts.commit(account, () async {
+          if (!stillNeeded()) return;
+          await cache.storeBytes(
+            ownerUserId: account.userId,
+            bucket: _mediaBucket,
+            storagePath: path,
+            mimeType: 'image/jpeg',
+            bytes: bytes,
+          );
+        });
+      } on StaleAccountSessionException {
+        rethrow;
+      } catch (_) {
+        // The authorized network result remains usable without a disk write.
+      }
+    }
+    _ensureAccount(account);
     return bytes;
+  }
+
+  Future<void> evictPostMedia(
+    FeedPost post,
+    AccountSessionSnapshot account,
+  ) async {
+    final cache = _mediaCache;
+    if (cache == null || post.photos.isEmpty) return;
+    try {
+      await _accounts.commit(
+        account,
+        () => cache.removeStorageFiles(
+          ownerUserId: account.userId,
+          bucket: _mediaBucket,
+          storagePaths: {
+            for (final photo in post.photos) ...[
+              photo.thumbnailPath,
+              ?photo.path,
+            ],
+          },
+          mimeType: 'image/jpeg',
+        ),
+      );
+    } catch (_) {
+      // Access is checked separately from the file and logout clears the scope.
+    }
   }
 
   @override

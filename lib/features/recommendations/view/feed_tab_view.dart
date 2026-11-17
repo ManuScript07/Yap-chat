@@ -116,42 +116,53 @@ class _FeedTabViewState extends State<FeedTabView> {
 
   Widget _scroll({bool requiresLocation = false}) {
     final timeline = widget.timeline;
-    return PullRefresh(
-      indicatorTop: widget.headerExtent,
-      indicatorKey: const ValueKey('feed_pull_indicator'),
-      useSliverInset: true,
-      onRefresh: timeline.refresh,
-      onScroll: _onScroll,
-      child: CustomScrollView(
-        key: PageStorageKey((timeline.tab, timeline.account.generation)),
-        controller: widget.controller,
-        physics: PullRefresh.physics,
-        scrollCacheExtent: const ScrollCacheExtent.pixels(160),
-        slivers: [
-          SliverToBoxAdapter(child: SizedBox(height: widget.headerExtent)),
-          const SliverPullRefreshGap(),
-          _FeedRows(
-            timeline: timeline,
-            visible: widget.visible && !requiresLocation,
-          ),
-          BlocSelector<FeedCubit, FeedState, FeedFooter>(
-            bloc: timeline,
-            selector: (state) => state.footer,
-            builder: _footer,
-          ),
-          SliverLayoutBuilder(
-            builder: (context, constraints) {
-              // Even an empty tab must be able to scroll past the header.
-              final remaining =
-                  constraints.viewportMainAxisExtent +
-                  widget.headerExtent -
-                  constraints.precedingScrollExtent;
-              return remaining > 0
-                  ? SliverToBoxAdapter(child: SizedBox(height: remaining))
-                  : const SliverToBoxAdapter();
-            },
-          ),
-        ],
+    return BlocSelector<FeedCubit, FeedState, bool>(
+      bloc: timeline,
+      selector: (state) =>
+          widget.visible &&
+          !requiresLocation &&
+          !state.loaded &&
+          state.rows.posts.isEmpty &&
+          state.failure == null,
+      builder: (context, initialLoad) => PullRefresh(
+        refreshing: initialLoad,
+        showExternalProgress: true,
+        indicatorTop: widget.headerExtent,
+        indicatorKey: const ValueKey('feed_pull_indicator'),
+        useSliverInset: true,
+        onRefresh: timeline.refresh,
+        onScroll: _onScroll,
+        child: CustomScrollView(
+          key: PageStorageKey((timeline.tab, timeline.account.generation)),
+          controller: widget.controller,
+          physics: PullRefresh.physics,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(160),
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: widget.headerExtent)),
+            const SliverPullRefreshGap(),
+            _FeedRows(
+              timeline: timeline,
+              visible: widget.visible && !requiresLocation,
+            ),
+            BlocSelector<FeedCubit, FeedState, FeedFooter>(
+              bloc: timeline,
+              selector: (state) => state.footer,
+              builder: _footer,
+            ),
+            SliverLayoutBuilder(
+              builder: (context, constraints) {
+                // Even an empty tab must be able to scroll past the header.
+                final remaining =
+                    constraints.viewportMainAxisExtent +
+                    widget.headerExtent -
+                    constraints.precedingScrollExtent;
+                return remaining > 0
+                    ? SliverToBoxAdapter(child: SizedBox(height: remaining))
+                    : const SliverToBoxAdapter();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -165,12 +176,18 @@ class _FeedTabViewState extends State<FeedTabView> {
       return const SliverToBoxAdapter();
     }
     Widget? content;
-    if (state.loading || !state.loaded && failure == null) {
+    if (empty && !state.loaded && failure == null) {
+      return const SliverToBoxAdapter();
+    }
+    if (state.loading) {
       content = const Padding(
         padding: EdgeInsets.all(16),
-        child: SizedBox.square(
-          dimension: 22,
-          child: CircularProgressIndicator(strokeWidth: 2),
+        child: PullRefreshIndicator(
+          opacity: 1,
+          progress: 1,
+          spinning: true,
+          size: 24,
+          strokeWidth: 3,
         ),
       );
     } else if (failure != null) {

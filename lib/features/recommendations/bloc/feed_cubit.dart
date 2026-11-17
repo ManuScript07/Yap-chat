@@ -335,6 +335,7 @@ class FeedCubit extends Cubit<FeedState> {
       rows: _rows,
       expandedIds: _expandedIds,
       loading: _refresh != null || _append != null,
+      appending: _append != null,
       loaded: _loaded,
       canContinue: _canContinue,
       failure: _failure,

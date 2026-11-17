@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:drift/native.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/core/services/services.dart';
+import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 void main() {
@@ -68,24 +73,7 @@ void main() {
       }),
     );
     addTearDown(client.dispose);
-    final claims = base64Url
-        .encode(
-          utf8.encode(
-            jsonEncode({
-              'sub': viewer,
-              'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
-            }),
-          ),
-        )
-        .replaceAll('=', '');
-    await client.auth.setInitialSession(
-      jsonEncode({
-        'access_token': 'eyJhbGciOiJIUzI1NiJ9.$claims.signature',
-        'refresh_token': 'test-refresh',
-        'token_type': 'bearer',
-        'user': {'id': viewer, 'aud': 'authenticated'},
-      }),
-    );
+    await _signIn(client, viewer);
     final accounts = AccountSessionController(initialUserId: viewer);
     final repository = FeedRepository(client: client, accounts: accounts);
     final account = accounts.capture();
@@ -128,4 +116,152 @@ void main() {
     );
     expect(requests, hasLength(6));
   });
+
+  test(
+    'media files survive a repository restart and stay scoped to the viewer',
+    () async {
+      const viewer = '10000000-0000-4000-8000-000000000001';
+      const other = '10000000-0000-4000-8000-000000000002';
+      final directory = await Directory.systemTemp.createTemp(
+        'yap-feed-media-',
+      );
+      final database = AppDatabase.forTesting(NativeDatabase.memory());
+      final cache = MediaCacheService(
+        database: database,
+        environment: 'test',
+        cacheDirectoryProvider: () async => directory,
+        supportDirectoryProvider: () async => directory,
+      );
+      addTearDown(() async {
+        cache.dispose();
+        await database.close();
+        await directory.delete(recursive: true);
+      });
+      final requests = <String>[];
+      final client = SupabaseClient(
+        'http://127.0.0.1:1',
+        'test-key',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+        httpClient: MockClient((request) async {
+          requests.add(request.url.path);
+          return http.Response.bytes(
+            [255, 216, 42, 255, 217],
+            200,
+            request: request,
+          );
+        }),
+      );
+      addTearDown(client.dispose);
+      await _signIn(client, viewer);
+      final accounts = AccountSessionController(initialUserId: viewer);
+      FeedRepository repository() =>
+          FeedRepository(client: client, accounts: accounts, mediaCache: cache);
+      final first = repository();
+      final account = accounts.capture();
+      const photo = FeedPhoto(
+        id: 'photo',
+        thumbnailPath: 'fixture/thumb.jpg',
+        path: 'fixture/full.jpg',
+      );
+      await Future.wait(
+        List.generate(
+          4,
+          (_) => first.downloadThumbnail(
+            photo,
+            account: account,
+            stillNeeded: () => true,
+          ),
+        ),
+      );
+      await first.downloadPhoto(
+        photo,
+        account: account,
+        stillNeeded: () => true,
+      );
+      expect(requests, hasLength(2));
+      final restarted = repository();
+      await restarted.downloadThumbnail(
+        photo,
+        account: account,
+        stillNeeded: () => true,
+      );
+      await restarted.downloadPhoto(
+        photo,
+        account: account,
+        stillNeeded: () => true,
+      );
+      expect(requests, hasLength(2));
+      final actions = FeedActionsCubit(
+        restarted,
+        account,
+        () => accounts.isCurrent(account),
+      );
+      addTearDown(actions.close);
+      final post = FeedPost(
+        id: 'post',
+        authorId: 'author',
+        authorName: null,
+        text: '',
+        createdAt: DateTime.utc(2026),
+        photos: const [photo],
+        friendsOnly: true,
+      );
+      actions.trackMedia(post);
+      actions.friendshipRemoved(post.authorId);
+      await accounts.drainCommits();
+      expect(actions.canShow(post), isFalse);
+      expect(
+        await cache.findStorageFile(
+          ownerUserId: viewer,
+          bucket: 'feed-media',
+          storagePath: photo.path!,
+          mimeType: 'image/jpeg',
+        ),
+        isNull,
+      );
+      await restarted.downloadThumbnail(
+        photo,
+        account: account,
+        stillNeeded: () => true,
+      );
+      expect(requests, hasLength(3));
+      accounts.setAuthenticatedUser(other);
+      await _signIn(client, other);
+      await expectLater(
+        first.downloadThumbnail(
+          photo,
+          account: account,
+          stillNeeded: () => true,
+        ),
+        throwsA(isA<StaleAccountSessionException>()),
+      );
+      await restarted.downloadThumbnail(
+        photo,
+        account: accounts.capture(),
+        stillNeeded: () => true,
+      );
+      expect(requests, hasLength(4));
+    },
+  );
+}
+
+Future<void> _signIn(SupabaseClient client, String userId) async {
+  final claims = base64Url
+      .encode(
+        utf8.encode(
+          jsonEncode({
+            'sub': userId,
+            'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+          }),
+        ),
+      )
+      .replaceAll('=', '');
+  await client.auth.setInitialSession(
+    jsonEncode({
+      'access_token': 'eyJhbGciOiJIUzI1NiJ9.$claims.signature',
+      'refresh_token': 'test-refresh',
+      'token_type': 'bearer',
+      'user': {'id': userId, 'aud': 'authenticated'},
+    }),
+  );
 }

@@ -26,6 +26,7 @@ class FeedState {
     this.rows = const FeedRows.empty(),
     this.expandedIds = const {},
     this.loading = false,
+    this.appending = false,
     this.loaded = false,
     this.canContinue = false,
     this.failure,
@@ -34,12 +35,13 @@ class FeedState {
   final FeedRows rows;
   final Set<String> expandedIds;
   final bool loading;
+  final bool appending;
   final bool loaded;
   final bool canContinue;
   final Object? failure;
 
   FeedFooter get footer => (
-    loading: loading,
+    loading: appending,
     loaded: loaded,
     empty: rows.posts.isEmpty,
     canContinue: canContinue,

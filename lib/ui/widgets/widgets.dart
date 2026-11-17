@@ -17,6 +17,8 @@ export 'user_avatar.dart';
 export 'avatar_geometry.dart';
 export 'local_avatar_frames.dart';
 export 'glass_icon_button.dart';
+export 'media_gallery_route.dart';
+export 'media_gallery_chrome.dart';
 export 'permission_denied_dialog.dart';
 export 'location_required_overlay.dart';
 export 'app_snack_bar.dart';

@@ -160,78 +160,96 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('gallery swipes at normal scale and loads only the active page', (
-    tester,
-  ) async {
-    final preview = await tester.runAsync(() async {
-      final recorder = ui.PictureRecorder();
-      ui.Canvas(recorder).drawPaint(ui.Paint()..color = Colors.blue);
-      final picture = recorder.endRecording();
-      try {
-        return await picture.toImage(40, 40);
-      } finally {
-        picture.dispose();
+  testWidgets(
+    'gallery requests only the active photo and reuses its decoded frame on return',
+    (tester) async {
+      final preview = await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        ui.Canvas(recorder).drawPaint(ui.Paint()..color = Colors.blue);
+        final picture = recorder.endRecording();
+        try {
+          final image = await picture.toImage(40, 40);
+          final png = await image.toByteData(format: ui.ImageByteFormat.png);
+          repository.photoBytes = png!.buffer.asUint8List();
+          return image;
+        } finally {
+          picture.dispose();
+        }
+      });
+      Future<void> settleImage() async {
+        for (var frame = 0; frame < 20; frame++) {
+          await tester.pump(const Duration(milliseconds: 25));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 3)),
+          );
+        }
+        await tester.pumpAndSettle();
       }
-    });
-    addTearDown(preview!.dispose);
-    final account = accounts.capture();
-    final timeline = FeedCubit(
-      tab: FeedTab.forYou,
-      repository: repository,
-      account: account,
-      isCurrentAccount: () => accounts.isCurrent(account),
-      actions: scope.actionsFor(account),
-    );
-    addTearDown(timeline.close);
-    final post = FeedPost(
-      id: _postId,
-      authorId: 'author',
-      authorName: 'author',
-      text: '',
-      createdAt: DateTime.utc(2026),
-      photos: const [
-        FeedPhoto(id: 'first', thumbnailPath: 'first'),
-        FeedPhoto(id: 'second', thumbnailPath: 'second'),
-      ],
-    );
-    await tester.pumpWidget(
-      RepositoryProvider.value(
-        value: accounts,
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: TextButton(
-                onPressed: () => openFeedGallery(
-                  context,
-                  timeline: timeline,
-                  post: post,
-                  index: 0,
-                  heroTag: 'post photo',
-                  preview: preview,
+
+      addTearDown(preview!.dispose);
+      final account = accounts.capture();
+      final timeline = FeedCubit(
+        tab: FeedTab.forYou,
+        repository: repository,
+        account: account,
+        isCurrentAccount: () => accounts.isCurrent(account),
+        actions: scope.actionsFor(account),
+      );
+      addTearDown(timeline.close);
+      final post = FeedPost(
+        id: _postId,
+        authorId: 'author',
+        authorName: 'author',
+        text: '',
+        createdAt: DateTime.utc(2026),
+        photos: const [
+          FeedPhoto(id: 'first', thumbnailPath: 'first'),
+          FeedPhoto(id: 'second', thumbnailPath: 'second'),
+        ],
+      );
+      await tester.pumpWidget(
+        RepositoryProvider.value(
+          value: accounts,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => openFeedGallery(
+                    context,
+                    timeline: timeline,
+                    post: post,
+                    index: 0,
+                    heroTag: 'post photo',
+                    preview: preview,
+                  ),
+                  child: const Text('open gallery'),
                 ),
-                child: const Text('open gallery'),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('open gallery'));
-    await tester.pumpAndSettle();
-    expect(repository.photoReads, ['first']);
-    expect(find.text('1/2'), findsOneWidget);
-    await tester.drag(find.byType(PageView), const Offset(-600, 0));
-    await tester.pumpAndSettle();
-    expect(find.text('2/2'), findsOneWidget);
-    expect(repository.photoReads, ['first', 'second']);
-    await tester.tap(find.byTooltip('back'));
-    await tester.pumpAndSettle();
-    expect(find.text('open gallery'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      );
+      await tester.tap(find.text('open gallery'));
+      await settleImage();
+      expect(repository.photoReads, ['first']);
+      expect(find.text('1 of 2'), findsOneWidget);
+      await tester.drag(find.byType(PageView), const Offset(-600, 0));
+      await settleImage();
+      expect(find.text('2 of 2'), findsOneWidget);
+      expect(repository.photoReads, ['first', 'second']);
+      await tester.drag(find.byType(PageView), const Offset(600, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('1 of 2'), findsOneWidget);
+      expect(repository.photoReads, ['first', 'second']);
+      await tester.tap(find.byTooltip('back'));
+      await tester.pumpAndSettle();
+      expect(find.text('open gallery'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 FeedPost _postWithLocation({String id = _postId, bool friendsOnly = false}) =>
@@ -259,6 +277,7 @@ class _Repository extends MockFeedRepository
   int postReads = 0;
   int commentReads = 0;
   final photoReads = <String>[];
+  Uint8List? photoBytes;
 
   @override
   Future<FeedPost?> getPost(String id, AccountSessionSnapshot account) async {
@@ -295,7 +314,7 @@ class _Repository extends MockFeedRepository
     required bool Function() stillNeeded,
   }) async {
     photoReads.add(photo.id);
-    throw StateError('simulated download failure');
+    return photoBytes ?? (throw StateError('no fixture image'));
   }
 
   @override

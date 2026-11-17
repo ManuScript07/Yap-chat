@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
+import 'package:yap_chat/features/recommendations/data/feed_media_frames.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
 
@@ -229,6 +231,9 @@ class _FeedPhotosState extends State<_FeedPhotos> {
         post: widget.post,
         index: index,
         heroTag: tag,
+        heroTags: [
+          for (final photo in widget.post.photos) (_instance, photo.id),
+        ],
         preview: image,
       );
     } finally {
@@ -240,14 +245,19 @@ class _FeedPhotosState extends State<_FeedPhotos> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final photos = widget.post.photos;
-      final width = constraints.maxWidth - widget.padding.horizontal;
-      final tile = width < 360
-          ? 132.0
-          : width < 600
-          ? 164.0
-          : 192.0;
+      final media = MediaQuery.of(context);
+      final landscape = media.orientation == Orientation.landscape;
+      final available = math.max(
+        1.0,
+        constraints.maxWidth - widget.padding.horizontal - widget.leadingInset,
+      );
+      final height = landscape
+          ? (media.size.height * .40).clamp(88.0, 164.0)
+          : (available * .66).clamp(144.0, 208.0);
+      final maxWidth = math.min(available, landscape ? 300.0 : 460.0);
+      final minWidth = math.min(maxWidth, height * .55);
       return SizedBox(
-        height: tile,
+        height: height,
         child: ListView.separated(
           key: PageStorageKey(('feed-photos', widget.post.id)),
           primary: false,
@@ -260,15 +270,21 @@ class _FeedPhotosState extends State<_FeedPhotos> {
           itemBuilder: (_, index) {
             final photo = photos[index];
             final tag = (_instance, photo.id);
+            final width = (height * (photo.aspectRatio ?? 1)).clamp(
+              minWidth,
+              maxWidth,
+            );
             return SizedBox(
-              width: tile,
+              width: width,
               child: _FeedThumbnail(
                 key: ValueKey(photo.id),
                 timeline: widget.timeline,
+                post: widget.post,
                 photo: photo,
                 visible: widget.visible,
-                decodeSize: (tile * MediaQuery.devicePixelRatioOf(context))
-                    .ceil(),
+                decodeSize: (math.max(width, height) * media.devicePixelRatio)
+                    .ceil()
+                    .clamp(1, 900),
                 heroTag: tag,
                 onOpen: (image) => _open(index, tag, image),
               ),
@@ -284,6 +300,7 @@ class _FeedThumbnail extends StatefulWidget {
   const _FeedThumbnail({
     super.key,
     required this.timeline,
+    required this.post,
     required this.photo,
     required this.decodeSize,
     required this.heroTag,
@@ -292,6 +309,7 @@ class _FeedThumbnail extends StatefulWidget {
   });
 
   final FeedCubit timeline;
+  final FeedPost post;
   final FeedPhoto photo;
   final int decodeSize;
   final Object heroTag;
@@ -303,7 +321,11 @@ class _FeedThumbnail extends StatefulWidget {
 }
 
 class _FeedThumbnailState extends State<_FeedThumbnail> {
+  static const _radius = BorderRadius.all(
+    Radius.circular(feedPhotoPreviewRadius),
+  );
   ui.Image? _image;
+  int? _frameSize;
   int _generation = 0;
   bool _loading = false;
 
@@ -316,14 +338,21 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
   @override
   void didUpdateWidget(covariant _FeedThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.photo.thumbnailPath != oldWidget.photo.thumbnailPath ||
-        widget.decodeSize != oldWidget.decodeSize) {
+    final changedPhoto =
+        widget.photo.thumbnailPath != oldWidget.photo.thumbnailPath ||
+        widget.timeline.account != oldWidget.timeline.account;
+    final needsFrame =
+        changedPhoto || widget.decodeSize != oldWidget.decodeSize;
+    if (changedPhoto) {
       _image?.dispose();
       _image = null;
+      _frameSize = null;
+    }
+    if (needsFrame) {
       _generation++;
       _loading = false;
     }
-    if (widget.visible && _image == null && !_loading) {
+    if (widget.visible && _frameSize != widget.decodeSize && !_loading) {
       unawaited(_load());
     }
   }
@@ -332,32 +361,39 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
     _loading = true;
     final generation = ++_generation;
     final timeline = widget.timeline;
+    final post = widget.post;
+    final photo = widget.photo;
     final decodeSize = widget.decodeSize;
+    final frames = timeline.actions?.thumbnailFrames;
     bool isCurrent() =>
-        mounted && generation == _generation && timeline.isCurrentAccount();
+        mounted &&
+        generation == _generation &&
+        timeline.isCurrentAccount() &&
+        timeline.actions?.canShow(post) != false;
     try {
-      final bytes = await timeline.repository.downloadThumbnail(
-        widget.photo,
-        account: timeline.account,
-        stillNeeded: () => isCurrent() && widget.visible,
-      );
       if (!isCurrent()) return;
-      final codec = await ui.instantiateImageCodec(
-        bytes,
-        targetWidth: decodeSize,
-        allowUpscaling: false,
-      );
-      try {
+      timeline.actions?.trackMedia(post);
+      var frame = frames?.find(post, photo.thumbnailPath, decodeSize);
+      if (frame == null) {
+        final bytes = await timeline.repository.downloadThumbnail(
+          photo,
+          account: timeline.account,
+          stillNeeded: () => isCurrent() && widget.visible,
+        );
         if (!isCurrent()) return;
-        final frame = await codec.getNextFrame();
+        frame = await decodeFeedFrame(bytes, decodeSize);
         if (!isCurrent()) {
-          frame.image.dispose();
+          frame.dispose();
           return;
         }
-        setState(() => _image = frame.image);
-      } finally {
-        codec.dispose();
+        frames?.store(post, photo.thumbnailPath, decodeSize, frame);
       }
+      final preceding = _image;
+      setState(() {
+        _image = frame;
+        _frameSize = decodeSize;
+      });
+      preceding?.dispose();
     } catch (_) {
       // Keep the tile's dimensions on storage or decoding errors.
     } finally {
@@ -369,9 +405,14 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
   Widget build(BuildContext context) {
     final image = _image;
     if (image == null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: const _PhotoPlaceholder(),
+      return GestureDetector(
+        onTap: () {
+          if (widget.visible && !_loading) unawaited(_load());
+        },
+        child: const ClipRRect(
+          borderRadius: _radius,
+          child: _PhotoPlaceholder(),
+        ),
       );
     }
     return Semantics(
@@ -382,7 +423,7 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
         child: Hero(
           tag: widget.heroTag,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _radius,
             child: RawImage(image: image, fit: BoxFit.cover),
           ),
         ),

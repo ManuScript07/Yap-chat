@@ -5,10 +5,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
+import 'package:yap_chat/features/recommendations/data/feed_media_frames.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
+
+const feedPhotoPreviewRadius = 16.0;
 
 Future<void> openFeedGallery(
   BuildContext context, {
@@ -16,6 +20,7 @@ Future<void> openFeedGallery(
   required FeedPost post,
   required int index,
   required Object heroTag,
+  List<Object>? heroTags,
   required ui.Image preview,
 }) async {
   final actions = timeline.actions;
@@ -26,7 +31,16 @@ Future<void> openFeedGallery(
       ModalRoute.isCurrentOf(context) == false) {
     return;
   }
-  final image = preview.clone();
+  actions.trackMedia(post);
+  final previews = <int, ui.Image>{index: preview.clone()};
+  for (final (position, photo) in post.photos.indexed) {
+    if (position == index) continue;
+    final thumbnail = actions.thumbnailFrames.findPreview(
+      post,
+      photo.thumbnailPath,
+    );
+    if (thumbnail != null) previews[position] = thumbnail;
+  }
   final accounts = context.read<AccountSessionController?>();
   final allowed = ValueNotifier(true);
   void checkAccess() {
@@ -35,14 +49,17 @@ Future<void> openFeedGallery(
 
   accounts?.generationChanges.addListener(checkAccess);
   final subscription = actions.stream.listen((_) => checkAccess());
-  final route = MaterialPageRoute<void>(
-    builder: (_) => _FeedPostGallery(
+  late final MediaGalleryRoute route;
+  route = MediaGalleryRoute(
+    pageBuilder: (_, _, _) => _FeedPostGallery(
       timeline: timeline,
       post: post,
       repository: repository as IFeedPublicationRepository,
       initialIndex: index,
       heroTag: heroTag,
-      preview: image,
+      heroTags: heroTags,
+      animation: route.mediaAnimation,
+      previews: previews,
       allowed: allowed,
     ),
   );
@@ -54,7 +71,9 @@ Future<void> openFeedGallery(
     accounts?.generationChanges.removeListener(checkAccess);
     await subscription.cancel();
     allowed.dispose();
-    image.dispose();
+    for (final image in previews.values) {
+      image.dispose();
+    }
   }
 }
 
@@ -65,7 +84,9 @@ class _FeedPostGallery extends StatefulWidget {
     required this.repository,
     required this.initialIndex,
     required this.heroTag,
-    required this.preview,
+    required this.heroTags,
+    required this.animation,
+    required this.previews,
     required this.allowed,
   });
 
@@ -74,7 +95,9 @@ class _FeedPostGallery extends StatefulWidget {
   final IFeedPublicationRepository repository;
   final int initialIndex;
   final Object heroTag;
-  final ui.Image preview;
+  final List<Object>? heroTags;
+  final Animation<double> animation;
+  final Map<int, ui.Image> previews;
   final ValueListenable<bool> allowed;
 
   @override
@@ -85,8 +108,9 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
   late int _index = widget.initialIndex;
   late final _pages = PageController(initialPage: _index);
   final _transform = TransformationController();
-  Animation<double>? _animation;
-  ui.Image? _image;
+  final _frames = <int, ui.Image>{};
+  static const _frameBudget = 32 * 1024 * 1024;
+  var _frameBytes = 0;
   Uint8List? _encoded;
   int _loadGeneration = 0;
   bool _failed = false;
@@ -96,38 +120,32 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
 
   bool get _allowed =>
       widget.allowed.value && widget.timeline.actions!.canShow(widget.post);
-  bool get _settled => _animation?.status == AnimationStatus.completed;
+  bool get _settled => widget.animation.status == AnimationStatus.completed;
 
   @override
   void initState() {
     super.initState();
     widget.allowed.addListener(_accessChanged);
     _transform.addListener(_zoomChanged);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final animation = ModalRoute.of(context)?.animation;
-    if (identical(animation, _animation)) return;
-    _animation?.removeStatusListener(_routeChanged);
-    _animation = animation?..addStatusListener(_routeChanged);
+    widget.animation.addStatusListener(_routeChanged);
     if (_settled) _routeChanged(AnimationStatus.completed);
   }
 
   void _routeChanged(AnimationStatus status) {
+    if (mounted) setState(() {});
     if (status != AnimationStatus.completed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _allowed && _settled) unawaited(_load());
+      if (mounted && _allowed && _settled && !_frames.containsKey(_index)) {
+        unawaited(_load());
+      }
     });
   }
 
   void _accessChanged() {
     if (_allowed) return;
     _loadGeneration++;
-    _image?.dispose();
     _encoded = null;
-    setState(() => _image = null);
+    setState(_clearFrames);
   }
 
   void _zoomChanged() {
@@ -137,20 +155,21 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
 
   void _select(int index) {
     _loadGeneration++;
-    _image?.dispose();
     _encoded = null;
     _transform.value = Matrix4.identity();
     setState(() {
       _index = index;
       _failed = false;
-      _image = null;
+      final existing = _frames.remove(index);
+      if (existing != null) _frames[index] = existing;
     });
-    if (_settled) unawaited(_load());
+    if (_settled && !_frames.containsKey(index)) unawaited(_load());
   }
 
   Future<void> _load() async {
     final generation = ++_loadGeneration;
-    final photo = widget.post.photos[_index];
+    final index = _index;
+    final photo = widget.post.photos[index];
     final timeline = widget.timeline;
     final viewport = MediaQuery.sizeOf(context);
     final pixels = MediaQuery.devicePixelRatioOf(context);
@@ -168,31 +187,39 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
         stillNeeded: current,
       );
       if (!current()) return;
-      final ratio = photo.aspectRatio;
-      final codec = await ui.instantiateImageCodec(
-        bytes,
-        targetWidth: ratio != null && ratio >= 1 ? maxSide : null,
-        targetHeight: ratio != null && ratio < 1 ? maxSide : null,
-        allowUpscaling: false,
-      );
-      try {
-        if (!current()) return;
-        final frame = await codec.getNextFrame();
-        if (!current()) {
-          frame.image.dispose();
-          return;
-        }
-        _image?.dispose();
-        setState(() {
-          _image = frame.image;
-          _encoded = bytes;
-        });
-      } finally {
-        codec.dispose();
+      final image = await decodeFeedFrame(bytes, maxSide);
+      if (!current()) {
+        image.dispose();
+        return;
       }
+      setState(() {
+        _dropFrame(index);
+        _frames[index] = image;
+        _frameBytes += image.width * image.height * 4;
+        while (_frames.length > 1 &&
+            (_frameBytes > _frameBudget || _frames.length > 3)) {
+          _dropFrame(_frames.keys.first);
+        }
+        _encoded = bytes;
+      });
     } catch (_) {
       if (current()) setState(() => _failed = true);
     }
+  }
+
+  void _dropFrame(int index) {
+    final image = _frames.remove(index);
+    if (image == null) return;
+    _frameBytes -= image.width * image.height * 4;
+    image.dispose();
+  }
+
+  void _clearFrames() {
+    for (final image in _frames.values) {
+      image.dispose();
+    }
+    _frames.clear();
+    _frameBytes = 0;
   }
 
   Future<void> _save() async {
@@ -277,13 +304,15 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
                     ),
                   ),
                 ),
-                if (_showControls)
+                if (_showControls && _settled)
                   Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: SafeArea(bottom: false, child: _header(context)),
+                    top: MediaQuery.paddingOf(context).top + 16,
+                    left: MediaQuery.paddingOf(context).left + 16,
+                    right: MediaQuery.paddingOf(context).right + 16,
+                    child: _header(context),
                   ),
+                if (_showControls && _settled && widget.post.photos.length > 1)
+                  _counter(context),
               ],
             ),
     ),
@@ -292,8 +321,8 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
   Widget _buildPhoto(int index) {
     final initial = index == widget.initialIndex;
     final selected = index == _index;
-    final image =
-        (selected ? _image : null) ?? (initial ? widget.preview : null);
+    final preview = widget.previews[index];
+    final image = _frames[index] ?? preview;
     final retry = selected && _failed
         ? TextButton(
             onPressed: () {
@@ -319,19 +348,23 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
           size: size,
           child: RawImage(image: image, fit: BoxFit.contain),
         );
-        final content = initial && selected && !_zoomed
+        final heroTag =
+            widget.heroTags?[index] ?? (initial ? widget.heroTag : null);
+        final content = heroTag != null && selected && !_zoomed
             ? Hero(
-                tag: widget.heroTag,
-                flightShuttleBuilder: (_, animation, _, _, _) =>
+                tag: heroTag,
+                flightShuttleBuilder: (_, animation, direction, _, _) =>
                     ValueListenableBuilder(
                       valueListenable: widget.allowed,
                       builder: (context, allowed, _) => allowed
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(
-                                8 * (1 - animation.value),
+                                feedPhotoPreviewRadius * (1 - animation.value),
                               ),
                               child: RawImage(
-                                image: widget.preview,
+                                image: direction == HeroFlightDirection.push
+                                    ? preview ?? image
+                                    : image,
                                 fit: BoxFit.cover,
                               ),
                             )
@@ -348,11 +381,13 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     );
   }
 
+  String _backLabel(BuildContext context) =>
+      MaterialLocalizations.of(context).backButtonTooltip.toLowerCase();
+
   Widget _back(BuildContext context) => Tooltip(
-    message: MaterialLocalizations.of(context).backButtonTooltip.toLowerCase(),
-    child: GlassIconButton(
-      icon: Icons.arrow_back_rounded,
-      onTap: () => Navigator.of(context).maybePop(),
+    message: _backLabel(context),
+    child: MediaGalleryHeader.backButton(
+      () => Navigator.of(context).maybePop(),
     ),
   );
 
@@ -360,70 +395,40 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     final post = widget.post;
     final path = post.avatarPath;
     final repository = widget.timeline.repository;
-    return ColoredBox(
-      color: context.scaffoldBackgroundColor.withValues(alpha: .82),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          children: [
-            _back(context),
-            const SizedBox(width: 8),
-            UserAvatar(
-              size: 40,
-              avatarUrl: path == null ? post.avatarUrl : null,
-              avatarRevision: post.avatarRevision,
-              preferAvatarLoader: path != null,
-              avatarLoader: path != null && repository is FeedRepository
-                  ? () => repository.loadAvatar(path, widget.timeline.account)
-                  : null,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.authorName ?? context.l10n.feedUnknownAuthor,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.textTheme.titleMedium,
-                  ),
-                  Text(
-                    MaterialLocalizations.of(
-                      context,
-                    ).formatMediumDate(post.createdAt.toLocal()),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.textTheme.bodySmall?.copyWith(
-                      color: context.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (post.photos.length > 1)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  '${_index + 1}/${post.photos.length}',
-                  style: context.textTheme.labelMedium?.copyWith(
-                    color: context.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            IconButton(
-              tooltip: context.l10n.feedSavePhoto,
-              color: context.colorScheme.onSurface,
-              onPressed: _saving ? null : _save,
-              icon: _saving
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download_rounded),
-            ),
-          ],
+    return MediaGalleryHeader(
+      name: post.authorName ?? context.l10n.feedUnknownAuthor,
+      date: DateFormat(
+        'd MMMM yyyy',
+        Localizations.localeOf(context).toString(),
+      ).format(post.createdAt.toLocal()),
+      avatar: UserAvatar(
+        size: MediaGalleryHeader.buttonSize,
+        avatarUrl: path == null ? post.avatarUrl : null,
+        avatarRevision: post.avatarRevision,
+        preferAvatarLoader: path != null,
+        avatarLoader: path != null && repository is FeedRepository
+            ? () => repository.loadAvatar(path, widget.timeline.account)
+            : null,
+      ),
+      onBack: () => Navigator.of(context).maybePop(),
+      onSave: _save,
+      backLabel: _backLabel(context),
+      saveLabel: context.l10n.feedSavePhoto,
+    );
+  }
+
+  Widget _counter(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return Positioned(
+      top:
+          media.padding.top +
+          (media.orientation == Orientation.landscape ? 18 : 76),
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: MediaGalleryCounter(
+          index: _index,
+          total: widget.post.photos.length,
         ),
       ),
     );
@@ -432,10 +437,10 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
   @override
   void dispose() {
     widget.allowed.removeListener(_accessChanged);
-    _animation?.removeStatusListener(_routeChanged);
+    widget.animation.removeStatusListener(_routeChanged);
     _pages.dispose();
     _transform.dispose();
-    _image?.dispose();
+    _clearFrames();
     super.dispose();
   }
 }

@@ -18,6 +18,7 @@ class PullRefresh extends StatefulWidget {
     this.onActivityChanged,
     this.overlayBuilder,
     this.useSliverInset = false,
+    this.showExternalProgress = false,
   });
 
   final double indicatorTop;
@@ -29,6 +30,7 @@ class PullRefresh extends StatefulWidget {
   final ValueChanged<bool>? onActivityChanged;
   final Widget Function(bool pullingToRefresh)? overlayBuilder;
   final bool useSliverInset;
+  final bool showExternalProgress;
 
   static const physics = BouncingScrollPhysics(
     parent: AlwaysScrollableScrollPhysics(),
@@ -51,7 +53,10 @@ class _PullRefreshState extends State<PullRefresh> {
   var _isArmed = false;
   var _hasArmedHaptic = false;
 
-  double get _dragProgress => _isArmed || _isSnapping
+  bool get _externalProgress =>
+      widget.showExternalProgress && widget.refreshing;
+
+  double get _dragProgress => _isArmed || _isSnapping || _externalProgress
       ? 1
       : 1 -
             math.exp(
@@ -223,7 +228,7 @@ class _PullRefreshState extends State<PullRefresh> {
                     ? (_isRefreshRunning || _isArmed ? 1 : _dragProgress)
                     : 0,
                 progress: _dragProgress,
-                spinning: _isRefreshRunning,
+                spinning: _isRefreshRunning || _externalProgress,
               ),
             ),
           ),

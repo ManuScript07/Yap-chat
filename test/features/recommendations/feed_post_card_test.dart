@@ -369,6 +369,20 @@ void main() {
     },
   );
 
+  testWidgets('a tap on an unloaded photo stays inside the feed card', (
+    tester,
+  ) async {
+    final opened = <String>[];
+    final post = _post(
+      'viewer',
+      photos: const [FeedPhoto(id: 'photo', thumbnailPath: 'photo')],
+    );
+    await mount(tester, [post], onOpen: opened.add);
+    await tester.tap(find.byIcon(Icons.image_outlined));
+    await tester.pumpAndSettle();
+    expect(opened, isEmpty);
+  });
+
   testWidgets(
     'unfollow requires confirmation and preserves the button while pending',
     (tester) async {
@@ -427,6 +441,7 @@ FeedPost _post(
   FeedCoordinates? coordinates,
   String? avatarPath,
   String? repostedBy,
+  List<FeedPhoto> photos = const [],
 }) => FeedPost(
   id: id ?? 'post-$author',
   authorId: author,
@@ -437,6 +452,7 @@ FeedPost _post(
   coordinates: coordinates,
   avatarPath: avatarPath,
   repostedBy: repostedBy,
+  photos: photos,
   reaction: (version: 0, liked: true, likes: 12000),
   commentCount: 452100000,
   viewCount: 10000000000,

@@ -353,9 +353,10 @@ void main() {
             authorName: 'author',
             text: 'media body',
             createdAt: DateTime.utc(2026),
-            photos: [
-              for (var i = 0; i < 3; i++)
-                FeedPhoto(id: '$i', thumbnailPath: '$i'),
+            photos: const [
+              FeedPhoto(id: '0', thumbnailPath: '0', width: 800, height: 1200),
+              FeedPhoto(id: '1', thumbnailPath: '1', width: 1200, height: 800),
+              FeedPhoto(id: '2', thumbnailPath: '2', width: 800, height: 800),
             ],
           ),
         ],
@@ -374,6 +375,16 @@ void main() {
       tester.getTopLeft(firstPhoto).dx,
       tester.getTopLeft(find.text('media body')).dx,
     );
+    final landscapePhoto = find.descendant(
+      of: photos,
+      matching: find.byKey(const ValueKey('1')),
+    );
+    expect(
+      tester.getSize(firstPhoto).height,
+      tester.getSize(landscapePhoto).height,
+    );
+    expect(tester.getSize(firstPhoto).aspectRatio, closeTo(2 / 3, .01));
+    expect(tester.getSize(landscapePhoto).aspectRatio, closeTo(1.5, .01));
     final position = tester
         .state<ScrollableState>(
           find.descendant(of: photos, matching: find.byType(Scrollable)),
@@ -493,6 +504,12 @@ void main() {
       expect(find.text('forYou post 0'), findsNothing);
       expect(find.text('friends post 0'), findsNothing);
       expect(feed.calls, [FeedTab.forYou, FeedTab.friends, FeedTab.forYou]);
+      final indicator = tester.widget<PullRefreshIndicator>(
+        find.byKey(const ValueKey('feed_pull_indicator')),
+      );
+      expect(indicator.opacity, 1);
+      expect(indicator.size, 36);
+      expect(indicator.spinning, isTrue);
       pending.complete(const FeedPageResult(posts: []));
       await tester.pumpAndSettle();
       expect(find.text('no posts yet'), findsOneWidget);

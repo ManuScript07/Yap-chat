@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/core/services/services.dart';
+import 'package:yap_chat/features/recommendations/data/feed_media_frames.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 typedef FeedActionsState = ({
@@ -34,6 +35,8 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
        ));
 
   final IFeedPostRepository repository;
+  final thumbnailFrames = FeedMediaFrames(maxBytes: 8 * 1024 * 1024);
+  final _mediaPosts = <String, FeedPost>{};
   final AccountSessionSnapshot account;
   final bool Function() isCurrent;
   final _follows = <String, FeedFollowState>{};
@@ -61,6 +64,13 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   bool get active => !isClosed && isCurrent();
   int get projectionVersion => _projectionVersion;
+
+  void trackMedia(FeedPost post) {
+    if (!canShow(post)) return;
+    _mediaPosts.remove(post.id);
+    _mediaPosts[post.id] = post;
+    if (_mediaPosts.length > 128) _mediaPosts.remove(_mediaPosts.keys.first);
+  }
 
   bool canShow(FeedPost post) {
     if (!active || _hidden.contains(post.id)) return false;
@@ -391,6 +401,19 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
               error.message == 'delivery_expired_or_invalidated');
 
   void _publish() {
+    if (state.hidden.length != _hidden.length ||
+        !identical(state.blocked, _blocked) ||
+        state.accessVersion != _accessVersion) {
+      thumbnailFrames.removeUnavailable(canShow);
+      final source = repository;
+      _mediaPosts.removeWhere((_, post) {
+        if (canShow(post)) return false;
+        if (source is FeedRepository) {
+          unawaited(source.evictPostMedia(post, account));
+        }
+        return true;
+      });
+    }
     _trim(_follows);
     _trim(_reactions);
     _trim(_reposts);
@@ -403,6 +426,13 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       reposts: Map.unmodifiable(_reposts),
       accessVersion: _accessVersion,
     ));
+  }
+
+  @override
+  Future<void> close() {
+    thumbnailFrames.clear();
+    _mediaPosts.clear();
+    return super.close();
   }
 
   void _trim<T>(Map<String, T> values) {

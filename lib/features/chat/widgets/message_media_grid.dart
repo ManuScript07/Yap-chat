@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/features/chat/bloc/bloc.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/ui/ui.dart';
 
 import 'widgets.dart';
 
@@ -277,10 +278,8 @@ class _MediaAlbum extends StatelessWidget {
     aspectRatios[index] = aspectRatio;
 
     final transitionGeometry = ChatMediaTransitionScope.maybeOf(context);
-    late final _ChatMediaGalleryRoute route;
-    route = _ChatMediaGalleryRoute(
-      transitionDuration: const Duration(milliseconds: 260),
-      reverseTransitionDuration: const Duration(milliseconds: 180),
+    late final MediaGalleryRoute route;
+    route = MediaGalleryRoute(
       pageBuilder: (_, _, _) => ChatMediaGalleryPage(
         imagePaths: message.mediaUrls,
         heroTags: List.generate(
@@ -325,21 +324,6 @@ class _MediaAlbum extends StatelessWidget {
     );
     await completion;
   }
-}
-
-class _ChatMediaGalleryRoute extends PageRouteBuilder<void> {
-  _ChatMediaGalleryRoute({
-    required super.pageBuilder,
-    required super.transitionsBuilder,
-    required super.transitionDuration,
-    required super.reverseTransitionDuration,
-  });
-
-  // ModalRoute.animation is a proxy: HeroController temporarily replaces it
-  // with a completed animation for offstage layout, before any time advances.
-  // Use the SAME route controller's read-only view for visible local effects.
-  // No additional ticker/controller and no changes to Navigator/Hero behavior.
-  Animation<double> get mediaAnimation => controller!.view;
 }
 
 String chatMediaHeroTag(String messageId, int imageIndex) {

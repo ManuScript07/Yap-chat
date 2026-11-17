@@ -203,68 +203,21 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                         ? const Duration(milliseconds: 140)
                         : Duration.zero,
                     curve: Curves.easeInOut,
-                    child: Row(
-                      children: [
-                        GlassIconButton(
-                          icon: Icons.arrow_back_rounded,
-                          onTap: () => Navigator.of(context).pop(),
-                          width: 44,
-                          height: 44,
-                          borderRadius: 16,
-                          iconSize: 26,
-                        ),
-                        const SizedBox(width: 12),
-                        UserAvatar(
-                          avatarUrl: widget.senderAvatarUrl,
-                          avatarLoader: widget.senderAvatarLoader,
-                          avatarImage: widget.senderAvatarImage,
-                          avatarRevision: widget.senderAvatarUrl,
-                          size: 44,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.senderName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                DateFormat(
-                                  'd MMMM yyyy',
-                                  Localizations.localeOf(context).toString(),
-                                ).format(sentAt),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: .68),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w400,
-                                  letterSpacing: .2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        GlassIconButton(
-                          icon: Icons.download_rounded,
-                          onTap: _saveCurrentImage,
-                          width: 44,
-                          height: 44,
-                          borderRadius: 16,
-                          iconSize: 24,
-                        ),
-                      ],
+                    child: MediaGalleryHeader(
+                      name: widget.senderName,
+                      date: DateFormat(
+                        'd MMMM yyyy',
+                        Localizations.localeOf(context).toString(),
+                      ).format(sentAt),
+                      avatar: UserAvatar(
+                        avatarUrl: widget.senderAvatarUrl,
+                        avatarLoader: widget.senderAvatarLoader,
+                        avatarImage: widget.senderAvatarImage,
+                        avatarRevision: widget.senderAvatarUrl,
+                        size: MediaGalleryHeader.buttonSize,
+                      ),
+                      onBack: () => Navigator.of(context).pop(),
+                      onSave: _saveCurrentImage,
                     ),
                   ),
                 ),
@@ -281,33 +234,9 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                         ? const Duration(milliseconds: 140)
                         : Duration.zero,
                     curve: Curves.easeInOut,
-                    child: Center(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: context.colorScheme.scrim.withValues(
-                            alpha: .52,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          child: Text(
-                            context.l10n.profilePhotoCounter(
-                              _currentIndex + 1,
-                              widget.imagePaths.length,
-                            ),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: .3,
-                            ),
-                          ),
-                        ),
-                      ),
+                    child: MediaGalleryCounter(
+                      index: _currentIndex,
+                      total: widget.imagePaths.length,
                     ),
                   ),
                 ),
