@@ -11,20 +11,27 @@ typedef FeedActionsState = ({
   Map<String, FeedReaction> reactions,
   Set<String> busy,
   Set<String> hidden,
+  Set<String> blocked,
   Map<String, int> reposts,
   String? revokedAuthor,
 });
 
 class FeedActionsCubit extends Cubit<FeedActionsState> {
-  FeedActionsCubit(this.repository, this.account, this.isCurrent)
-    : super((
-        follows: const {},
-        reactions: const {},
-        busy: const {},
-        hidden: const {},
-        reposts: const {},
-        revokedAuthor: null,
-      ));
+  FeedActionsCubit(
+    this.repository,
+    this.account,
+    this.isCurrent, {
+    Duration Function()? elapsed,
+  }) : _elapsedOverride = elapsed,
+       super((
+         follows: const {},
+         reactions: const {},
+         busy: const {},
+         hidden: const {},
+         blocked: const {},
+         reposts: const {},
+         revokedAuthor: null,
+       ));
 
   final IFeedPostRepository repository;
   final AccountSessionSnapshot account;
@@ -34,6 +41,12 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   final _busy = <String>{};
   final _hidden = <String>{};
   final _reposts = <String, int>{};
+  final _followWrites = <String, Object>{};
+  final _recentToggles = <String, Duration>{};
+  final _clock = Stopwatch()..start();
+  final Duration Function()? _elapsedOverride;
+  Duration get _elapsed => _elapsedOverride?.call() ?? _clock.elapsed;
+  static const _toggleInterval = Duration(milliseconds: 350);
   Set<String> _blocked = const {};
   bool _detailOpening = false;
   String? _revokedAuthor;
@@ -41,6 +54,10 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   bool get active => !isClosed && isCurrent();
   bool canShow(FeedPost post) =>
       active && !_blocked.contains(post.authorId) && !_hidden.contains(post.id);
+
+  void hidePost(String id) {
+    if (active && _hidden.add(id)) _publish();
+  }
 
   bool beginDetail() {
     if (!active || _detailOpening) return false;
@@ -52,6 +69,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   void revalidateAuthor(String id) {
     if (!active) return;
+    _followWrites.remove(id);
     _follows.remove(id);
     _revokedAuthor = id;
     _publish();
@@ -59,9 +77,14 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   }
 
   void setBlocked(Set<String> blocked) {
-    _blocked = Set.of(blocked);
+    if (!active ||
+        _blocked.length == blocked.length && _blocked.containsAll(blocked)) {
+      return;
+    }
+    _blocked = Set.unmodifiable(blocked);
     _follows.removeWhere((id, _) => blocked.contains(id));
-    if (active) _publish();
+    _followWrites.removeWhere((id, _) => blocked.contains(id));
+    _publish();
   }
 
   FeedFollowState? followFor(FeedPost post) {
@@ -88,22 +111,27 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         !current.canFollow && !current.following) {
       return;
     }
-    await _run(post, 'author:$id', (requestId) async {
+    await _run(post, 'author:$id', throttle: true, (requestId) async {
+      final write = _followWrites[id] = Object();
+      bool valid() => active && identical(_followWrites[id], write);
       try {
         final result = await _retry(
           () => repository.setFollow(id, current, requestId, account),
+          canRetry: valid,
         );
-        if (active && !_blocked.contains(id)) _follows[id] = result;
+        if (valid()) _follows[id] = result;
       } catch (error) {
-        if (active && !_blocked.contains(id) && _shouldReconcile(error)) {
+        if (valid() && _shouldReconcile(error)) {
           try {
             final result = await repository.getFollow(id, account);
-            if (active && !_blocked.contains(id)) _follows[id] = result;
+            if (valid()) _follows[id] = result;
           } catch (_) {
             // The next feed snapshot can reconcile the relationship.
           }
         }
         rethrow;
+      } finally {
+        if (valid()) _followWrites.remove(id);
       }
     });
   }
@@ -111,7 +139,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   Future<void> act(FeedPost post, {bool lessSimilar = false}) async {
     final delivery = post.delivery;
     if (delivery == null) return;
-    await _run(post, post.id, (requestId) async {
+    await _run(post, post.id, throttle: !lessSimilar, (requestId) async {
       var current = reactionFor(post);
       var receipt = delivery;
       final action = lessSimilar
@@ -122,13 +150,17 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       if (!receipt.expiresAt.isAfter(DateTime.now())) {
         if (lessSimilar) throw StateError('Recommendation delivery expired');
         final refreshed = await repository.getPost(post.id, account);
-        if (!active || _blocked.contains(post.authorId)) return;
+        if (!canShow(post)) return;
         if (refreshed?.delivery == null) {
           _hidden.add(post.id);
           return;
         }
         current = refreshed!.reaction;
         receipt = refreshed.delivery!;
+        if (current.liked == (action == FeedPostAction.like)) {
+          _reactions[post.id] = current;
+          return;
+        }
       }
       try {
         final result = await _retry(
@@ -139,6 +171,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
             requestId,
             account,
           ),
+          canRetry: () => canShow(post),
         );
         if (!canShow(post)) return;
         final delta = result.liked == current.liked
@@ -190,11 +223,15 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   Future<void> _run(
     FeedPost post,
     String key,
-    Future<void> Function(String) run,
-  ) async {
+    Future<void> Function(String) run, {
+    bool throttle = false,
+  }) async {
+    final now = _elapsed;
+    _recentToggles.removeWhere((_, until) => until <= now);
     if (!active ||
         _blocked.contains(post.authorId) ||
         _hidden.contains(post.id) ||
+        throttle && _recentToggles.containsKey(key) ||
         !_busy.add(key)) {
       return;
     }
@@ -203,15 +240,21 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       await run(const Uuid().v4());
     } finally {
       _busy.remove(key);
-      if (active) _publish();
+      if (active) {
+        if (throttle) _recentToggles[key] = _elapsed + _toggleInterval;
+        _publish();
+      }
     }
   }
 
-  Future<T> _retry<T>(Future<T> Function() send) async {
+  Future<T> _retry<T>(
+    Future<T> Function() send, {
+    bool Function()? canRetry,
+  }) async {
     try {
       return await send();
     } on TimeoutException {
-      if (!active) rethrow;
+      if (!active || canRetry?.call() == false) rethrow;
       return send();
     }
   }
@@ -231,6 +274,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       reactions: Map.unmodifiable(_reactions),
       busy: Set.unmodifiable(_busy),
       hidden: Set.unmodifiable(_hidden),
+      blocked: _blocked,
       reposts: Map.unmodifiable(_reposts),
       revokedAuthor: _revokedAuthor,
     ));

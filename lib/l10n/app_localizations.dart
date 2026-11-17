@@ -380,6 +380,42 @@ abstract class AppLocalizations {
   /// **'публикация'**
   String get feedPublication;
 
+  /// No description provided for @feedSavePhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'сохранить фото'**
+  String get feedSavePhoto;
+
+  /// No description provided for @feedWriteComment.
+  ///
+  /// In ru, this message translates to:
+  /// **'написать комментарий'**
+  String get feedWriteComment;
+
+  /// No description provided for @feedSendComment.
+  ///
+  /// In ru, this message translates to:
+  /// **'отправить комментарий'**
+  String get feedSendComment;
+
+  /// No description provided for @feedNoComments.
+  ///
+  /// In ru, this message translates to:
+  /// **'пока нет комментариев'**
+  String get feedNoComments;
+
+  /// No description provided for @feedCommentUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'комментарий недоступен'**
+  String get feedCommentUnavailable;
+
+  /// No description provided for @feedCommentTooLong.
+  ///
+  /// In ru, this message translates to:
+  /// **'в комментарии может быть не больше 200 символов'**
+  String get feedCommentTooLong;
+
   /// No description provided for @feedActionFailed.
   ///
   /// In ru, this message translates to:

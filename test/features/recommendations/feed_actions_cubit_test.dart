@@ -9,15 +9,18 @@ void main() {
   late AccountSessionController accounts;
   late FeedActionsCubit cubit;
   late _Repository repository;
+  late Duration elapsed;
 
   setUp(() {
     accounts = AccountSessionController(initialUserId: 'viewer');
     final account = accounts.capture();
     repository = _Repository();
+    elapsed = Duration.zero;
     cubit = FeedActionsCubit(
       repository,
       account,
       () => accounts.isCurrent(account),
+      elapsed: () => elapsed,
     );
   });
   tearDown(() => cubit.close());
@@ -39,6 +42,55 @@ void main() {
       expect(cubit.state.busy, isEmpty);
     },
   );
+
+  test('rapid repeat taps share the in-flight and cooldown limits', () async {
+    final post = _post('one');
+    await Future.wait([for (var i = 0; i < 25; i++) cubit.act(post)]);
+    await Future.wait([for (var i = 0; i < 25; i++) cubit.act(post)]);
+    // One user intent, replayed once by the timeout retry.
+    expect(repository.actions, hasLength(2));
+    expect(repository.actions.map((action) => action.$4).toSet(), hasLength(1));
+    expect(cubit.reactionFor(post).liked, isTrue);
+    elapsed = const Duration(milliseconds: 350);
+    await cubit.act(post);
+    expect(repository.actions.last.$2, FeedPostAction.unlike);
+    expect(repository.actions.last.$3, 1);
+  });
+
+  test(
+    'relationship invalidation discards a delayed follow response',
+    () async {
+      final post = _post('one');
+      final pending = cubit.toggleFollow(post);
+      cubit.revalidateAuthor(post.authorId);
+      repository.follow.complete((
+        version: 1,
+        following: true,
+        canFollow: true,
+      ));
+      await pending;
+      expect(cubit.state.follows, isEmpty);
+      expect(cubit.state.busy, isEmpty);
+    },
+  );
+
+  test('one account scope shares mutation locks across entry points', () async {
+    final scope = FeedAccountScope(accounts, repository);
+    addTearDown(scope.dispose);
+    final account = accounts.capture();
+    final card = scope.actionsFor(account)!;
+    final details = scope.actionsFor(accounts.capture())!;
+    expect(identical(card, details), isTrue);
+    final follow = card.toggleFollow(_post('one'));
+    await details.toggleFollow(_post('two'));
+    expect(repository.followCalls, 1);
+    accounts.setAuthenticatedUser('other');
+    expect(scope.actionsFor(account), isNull);
+    expect(identical(details, scope.actionsFor(accounts.capture())), isFalse);
+    repository.follow.complete((version: 1, following: true, canFollow: true));
+    await follow;
+    expect(details.state.follows, isEmpty);
+  });
 
   test(
     'a timeout retries the same intent with the original version and receipt',
@@ -94,7 +146,7 @@ FeedPost _post(String id) => FeedPost(
   delivery: (id: id, expiresAt: DateTime.now().add(const Duration(minutes: 3))),
 );
 
-class _Repository implements IFeedPostRepository {
+class _Repository extends MockFeedRepository implements IFeedPostRepository {
   final follow = Completer<FeedFollowState>();
   final actions = <(FeedDelivery, FeedPostAction, int, String)>[];
   int followCalls = 0;

@@ -154,6 +154,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedPublication => 'публикация';
 
   @override
+  String get feedSavePhoto => 'сохранить фото';
+
+  @override
+  String get feedWriteComment => 'написать комментарий';
+
+  @override
+  String get feedSendComment => 'отправить комментарий';
+
+  @override
+  String get feedNoComments => 'пока нет комментариев';
+
+  @override
+  String get feedCommentUnavailable => 'комментарий недоступен';
+
+  @override
+  String get feedCommentTooLong =>
+      'в комментарии может быть не больше 200 символов';
+
+  @override
   String get feedActionFailed => 'не удалось выполнить действие';
 
   @override

@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/services/profile_share_link.dart';
+import 'package:yap_chat/core/services/feed_post_link.dart';
 import 'package:yap_chat/repositories/auth/oauth_attempt_coordinator.dart';
 import 'package:yap_chat/router/router.gr.dart';
 
@@ -22,7 +23,8 @@ DeepLink resolveAppDeepLink(
   // Profile links are handled after authentication by
   // ProfileShareLinkCoordinator. AutoRoute must not try to treat a username as
   // an application route while that happens.
-  if (ProfileShareLink.tryParse(deepLink.uri) != null) {
+  if (ProfileShareLink.tryParse(deepLink.uri) != null ||
+      FeedPostLink.matchesPath(deepLink.uri)) {
     return deepLink.initial ? DeepLink.defaultPath : DeepLink.none;
   }
   if (!isConfiguredAuthCallback(deepLink.uri, authRedirectUrl)) {
@@ -123,6 +125,13 @@ class AppRouter extends RootStackRouter {
           transitionsBuilder: _slideRightWithFade,
           duration: const Duration(milliseconds: 200),
           reverseDuration: const Duration(milliseconds: 150),
+        ),
+        CustomRoute(
+          path: 'publication/:id',
+          page: FeedPostDetailsRoute.page,
+          transitionsBuilder: _slideRightWithFade,
+          duration: const Duration(milliseconds: 220),
+          reverseDuration: const Duration(milliseconds: 180),
         ),
         CustomRoute(
           path: 'user-profile',

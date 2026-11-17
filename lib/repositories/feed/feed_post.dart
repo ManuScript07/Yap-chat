@@ -10,11 +10,39 @@ enum FeedPostAction { like, unlike, lessSimilar }
 enum FeedReportReason { spam, scam, pornography, other }
 
 class FeedPhoto {
-  const FeedPhoto({required this.id, required this.thumbnailPath});
+  const FeedPhoto({
+    required this.id,
+    required this.thumbnailPath,
+    this.path,
+    this.width,
+    this.height,
+  });
 
   final String id;
   final String thumbnailPath;
+  final String? path;
+  final int? width;
+  final int? height;
+
+  double? get aspectRatio {
+    final w = width;
+    final h = height;
+    return w != null && h != null && w > 0 && h > 0 ? w / h : null;
+  }
 }
+
+typedef FeedComment = ({
+  String id,
+  String? authorId,
+  String? authorName,
+  String? text,
+});
+
+typedef FeedCommentsCursor = ({String sessionId, int position});
+typedef FeedCommentsPage = ({
+  List<FeedComment> comments,
+  FeedCommentsCursor? next,
+});
 
 class FeedPost {
   const FeedPost({

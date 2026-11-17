@@ -265,6 +265,7 @@ class FeedQuotePreview extends StatelessWidget {
   Widget _preview(BuildContext context, FeedPost? original) {
     return Card.outlined(
       margin: const EdgeInsets.only(top: 10),
+      color: context.scaffoldBackgroundColor,
       child: InkWell(
         onTap: original == null ? null : () => onOpenPost(original.id),
         child: Padding(
@@ -428,8 +429,7 @@ class FeedPostFooter extends StatelessWidget {
   }
 }
 
-Uri _postLink(FeedPost post) =>
-    Uri.https(ProfileShareLink.host, '/post/${post.id}');
+Uri _postLink(FeedPost post) => FeedPostLink.create(post.id);
 
 String _postTime(BuildContext context, DateTime createdAt) {
   final elapsed = DateTime.now().difference(createdAt);
@@ -446,6 +446,7 @@ Future<T?> _options<T>(
   List<(IconData, String, T)> options,
 ) => showModalBottomSheet<T>(
   context: context,
+  backgroundColor: context.scaffoldBackgroundColor,
   showDragHandle: true,
   builder: (context) => SafeArea(
     child: Column(

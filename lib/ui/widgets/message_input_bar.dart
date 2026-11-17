@@ -13,9 +13,15 @@ class MessageInputBar extends StatefulWidget {
     this.onVoiceRecord,
     this.replyToMessageId,
     this.focusNode,
+    this.showAttachmentButton = true,
+    this.hintText,
+    this.sendTooltip,
   });
 
   final ValueChanged<String> onSend;
+  final bool showAttachmentButton;
+  final String? hintText;
+  final String? sendTooltip;
 
   /// When provided, replaces [onSend] and receives the trimmed draft.
   ///
@@ -94,7 +100,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
     Future<bool> Function(String) onSubmit,
   ) async {
     final revision = _textRevision;
-    _isSubmitting = true;
+    setState(() => _isSubmitting = true);
     try {
       final accepted = await onSubmit(text);
       if (mounted && accepted && revision == _textRevision) {
@@ -103,7 +109,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
     } catch (_) {
       // Submission failures leave the draft available for retry.
     } finally {
-      _isSubmitting = false;
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -172,7 +178,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeInOut,
                   alignment: Alignment.centerLeft,
-                  child: _hasText
+                  child: _hasText || !widget.showAttachmentButton
                       ? const SizedBox.shrink()
                       : Row(
                           mainAxisSize: MainAxisSize.min,
@@ -187,14 +193,20 @@ class _MessageInputBarState extends State<MessageInputBar> {
                     controller: _controller,
                     focusNode: _focusNode,
                     mainColor: mainColor,
+                    hintText: widget.hintText,
                   ),
                 ),
                 const SizedBox(width: 8),
                 _SendButton(
-                  hasText: _hasText,
+                  hasText: _hasText || widget.sendTooltip != null,
+                  busy: _isSubmitting && widget.sendTooltip != null,
+                  tooltip: widget.sendTooltip,
                   primaryColor: primaryColor,
                   iconColor: backgroundColor,
-                  onTap: _handleAction,
+                  onTap:
+                      _isSubmitting || !_hasText && widget.sendTooltip != null
+                      ? null
+                      : _handleAction,
                 ),
               ],
             ),
@@ -229,14 +241,20 @@ class _MessageTextField extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.mainColor,
+    this.hintText,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final Color mainColor;
+  final String? hintText;
 
   @override
   Widget build(BuildContext context) {
+    final textStyle = context.textTheme.bodyLarge?.copyWith(
+      fontWeight: FontWeight.w500,
+      color: mainColor,
+    );
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 50, maxHeight: 150),
       child: ChatGlassSurface(
@@ -252,13 +270,7 @@ class _MessageTextField extends StatelessWidget {
             keyboardType: TextInputType.multiline,
             cursorColor: mainColor,
             textAlignVertical: TextAlignVertical.center,
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.15,
-              color: mainColor,
-            ),
+            style: textStyle,
             decoration: InputDecoration(
               filled: false,
               isDense: true,
@@ -266,12 +278,8 @@ class _MessageTextField extends StatelessWidget {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              hintText: context.l10n.chatInputHint,
-              hintStyle: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.15,
+              hintText: hintText ?? context.l10n.chatInputHint,
+              hintStyle: textStyle?.copyWith(
                 color: mainColor.withValues(alpha: 0.6),
               ),
             ),
@@ -288,16 +296,20 @@ class _SendButton extends StatelessWidget {
     required this.primaryColor,
     required this.iconColor,
     required this.onTap,
+    required this.busy,
+    this.tooltip,
   });
 
   final bool hasText;
   final Color primaryColor;
   final Color iconColor;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool busy;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final button = SizedBox(
       width: 50,
       height: 50,
       child: Material(
@@ -312,16 +324,25 @@ class _SendButton extends StatelessWidget {
               transitionBuilder: (child, animation) {
                 return ScaleTransition(scale: animation, child: child);
               },
-              child: Icon(
-                hasText ? Icons.send_rounded : Icons.mic_rounded,
-                key: ValueKey<bool>(hasText),
-                color: iconColor,
-                size: 32,
-              ),
+              child: busy
+                  ? SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: iconColor,
+                      ),
+                    )
+                  : Icon(
+                      hasText ? Icons.send_rounded : Icons.mic_rounded,
+                      key: ValueKey<bool>(hasText),
+                      color: iconColor,
+                      size: 32,
+                    ),
             ),
           ),
         ),
       ),
     );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }

@@ -154,6 +154,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedPublication => 'post';
 
   @override
+  String get feedSavePhoto => 'save photo';
+
+  @override
+  String get feedWriteComment => 'write a comment';
+
+  @override
+  String get feedSendComment => 'send comment';
+
+  @override
+  String get feedNoComments => 'no comments yet';
+
+  @override
+  String get feedCommentUnavailable => 'comment unavailable';
+
+  @override
+  String get feedCommentTooLong => 'comments can contain up to 200 characters';
+
+  @override
   String get feedActionFailed => 'couldn’t complete the action';
 
   @override

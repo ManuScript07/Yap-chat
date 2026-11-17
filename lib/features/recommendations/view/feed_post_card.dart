@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 import 'feed_post_body.dart';
 import 'feed_post_controls.dart';
+import 'feed_post_gallery.dart';
 
 class FeedPostCard extends StatelessWidget {
   const FeedPostCard({
@@ -32,6 +32,8 @@ class FeedPostCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Card(
         margin: EdgeInsets.zero,
+        color: context.scaffoldBackgroundColor,
+        elevation: 0,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -56,38 +58,7 @@ class FeedPostCard extends StatelessWidget {
               ],
               if (post.photos.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final size = (constraints.maxWidth / post.photos.length - 6)
-                        .clamp(70.0, 170.0);
-                    return Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final photo in post.photos)
-                          SizedBox.square(
-                            dimension: size,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: _FeedThumbnail(
-                                key: ValueKey(photo.id),
-                                timeline: timeline,
-                                photo: photo,
-                                post: post,
-                                visible: visible,
-                                decodeSize:
-                                    (size *
-                                            MediaQuery.devicePixelRatioOf(
-                                              context,
-                                            ))
-                                        .ceil(),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
+                _FeedPhotos(post: post, timeline: timeline, visible: visible),
               ],
               if (post.isQuote)
                 FeedQuotePreview(
@@ -101,6 +72,10 @@ class FeedPostCard extends StatelessWidget {
                 details: details,
                 onOpenPost: onOpenPost,
               ),
+              Divider(
+                height: 1,
+                color: context.colorScheme.onSurface.withValues(alpha: .12),
+              ),
             ],
           ),
         ),
@@ -109,20 +84,99 @@ class FeedPostCard extends StatelessWidget {
   }
 }
 
+class _FeedPhotos extends StatefulWidget {
+  const _FeedPhotos({
+    required this.post,
+    required this.timeline,
+    required this.visible,
+  });
+
+  final FeedPost post;
+  final FeedCubit timeline;
+  final bool visible;
+
+  @override
+  State<_FeedPhotos> createState() => _FeedPhotosState();
+}
+
+class _FeedPhotosState extends State<_FeedPhotos> {
+  final _instance = Object();
+  bool _opening = false;
+
+  Future<void> _open(int index, Object tag, ui.Image image) async {
+    if (_opening) return;
+    _opening = true;
+    try {
+      await openFeedGallery(
+        context,
+        timeline: widget.timeline,
+        post: widget.post,
+        index: index,
+        heroTag: tag,
+        preview: image,
+      );
+    } finally {
+      _opening = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final photos = widget.post.photos;
+      final width = constraints.maxWidth;
+      final tile = width < 360
+          ? 132.0
+          : width < 600
+          ? 164.0
+          : 192.0;
+      return SizedBox(
+        height: tile,
+        child: ListView.separated(
+          primary: false,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
+          itemCount: photos.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 6),
+          itemBuilder: (_, index) {
+            final photo = photos[index];
+            final tag = (_instance, photo.id);
+            return SizedBox(
+              width: tile,
+              child: _FeedThumbnail(
+                key: ValueKey(photo.id),
+                timeline: widget.timeline,
+                photo: photo,
+                visible: widget.visible,
+                decodeSize: (tile * MediaQuery.devicePixelRatioOf(context))
+                    .ceil(),
+                heroTag: tag,
+                onOpen: (image) => _open(index, tag, image),
+              ),
+            );
+          },
+        ),
+      );
+    },
+  );
+}
+
 class _FeedThumbnail extends StatefulWidget {
   const _FeedThumbnail({
     super.key,
     required this.timeline,
     required this.photo,
     required this.decodeSize,
-    required this.post,
+    required this.heroTag,
+    required this.onOpen,
     required this.visible,
   });
 
   final FeedCubit timeline;
   final FeedPhoto photo;
   final int decodeSize;
-  final FeedPost post;
+  final Object heroTag;
+  final ValueChanged<ui.Image> onOpen;
   final bool visible;
 
   @override
@@ -192,56 +246,27 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
     }
   }
 
-  Future<void> _preview() async {
-    final actions = widget.timeline.actions;
-    final source = _image;
-    final post = widget.post;
-    if (source == null || actions == null || !actions.canShow(post)) return;
-    final image = source.clone();
-    final accounts = context.read<AccountSessionController?>();
-    var revoked = false;
-    try {
-      final route = DialogRoute<void>(
-        context: context,
-        builder: (context) {
-          Widget preview() => !revoked && actions.canShow(post)
-              ? RawImage(image: image, fit: BoxFit.contain)
-              : Text(context.l10n.feedPostUnavailable);
-          return Dialog(
-            child: BlocBuilder<FeedActionsCubit, FeedActionsState>(
-              bloc: actions,
-              builder: (context, state) {
-                revoked |=
-                    state.revokedAuthor == post.authorId ||
-                    !actions.canShow(post);
-                return accounts == null
-                    ? preview()
-                    : ValueListenableBuilder(
-                        valueListenable: accounts.generationChanges,
-                        builder: (context, _, _) => preview(),
-                      );
-              },
-            ),
-          );
-        },
-      );
-      await Navigator.of(context, rootNavigator: true).push(route);
-      await route.completed;
-    } finally {
-      image.dispose();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final image = _image;
-    if (image == null) return const _PhotoPlaceholder();
+    if (image == null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: const _PhotoPlaceholder(),
+      );
+    }
     return Semantics(
       button: true,
       label: context.l10n.feedOpenPhoto,
       child: GestureDetector(
-        onTap: _preview,
-        child: RawImage(image: image, fit: BoxFit.cover),
+        onTap: () => widget.onOpen(image),
+        child: Hero(
+          tag: widget.heroTag,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: RawImage(image: image, fit: BoxFit.cover),
+          ),
+        ),
       ),
     );
   }
@@ -258,7 +283,7 @@ class _PhotoPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-    color: context.colorScheme.surfaceContainerHighest,
+    color: context.colorScheme.onSurface.withValues(alpha: .08),
     child: const Center(child: Icon(Icons.image_outlined)),
   );
 }

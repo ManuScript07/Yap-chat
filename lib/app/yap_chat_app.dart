@@ -147,6 +147,7 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
           .read<IProfileRepository>()
           .resolveSharedProfileUsername,
       openProfile: _openSharedProfile,
+      openPost: _openSharedPost,
       onError: talker.handle,
     );
     unawaited(_profileShareLinkCoordinator.start());
@@ -165,6 +166,36 @@ class _AppContentState extends State<_AppContent> with WidgetsBindingObserver {
       }
       if (await _authenticatedRouter != null) {
         await _profileNavigator.open(userId);
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return false;
+  }
+
+  Future<bool> _openSharedPost(String id) async {
+    if (!context.read<AppConfig>().feedEnabled) return true;
+    final auth = context.read<AuthBloc>();
+    final accounts = context.read<AccountSessionController>();
+    final user = auth.state.session?.userId;
+    if (user == null) return false;
+    bool current() =>
+        mounted &&
+        auth.state.status == AuthStatus.authenticated &&
+        auth.state.session?.userId == user;
+    for (var attempt = 0; attempt < 20; attempt++) {
+      if (!current()) return false;
+      final account = accounts.userId == user ? accounts.capture() : null;
+      final router = await _authenticatedRouter;
+      if (!current() || account != null && !accounts.isCurrent(account)) {
+        return false;
+      }
+      if (router != null && accounts.userId == user) {
+        final top = router.current;
+        if (top.name != FeedPostDetailsRoute.name ||
+            top.argsAs<FeedPostDetailsRouteArgs>().id != id) {
+          unawaited(router.push<void>(FeedPostDetailsRoute(id: id)));
+        }
         return true;
       }
       await Future<void>.delayed(const Duration(milliseconds: 100));

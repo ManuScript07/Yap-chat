@@ -58,18 +58,20 @@ class MainPage extends StatelessWidget {
 class _MainView extends StatelessWidget {
   const _MainView();
 
+  static final _routes = <PageRouteInfo>[
+    const ChatsRoute(),
+    NearbyPeopleRoute(),
+    const RecommendationsRoute(),
+    const FriendsRoute(),
+    const ProfileRoute(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     const chatsTabIndex = 0;
 
     return AutoTabsRouter(
-      routes: const [
-        ChatsRoute(),
-        NearbyPeopleRoute(),
-        RecommendationsRoute(),
-        FriendsRoute(),
-        ProfileRoute(),
-      ],
+      routes: _routes,
       // Cached tabs switch directly; fading the entire new page from zero
       // briefly exposes the black scaffold even when all its data is ready.
       duration: Duration.zero,

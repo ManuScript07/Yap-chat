@@ -29,12 +29,11 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   IFeedRepository? _repository;
   ILocationRepository? _location;
   LocationTrackingCoordinator? _tracking;
-  StreamSubscription<Set<String>>? _blocks;
-  StreamSubscription<String>? _friendChanges;
   AccountSessionSnapshot? _account;
   Map<FeedTab, FeedCubit> _timelines = {};
   FeedActionsCubit? _actions;
-  StreamSubscription<Set<String>>? _actionChanges;
+  StreamSubscription<FeedActionsState>? _actionChanges;
+  FeedAccountScope? _localFeedScope;
   FeedTab _selected = FeedTab.forYou;
   bool _activeRoute = false;
   bool _foreground = true;
@@ -79,9 +78,6 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   }
 
   void _replaceTimelines() {
-    unawaited(_blocks?.cancel());
-    unawaited(_friendChanges?.cancel());
-    unawaited(_actions?.close());
     unawaited(_actionChanges?.cancel());
     _actions = null;
     for (final timeline in _timelines.values) {
@@ -101,13 +97,18 @@ class _RecommendationsPageState extends State<RecommendationsPage>
 
     final account = accounts.capture();
     _account = account;
-    if (repository is IFeedPostRepository) {
-      _actions = FeedActionsCubit(
-        repository as IFeedPostRepository,
-        account,
-        () => accounts.isCurrent(account),
-      );
-    }
+    final friends = context.read<IFriendsRepository?>();
+    final scope =
+        context.read<FeedAccountScope?>() ??
+        (_localFeedScope ??= FeedAccountScope(
+          accounts,
+          repository,
+          blocks: context.read<IBlocklistRepository?>(),
+          friends: friends is IProfileFriendsRepository
+              ? friends as IProfileFriendsRepository
+              : null,
+        ));
+    _actions = scope.actionsFor(account);
     _timelines = {
       for (final tab in FeedTab.values)
         tab: FeedCubit(
@@ -118,37 +119,25 @@ class _RecommendationsPageState extends State<RecommendationsPage>
           isCurrentAccount: () => accounts.isCurrent(account),
         ),
     };
-    _actionChanges = _actions?.stream
-        .map((state) => state.hidden)
-        .distinct((a, b) => a.length == b.length && a.containsAll(b))
-        .listen((hidden) {
-          if (!mounted || !accounts.isCurrent(account)) return;
-          for (final timeline in _timelines.values) {
-            timeline.hidePosts(hidden);
-          }
-        });
-    _blocks = context
-        .read<IBlocklistRepository?>()
-        ?.watchBlockedUserIds()
-        .listen((blocked) {
-          if (!mounted || !accounts.isCurrent(account)) return;
-          _actions?.setBlocked(blocked);
-          for (final timeline in _timelines.values) {
-            timeline.updateBlockedAuthors(blocked);
-          }
-        }, onError: (Object _) {});
-    final friends = context.read<IFriendsRepository?>();
-    if (friends is IProfileFriendsRepository) {
-      _friendChanges = (friends as IProfileFriendsRepository)
-          .watchProfileChanges()
-          .listen((id) {
-            if (!mounted || !accounts.isCurrent(account)) return;
-            _actions?.revalidateAuthor(id);
-            for (final timeline in _timelines.values) {
-              if (timeline.hasAuthor(id)) timeline.invalidateAccess();
-            }
-            _scheduleVisibilityCheck();
-          }, onError: (Object _) {});
+    if (_actions case final actions?) {
+      FeedActionsState? previous;
+      void apply(FeedActionsState state) {
+        if (!mounted || !accounts.isCurrent(account)) return;
+        final id = state.revokedAuthor;
+        final accessChanged = !identical(previous?.blocked, state.blocked);
+        final hiddenChanged =
+            previous == null || previous!.hidden.length != state.hidden.length;
+        previous = state;
+        for (final timeline in _timelines.values) {
+          if (hiddenChanged) timeline.hidePosts(state.hidden);
+          if (accessChanged) timeline.updateBlockedAuthors(state.blocked);
+          if (id != null && timeline.hasAuthor(id)) timeline.invalidateAccess();
+        }
+        if (id != null) _scheduleVisibilityCheck();
+      }
+
+      _actionChanges = actions.stream.listen(apply);
+      apply(actions.state);
     }
   }
 
@@ -253,6 +242,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   void _showPlaceholder(String title) {
     showModalBottomSheet<void>(
       context: context,
+      backgroundColor: context.scaffoldBackgroundColor,
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Padding(
@@ -359,9 +349,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _accounts?.generationChanges.removeListener(_accountChanged);
-    unawaited(_blocks?.cancel());
-    unawaited(_friendChanges?.cancel());
-    unawaited(_actions?.close());
+    _localFeedScope?.dispose();
     unawaited(_actionChanges?.cancel());
     for (final timeline in _timelines.values) {
       unawaited(timeline.close());

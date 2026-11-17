@@ -14,6 +14,7 @@ import 'package:yap_chat/features/auth/auth.dart';
 import 'package:yap_chat/features/blocks/blocks.dart';
 import 'package:yap_chat/features/presence/presence.dart';
 import 'package:yap_chat/features/profile/profile.dart';
+import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/features/notifications/notifications.dart';
 import 'package:yap_chat/features/settings/settings.dart';
 import 'package:yap_chat/repositories/repositories.dart';
@@ -197,6 +198,21 @@ class _AppInitializerState extends State<AppInitializer>
         if (widget.config.feedEnabled)
           RepositoryProvider<IFeedRepository>.value(
             value: _repositories.feedRepository,
+          ),
+        if (widget.config.feedEnabled)
+          RepositoryProvider<FeedAccountScope>(
+            create: (_) {
+              final friends = _repositories.friendsRepository;
+              return FeedAccountScope(
+                widget.config.accountSessionController,
+                _repositories.feedRepository,
+                blocks: _repositories.blocklistRepository,
+                friends: friends is IProfileFriendsRepository
+                    ? friends as IProfileFriendsRepository
+                    : null,
+              );
+            },
+            dispose: (scope) => scope.dispose(),
           ),
         RepositoryProvider<AppConnectionCoordinator>.value(
           value: _connectionCoordinator,

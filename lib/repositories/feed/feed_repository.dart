@@ -81,7 +81,30 @@ abstract interface class IFeedRepository {
   });
 }
 
-class FeedRepository implements IFeedRepository, IFeedPostRepository {
+abstract interface class IFeedPublicationRepository {
+  Future<FeedCommentsPage> getComments(
+    String id,
+    AccountSessionSnapshot account, {
+    FeedCommentsCursor? cursor,
+  });
+  Future<FeedComment> createComment(
+    String id,
+    String requestId,
+    String text,
+    AccountSessionSnapshot account,
+  );
+  Future<Uint8List> downloadPhoto(
+    FeedPhoto photo, {
+    required AccountSessionSnapshot account,
+    required bool Function() stillNeeded,
+  });
+}
+
+class FeedRepository
+    implements
+        IFeedRepository,
+        IFeedPostRepository,
+        IFeedPublicationRepository {
   FeedRepository({
     required this._client,
     required this._accounts,
@@ -98,6 +121,7 @@ class FeedRepository implements IFeedRepository, IFeedPostRepository {
   final AppDiagnostics? _diagnostics;
   final MediaCacheService? _mediaCache;
   final _thumbnails = <(int, String), Future<Uint8List>>{};
+  final _photos = <(int, String), Future<Uint8List>>{};
 
   @override
   Future<FeedPageResult> fetch(
@@ -264,6 +288,9 @@ class FeedRepository implements IFeedRepository, IFeedPostRepository {
           (photo) => FeedPhoto(
             id: photo['id'] as String,
             thumbnailPath: photo['thumbnail_path'] as String,
+            path: photo['path'] as String?,
+            width: photo['width'] as int?,
+            height: photo['height'] as int?,
           ),
         ),
       ),
@@ -397,44 +424,123 @@ class FeedRepository implements IFeedRepository, IFeedPostRepository {
     FeedPhoto photo, {
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
+  }) => _downloadMedia(
+    photo.thumbnailPath,
+    account,
+    stillNeeded,
+    _thumbnails,
+    limit: _maxThumbnailDownloads,
+    metric: 'feed_thumbnail',
+  );
+
+  @override
+  Future<Uint8List> downloadPhoto(
+    FeedPhoto photo, {
+    required AccountSessionSnapshot account,
+    required bool Function() stillNeeded,
+  }) => _downloadMedia(
+    photo.path ?? photo.thumbnailPath,
+    account,
+    stillNeeded,
+    _photos,
+    limit: 1,
+    metric: 'feed_photo',
+  );
+
+  Future<Uint8List> _downloadMedia(
+    String path,
+    AccountSessionSnapshot account,
+    bool Function() stillNeeded,
+    Map<(int, String), Future<Uint8List>> inFlight, {
+    required int limit,
+    required String metric,
   }) async {
-    final key = (account.generation, photo.thumbnailPath);
+    final key = (account.generation, path);
     while (stillNeeded() &&
-        !_thumbnails.containsKey(key) &&
-        _thumbnails.length >= _maxThumbnailDownloads) {
+        !inFlight.containsKey(key) &&
+        inFlight.length >= limit) {
       await Future.any(
-        _thumbnails.values.map(
+        inFlight.values.map(
           (download) => download.then<void>((_) {}, onError: (Object _) {}),
         ),
       );
     }
     if (!stillNeeded()) throw const StaleAccountSessionException();
     _ensureAccount(account);
-    final pending = _thumbnails[key];
+    final pending = inFlight[key];
     if (pending != null) return pending;
-    final download = _download(photo, account);
-    _thumbnails[key] = download;
+    final download = _download(path, account, metric);
+    inFlight[key] = download;
     try {
       return await download;
     } finally {
-      _thumbnails.remove(key);
+      inFlight.remove(key);
     }
   }
 
   Future<Uint8List> _download(
-    FeedPhoto photo,
+    String path,
     AccountSessionSnapshot account,
+    String metric,
   ) async {
     final bytes = await measureRpc(
       _diagnostics,
-      'feed_thumbnail',
-      () => _client.storage
-          .from('feed-media')
-          .download(photo.thumbnailPath)
-          .timeout(_timeout),
+      metric,
+      () => _client.storage.from('feed-media').download(path).timeout(_timeout),
     );
     _ensureAccount(account);
     return bytes;
+  }
+
+  @override
+  Future<FeedCommentsPage> getComments(
+    String id,
+    AccountSessionSnapshot account, {
+    FeedCommentsCursor? cursor,
+  }) async {
+    final result = await _postRpc<Map<String, dynamic>>('get_feed_comments', {
+      'requested_post': id,
+      if (cursor != null) 'requested_session': cursor.sessionId,
+      if (cursor != null) 'after_position': cursor.position,
+      'requested_limit': 20,
+    }, account);
+    final next = result['next_cursor'] as Map<String, dynamic>?;
+    return (
+      comments: [
+        for (final row in result['items'] as List<dynamic>) _comment(row),
+      ],
+      next: next == null
+          ? null
+          : (
+              sessionId: next['session_id'] as String,
+              position: next['after_position'] as int,
+            ),
+    );
+  }
+
+  @override
+  Future<FeedComment> createComment(
+    String id,
+    String requestId,
+    String text,
+    AccountSessionSnapshot account,
+  ) async {
+    final row = await _postRpc<Map<String, dynamic>>('create_feed_comment', {
+      'requested_id': requestId,
+      'requested_post': id,
+      'requested_text': text,
+    }, account);
+    return _comment(row);
+  }
+
+  FeedComment _comment(Map<String, dynamic> row) {
+    final author = row['author'] as Map<String, dynamic>?;
+    return (
+      id: row['id'] as String,
+      authorId: author?['id'] as String?,
+      authorName: (author?['display_name'] ?? author?['username']) as String?,
+      text: row['text'] as String?,
+    );
   }
 
   void _ensureAccount(AccountSessionSnapshot account) {
