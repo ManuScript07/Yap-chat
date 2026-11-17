@@ -4,6 +4,7 @@ import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 import 'feed_state.dart';
+import 'feed_actions_cubit.dart';
 
 /// The screen owns one timeline per tab. Only the selected timeline can start
 /// new work, and a refresh supersedes any in-flight continuation.
@@ -13,6 +14,7 @@ class FeedCubit extends Cubit<FeedState> {
     required this.repository,
     required this.isCurrentAccount,
     required this.account,
+    this.actions,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
        super(const FeedState());
@@ -24,6 +26,7 @@ class FeedCubit extends Cubit<FeedState> {
   final FeedTab tab;
   final IFeedRepository repository;
   final AccountSessionSnapshot account;
+  final FeedActionsCubit? actions;
   final bool Function() isCurrentAccount;
   final DateTime Function() _now;
   final _posts = <FeedPost>[];
@@ -49,6 +52,18 @@ class FeedCubit extends Cubit<FeedState> {
   int _generation = 0;
 
   bool get _canContinue => _cursor != null || _restart;
+
+  void hidePosts(Set<String> ids) {
+    if (isClosed || !_posts.any((post) => ids.contains(post.id))) return;
+    _posts.removeWhere((post) => ids.contains(post.id));
+    _indexes.clear();
+    for (final (index, post) in _posts.indexed) {
+      _indexes[post.id] = index;
+    }
+    _pruneExpanded();
+    _snapshotRows();
+    _publish();
+  }
 
   void deactivate() => _active = false;
 
@@ -214,6 +229,7 @@ class FeedCubit extends Cubit<FeedState> {
     }
     for (final post in incoming) {
       if (_blockedAuthors.contains(post.authorId) ||
+          (actions?.state.hidden.contains(post.id) ?? false) ||
           _indexes.containsKey(post.id)) {
         continue;
       }
@@ -259,7 +275,9 @@ class FeedCubit extends Cubit<FeedState> {
     _publish();
   }
 
-  bool hasAuthor(String id) => _posts.any((post) => post.authorId == id);
+  bool hasAuthor(String id) => _posts.any(
+    (post) => post.authorId == id || post.original?.authorId == id,
+  );
 
   void setLocationAllowed(bool allowed) {
     if (_restricted == !allowed) return;

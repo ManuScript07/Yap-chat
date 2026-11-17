@@ -79,7 +79,97 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedShowMore => 'показать ещё';
 
   @override
+  String get feedInlineMore => 'ещё…';
+
+  @override
+  String get feedOpenPhoto => 'открыть фото';
+
+  @override
   String get feedShowLess => 'свернуть';
+
+  @override
+  String get feedEdited => 'ред.';
+
+  @override
+  String get feedFollow => 'подписаться';
+
+  @override
+  String get feedUnfollow => 'отписаться';
+
+  @override
+  String get feedPostOptions => 'действия с публикацией';
+
+  @override
+  String get feedCopyLink => 'скопировать ссылку';
+
+  @override
+  String get feedReport => 'пожаловаться';
+
+  @override
+  String get feedLessSimilar => 'меньше похожего';
+
+  @override
+  String get feedBlock => 'заблокировать автора';
+
+  @override
+  String get feedConfirmBlock => 'подтвердить блокировку';
+
+  @override
+  String get feedSpam => 'спам';
+
+  @override
+  String get feedScam => 'мошенничество';
+
+  @override
+  String get feedPornography => 'порнография';
+
+  @override
+  String get feedOther => 'другое';
+
+  @override
+  String get feedNearYou => 'рядом с вами';
+
+  @override
+  String get feedPostLocation => 'местоположение';
+
+  @override
+  String get feedPostUnavailable => 'публикация недоступна';
+
+  @override
+  String get feedLike => 'нравится';
+
+  @override
+  String get feedComments => 'комментарии';
+
+  @override
+  String get feedRepost => 'репост';
+
+  @override
+  String get feedViews => 'просмотры';
+
+  @override
+  String get feedShare => 'поделиться';
+
+  @override
+  String get feedPublication => 'публикация';
+
+  @override
+  String get feedActionFailed => 'не удалось выполнить действие';
+
+  @override
+  String feedMinutesAgo(int count) {
+    return '$count мин. назад';
+  }
+
+  @override
+  String feedHoursAgo(int count) {
+    return '$count ч. назад';
+  }
+
+  @override
+  String feedDaysAgo(int count) {
+    return '$count дн. назад';
+  }
 
   @override
   String get searchHintChats => 'поиск по чатам';

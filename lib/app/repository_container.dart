@@ -250,6 +250,7 @@ class RepositoryContainer {
         accounts: config.accountSessionController,
         connection: connectionStatus,
         diagnostics: config.diagnostics,
+        mediaCache: mediaCache,
       ),
     );
   }

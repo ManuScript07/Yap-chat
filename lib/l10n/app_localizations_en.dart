@@ -79,7 +79,97 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedShowMore => 'show more';
 
   @override
+  String get feedInlineMore => 'more…';
+
+  @override
+  String get feedOpenPhoto => 'open photo';
+
+  @override
   String get feedShowLess => 'show less';
+
+  @override
+  String get feedEdited => 'edited';
+
+  @override
+  String get feedFollow => 'follow';
+
+  @override
+  String get feedUnfollow => 'unfollow';
+
+  @override
+  String get feedPostOptions => 'post options';
+
+  @override
+  String get feedCopyLink => 'copy link';
+
+  @override
+  String get feedReport => 'report';
+
+  @override
+  String get feedLessSimilar => 'less like this';
+
+  @override
+  String get feedBlock => 'block author';
+
+  @override
+  String get feedConfirmBlock => 'confirm block';
+
+  @override
+  String get feedSpam => 'spam';
+
+  @override
+  String get feedScam => 'scam';
+
+  @override
+  String get feedPornography => 'pornography';
+
+  @override
+  String get feedOther => 'other';
+
+  @override
+  String get feedNearYou => 'near you';
+
+  @override
+  String get feedPostLocation => 'location';
+
+  @override
+  String get feedPostUnavailable => 'post unavailable';
+
+  @override
+  String get feedLike => 'like';
+
+  @override
+  String get feedComments => 'comments';
+
+  @override
+  String get feedRepost => 'repost';
+
+  @override
+  String get feedViews => 'views';
+
+  @override
+  String get feedShare => 'share';
+
+  @override
+  String get feedPublication => 'post';
+
+  @override
+  String get feedActionFailed => 'couldn’t complete the action';
+
+  @override
+  String feedMinutesAgo(int count) {
+    return '$count min ago';
+  }
+
+  @override
+  String feedHoursAgo(int count) {
+    return '$count hr ago';
+  }
+
+  @override
+  String feedDaysAgo(int count) {
+    return '$count d ago';
+  }
 
   @override
   String get searchHintChats => 'search chats';

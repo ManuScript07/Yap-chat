@@ -11,6 +11,38 @@ import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 void main() {
+  testWidgets(
+    'long text expands inline without starting another feed request',
+    (tester) async {
+      final feed = _Feed();
+      final text = List.filled(14, 'long text with emoji 🚀').join('\n');
+      feed.next = Future.value(
+        FeedPageResult(
+          posts: [
+            FeedPost(
+              id: 'long-post',
+              authorId: 'author',
+              authorName: 'author',
+              text: text,
+              createdAt: DateTime.utc(2026),
+            ),
+          ],
+        ),
+      );
+      await _mount(tester, feed);
+      final collapsed = find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (widget.textSpan?.toPlainText().endsWith('more…') ?? false),
+      );
+      expect(collapsed, findsOneWidget);
+      await tester.tap(collapsed);
+      await tester.pumpAndSettle();
+      expect(find.text(text), findsOneWidget);
+      expect(collapsed, findsNothing);
+      expect(feed.calls, [FeedTab.forYou]);
+    },
+  );
   testWidgets('loads only visited tabs and restores the scroll offset', (
     tester,
   ) async {

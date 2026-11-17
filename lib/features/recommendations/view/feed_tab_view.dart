@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
@@ -9,7 +8,8 @@ import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
 
-import 'feed_post_text.dart';
+import 'feed_post_card.dart';
+import 'feed_post_details.dart';
 
 class FeedTabView extends StatefulWidget {
   const FeedTabView({
@@ -186,234 +186,15 @@ class _FeedRowsState extends State<_FeedRows> {
             rows.indexOf((key as ValueKey<String>).value),
         itemBuilder: (context, index) {
           final post = rows.posts[index];
-          return _cards[post] ??= _FeedCard(
+          return _cards[post] ??= FeedPostCard(
             key: ValueKey(post.id),
             post: post,
             timeline: timeline,
             visible: widget.visible,
+            onOpenPost: (id) => openFeedPost(this.context, timeline, id),
           );
         },
       ),
     );
   }
-}
-
-class _FeedCard extends StatelessWidget {
-  const _FeedCard({
-    super.key,
-    required this.post,
-    required this.timeline,
-    required this.visible,
-  });
-
-  final FeedPost post;
-  final FeedCubit timeline;
-  final bool visible;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = MaterialLocalizations.of(context);
-    final date = post.createdAt.toLocal();
-    final textStyle = context.textTheme.bodyLarge ?? const TextStyle();
-    final body = feedPostText(post, textStyle);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                post.authorName ?? context.l10n.feedUnknownAuthor,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.textTheme.titleMedium,
-              ),
-              Text(
-                '${localizations.formatShortDate(date)} · ${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(date))}',
-                style: context.textTheme.bodySmall,
-              ),
-              if (post.text.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const collapsedLines = 5;
-                    final painter = TextPainter(
-                      text: body,
-                      textDirection: Directionality.of(context),
-                      textScaler: MediaQuery.textScalerOf(context),
-                      maxLines: collapsedLines,
-                    )..layout(maxWidth: constraints.maxWidth);
-                    final canExpand = painter.didExceedMaxLines;
-                    painter.dispose();
-                    return BlocSelector<FeedCubit, FeedState, bool>(
-                      bloc: timeline,
-                      selector: (state) => state.expandedIds.contains(post.id),
-                      builder: (context, expanded) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (post.formatting.isEmpty)
-                            Text(
-                              post.text,
-                              style: textStyle,
-                              maxLines: expanded ? null : collapsedLines,
-                              overflow: expanded ? null : TextOverflow.ellipsis,
-                            )
-                          else
-                            Text.rich(
-                              body,
-                              maxLines: expanded ? null : collapsedLines,
-                              overflow: expanded ? null : TextOverflow.ellipsis,
-                            ),
-                          if (canExpand)
-                            TextButton(
-                              onPressed: () => timeline.toggleExpanded(post.id),
-                              child: Text(
-                                expanded
-                                    ? context.l10n.feedShowLess
-                                    : context.l10n.feedShowMore,
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-              if (post.photos.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final size = (constraints.maxWidth / post.photos.length - 6)
-                        .clamp(70.0, 170.0);
-                    return Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final photo in post.photos)
-                          SizedBox.square(
-                            dimension: size,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: visible
-                                  ? _FeedThumbnail(
-                                      key: ValueKey(photo.id),
-                                      timeline: timeline,
-                                      photo: photo,
-                                      decodeSize:
-                                          (size *
-                                                  MediaQuery.devicePixelRatioOf(
-                                                    context,
-                                                  ))
-                                              .ceil(),
-                                    )
-                                  : const _PhotoPlaceholder(),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeedThumbnail extends StatefulWidget {
-  const _FeedThumbnail({
-    super.key,
-    required this.timeline,
-    required this.photo,
-    required this.decodeSize,
-  });
-
-  final FeedCubit timeline;
-  final FeedPhoto photo;
-  final int decodeSize;
-
-  @override
-  State<_FeedThumbnail> createState() => _FeedThumbnailState();
-}
-
-class _FeedThumbnailState extends State<_FeedThumbnail> {
-  ui.Image? _image;
-  int _generation = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  @override
-  void didUpdateWidget(covariant _FeedThumbnail oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.photo.thumbnailPath != oldWidget.photo.thumbnailPath ||
-        widget.decodeSize != oldWidget.decodeSize) {
-      _image?.dispose();
-      _image = null;
-      unawaited(_load());
-    }
-  }
-
-  Future<void> _load() async {
-    final generation = ++_generation;
-    final timeline = widget.timeline;
-    final decodeSize = widget.decodeSize;
-    bool isCurrent() =>
-        mounted && generation == _generation && timeline.isCurrentAccount();
-    try {
-      final bytes = await timeline.repository.downloadThumbnail(
-        widget.photo,
-        account: timeline.account,
-        stillNeeded: isCurrent,
-      );
-      if (!isCurrent()) return;
-      final codec = await ui.instantiateImageCodec(
-        bytes,
-        targetWidth: decodeSize,
-        allowUpscaling: false,
-      );
-      try {
-        if (!isCurrent()) return;
-        final frame = await codec.getNextFrame();
-        if (!isCurrent()) {
-          frame.image.dispose();
-          return;
-        }
-        setState(() => _image = frame.image);
-      } finally {
-        codec.dispose();
-      }
-    } catch (_) {
-      // Keep the tile's dimensions on storage or decoding errors.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => _image == null
-      ? const _PhotoPlaceholder()
-      : RawImage(image: _image, fit: BoxFit.cover);
-
-  @override
-  void dispose() {
-    _image?.dispose();
-    super.dispose();
-  }
-}
-
-class _PhotoPlaceholder extends StatelessWidget {
-  const _PhotoPlaceholder();
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: context.colorScheme.surfaceContainerHighest,
-    child: const Center(child: Icon(Icons.image_outlined)),
-  );
 }

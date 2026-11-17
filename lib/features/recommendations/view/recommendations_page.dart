@@ -33,6 +33,8 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   StreamSubscription<String>? _friendChanges;
   AccountSessionSnapshot? _account;
   Map<FeedTab, FeedCubit> _timelines = {};
+  FeedActionsCubit? _actions;
+  StreamSubscription<Set<String>>? _actionChanges;
   FeedTab _selected = FeedTab.forYou;
   bool _activeRoute = false;
   bool _foreground = true;
@@ -79,6 +81,9 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   void _replaceTimelines() {
     unawaited(_blocks?.cancel());
     unawaited(_friendChanges?.cancel());
+    unawaited(_actions?.close());
+    unawaited(_actionChanges?.cancel());
+    _actions = null;
     for (final timeline in _timelines.values) {
       unawaited(timeline.close());
     }
@@ -96,20 +101,38 @@ class _RecommendationsPageState extends State<RecommendationsPage>
 
     final account = accounts.capture();
     _account = account;
+    if (repository is IFeedPostRepository) {
+      _actions = FeedActionsCubit(
+        repository as IFeedPostRepository,
+        account,
+        () => accounts.isCurrent(account),
+      );
+    }
     _timelines = {
       for (final tab in FeedTab.values)
         tab: FeedCubit(
           tab: tab,
           repository: repository,
           account: account,
+          actions: _actions,
           isCurrentAccount: () => accounts.isCurrent(account),
         ),
     };
+    _actionChanges = _actions?.stream
+        .map((state) => state.hidden)
+        .distinct((a, b) => a.length == b.length && a.containsAll(b))
+        .listen((hidden) {
+          if (!mounted || !accounts.isCurrent(account)) return;
+          for (final timeline in _timelines.values) {
+            timeline.hidePosts(hidden);
+          }
+        });
     _blocks = context
         .read<IBlocklistRepository?>()
         ?.watchBlockedUserIds()
         .listen((blocked) {
           if (!mounted || !accounts.isCurrent(account)) return;
+          _actions?.setBlocked(blocked);
           for (final timeline in _timelines.values) {
             timeline.updateBlockedAuthors(blocked);
           }
@@ -120,6 +143,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
           .watchProfileChanges()
           .listen((id) {
             if (!mounted || !accounts.isCurrent(account)) return;
+            _actions?.revalidateAuthor(id);
             for (final timeline in _timelines.values) {
               if (timeline.hasAuthor(id)) timeline.invalidateAccess();
             }
@@ -337,6 +361,8 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     _accounts?.generationChanges.removeListener(_accountChanged);
     unawaited(_blocks?.cancel());
     unawaited(_friendChanges?.cancel());
+    unawaited(_actions?.close());
+    unawaited(_actionChanges?.cancel());
     for (final timeline in _timelines.values) {
       unawaited(timeline.close());
     }

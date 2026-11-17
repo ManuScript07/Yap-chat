@@ -230,11 +230,179 @@ abstract class AppLocalizations {
   /// **'показать ещё'**
   String get feedShowMore;
 
+  /// No description provided for @feedInlineMore.
+  ///
+  /// In ru, this message translates to:
+  /// **'ещё…'**
+  String get feedInlineMore;
+
+  /// No description provided for @feedOpenPhoto.
+  ///
+  /// In ru, this message translates to:
+  /// **'открыть фото'**
+  String get feedOpenPhoto;
+
   /// No description provided for @feedShowLess.
   ///
   /// In ru, this message translates to:
   /// **'свернуть'**
   String get feedShowLess;
+
+  /// No description provided for @feedEdited.
+  ///
+  /// In ru, this message translates to:
+  /// **'ред.'**
+  String get feedEdited;
+
+  /// No description provided for @feedFollow.
+  ///
+  /// In ru, this message translates to:
+  /// **'подписаться'**
+  String get feedFollow;
+
+  /// No description provided for @feedUnfollow.
+  ///
+  /// In ru, this message translates to:
+  /// **'отписаться'**
+  String get feedUnfollow;
+
+  /// No description provided for @feedPostOptions.
+  ///
+  /// In ru, this message translates to:
+  /// **'действия с публикацией'**
+  String get feedPostOptions;
+
+  /// No description provided for @feedCopyLink.
+  ///
+  /// In ru, this message translates to:
+  /// **'скопировать ссылку'**
+  String get feedCopyLink;
+
+  /// No description provided for @feedReport.
+  ///
+  /// In ru, this message translates to:
+  /// **'пожаловаться'**
+  String get feedReport;
+
+  /// No description provided for @feedLessSimilar.
+  ///
+  /// In ru, this message translates to:
+  /// **'меньше похожего'**
+  String get feedLessSimilar;
+
+  /// No description provided for @feedBlock.
+  ///
+  /// In ru, this message translates to:
+  /// **'заблокировать автора'**
+  String get feedBlock;
+
+  /// No description provided for @feedConfirmBlock.
+  ///
+  /// In ru, this message translates to:
+  /// **'подтвердить блокировку'**
+  String get feedConfirmBlock;
+
+  /// No description provided for @feedSpam.
+  ///
+  /// In ru, this message translates to:
+  /// **'спам'**
+  String get feedSpam;
+
+  /// No description provided for @feedScam.
+  ///
+  /// In ru, this message translates to:
+  /// **'мошенничество'**
+  String get feedScam;
+
+  /// No description provided for @feedPornography.
+  ///
+  /// In ru, this message translates to:
+  /// **'порнография'**
+  String get feedPornography;
+
+  /// No description provided for @feedOther.
+  ///
+  /// In ru, this message translates to:
+  /// **'другое'**
+  String get feedOther;
+
+  /// No description provided for @feedNearYou.
+  ///
+  /// In ru, this message translates to:
+  /// **'рядом с вами'**
+  String get feedNearYou;
+
+  /// No description provided for @feedPostLocation.
+  ///
+  /// In ru, this message translates to:
+  /// **'местоположение'**
+  String get feedPostLocation;
+
+  /// No description provided for @feedPostUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'публикация недоступна'**
+  String get feedPostUnavailable;
+
+  /// No description provided for @feedLike.
+  ///
+  /// In ru, this message translates to:
+  /// **'нравится'**
+  String get feedLike;
+
+  /// No description provided for @feedComments.
+  ///
+  /// In ru, this message translates to:
+  /// **'комментарии'**
+  String get feedComments;
+
+  /// No description provided for @feedRepost.
+  ///
+  /// In ru, this message translates to:
+  /// **'репост'**
+  String get feedRepost;
+
+  /// No description provided for @feedViews.
+  ///
+  /// In ru, this message translates to:
+  /// **'просмотры'**
+  String get feedViews;
+
+  /// No description provided for @feedShare.
+  ///
+  /// In ru, this message translates to:
+  /// **'поделиться'**
+  String get feedShare;
+
+  /// No description provided for @feedPublication.
+  ///
+  /// In ru, this message translates to:
+  /// **'публикация'**
+  String get feedPublication;
+
+  /// No description provided for @feedActionFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось выполнить действие'**
+  String get feedActionFailed;
+
+  /// No description provided for @feedMinutesAgo.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count} мин. назад'**
+  String feedMinutesAgo(int count);
+
+  /// No description provided for @feedHoursAgo.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count} ч. назад'**
+  String feedHoursAgo(int count);
+
+  /// No description provided for @feedDaysAgo.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count} дн. назад'**
+  String feedDaysAgo(int count);
 
   /// No description provided for @searchHintChats.
   ///
