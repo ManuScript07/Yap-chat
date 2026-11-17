@@ -60,7 +60,7 @@ class FeedPostCard extends StatelessWidget {
                     details: details,
                   ),
                   if (post.coordinates != null || post.nearby)
-                    FeedPostLocation(post: post),
+                    FeedPostLocation(post: post, actions: timeline.actions),
                   if (post.text.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     FeedPostBody(

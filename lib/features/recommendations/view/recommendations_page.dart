@@ -50,6 +50,8 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   bool _visibilityCheckScheduled = false;
   bool _checkingLocation = false;
   bool _updatingLocation = false;
+  DateTime? _nearbyPublicationAt;
+  Timer? _nearbyExpiry;
 
   @override
   void initState() {
@@ -114,6 +116,8 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     _headerHiddenFraction.value = 0;
     _checkingLocation = false;
     _updatingLocation = false;
+    _nearbyPublicationAt = null;
+    _cancelNearbyExpiry();
     final accounts = _accounts;
     final repository = _repository;
     if (accounts == null || accounts.userId == null || repository == null) {
@@ -129,8 +133,8 @@ class _RecommendationsPageState extends State<RecommendationsPage>
           accounts,
           repository,
           blocks: context.read<IBlocklistRepository?>(),
-          friends: friends is IProfileFriendsRepository
-              ? friends as IProfileFriendsRepository
+          friends: friends is IFriendAccessRepository
+              ? friends as IFriendAccessRepository
               : null,
         ));
     _actions = scope.actionsFor(account);
@@ -148,17 +152,16 @@ class _RecommendationsPageState extends State<RecommendationsPage>
       FeedActionsState? previous;
       void apply(FeedActionsState state) {
         if (!mounted || !accounts.isCurrent(account)) return;
-        final id = state.revokedAuthor;
-        final accessChanged = !identical(previous?.blocked, state.blocked);
+        final blocksChanged = !identical(previous?.blocked, state.blocked);
+        final accessChanged = previous?.accessVersion != state.accessVersion;
         final hiddenChanged =
             previous == null || previous!.hidden.length != state.hidden.length;
         previous = state;
         for (final timeline in _timelines.values) {
           if (hiddenChanged) timeline.hidePosts(state.hidden);
-          if (accessChanged) timeline.updateBlockedAuthors(state.blocked);
-          if (id != null && timeline.hasAuthor(id)) timeline.invalidateAccess();
+          if (blocksChanged) timeline.updateBlockedAuthors(state.blocked);
+          if (accessChanged) timeline.removeInaccessiblePosts();
         }
-        if (id != null) _scheduleVisibilityCheck();
       }
 
       _actionChanges = actions.stream.listen(apply);
@@ -172,6 +175,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     if (_foreground == foreground) return;
     setState(() => _foreground = foreground);
     if (!_foreground) {
+      _cancelNearbyExpiry();
       for (final timeline in _timelines.values) {
         timeline.deactivate();
       }
@@ -198,6 +202,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
 
   void _activateSelected() {
     final active = _activeRoute && _foreground;
+    if (!active || _selected != FeedTab.nearby) _cancelNearbyExpiry();
     for (final timeline in _timelines.values) {
       if (!active || timeline.tab != _selected) timeline.deactivate();
     }
@@ -211,22 +216,61 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   }
 
   Future<void> _activateNearby(FeedCubit timeline) async {
-    if (_checkingLocation) return;
-    _checkingLocation = true;
-    bool allowed;
-    try {
-      allowed =
-          await _location!.getLocationAccessStatus() ==
-          LocationAccessStatus.granted;
-    } catch (_) {
-      allowed = false;
+    if (_checkingLocation || _updatingLocation || !_isActiveNearby(timeline)) {
+      return;
     }
+    _checkingLocation = true;
+    final location = await _readNearbyLocation();
     if (!mounted || !identical(_timelines[FeedTab.nearby], timeline)) return;
     _checkingLocation = false;
-    timeline.setLocationAllowed(allowed);
-    if (_selected == FeedTab.nearby && _activeRoute && _foreground) {
-      await timeline.activate(atTop: _atTop(FeedTab.nearby));
+    if (!_isActiveNearby(timeline) || _updatingLocation) return;
+    _applyNearbyLocation(timeline, location);
+    await timeline.activate(atTop: _atTop(FeedTab.nearby));
+  }
+
+  bool _isActiveNearby(FeedCubit timeline) =>
+      mounted &&
+      _selected == FeedTab.nearby &&
+      _activeRoute &&
+      _foreground &&
+      identical(_timelines[FeedTab.nearby], timeline) &&
+      timeline.isCurrentAccount();
+
+  Future<CachedTrackedLocation?> _readNearbyLocation() async {
+    try {
+      return await _location?.getCachedCurrentLocation(
+        maxAge: nearbyLocationMaxAge,
+      );
+    } catch (_) {
+      return null;
     }
+  }
+
+  void _applyNearbyLocation(
+    FeedCubit timeline,
+    CachedTrackedLocation? location,
+  ) {
+    _cancelNearbyExpiry();
+    final publishedAt = location?.updatedAt;
+    final timeLeft = publishedAt
+        ?.add(nearbyLocationMaxAge)
+        .difference(DateTime.now());
+    if (publishedAt == null || timeLeft == null || timeLeft <= Duration.zero) {
+      timeline.setLocationAllowed(false);
+      return;
+    }
+    final previous = _nearbyPublicationAt;
+    _nearbyPublicationAt = publishedAt;
+    timeline.setLocationAllowed(
+      true,
+      newerPublication: previous != null && publishedAt.isAfter(previous),
+    );
+    _nearbyExpiry = Timer(timeLeft, () => unawaited(_activateNearby(timeline)));
+  }
+
+  void _cancelNearbyExpiry() {
+    _nearbyExpiry?.cancel();
+    _nearbyExpiry = null;
   }
 
   bool _atTop(FeedTab tab) {
@@ -267,6 +311,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   void _select(int index) {
     final selected = FeedTab.values[index];
     if (selected == _selected) return;
+    _cancelNearbyExpiry();
     _timelines[_selected]?.deactivate();
     setState(() => _selected = selected);
     _scheduleVisibilityCheck();
@@ -275,7 +320,12 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   Future<void> _updateLocation() async {
     final tracking = _tracking;
     final timeline = _timelines[FeedTab.nearby];
-    if (tracking == null || timeline == null || _updatingLocation) return;
+    if (tracking == null ||
+        timeline == null ||
+        _updatingLocation ||
+        !_isActiveNearby(timeline)) {
+      return;
+    }
     setState(() => _updatingLocation = true);
     var result = TrackedLocationRefreshResult.unavailable;
     try {
@@ -283,20 +333,29 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     } catch (_) {
       // The coordinator can fail when permission or the network changes.
     }
+    final location = await _readNearbyLocation();
     if (!mounted || !identical(_timelines[FeedTab.nearby], timeline)) return;
     setState(() => _updatingLocation = false);
+    if (!_isActiveNearby(timeline)) return;
+    _applyNearbyLocation(timeline, location);
     if (result != TrackedLocationRefreshResult.unavailable) {
-      await timeline.locationUpdated();
-    } else if (_selected == FeedTab.nearby && _activeRoute) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.feedLocationUnavailable,
-        type: SnackBarType.error,
-        bottomMargin: FloatingNavigationGeometry.occupiedHeight(
-          MediaQuery.of(context),
-        ),
-      );
+      if (result == TrackedLocationRefreshResult.updated && location != null) {
+        await timeline.locationUpdated();
+        return;
+      }
+      if (timeline.state.failure != FeedFailure.locationRequired) {
+        await timeline.activate(atTop: _atTop(FeedTab.nearby));
+        return;
+      }
     }
+    showAppSnackBar(
+      context,
+      message: context.l10n.feedLocationUnavailable,
+      type: SnackBarType.error,
+      bottomMargin: FloatingNavigationGeometry.occupiedHeight(
+        MediaQuery.of(context),
+      ),
+    );
   }
 
   void _showPlaceholder(String title) {
@@ -476,6 +535,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     WidgetsBinding.instance.removeObserver(this);
     _accounts?.generationChanges.removeListener(_accountChanged);
     _localFeedScope?.dispose();
+    _cancelNearbyExpiry();
     _headerHiddenFraction.dispose();
     _pages.dispose();
     unawaited(_actionChanges?.cancel());

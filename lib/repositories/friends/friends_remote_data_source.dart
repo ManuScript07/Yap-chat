@@ -374,16 +374,19 @@ class FriendsRemoteDataSource {
     if (controller == null || controller.isClosed || !controller.hasListener) {
       return;
     }
+    final channelUserId = currentUserId;
     late final RealtimeChannel channel;
     channel = _client
         .channel(
-          'user:$currentUserId:friends',
+          'user:$channelUserId:friends',
           opts: const RealtimeChannelConfig(private: true),
         )
         .onBroadcast(
           event: 'changed',
           callback: (event) {
-            if (identical(_channel, channel) && !controller.isClosed) {
+            if (identical(_channel, channel) &&
+                !controller.isClosed &&
+                _client.auth.currentUser?.id == channelUserId) {
               final nested = event['payload'];
               final payload = nested is Map
                   ? Map<String, dynamic>.from(nested)
@@ -404,7 +407,11 @@ class FriendsRemoteDataSource {
     _diagnosticsChannel = channel;
     _channelLease = _diagnostics?.trackRealtimeChannel('friends-realtime');
     channel.subscribe((status, _) {
-      if (!identical(_channel, channel) || controller.isClosed) return;
+      if (!identical(_channel, channel) ||
+          controller.isClosed ||
+          _client.auth.currentUser?.id != channelUserId) {
+        return;
+      }
       switch (status) {
         case RealtimeSubscribeStatus.subscribed:
           _backoff.reset();

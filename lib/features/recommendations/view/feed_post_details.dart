@@ -52,8 +52,6 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
   late final AccountSessionController? _accounts;
   Future<FeedPost?>? _request;
   Future<FeedPost?>? _inFlight;
-  int _accessRevision = 0;
-  FeedPost? _visiblePost;
 
   @override
   void initState() {
@@ -87,20 +85,11 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
 
   Future<FeedPost?> _readPost() async {
     final actions = _timeline!.actions!;
-    while (mounted && actions.active) {
-      final revision = _accessRevision;
-      if (actions.state.blocked.contains(_visiblePost?.authorId)) return null;
-      try {
-        final post = await actions.repository.getPost(
-          widget.id,
-          actions.account,
-        );
-        if (revision == _accessRevision) return post;
-      } catch (_) {
-        if (revision == _accessRevision) rethrow;
-      }
-    }
-    return null;
+    final requestedAt = actions.projectionVersion;
+    final post = await actions.repository.getPost(widget.id, actions.account);
+    if (!mounted || !actions.active || post == null) return null;
+    actions.recordProjection(post, requestedAt);
+    return post;
   }
 
   @override
@@ -131,24 +120,11 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
     if (timeline == null || actions == null || !actions.active) {
       return _unavailable(context);
     }
-    return BlocConsumer<FeedActionsCubit, FeedActionsState>(
+    return BlocBuilder<FeedActionsCubit, FeedActionsState>(
       bloc: actions,
-      listenWhen: (previous, state) {
-        final author = state.revokedAuthor;
-        final post = _visiblePost;
-        if (post == null) return previous.blocked != state.blocked;
-        bool changed(String? id) =>
-            id != null &&
-            (author == id ||
-                previous.blocked.contains(id) != state.blocked.contains(id));
-        return changed(post.authorId) || changed(post.original?.authorId);
-      },
-      listener: (_, _) => setState(() {
-        _accessRevision++;
-        _request = _load();
-      }),
       buildWhen: (previous, current) =>
           previous.blocked != current.blocked ||
+          previous.accessVersion != current.accessVersion ||
           previous.hidden.length != current.hidden.length,
       builder: (context, _) => FutureBuilder(
         future: _request,
@@ -168,7 +144,6 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
           if (post == null || !actions.canShow(post)) {
             return _unavailable(context);
           }
-          _visiblePost = post;
           return _Publication(post: post, timeline: timeline, actions: actions);
         },
       ),

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
+import 'package:yap_chat/repositories/friends/friends.dart';
 
 void main() {
   late AccountSessionController accounts;
@@ -57,20 +58,96 @@ void main() {
     expect(repository.actions.last.$3, 1);
   });
 
+  test('a block discards a delayed follow response', () async {
+    final post = _post('one');
+    final pending = cubit.toggleFollow(post);
+    cubit.peerBlocked(post.authorId);
+    repository.follow.complete((version: 1, following: true, canFollow: true));
+    await pending;
+    expect(cubit.state.follows, isEmpty);
+    expect(cubit.state.busy, isEmpty);
+  });
+
   test(
-    'relationship invalidation discards a delayed follow response',
+    'reconnect verifies known friends in one batch without erasing rows',
     () async {
-      final post = _post('one');
-      final pending = cubit.toggleFollow(post);
-      cubit.revalidateAuthor(post.authorId);
-      repository.follow.complete((
-        version: 1,
-        following: true,
-        canFollow: true,
+      final removed = _locationPost('removed');
+      final kept = _locationPost('kept');
+      final unknown = _locationPost('unknown');
+      final oldVersion = cubit.projectionVersion;
+      cubit.recordProjection(removed, oldVersion);
+      cubit.recordProjection(kept, oldVersion);
+      final result = Completer<Set<String>>();
+      var calls = 0;
+      final check = cubit.recheckFriendships((authors) {
+        calls++;
+        expect(authors, {'removed', 'kept'});
+        return result.future;
+      });
+      expect(cubit.coordinatesFor(removed), removed.coordinates);
+      cubit.recordProjection(unknown, oldVersion);
+      expect(cubit.canShow(unknown), isTrue);
+      expect(cubit.coordinatesFor(unknown), isNull);
+      result.complete({'kept'});
+      await check;
+      expect(calls, 1);
+      expect(cubit.coordinatesFor(removed), isNull);
+      expect(cubit.canShow(removed), isTrue);
+      expect(cubit.coordinatesFor(kept), kept.coordinates);
+    },
+  );
+
+  test(
+    'a stale reconnect reply cannot override a later friendship event',
+    () async {
+      final post = _locationPost('author');
+      cubit.recordProjection(post, cubit.projectionVersion);
+      final result = Completer<Set<String>>();
+      final check = cubit.recheckFriendships((_) => result.future);
+      cubit.friendshipRemoved(post.authorId);
+      cubit.friendshipAdded(post.authorId);
+      expect(cubit.coordinatesFor(post), isNull);
+      final freshPost = _locationPost('author');
+      cubit.recordProjection(freshPost, cubit.projectionVersion);
+      result.complete({});
+      await check;
+      expect(cubit.coordinatesFor(post), isNull);
+      expect(cubit.coordinatesFor(freshPost), freshPost.coordinates);
+    },
+  );
+
+  test(
+    'the account uses one in-flight batch for repeated reconnects',
+    () async {
+      final friends = _FriendAccess();
+      final scope = FeedAccountScope(accounts, repository, friends: friends);
+      addTearDown(friends.events.close);
+      addTearDown(scope.dispose);
+      final actions = scope.actionsFor(accounts.capture())!;
+      final post = _locationPost('author');
+      actions.recordProjection(post, actions.projectionVersion);
+      const reconnect = (
+        kind: FriendAccessChangeKind.reconnected,
+        peerId: null,
+      );
+      for (var index = 0; index < 20; index++) {
+        friends.events.add(reconnect);
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(friends.checks, hasLength(1));
+      friends.checks.first.complete({});
+      await Future<void>.delayed(Duration.zero);
+      expect(friends.checks, hasLength(2));
+      expect(actions.coordinatesFor(post), post.coordinates);
+      friends.checks.last.complete({'author'});
+      await Future<void>.delayed(Duration.zero);
+      friends.events.add((
+        kind: FriendAccessChangeKind.removed,
+        peerId: 'author',
       ));
-      await pending;
-      expect(cubit.state.follows, isEmpty);
-      expect(cubit.state.busy, isEmpty);
+      await Future<void>.delayed(Duration.zero);
+      expect(actions.coordinatesFor(post), isNull);
+      expect(friends.checks, hasLength(2));
     },
   );
 
@@ -130,9 +207,39 @@ void main() {
       expect(cubit.canShow(second), isTrue);
       cubit.setBlocked({'author'});
       expect(cubit.canShow(second), isFalse);
+      cubit.setBlocked({});
+      expect(cubit.canShow(second), isFalse);
+      final fresh = _post('three');
+      cubit.recordProjection(fresh, cubit.projectionVersion);
+      expect(cubit.canShow(fresh), isTrue);
       expect(repository.reportCalls, 1);
     },
   );
+}
+
+FeedPost _locationPost(String author) => FeedPost(
+  id: author,
+  authorId: author,
+  authorName: author,
+  text: 'text',
+  createdAt: DateTime.utc(2026),
+  coordinates: (latitude: 1, longitude: 1),
+  nearby: true,
+);
+
+class _FriendAccess implements IFriendAccessRepository {
+  final events = StreamController<FriendAccessChange>.broadcast();
+  final checks = <Completer<Set<String>>>[];
+
+  @override
+  Stream<FriendAccessChange> watchFriendAccessChanges() => events.stream;
+
+  @override
+  Future<Set<String>> verifyCurrentFriends(Set<String> peerIds) {
+    final request = Completer<Set<String>>();
+    checks.add(request);
+    return request.future;
+  }
 }
 
 FeedPost _post(String id) => FeedPost(

@@ -49,6 +49,15 @@ abstract interface class IProfileFriendsRepository {
   Future<void> removeFriend(String friendId);
 }
 
+enum FriendAccessChangeKind { removed, added, blocked, reconnected }
+
+typedef FriendAccessChange = ({FriendAccessChangeKind kind, String? peerId});
+
+abstract interface class IFriendAccessRepository {
+  Stream<FriendAccessChange> watchFriendAccessChanges();
+  Future<Set<String>> verifyCurrentFriends(Set<String> peerIds);
+}
+
 extension ProfileFriendsRepositoryAccess on IFriendsRepository {
   IProfileFriendsRepository get _profiles => this as IProfileFriendsRepository;
 

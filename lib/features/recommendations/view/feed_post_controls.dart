@@ -210,21 +210,46 @@ class FeedPostHeader extends StatelessWidget {
 }
 
 class FeedPostLocation extends StatelessWidget {
-  const FeedPostLocation({super.key, required this.post});
+  const FeedPostLocation({
+    super.key,
+    required this.post,
+    required this.actions,
+  });
 
   final FeedPost post;
+  final FeedActionsCubit? actions;
 
   @override
   Widget build(BuildContext context) {
-    final point = post.coordinates;
-    if (point == null) return Text(context.l10n.feedNearYou);
+    final actions = this.actions;
+    if (actions == null || post.coordinates == null) {
+      return _location(context, post.coordinates);
+    }
+    return BlocSelector<FeedActionsCubit, FeedActionsState, FeedCoordinates?>(
+      bloc: actions,
+      selector: (_) => actions.coordinatesFor(post),
+      builder: _location,
+    );
+  }
+
+  Widget _location(BuildContext context, FeedCoordinates? point) {
+    if (point == null) {
+      return post.nearby
+          ? Text(context.l10n.feedNearYou)
+          : const SizedBox.shrink();
+    }
     return Align(
       alignment: AlignmentDirectional.centerStart,
       child: TextButton.icon(
         icon: const Icon(Icons.place_outlined, size: 16),
         label: Text(context.l10n.feedPostLocation),
         onPressed: () => _perform(context, () async {
-          final coordinates = '${point.latitude},${point.longitude}';
+          final actions = this.actions;
+          final current = actions == null
+              ? point
+              : actions.coordinatesFor(post);
+          if (current == null) return;
+          final coordinates = '${current.latitude},${current.longitude}';
           final uri = Uri.parse('geo:$coordinates?q=$coordinates');
           if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
             throw StateError('Could not open map');

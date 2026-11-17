@@ -141,7 +141,7 @@ class NearbyCubit extends Cubit<NearbyState> {
       final filters = await _repository.getFilters();
       final cached = await _repository.getCachedFeed(filters);
       final ownLocation = await _locationRepository.getCachedCurrentLocation(
-        maxAge: const Duration(hours: 12),
+        maxAge: nearbyLocationMaxAge,
       );
       if (isClosed || revision != _queryRevision) return;
       if (!_nearbyVisible) {
@@ -219,7 +219,7 @@ class NearbyCubit extends Cubit<NearbyState> {
       return;
     } catch (_) {
       final ownLocation = await _locationRepository.getCachedCurrentLocation(
-        maxAge: const Duration(hours: 12),
+        maxAge: nearbyLocationMaxAge,
       );
       if (isClosed || !_nearbyVisible) return;
       if (ownLocation == null) {
@@ -454,7 +454,7 @@ class NearbyCubit extends Cubit<NearbyState> {
       final cached = await _repository.getCachedFeed(normalized);
       if (isClosed || revision != _queryRevision) return;
       final ownLocation = await _locationRepository.getCachedCurrentLocation(
-        maxAge: const Duration(hours: 12),
+        maxAge: nearbyLocationMaxAge,
       );
       if (isClosed || revision != _queryRevision) return;
       if (ownLocation == null) {
@@ -566,7 +566,7 @@ class NearbyCubit extends Cubit<NearbyState> {
     CachedTrackedLocation? location;
     try {
       location = await _locationRepository.getCachedCurrentLocation(
-        maxAge: const Duration(hours: 12),
+        maxAge: nearbyLocationMaxAge,
       );
     } catch (_) {
       if (!isClosed && revision == _queryRevision && _nearbyVisible) {

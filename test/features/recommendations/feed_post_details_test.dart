@@ -72,6 +72,47 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('revocation changes the map button to a label without a reload', (
+    tester,
+  ) async {
+    repository.post = _postWithLocation();
+    await show(tester);
+    expect(find.text('location'), findsOneWidget);
+    expect(find.text('near you'), findsNothing);
+    final actions = scope.actionsFor(accounts.capture())!;
+    actions.friendshipRemoved('author');
+    await tester.pumpAndSettle();
+    expect(find.text('location'), findsNothing);
+    expect(find.text('near you'), findsOneWidget);
+    expect(find.text('test publication'), findsOneWidget);
+    expect(repository.postReads, 1);
+    expect(repository.commentReads, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a public quote closes when its original loses access', (
+    tester,
+  ) async {
+    repository.post = FeedPost(
+      id: _postId,
+      authorId: 'quoting author',
+      authorName: 'quoting author',
+      text: 'test quote',
+      createdAt: DateTime.utc(2026),
+      isQuote: true,
+      original: _postWithLocation(id: 'original', friendsOnly: true),
+    );
+    await show(tester);
+    expect(find.text('test quote'), findsOneWidget);
+    scope.actionsFor(accounts.capture())!.friendshipRemoved('author');
+    await tester.pumpAndSettle();
+    expect(find.text('test quote'), findsNothing);
+    expect(find.text('test publication'), findsNothing);
+    expect(find.text('post unavailable'), findsOneWidget);
+    expect(repository.postReads, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('comment retry keeps the draft and reuses its request id', (
     tester,
   ) async {
@@ -192,6 +233,18 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
+
+FeedPost _postWithLocation({String id = _postId, bool friendsOnly = false}) =>
+    FeedPost(
+      id: id,
+      authorId: 'author',
+      authorName: 'author',
+      text: 'test publication',
+      createdAt: DateTime.utc(2026),
+      coordinates: (latitude: 1, longitude: 1),
+      nearby: true,
+      friendsOnly: friendsOnly,
+    );
 
 class _Repository extends MockFeedRepository
     implements IFeedPostRepository, IFeedPublicationRepository {

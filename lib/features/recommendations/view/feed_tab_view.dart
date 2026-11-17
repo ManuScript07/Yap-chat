@@ -85,6 +85,37 @@ class _FeedTabViewState extends State<FeedTabView> {
   @override
   Widget build(BuildContext context) {
     final timeline = widget.timeline;
+    if (timeline.tab != FeedTab.nearby) return _scroll();
+    return BlocSelector<FeedCubit, FeedState, bool>(
+      bloc: timeline,
+      selector: (state) => state.failure == FeedFailure.locationRequired,
+      builder: (context, requiresLocation) => Stack(
+        fit: StackFit.expand,
+        children: [
+          ExcludeFocus(
+            excluding: requiresLocation,
+            child: ExcludeSemantics(
+              excluding: requiresLocation,
+              child: AbsorbPointer(
+                absorbing: requiresLocation,
+                child: _scroll(requiresLocation: requiresLocation),
+              ),
+            ),
+          ),
+          if (requiresLocation) ...[
+            const ClipRect(child: LocationRequiredBackdrop()),
+            LocationRequiredOverlay(
+              bottomInset: widget.bottomPadding,
+              onRetry: widget.onUpdateLocation,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _scroll({bool requiresLocation = false}) {
+    final timeline = widget.timeline;
     return PullRefresh(
       indicatorTop: widget.headerExtent,
       indicatorKey: const ValueKey('feed_pull_indicator'),
@@ -99,7 +130,10 @@ class _FeedTabViewState extends State<FeedTabView> {
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: widget.headerExtent)),
           const SliverPullRefreshGap(),
-          _FeedRows(timeline: timeline, visible: widget.visible),
+          _FeedRows(
+            timeline: timeline,
+            visible: widget.visible && !requiresLocation,
+          ),
           BlocSelector<FeedCubit, FeedState, FeedFooter>(
             bloc: timeline,
             selector: (state) => state.footer,
@@ -127,6 +161,9 @@ class _FeedTabViewState extends State<FeedTabView> {
     final l10n = context.l10n;
     final failure = state.failure;
     final empty = state.empty;
+    if (failure == FeedFailure.locationRequired) {
+      return const SliverToBoxAdapter();
+    }
     Widget? content;
     if (state.loading || !state.loaded && failure == null) {
       content = const Padding(
@@ -135,17 +172,6 @@ class _FeedTabViewState extends State<FeedTabView> {
           dimension: 22,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
-      );
-    } else if (failure == FeedFailure.locationRequired) {
-      content = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(l10n.feedLocationRequired, textAlign: TextAlign.center),
-          TextButton(
-            onPressed: widget.onUpdateLocation,
-            child: Text(l10n.nearbyLocationUpdate),
-          ),
-        ],
       );
     } else if (failure != null) {
       content = Column(

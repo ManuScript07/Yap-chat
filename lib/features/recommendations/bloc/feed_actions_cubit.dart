@@ -13,7 +13,7 @@ typedef FeedActionsState = ({
   Set<String> hidden,
   Set<String> blocked,
   Map<String, int> reposts,
-  String? revokedAuthor,
+  int accessVersion,
 });
 
 class FeedActionsCubit extends Cubit<FeedActionsState> {
@@ -30,7 +30,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
          hidden: const {},
          blocked: const {},
          reposts: const {},
-         revokedAuthor: null,
+         accessVersion: 0,
        ));
 
   final IFeedPostRepository repository;
@@ -49,11 +49,59 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   static const _toggleInterval = Duration(milliseconds: 350);
   Set<String> _blocked = const {};
   bool _detailOpening = false;
-  String? _revokedAuthor;
+  int _projectionVersion = 0;
+  int _accessVersion = 0;
+  int _lastReconnect = 0;
+  bool _checkingFriends = false;
+  final _projectionVersions = Expando<int>();
+  final _friendshipChanges = <String, ({int changedAt, int removedAt})>{};
+  final _blockedAt = <String, int>{};
+  final _observedFriends = <String>{};
 
   bool get active => !isClosed && isCurrent();
-  bool canShow(FeedPost post) =>
-      active && !_blocked.contains(post.authorId) && !_hidden.contains(post.id);
+  int get projectionVersion => _projectionVersion;
+
+  bool canShow(FeedPost post) {
+    if (!active || _hidden.contains(post.id)) return false;
+    for (FeedPost? item = post; item != null; item = item.original) {
+      final blockedAt = _blockedAt[item.authorId];
+      if (_blocked.contains(item.authorId) ||
+          blockedAt != null && (_projectionVersions[item] ?? 0) < blockedAt ||
+          item.friendsOnly && !_hasFriendAccess(item)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  FeedCoordinates? coordinatesFor(FeedPost post) =>
+      canShow(post) && _hasFriendAccess(post) ? post.coordinates : null;
+
+  bool _hasFriendAccess(FeedPost post) =>
+      post.authorId == account.userId ||
+      (_projectionVersions[post] ?? 0) >=
+          (_friendshipChanges[post.authorId]?.removedAt ?? 0);
+
+  void recordProjection(FeedPost post, int requestedAt) {
+    for (FeedPost? item = post; item != null; item = item.original) {
+      final author = item.authorId;
+      final sensitive =
+          author != account.userId &&
+          (item.friendsOnly || item.coordinates != null);
+      // A response started before reconnection might contain an author absent
+      // from the batch being rechecked. Require a new read for that projection.
+      final missedCheck =
+          sensitive &&
+          requestedAt < _lastReconnect &&
+          !_observedFriends.contains(author);
+      _projectionVersions[item] = missedCheck ? -1 : requestedAt;
+      if (sensitive &&
+          _hasFriendAccess(item) &&
+          requestedAt >= (_blockedAt[author] ?? 0)) {
+        _observedFriends.add(author);
+      }
+    }
+  }
 
   void hidePost(String id) {
     if (active && _hidden.add(id)) _publish();
@@ -67,13 +115,80 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   void endDetail() => _detailOpening = false;
 
-  void revalidateAuthor(String id) {
+  void friendshipRemoved(String id) {
     if (!active) return;
+    _markFriendshipRemoved(id);
+    _publishAccessChange();
+  }
+
+  void _markFriendshipRemoved(String id) {
+    final version = ++_projectionVersion;
+    _friendshipChanges[id] = (changedAt: version, removedAt: version);
+    _observedFriends.remove(id);
+  }
+
+  void friendshipAdded(String id) {
+    if (!active) return;
+    _friendshipChanges[id] = (
+      changedAt: ++_projectionVersion,
+      removedAt: _friendshipChanges[id]?.removedAt ?? 0,
+    );
+  }
+
+  void peerBlocked(String id) {
+    if (!active) return;
+    _markPeerBlocked(id);
+    _publishAccessChange();
+  }
+
+  void _markPeerBlocked(String id) {
     _followWrites.remove(id);
     _follows.remove(id);
-    _revokedAuthor = id;
+    _markFriendshipRemoved(id);
+    _blockedAt[id] = _projectionVersion;
+  }
+
+  Future<void> recheckFriendships(
+    Future<Set<String>> Function(Set<String>) verify,
+  ) async {
+    if (!active) return;
+    _lastReconnect = ++_projectionVersion;
+    if (_checkingFriends) return;
+    _checkingFriends = true;
+    try {
+      int reconnect;
+      do {
+        reconnect = _lastReconnect;
+        final requestedAt = _projectionVersion;
+        final authors = Set<String>.of(_observedFriends);
+        if (authors.isEmpty) return;
+        final Set<String> confirmed;
+        try {
+          confirmed = await verify(authors);
+        } catch (_) {
+          // A network failure gives no new access decision. Retain the last
+          // confirmed projection and retry when the channel reconnects again.
+          continue;
+        }
+        if (!active || reconnect != _lastReconnect) continue;
+        var revoked = false;
+        for (final id in authors.difference(confirmed)) {
+          if ((_friendshipChanges[id]?.changedAt ?? 0) > requestedAt) {
+            continue;
+          }
+          _markFriendshipRemoved(id);
+          revoked = true;
+        }
+        if (revoked) _publishAccessChange();
+      } while (active && reconnect != _lastReconnect);
+    } finally {
+      _checkingFriends = false;
+    }
+  }
+
+  void _publishAccessChange() {
+    _accessVersion++;
     _publish();
-    _revokedAuthor = null;
   }
 
   void setBlocked(Set<String> blocked) {
@@ -81,9 +196,10 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         _blocked.length == blocked.length && _blocked.containsAll(blocked)) {
       return;
     }
+    for (final id in blocked.difference(_blocked)) {
+      _markPeerBlocked(id);
+    }
     _blocked = Set.unmodifiable(blocked);
-    _follows.removeWhere((id, _) => blocked.contains(id));
-    _followWrites.removeWhere((id, _) => blocked.contains(id));
     _publish();
   }
 
@@ -276,7 +392,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       hidden: Set.unmodifiable(_hidden),
       blocked: _blocked,
       reposts: Map.unmodifiable(_reposts),
-      revokedAuthor: _revokedAuthor,
+      accessVersion: _accessVersion,
     ));
   }
 

@@ -32,6 +32,103 @@ void main() {
       timeline.state.rows.posts[i].id,
   ];
 
+  test(
+    'nearby rejects expired pagination and needs a newer publication',
+    () async {
+      final account = accounts.capture();
+      final nearby = FeedCubit(
+        tab: FeedTab.nearby,
+        repository: feed,
+        account: account,
+        isCurrentAccount: () => accounts.isCurrent(account),
+        now: () => now,
+      );
+      addTearDown(nearby.close);
+      feed.respond(null, _page(['initial'], next: '1'));
+      feed.responses['1'] = () async => throw FeedFailure.locationRequired;
+      await nearby.activate(atTop: true);
+      await nearby.loadMore();
+      expect(nearby.state.failure, FeedFailure.locationRequired);
+      expect(nearby.state.rows.posts.single.id, 'initial');
+      nearby.setLocationAllowed(true);
+      await nearby.refresh(force: true);
+      expect(feed.calls, [null, '1']);
+      feed.respond(null, _page(['new']));
+      nearby.setLocationAllowed(true, newerPublication: true);
+      await nearby.activate(atTop: false);
+      expect(feed.calls, [null, '1', null]);
+      expect(nearby.state.rows.posts.single.id, 'new');
+    },
+  );
+
+  test('location expiry discards a late nearby response', () async {
+    final account = accounts.capture();
+    final nearby = FeedCubit(
+      tab: FeedTab.nearby,
+      repository: feed,
+      account: account,
+      isCurrentAccount: () => accounts.isCurrent(account),
+    );
+    addTearDown(nearby.close);
+    final pending = Completer<FeedPageResult>();
+    feed.responses[null] = () => pending.future;
+    final initial = nearby.activate(atTop: true);
+    await Future<void>.value();
+    expect(feed.calls, [null]);
+    nearby.setLocationAllowed(false);
+    pending.complete(_page(['late']));
+    await initial;
+    expect(nearby.state.rows.posts, isEmpty);
+    expect(nearby.state.failure, FeedFailure.locationRequired);
+  });
+
+  test(
+    'late nearby pages keep their public order and lose revoked access',
+    () async {
+      final account = accounts.capture();
+      bool isCurrent() => accounts.isCurrent(account);
+      final actions = FeedActionsCubit(feed, account, isCurrent);
+      final nearby = FeedCubit(
+        tab: FeedTab.nearby,
+        repository: feed,
+        account: account,
+        actions: actions,
+        isCurrentAccount: isCurrent,
+      );
+      addTearDown(actions.close);
+      addTearDown(nearby.close);
+      final retained = _locationPost('retained');
+      final restricted = _locationPost('restricted', friendsOnly: true);
+      feed.respond(
+        null,
+        FeedPageResult(
+          posts: [retained, restricted],
+          nextCursor: (sessionId: 'session', token: '1', position: null),
+        ),
+      );
+      await nearby.activate(atTop: true);
+      expect(actions.coordinatesFor(retained), retained.coordinates);
+      final tail = Completer<FeedPageResult>();
+      feed.responses['1'] = () => tail.future;
+      final append = nearby.loadMore();
+      await Future<void>.value();
+      actions.friendshipRemoved('author');
+      nearby.removeInaccessiblePosts();
+      expect(nearby.state.rows.posts, [retained]);
+      expect(actions.coordinatesFor(retained), isNull);
+      final latePublic = _locationPost('late public');
+      final lateRestricted = _locationPost(
+        'late restricted',
+        friendsOnly: true,
+      );
+      tail.complete(FeedPageResult(posts: [lateRestricted, latePublic]));
+      await append;
+      expect(nearby.state.rows.posts, [retained, latePublic]);
+      expect(actions.coordinatesFor(latePublic), isNull);
+      expect(feed.calls, [null, '1']);
+    },
+  );
+
   test('follows empty continuations and includes unique final items', () async {
     feed.respond(null, _page(['a'], next: '1'));
     feed.respond('1', _page([], next: '2'));
@@ -46,6 +143,51 @@ void main() {
     expect(timeline.state.expandedIds, {'a'});
     expect(timeline.state.canContinue, isFalse);
   });
+
+  test(
+    'repeated refreshes share one result and never queue another page',
+    () async {
+      feed.respond(null, _page(['cached']));
+      await timeline.activate(atTop: true);
+      now = now.add(const Duration(seconds: 3));
+      final next = Completer<FeedPageResult>();
+      feed.responses[null] = () => next.future;
+      final refresh = timeline.refresh();
+      for (var i = 0; i < 15; i++) {
+        expect(timeline.refresh(), same(refresh));
+      }
+      expect(ids(), ['cached']);
+      next.complete(_page(['fresh']));
+      await refresh;
+      await timeline.refresh();
+      expect(feed.calls, [null, null]);
+      expect(ids(), ['fresh']);
+      now = now.add(const Duration(seconds: 2));
+      feed.respond(null, _page(['next']));
+      await timeline.refresh();
+      expect(feed.calls, [null, null, null]);
+      expect(ids(), ['next']);
+    },
+  );
+
+  test(
+    'retry after a failed head refresh starts without waiting for cooldown',
+    () async {
+      feed.respond(null, _page(['cached']));
+      await timeline.activate(atTop: true);
+      now = now.add(const Duration(seconds: 2));
+      feed.responses[null] = () async =>
+          throw StateError('network unavailable');
+      await timeline.refresh();
+      expect(ids(), ['cached']);
+      expect(timeline.state.failure, isA<StateError>());
+      feed.respond(null, _page(['recovered']));
+      await timeline.retry();
+      expect(feed.calls, [null, null, null]);
+      expect(ids(), ['recovered']);
+      expect(timeline.state.failure, isNull);
+    },
+  );
 
   test('bounds empty scans and stops cursor cycles', () async {
     feed.respond(null, _page([], next: '1'));
@@ -221,7 +363,18 @@ FeedPageResult _page(List<String> ids, {String? next, DateTime? expiresAt}) =>
           : (sessionId: 'session', token: next, position: null),
     );
 
-class _Feed implements IFeedRepository {
+FeedPost _locationPost(String id, {bool friendsOnly = false}) => FeedPost(
+  id: id,
+  authorId: 'author',
+  authorName: 'author',
+  text: id,
+  createdAt: DateTime.utc(2026),
+  coordinates: (latitude: 1, longitude: 1),
+  nearby: true,
+  friendsOnly: friendsOnly,
+);
+
+class _Feed extends Fake implements IFeedRepository, IFeedPostRepository {
   final calls = <String?>[];
   final responses = <String?, Future<FeedPageResult> Function()>{};
 

@@ -207,8 +207,8 @@ class _AppInitializerState extends State<AppInitializer>
                 widget.config.accountSessionController,
                 _repositories.feedRepository,
                 blocks: _repositories.blocklistRepository,
-                friends: friends is IProfileFriendsRepository
-                    ? friends as IProfileFriendsRepository
+                friends: friends is IFriendAccessRepository
+                    ? friends as IFriendAccessRepository
                     : null,
               );
             },

@@ -34,10 +34,7 @@ Future<void> openFeedGallery(
   }
 
   accounts?.generationChanges.addListener(checkAccess);
-  final subscription = actions.stream.listen((state) {
-    if (state.revokedAuthor == post.authorId) allowed.value = false;
-    checkAccess();
-  });
+  final subscription = actions.stream.listen((_) => checkAccess());
   final route = MaterialPageRoute<void>(
     builder: (_) => _FeedPostGallery(
       timeline: timeline,
@@ -97,7 +94,8 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
   bool _zoomed = false;
   bool _showControls = true;
 
-  bool get _allowed => widget.allowed.value;
+  bool get _allowed =>
+      widget.allowed.value && widget.timeline.actions!.canShow(widget.post);
   bool get _settled => _animation?.status == AnimationStatus.completed;
 
   @override

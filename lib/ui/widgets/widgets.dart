@@ -18,6 +18,7 @@ export 'avatar_geometry.dart';
 export 'local_avatar_frames.dart';
 export 'glass_icon_button.dart';
 export 'permission_denied_dialog.dart';
+export 'location_required_overlay.dart';
 export 'app_snack_bar.dart';
 export 'confirmation_dialog.dart';
 export 'chat_limit_dialog.dart';

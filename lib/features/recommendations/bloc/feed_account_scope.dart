@@ -19,10 +19,10 @@ class FeedAccountScope {
   final AccountSessionController _accounts;
   final IFeedRepository _repository;
   final IBlocklistRepository? blocks;
-  final IProfileFriendsRepository? friends;
+  final IFriendAccessRepository? friends;
   FeedActionsCubit? _actions;
   StreamSubscription<Set<String>>? _blocks;
-  StreamSubscription<String>? _profiles;
+  StreamSubscription<FriendAccessChange>? _friendAccess;
 
   FeedActionsCubit? actionsFor(AccountSessionSnapshot account) {
     final repository = _repository;
@@ -39,19 +39,31 @@ class FeedAccountScope {
       actions.setBlocked,
       onError: (Object _) {},
     );
-    _profiles = friends?.watchProfileChanges().listen(
-      actions.revalidateAuthor,
-      onError: (Object _) {},
-    );
+    if (friends case final access?) {
+      _friendAccess = access.watchFriendAccessChanges().listen((change) {
+        switch (change) {
+          case (kind: FriendAccessChangeKind.removed, peerId: final String id):
+            actions.friendshipRemoved(id);
+          case (kind: FriendAccessChangeKind.added, peerId: final String id):
+            actions.friendshipAdded(id);
+          case (kind: FriendAccessChangeKind.blocked, peerId: final String id):
+            actions.peerBlocked(id);
+          case (kind: FriendAccessChangeKind.reconnected, peerId: _):
+            unawaited(actions.recheckFriendships(access.verifyCurrentFriends));
+          default:
+            break;
+        }
+      });
+    }
     return actions;
   }
 
   void _reset() {
     unawaited(_blocks?.cancel());
-    unawaited(_profiles?.cancel());
+    unawaited(_friendAccess?.cancel());
     unawaited(_actions?.close());
     _blocks = null;
-    _profiles = null;
+    _friendAccess = null;
     _actions = null;
   }
 

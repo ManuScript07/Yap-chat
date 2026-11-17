@@ -277,6 +277,7 @@ class FeedRepository
           ? null
           : (latitude: latitude, longitude: longitude),
       nearby: location?['nearby'] == true,
+      friendsOnly: row['audience'] == 'friends',
       isQuote: row['is_repost'] == true,
       original: original == null || depth >= 4
           ? null

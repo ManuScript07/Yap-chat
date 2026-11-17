@@ -47,15 +47,27 @@ class FeedCubit extends Cubit<FeedState> {
   bool _active = false;
   bool _loaded = false;
   bool _restricted = false;
+  bool _serverRequiresLocation = false;
   bool _restart = false;
   bool _refreshOnReturn = false;
   int _generation = 0;
 
   bool get _canContinue => _cursor != null || _restart;
 
-  void hidePosts(Set<String> ids) {
-    if (isClosed || !_posts.any((post) => ids.contains(post.id))) return;
-    _posts.removeWhere((post) => ids.contains(post.id));
+  void hidePosts(Set<String> ids) =>
+      _removePosts((post) => ids.contains(post.id));
+
+  void removeInaccessiblePosts() => _removePosts((post) => !_canShow(post));
+
+  bool _canShow(FeedPost post) =>
+      !_blockedAuthors.contains(post.authorId) &&
+      (actions?.canShow(post) ?? true);
+
+  void _removePosts(bool Function(FeedPost) shouldRemove) {
+    if (isClosed) return;
+    final count = _posts.length;
+    _posts.removeWhere(shouldRemove);
+    if (_posts.length == count) return;
     _indexes.clear();
     for (final (index, post) in _posts.indexed) {
       _indexes[post.id] = index;
@@ -168,6 +180,7 @@ class FeedCubit extends Cubit<FeedState> {
     var restarted = startsAtHead;
     for (var request = 0; request < _emptyPageBudget; request++) {
       final FeedPageResult page;
+      final accessVersion = actions?.projectionVersion;
       try {
         page = await repository.fetch(tab, account: account, cursor: cursor);
       } catch (error) {
@@ -182,9 +195,14 @@ class FeedCubit extends Cubit<FeedState> {
           if (_active) continue;
         }
         if (error is StaleAccountSessionException ||
-            error == FeedFailure.accessDenied ||
-            error == FeedFailure.locationRequired) {
+            error == FeedFailure.accessDenied) {
           _clearRows();
+          _cursor = null;
+          _restart = false;
+        }
+        if (error == FeedFailure.locationRequired && tab == FeedTab.nearby) {
+          _serverRequiresLocation = true;
+          _restricted = true;
           _cursor = null;
           _restart = false;
         }
@@ -193,6 +211,11 @@ class FeedCubit extends Cubit<FeedState> {
         return;
       }
       if (!_isCurrent(generation)) return;
+      if (accessVersion != null) {
+        for (final post in page.posts) {
+          actions!.recordProjection(post, accessVersion);
+        }
+      }
 
       final atHead = cursor == null;
       if (atHead) {
@@ -210,7 +233,7 @@ class FeedCubit extends Cubit<FeedState> {
           _cursor != null &&
           _active &&
           request + 1 < _emptyPageBudget &&
-          !page.posts.any((post) => !_blockedAuthors.contains(post.authorId))) {
+          !page.posts.any(_canShow)) {
         cursor = _cursor;
         continue;
       }
@@ -228,9 +251,7 @@ class FeedCubit extends Cubit<FeedState> {
       _indexes.clear();
     }
     for (final post in incoming) {
-      if (_blockedAuthors.contains(post.authorId) ||
-          (actions?.state.hidden.contains(post.id) ?? false) ||
-          _indexes.containsKey(post.id)) {
+      if (!_canShow(post) || _indexes.containsKey(post.id)) {
         continue;
       }
       _indexes[post.id] = _posts.length;
@@ -248,21 +269,10 @@ class FeedCubit extends Cubit<FeedState> {
     if (isClosed) return;
     final changed = !setEquals(_blockedAuthors, blocked);
     _blockedAuthors = Set.unmodifiable(blocked);
-    if (!changed || !_posts.any((post) => blocked.contains(post.authorId))) {
-      return;
-    }
-    _posts.removeWhere((post) => blocked.contains(post.authorId));
-    _indexes.clear();
-    for (var index = 0; index < _posts.length; index++) {
-      _indexes[_posts[index].id] = index;
-    }
-    _pruneExpanded();
-    _snapshotRows();
-    _publish();
+    if (changed) removeInaccessiblePosts();
   }
 
-  void invalidateAccess() {
-    if (isClosed) return;
+  void _invalidateNearbyRequest() {
     _generation++;
     _refresh = null;
     _append = null;
@@ -271,25 +281,27 @@ class FeedCubit extends Cubit<FeedState> {
     _loaded = false;
     _lastRefresh = null;
     _refreshOnReturn = true;
-    _clearRows();
     _publish();
   }
 
-  bool hasAuthor(String id) => _posts.any(
-    (post) => post.authorId == id || post.original?.authorId == id,
-  );
-
-  void setLocationAllowed(bool allowed) {
+  void setLocationAllowed(bool allowed, {bool newerPublication = false}) {
+    if (isClosed) return;
+    if (newerPublication) _serverRequiresLocation = false;
+    if (allowed && _serverRequiresLocation) return;
     if (_restricted == !allowed) return;
     _restricted = !allowed;
     if (!allowed) {
       _failure = FeedFailure.locationRequired;
-      invalidateAccess();
+      _invalidateNearbyRequest();
+    } else {
+      _failure = null;
+      _lastRefresh = null;
+      _refreshOnReturn = true;
     }
   }
 
   Future<void> locationUpdated() {
-    setLocationAllowed(true);
+    setLocationAllowed(true, newerPublication: true);
     _refreshOnReturn = !_active;
     return refresh(force: true);
   }

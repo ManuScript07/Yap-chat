@@ -8,6 +8,8 @@ class LocationPermissionPermanentlyDeniedFailure implements Exception {}
 
 enum TrackedLocationRefreshResult { updated, unchanged, unavailable }
 
+const nearbyLocationMaxAge = Duration(hours: 12);
+
 enum LocationAccessStatus {
   granted,
   denied,

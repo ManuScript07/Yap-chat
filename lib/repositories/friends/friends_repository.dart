@@ -10,7 +10,10 @@ import 'package:yap_chat/repositories/friends/friends_cache_data_source.dart';
 import 'package:yap_chat/repositories/friends/friends_remote_data_source.dart';
 
 class FriendsRepository
-    implements IFriendsRepository, IProfileFriendsRepository {
+    implements
+        IFriendsRepository,
+        IProfileFriendsRepository,
+        IFriendAccessRepository {
   static const _friendLocationCacheTtl = Duration(minutes: 4);
   static const _distanceCacheTtl = Duration(minutes: 10);
   static const _realtimeSyncDebounce = Duration(milliseconds: 250);
@@ -46,9 +49,11 @@ class FriendsRepository
   StreamSubscription<FriendChange>? _changesSubscription;
   DiagnosticsLease? _changesListenerLease;
   AccountSessionSnapshot? _startedScope;
+  bool _friendChannelSubscribed = false;
   Timer? _realtimeSyncTimer;
   final StreamController<String> _profileChangesController =
       StreamController<String>.broadcast();
+  final _accessChanges = StreamController<FriendAccessChange>.broadcast();
   Future<void>? _activeSync;
   Future<void>? _activePageLoad;
   final Map<String, ({DateTime cachedAt, List<FriendCandidate> results})>
@@ -130,6 +135,29 @@ class FriendsRepository
       _profileChangesController.stream,
       'friend-profile-changes',
     );
+  }
+
+  @override
+  Stream<FriendAccessChange> watchFriendAccessChanges() {
+    unawaited(_ensureStarted());
+    return _trackLocalStream(_accessChanges.stream, 'friend-access-changes');
+  }
+
+  @override
+  Future<Set<String>> verifyCurrentFriends(Set<String> peerIds) async {
+    final scope = _accountSessionController.capture();
+    final ids = peerIds.toList(growable: false);
+    final verified = <String>{};
+    const batchSize = 500; // get_current_friends caps the input per request.
+    for (var start = 0; start < ids.length; start += batchSize) {
+      _accountSessionController.ensureCurrent(scope);
+      final end = start + batchSize;
+      final batch = ids.sublist(start, end < ids.length ? end : ids.length);
+      final friends = await _remote.fetchCurrentFriends(batch);
+      _accountSessionController.ensureCurrent(scope);
+      verified.addAll(friends.map((friend) => friend.id));
+    }
+    return verified;
   }
 
   Stream<T> _trackLocalStream<T>(Stream<T> source, String owner) {
@@ -670,6 +698,9 @@ class FriendsRepository
       _accountSessionController.ensureCurrent(scope);
       await _remote.respond(requestId, accept: accept);
       _accountSessionController.ensureCurrent(scope);
+      if (accept && request != null) {
+        _publishAccess(FriendAccessChangeKind.added, request.peerId);
+      }
       _invalidateSearchCache();
       await _synchronize();
     } on StaleAccountSessionException {
@@ -848,6 +879,7 @@ class FriendsRepository
     try {
       await _remote.removeFriend(friendId);
       _accountSessionController.ensureCurrent(scope);
+      _publishAccess(FriendAccessChangeKind.removed, friendId);
       _invalidateSearchCache();
       await _synchronize();
     } catch (_) {
@@ -976,13 +1008,19 @@ class FriendsRepository
         startedScope.generation == scope.generation;
     if (isCurrentScope && !forceSync) return;
 
+    if (!isCurrentScope) _friendChannelSubscribed = false;
     _startedScope = scope;
     _changesSubscription ??= _remote.watchChanges().listen(
       (change) {
+        final scope = _startedScope;
+        if (scope == null || !_accountSessionController.isCurrent(scope)) {
+          return;
+        }
         final profileId = change.profileId;
         if (profileId != null && !_profileChangesController.isClosed) {
           _profileChangesController.add(profileId);
         }
+        _handleAccessChange(change);
         _handleRealtimeChange(change);
       },
       onError: (Object error, StackTrace stackTrace) =>
@@ -992,6 +1030,29 @@ class FriendsRepository
       'friends-realtime-events',
     );
     await _synchronizeSafely();
+  }
+
+  void _handleAccessChange(FriendChange change) {
+    final peerId = change.profileId;
+    if (peerId == null) {
+      if (_friendChannelSubscribed) {
+        _publishAccess(FriendAccessChangeKind.reconnected, null);
+      }
+      _friendChannelSubscribed = true;
+    } else if (change.reason == 'block' && change.action == 'blocked') {
+      _publishAccess(FriendAccessChangeKind.blocked, peerId);
+    } else if (change.table == 'friendships') {
+      switch (change.operation) {
+        case 'DELETE':
+          _publishAccess(FriendAccessChangeKind.removed, peerId);
+        case 'INSERT':
+          _publishAccess(FriendAccessChangeKind.added, peerId);
+      }
+    }
+  }
+
+  void _publishAccess(FriendAccessChangeKind kind, String? peerId) {
+    _accessChanges.add((kind: kind, peerId: peerId));
   }
 
   void _handleRealtimeChange(FriendChange change) {

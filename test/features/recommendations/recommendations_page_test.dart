@@ -8,10 +8,53 @@ import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/recommendations/recommendations.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_controls.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
+import 'package:yap_chat/repositories/chat/chat.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 void main() {
+  testWidgets('nearby uses the published location and the shared gate', (
+    tester,
+  ) async {
+    final feed = _Feed();
+    final location = _Location();
+    await _mount(tester, feed, location: location);
+    await tester.tap(find.text('nearby'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LocationRequiredOverlay), findsOneWidget);
+    expect(find.byType(LocationRequiredBackdrop), findsOneWidget);
+    expect(location.maxAge, nearbyLocationMaxAge);
+    expect(feed.calls, [FeedTab.forYou]);
+  });
+
+  testWidgets('expiry blocks a visible nearby tab without a new feed request', (
+    tester,
+  ) async {
+    final feed = _Feed();
+    const remaining = Duration(seconds: 30);
+    final location = _Location()
+      ..publishedAt = DateTime.now().subtract(nearbyLocationMaxAge - remaining);
+    await _mount(tester, feed, location: location);
+    await tester.tap(find.text('nearby'));
+    await tester.pumpAndSettle();
+    expect(find.text('nearby post 0'), findsOneWidget);
+    expect(find.byType(LocationRequiredOverlay), findsNothing);
+    location.publishedAt = null;
+    await tester.pump(remaining);
+    await tester.pumpAndSettle();
+    expect(find.byType(LocationRequiredOverlay), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('nearby post 0'),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is AbsorbPointer && widget.absorbing,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(feed.calls, [FeedTab.forYou, FeedTab.nearby]);
+  });
+
   testWidgets(
     'long text expands inline without starting another feed request',
     (tester) async {
@@ -447,6 +490,7 @@ Future<AccountSessionController> _mount(
   _Feed feed, {
   Size size = const Size(360, 800),
   NavigationScrollToTopController? navigation,
+  ILocationRepository? location,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -458,6 +502,7 @@ Future<AccountSessionController> _mount(
       providers: [
         RepositoryProvider<AccountSessionController>.value(value: accounts),
         RepositoryProvider<IFeedRepository>.value(value: feed),
+        if (location != null) RepositoryProvider.value(value: location),
         if (navigation != null) RepositoryProvider.value(value: navigation),
       ],
       child: MaterialApp(
@@ -470,6 +515,25 @@ Future<AccountSessionController> _mount(
   );
   await tester.pumpAndSettle();
   return accounts;
+}
+
+class _Location implements ILocationRepository {
+  DateTime? publishedAt;
+  Duration? maxAge;
+
+  @override
+  Future<CachedTrackedLocation?> getCachedCurrentLocation({
+    Duration maxAge = const Duration(hours: 24),
+  }) async {
+    this.maxAge = maxAge;
+    final at = publishedAt;
+    return at == null
+        ? null
+        : CachedTrackedLocation(latitude: 1, longitude: 1, updatedAt: at);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _Feed implements IFeedRepository {

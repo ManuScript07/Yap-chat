@@ -66,6 +66,7 @@ class FeedPost {
     this.delivery,
     this.coordinates,
     this.nearby = false,
+    this.friendsOnly = false,
     this.isQuote = false,
     this.original,
     this.repostedBy,
@@ -92,6 +93,7 @@ class FeedPost {
   final FeedDelivery? delivery;
   final FeedCoordinates? coordinates;
   final bool nearby;
+  final bool friendsOnly;
   final bool isQuote;
   final FeedPost? original;
   final String? repostedBy;
