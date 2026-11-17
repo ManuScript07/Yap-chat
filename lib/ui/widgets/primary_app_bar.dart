@@ -10,6 +10,7 @@ abstract final class PrimaryHeaderGeometry {
   static const compactTabsContentTop =
       compactTabsTop + compactTabsHeight + tabsBottomSpacing;
   static const tabsBottomSpacing = 8.0;
+  static const horizontalPadding = 16.0;
 }
 
 class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -48,7 +49,9 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(
+            horizontal: PrimaryHeaderGeometry.horizontalPadding,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,

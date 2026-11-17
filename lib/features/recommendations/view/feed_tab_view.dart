@@ -16,7 +16,8 @@ class FeedTabView extends StatefulWidget {
     super.key,
     required this.timeline,
     required this.controller,
-    required this.header,
+    required this.headerExtent,
+    required this.onHeaderScroll,
     required this.bottomPadding,
     required this.visible,
     required this.onUpdateLocation,
@@ -24,7 +25,8 @@ class FeedTabView extends StatefulWidget {
 
   final FeedCubit timeline;
   final ScrollController controller;
-  final Widget header;
+  final double headerExtent;
+  final void Function(double pixels, double delta) onHeaderScroll;
   final double bottomPadding;
   final bool visible;
   final VoidCallback? onUpdateLocation;
@@ -37,12 +39,29 @@ class _FeedTabViewState extends State<FeedTabView> {
   bool _scrollingTowardEnd = false;
 
   void _onScroll(ScrollNotification notification) {
-    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+    if (!widget.visible ||
+        notification.depth != 0 ||
+        notification.metrics.axis != Axis.vertical) {
       return;
     }
     if (notification is ScrollStartNotification ||
         notification is ScrollEndNotification) {
       _scrollingTowardEnd = false;
+    }
+    if (notification case ScrollUpdateNotification(
+      :final metrics,
+      :final scrollDelta?,
+    )) {
+      // Overscroll and its rebound move the refresh content, not the header.
+      final before = (metrics.pixels - scrollDelta).clamp(
+        metrics.minScrollExtent,
+        metrics.maxScrollExtent,
+      );
+      final after = metrics.pixels.clamp(
+        metrics.minScrollExtent,
+        metrics.maxScrollExtent,
+      );
+      widget.onHeaderScroll(after - metrics.minScrollExtent, after - before);
     }
     if (notification is ScrollUpdateNotification &&
         notification.dragDetails != null) {
@@ -57,7 +76,7 @@ class _FeedTabViewState extends State<FeedTabView> {
         _scrollingTowardEnd = false;
         // Scroll notifications arrive after layout. Start the request outside it.
         scheduleMicrotask(() {
-          if (mounted) unawaited(timeline.loadMore());
+          if (mounted && widget.visible) unawaited(timeline.loadMore());
         });
       }
     }
@@ -66,9 +85,8 @@ class _FeedTabViewState extends State<FeedTabView> {
   @override
   Widget build(BuildContext context) {
     final timeline = widget.timeline;
-    final media = MediaQuery.paddingOf(context);
     return PullRefresh(
-      indicatorTop: PrimaryHeaderGeometry.compactTabsContentTop,
+      indicatorTop: widget.headerExtent,
       indicatorKey: const ValueKey('feed_pull_indicator'),
       useSliverInset: true,
       onRefresh: timeline.refresh,
@@ -79,21 +97,25 @@ class _FeedTabViewState extends State<FeedTabView> {
         physics: PullRefresh.physics,
         scrollCacheExtent: const ScrollCacheExtent.pixels(160),
         slivers: [
-          PinnedHeaderSliver(child: widget.header),
+          SliverToBoxAdapter(child: SizedBox(height: widget.headerExtent)),
           const SliverPullRefreshGap(),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              media.left + 16,
-              0,
-              media.right + 16,
-              0,
-            ),
-            sliver: _FeedRows(timeline: timeline, visible: widget.visible),
-          ),
+          _FeedRows(timeline: timeline, visible: widget.visible),
           BlocSelector<FeedCubit, FeedState, FeedFooter>(
             bloc: timeline,
             selector: (state) => state.footer,
             builder: _footer,
+          ),
+          SliverLayoutBuilder(
+            builder: (context, constraints) {
+              // Even an empty tab must be able to scroll past the header.
+              final remaining =
+                  constraints.viewportMainAxisExtent +
+                  widget.headerExtent -
+                  constraints.precedingScrollExtent;
+              return remaining > 0
+                  ? SliverToBoxAdapter(child: SizedBox(height: remaining))
+                  : const SliverToBoxAdapter();
+            },
           ),
         ],
       ),
@@ -139,7 +161,7 @@ class _FeedTabViewState extends State<FeedTabView> {
         child: Text(l10n.feedLoadMore),
       );
     } else if (empty) {
-      content = Text(l10n.feedEmpty, textAlign: TextAlign.center);
+      content = EmptyChatState(message: l10n.feedEmpty);
     }
 
     final body = Padding(

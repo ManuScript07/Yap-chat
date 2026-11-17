@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-enum NavigationScrollTarget { chats, nearby, friends }
+enum NavigationScrollTarget { chats, nearby, friends, recommendations }
 
 /// UI commands scoped to MainPage; does not own data, queries or subscriptions.
 class NavigationScrollToTopController {

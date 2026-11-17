@@ -70,6 +70,38 @@ void main() {
     await f.close(tester);
     navigation.dispose();
   });
+  testWidgets('friends tabs follow a swipe and keep the previous offset', (
+    tester,
+  ) async {
+    _geometry(tester, const Size(360, 800));
+    final f = await _mount(tester, page: 'friends');
+    final friends = tester
+        .widget<ListView>(find.byKey(const PageStorageKey('friends-list')))
+        .controller!;
+    friends.jumpTo(430);
+    await tester.pump();
+    final initialRequests = f.bloc.pageRequests;
+    final gesture = await tester.startGesture(const Offset(320, 350));
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    await gesture.moveBy(const Offset(-145, 0));
+    await tester.pump();
+    final pages =
+        tester.widget<PageView>(find.byType(PageView)).controller!
+            as SwipeTabController;
+    expect(pages.progress, inExclusiveRange(0, 1));
+    expect(f.bloc.state.activeTab, FriendsTab.friends);
+    await gesture.moveBy(const Offset(-130, 0));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(f.bloc.state.activeTab, FriendsTab.requests);
+    await tester.dragFrom(const Offset(45, 350), const Offset(270, 0));
+    await tester.pumpAndSettle();
+    expect(f.bloc.state.activeTab, FriendsTab.friends);
+    expect(friends.offset, 430);
+    expect(f.bloc.pageRequests, initialRequests);
+    await f.close(tester);
+  });
   for (final size in [const Size(360, 800), const Size(844, 390)]) {
     testWidgets(
       'navigation scrolls only the selected friends/request list $size',

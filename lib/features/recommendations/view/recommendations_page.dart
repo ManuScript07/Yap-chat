@@ -22,9 +22,19 @@ class RecommendationsPage extends StatefulWidget {
 class _RecommendationsPageState extends State<RecommendationsPage>
     with WidgetsBindingObserver {
   var _storage = PageStorageBucket();
-  final _controllers = {
-    for (final tab in FeedTab.values) tab: ScrollController(),
+  final _pages = SwipeTabController();
+  final _headerHiddenFraction = ValueNotifier<double>(0);
+  late final _controllers = {
+    for (final tab in FeedTab.values)
+      tab: ScrollController(
+        onAttach: (position) {
+          final offset = _hiddenHeaderOffset;
+          if (position.pixels < offset) position.correctPixels(offset);
+        },
+      ),
   };
+  double _headerExtent = PrimaryHeaderGeometry.compactTabsContentTop;
+  double get _hiddenHeaderOffset => _headerExtent * _headerHiddenFraction.value;
   AccountSessionController? _accounts;
   IFeedRepository? _repository;
   ILocationRepository? _location;
@@ -44,6 +54,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   @override
   void initState() {
     super.initState();
+    _pages.addListener(_prepareIncomingTab);
     WidgetsBinding.instance.addObserver(this);
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     _foreground = lifecycle == null || lifecycle == AppLifecycleState.resumed;
@@ -52,6 +63,19 @@ class _RecommendationsPageState extends State<RecommendationsPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final headerExtent =
+        MediaQuery.orientationOf(context) == Orientation.landscape
+        ? PrimaryHeaderGeometry.compactHeight
+        : PrimaryHeaderGeometry.compactTabsContentTop;
+    if (headerExtent != _headerExtent) {
+      _headerExtent = headerExtent;
+      // The new viewport layout will consume the new header extent.
+      final controller = _controllers[_selected]!;
+      final offset = _hiddenHeaderOffset;
+      if (controller.hasClients && controller.offset < offset) {
+        controller.position.correctPixels(offset);
+      }
+    }
     final tabs = TabsRouterScope.of(context, watch: true)?.controller;
     _activeRoute =
         (tabs?.current.name ?? 'RecommendationsRoute') ==
@@ -87,6 +111,7 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     _account = null;
     _storage = PageStorageBucket();
     _selected = FeedTab.forYou;
+    _headerHiddenFraction.value = 0;
     _checkingLocation = false;
     _updatingLocation = false;
     final accounts = _accounts;
@@ -209,6 +234,36 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     return !controller.hasClients || controller.offset <= 1;
   }
 
+  void _prepareIncomingTab() {
+    final progress = _pages.progress;
+    if (progress == _selected.index) return;
+    final offset = _hiddenHeaderOffset;
+    if (offset == 0) return;
+    final incoming = progress > _selected.index
+        ? progress.ceil()
+        : progress.floor();
+    final controller =
+        _controllers[FeedTab.values[incoming.clamp(
+          0,
+          FeedTab.values.length - 1,
+        )]]!;
+    if (!controller.hasClients) return;
+    final position = controller.position;
+    if (position.hasContentDimensions && position.pixels < offset) {
+      position.jumpTo(offset);
+    }
+  }
+
+  void _updateHeader(FeedTab tab, double pixels, double delta) {
+    final swipe = _pages.positions.singleOrNull;
+    if (tab != _selected || (swipe?.isScrollingNotifier.value ?? false)) {
+      return;
+    }
+    final limit = pixels.clamp(0.0, _headerExtent);
+    _headerHiddenFraction.value =
+        (_hiddenHeaderOffset + delta).clamp(0.0, limit) / _headerExtent;
+  }
+
   void _select(int index) {
     final selected = FeedTab.values[index];
     if (selected == _selected) return;
@@ -233,8 +288,13 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     if (result != TrackedLocationRefreshResult.unavailable) {
       await timeline.locationUpdated();
     } else if (_selected == FeedTab.nearby && _activeRoute) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.feedLocationUnavailable)),
+      showAppSnackBar(
+        context,
+        message: context.l10n.feedLocationUnavailable,
+        type: SnackBarType.error,
+        bottomMargin: FloatingNavigationGeometry.occupiedHeight(
+          MediaQuery.of(context),
+        ),
       );
     }
   }
@@ -266,17 +326,45 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     final l10n = context.l10n;
     final navigationHeight = FloatingNavigationGeometry.occupiedHeight(media);
     final account = _account;
-    final timeline = account != null && _accounts!.isCurrent(account)
-        ? _timelines[_selected]
-        : null;
+    final hasAccount = account != null && _accounts!.isCurrent(account);
+    final visible = _activeRoute && _foreground;
+    final landscape = media.orientation == Orientation.landscape;
+    final title = ConnectionStatusTitle(
+      compact: true,
+      title: l10n.recommendationsTitle,
+    );
+    Widget tabs({required double horizontalPadding}) => PrimarySegmentedControl(
+      compact: true,
+      horizontalPadding: horizontalPadding,
+      applySafeArea: !landscape,
+      selectedIndex: _selected.index,
+      pages: hasAccount ? _pages : null,
+      onChanged: _pages.select,
+      items: [
+        PrimarySegmentItem(label: l10n.feedForYou),
+        PrimarySegmentItem(label: l10n.feedNearby),
+        PrimarySegmentItem(label: l10n.feedFriends),
+      ],
+    );
     final appBar = PrimaryAppBar(
       compact: true,
       showGradient: _repository == null,
       title: l10n.recommendationsTitle,
-      titleWidget: ConnectionStatusTitle(
-        compact: true,
-        title: l10n.recommendationsTitle,
-      ),
+      titleWidget: landscape && _repository != null
+          ? Row(
+              children: [
+                Expanded(child: title),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 12),
+                    child: tabs(horizontalPadding: 0),
+                  ),
+                ),
+              ],
+            )
+          : title,
       actionIcon: _repository == null ? null : Icons.inbox_outlined,
       actionTooltip: l10n.feedInbox,
       onActionPressed: () => _showPlaceholder(l10n.feedInbox),
@@ -289,17 +377,10 @@ class _RecommendationsPageState extends State<RecommendationsPage>
         mainAxisSize: MainAxisSize.min,
         children: [
           appBar,
-          PrimarySegmentedControl(
-            compact: true,
-            selectedIndex: _selected.index,
-            onChanged: _select,
-            items: [
-              PrimarySegmentItem(label: l10n.feedForYou),
-              PrimarySegmentItem(label: l10n.feedNearby),
-              PrimarySegmentItem(label: l10n.feedFriends),
-            ],
-          ),
-          const SizedBox(height: PrimaryHeaderGeometry.tabsBottomSpacing),
+          if (!landscape) ...[
+            tabs(horizontalPadding: PrimaryHeaderGeometry.horizontalPadding),
+            const SizedBox(height: PrimaryHeaderGeometry.tabsBottomSpacing),
+          ],
         ],
       ),
     );
@@ -308,24 +389,66 @@ class _RecommendationsPageState extends State<RecommendationsPage>
       extendBodyBehindAppBar: true,
       appBar: _repository == null ? appBar : null,
       body: _repository == null
-          ? Center(child: Text(l10n.recommendationsEmpty))
-          : timeline == null
+          ? EmptyChatState(message: l10n.recommendationsEmpty)
+          : !hasAccount
           ? Column(
               children: [
                 header,
-                Expanded(child: Center(child: Text(l10n.feedEmpty))),
+                Expanded(child: EmptyChatState(message: l10n.feedEmpty)),
               ],
             )
           : PageStorage(
               bucket: _storage,
-              child: FeedTabView(
-                key: ValueKey((_selected, account!.generation)),
-                timeline: timeline,
+              child: NavigationScrollToTopTarget(
+                target: NavigationScrollTarget.recommendations,
                 controller: _controllers[_selected]!,
-                header: header,
-                bottomPadding: navigationHeight + 84,
-                visible: _activeRoute && _foreground,
-                onUpdateLocation: _updatingLocation ? null : _updateLocation,
+                enabled: visible,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    SwipeTabView(
+                      key: ValueKey(account.generation),
+                      controller: _pages,
+                      onSettled: _select,
+                      children: [
+                        for (final tab in FeedTab.values)
+                          TickerMode(
+                            enabled: tab == _selected && visible,
+                            child: FeedTabView(
+                              timeline: _timelines[tab]!,
+                              controller: _controllers[tab]!,
+                              headerExtent: _headerExtent,
+                              onHeaderScroll: (pixels, delta) =>
+                                  _updateHeader(tab, pixels, delta),
+                              bottomPadding: navigationHeight + 84,
+                              visible: tab == _selected && visible,
+                              onUpdateLocation: _updatingLocation
+                                  ? null
+                                  : _updateLocation,
+                            ),
+                          ),
+                      ],
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _headerHiddenFraction,
+                        child: header,
+                        builder: (context, hidden, child) => Offstage(
+                          offstage: hidden == 1,
+                          child: ClipRect(
+                            child: Transform.translate(
+                              offset: Offset(0, -hidden * _headerExtent),
+                              child: child,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
       floatingActionButton: _repository == null
@@ -338,8 +461,11 @@ class _RecommendationsPageState extends State<RecommendationsPage>
               child: FloatingActionButton(
                 heroTag: null,
                 tooltip: l10n.feedNewPost,
+                shape: const CircleBorder(),
+                backgroundColor: context.colorScheme.primary,
+                foregroundColor: context.colorScheme.onSurface,
                 onPressed: () => _showPlaceholder(l10n.feedNewPost),
-                child: const Icon(Icons.add),
+                child: const Icon(Icons.add, size: 36),
               ),
             ),
     );
@@ -350,6 +476,8 @@ class _RecommendationsPageState extends State<RecommendationsPage>
     WidgetsBinding.instance.removeObserver(this);
     _accounts?.generationChanges.removeListener(_accountChanged);
     _localFeedScope?.dispose();
+    _headerHiddenFraction.dispose();
+    _pages.dispose();
     unawaited(_actionChanges?.cancel());
     for (final timeline in _timelines.values) {
       unawaited(timeline.close());

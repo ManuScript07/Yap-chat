@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/recommendations/recommendations.dart';
+import 'package:yap_chat/features/recommendations/view/feed_post_controls.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -54,7 +55,13 @@ void main() {
     expect(tester.getSize(find.byTooltip('inbox')), const Size(42, 42));
     expect(find.byTooltip('new post'), findsOneWidget);
     final list = find.byType(CustomScrollView);
-    await tester.drag(list, const Offset(0, -400));
+    await tester.drag(list, const Offset(0, -650));
+    await tester.pumpAndSettle();
+    await tester.timedDragFrom(
+      const Offset(180, 335),
+      const Offset(0, 185),
+      const Duration(milliseconds: 650),
+    );
     await tester.pumpAndSettle();
     final offset = tester.widget<CustomScrollView>(list).controller!.offset;
     expect(offset, greaterThan(100));
@@ -68,12 +75,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<CustomScrollView>(list).controller!.offset, offset);
     expect(feed.calls, [FeedTab.forYou, FeedTab.friends]);
-    await tester.tap(find.byTooltip('inbox'));
+    await tester.timedDragFrom(
+      const Offset(180, 335),
+      const Offset(0, 185),
+      const Duration(milliseconds: 650),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('inbox').hitTestable());
     await tester.pumpAndSettle();
     expect(find.text('coming soon'), findsOneWidget);
   });
 
-  testWidgets('the list scrolls under fixed tabs and the header', (
+  testWidgets('the header collapses and floats back on a reverse drag', (
     tester,
   ) async {
     await _mount(tester, _Feed());
@@ -84,18 +97,274 @@ void main() {
       matching: find.byType(Card),
     );
     final tabsRect = tester.getRect(tabs);
-    expect(
-      find.ancestor(of: tabs, matching: find.byType(PinnedHeaderSliver)),
-      findsOneWidget,
-    );
     expect(tabsRect.top, PrimaryHeaderGeometry.compactTabsTop);
     expect(tester.getTopLeft(list).dy, lessThan(tabsRect.top));
     expect(tester.getTopLeft(firstCard).dy, greaterThan(tabsRect.bottom));
-    tester.widget<CustomScrollView>(list).controller!.jumpTo(70);
-    await tester.pump();
-    expect(tester.getRect(tabs), tabsRect);
-    expect(tester.getTopLeft(firstCard).dy, lessThan(tabsRect.top));
+    expect(tester.getTopLeft(find.text('forYou post 0')).dx, 16);
+    final divider = find.descendant(
+      of: firstCard,
+      matching: find.byType(Divider),
+    );
+    expect(tester.getSize(divider).width, 360);
+    final controller = tester.widget<CustomScrollView>(list).controller!;
+    controller.jumpTo(620);
+    await tester.pumpAndSettle();
+    expect(find.text('friends').hitTestable(), findsNothing);
+    await tester.timedDragFrom(
+      const Offset(180, 330),
+      const Offset(0, 215),
+      const Duration(milliseconds: 650),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.offset, greaterThan(100));
+    expect(find.text('friends').hitTestable(), findsOneWidget);
   });
+
+  testWidgets('swipe moves the selected segment before making one request', (
+    tester,
+  ) async {
+    final feed = _Feed();
+    await _mount(tester, feed);
+    final pages =
+        tester.widget<PageView>(find.byType(PageView)).controller!
+            as SwipeTabController;
+    final tabs = find.byType(PrimarySegmentedControl);
+    final bar = tester.getRect(tabs);
+    final indicator = find.descendant(
+      of: tabs,
+      matching: find.byType(FractionallySizedBox),
+    );
+    final indicatorLeft = tester.getTopLeft(indicator).dx;
+    final gesture = await tester.startGesture(const Offset(320, 330));
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    await gesture.moveBy(const Offset(-145, 0));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(pages.progress, inExclusiveRange(0, 1));
+    expect(tester.getRect(tabs).left, closeTo(bar.left, .01));
+    expect(tester.getTopLeft(indicator).dx, greaterThan(indicatorLeft));
+    expect(feed.calls, [FeedTab.forYou]);
+    await gesture.moveBy(const Offset(-135, 0));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(feed.calls, [FeedTab.forYou, FeedTab.nearby]);
+    expect(find.text('nearby post 0'), findsOneWidget);
+  });
+
+  for (final empty in [false, true]) {
+    testWidgets('a collapsed header stays collapsed on swipe (empty=$empty)', (
+      tester,
+    ) async {
+      final feed = _Feed();
+      await _mount(tester, feed);
+      final first = tester
+          .widget<CustomScrollView>(find.byType(CustomScrollView))
+          .controller!;
+      first.jumpTo(620);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('inbox').hitTestable(), findsNothing);
+      if (empty) feed.next = Future.value(const FeedPageResult(posts: []));
+
+      final gesture = await tester.startGesture(const Offset(320, 330));
+      await gesture.moveBy(const Offset(-30, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(-145, 0));
+      await tester.pump();
+      final incoming = tester
+          .widget<CustomScrollView>(
+            find.byKey(const PageStorageKey((FeedTab.nearby, 0))),
+          )
+          .controller!;
+      expect(incoming.offset, PrimaryHeaderGeometry.compactTabsContentTop);
+      expect(find.byTooltip('inbox').hitTestable(), findsNothing);
+      expect(feed.calls, [FeedTab.forYou]);
+
+      await gesture.moveBy(const Offset(-135, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(incoming.offset, PrimaryHeaderGeometry.compactTabsContentTop);
+      expect(find.byTooltip('inbox').hitTestable(), findsNothing);
+      expect(feed.calls, [FeedTab.forYou, FeedTab.nearby]);
+      expect(
+        find.text(empty ? 'no posts yet' : 'nearby post 0'),
+        findsOneWidget,
+      );
+
+      await tester.dragFrom(const Offset(45, 350), const Offset(270, 0));
+      await tester.pumpAndSettle();
+      expect(first.offset, 620);
+      expect(find.byTooltip('inbox').hitTestable(), findsNothing);
+      expect(feed.calls, [FeedTab.forYou, FeedTab.nearby]);
+    });
+  }
+
+  testWidgets(
+    'previously visited tabs use the same header in both directions',
+    (tester) async {
+      final feed = _Feed();
+      await _mount(tester, feed);
+      final inbox = find.byTooltip('inbox').hitTestable();
+      final expanded = tester.getRect(inbox);
+      await tester.tap(find.text('nearby'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('for you'));
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .widget<CustomScrollView>(find.byType(CustomScrollView))
+          .controller!;
+      controller.jumpTo(620);
+      await tester.pumpAndSettle();
+      expect(inbox, findsNothing);
+      final toNearby = await tester.startGesture(const Offset(320, 330));
+      await toNearby.moveBy(const Offset(-30, 0));
+      await tester.pump();
+      await toNearby.moveBy(const Offset(-145, 0));
+      await tester.pump();
+      final firstNearby = find.ancestor(
+        of: find.text('nearby post 0'),
+        matching: find.byType(Card),
+      );
+      expect(tester.getTopLeft(firstNearby).dy, closeTo(0, .01));
+      expect(inbox, findsNothing);
+      await toNearby.moveBy(const Offset(-135, 0));
+      await toNearby.up();
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(firstNearby).dy, closeTo(0, .01));
+      expect(inbox, findsNothing);
+
+      await tester.timedDragFrom(
+        const Offset(180, 330),
+        const Offset(0, 215),
+        const Duration(milliseconds: 650),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(inbox), expanded);
+      final back = await tester.startGesture(const Offset(45, 330));
+      await back.moveBy(const Offset(30, 0));
+      await tester.pump();
+      await back.moveBy(const Offset(145, 0));
+      await tester.pump();
+      expect(tester.getRect(inbox), expanded);
+      await back.moveBy(const Offset(135, 0));
+      await back.up();
+      await tester.pumpAndSettle();
+      expect(tester.getRect(inbox), expanded);
+      expect(controller.offset, 620);
+      expect(feed.calls, [FeedTab.forYou, FeedTab.nearby]);
+    },
+  );
+
+  testWidgets('rotation keeps a collapsed header aligned with the list', (
+    tester,
+  ) async {
+    await _mount(tester, _Feed(), size: const Size(844, 390));
+    final list = find.byType(CustomScrollView);
+    final controller = tester.widget<CustomScrollView>(list).controller!;
+    controller.jumpTo(PrimaryHeaderGeometry.compactHeight);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('inbox').hitTestable(), findsNothing);
+
+    tester.view.physicalSize = const Size(360, 800);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('inbox').hitTestable(), findsNothing);
+    final firstCard = find.ancestor(
+      of: find.text('forYou post 0'),
+      matching: find.byType(Card),
+    );
+    expect(tester.getTopLeft(firstCard).dy, closeTo(0, .01));
+  });
+
+  testWidgets('the divider leaves equal space between consecutive posts', (
+    tester,
+  ) async {
+    await _mount(tester, _Feed());
+    final footer = find.byType(FeedPostFooter).first;
+    final divider = find.byType(Divider).first;
+    final header = find.byType(FeedPostHeader).at(1);
+    final before =
+        tester.getTopLeft(divider).dy - tester.getBottomLeft(footer).dy;
+    final after =
+        tester.getTopLeft(header).dy - tester.getBottomLeft(divider).dy;
+    expect(before, greaterThan(0));
+    expect(before, closeTo(after, .01));
+  });
+
+  testWidgets('a swipe on the media strip stays inside that post', (
+    tester,
+  ) async {
+    final feed = _Feed();
+    feed.next = Future.value(
+      FeedPageResult(
+        posts: [
+          FeedPost(
+            id: 'media-post',
+            authorId: 'author',
+            authorName: 'author',
+            text: 'media body',
+            createdAt: DateTime.utc(2026),
+            photos: [
+              for (var i = 0; i < 3; i++)
+                FeedPhoto(id: '$i', thumbnailPath: '$i'),
+            ],
+          ),
+        ],
+      ),
+    );
+    await _mount(tester, feed);
+    final photos = find.byKey(
+      const PageStorageKey(('feed-photos', 'media-post')),
+    );
+    expect(tester.getSize(photos).width, 360);
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(of: photos, matching: find.byType(Scrollable)),
+        )
+        .position;
+    await tester.drag(photos, const Offset(-220, 0));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0));
+    expect(feed.calls, [FeedTab.forYou]);
+    expect(find.text('media body'), findsOneWidget);
+  });
+
+  testWidgets('landscape puts the tabs between title and inbox', (
+    tester,
+  ) async {
+    await _mount(tester, _Feed(), size: const Size(844, 390));
+    final tabs = find.byType(PrimarySegmentedControl);
+    expect(
+      find.ancestor(of: tabs, matching: find.byType(PrimaryAppBar)),
+      findsOneWidget,
+    );
+    final title = tester.getRect(find.byType(ConnectionStatusTitle));
+    final inbox = tester.getRect(find.byTooltip('inbox'));
+    final tabBar = tester.getRect(tabs);
+    expect(tabBar.left, greaterThan(title.right));
+    expect(tabBar.right, lessThan(inbox.left));
+  });
+
+  testWidgets(
+    'return to top affects only the current feed and makes no request',
+    (tester) async {
+      final feed = _Feed();
+      final navigation = NavigationScrollToTopController();
+      addTearDown(navigation.dispose);
+      await _mount(tester, feed, navigation: navigation);
+      final list = find.byType(CustomScrollView);
+      final controller = tester.widget<CustomScrollView>(list).controller!;
+      controller.jumpTo(600);
+      await tester.pump();
+      final done = navigation.scrollToTop(
+        NavigationScrollTarget.recommendations,
+      );
+      await tester.pumpAndSettle();
+      await done;
+      expect(controller.offset, 0);
+      expect(find.text('friends').hitTestable(), findsOneWidget);
+      expect(feed.calls, [FeedTab.forYou]);
+    },
+  );
 
   testWidgets('refresh emits one haptic and keeps cards while waiting', (
     tester,
@@ -155,13 +424,17 @@ void main() {
       final feed = _Feed();
       final accounts = await _mount(tester, feed);
       expect(find.text('forYou post 0'), findsOneWidget);
+      await tester.tap(find.text('friends'));
+      await tester.pumpAndSettle();
+      expect(find.text('friends post 0'), findsOneWidget);
       final pending = Completer<FeedPageResult>();
       feed.next = pending.future;
       accounts.setAuthenticatedUser('new-viewer');
       await tester.pump();
       await tester.pump();
       expect(find.text('forYou post 0'), findsNothing);
-      expect(feed.calls, [FeedTab.forYou, FeedTab.forYou]);
+      expect(find.text('friends post 0'), findsNothing);
+      expect(feed.calls, [FeedTab.forYou, FeedTab.friends, FeedTab.forYou]);
       pending.complete(const FeedPageResult(posts: []));
       await tester.pumpAndSettle();
       expect(find.text('no posts yet'), findsOneWidget);
@@ -169,13 +442,23 @@ void main() {
   );
 }
 
-Future<AccountSessionController> _mount(WidgetTester tester, _Feed feed) async {
+Future<AccountSessionController> _mount(
+  WidgetTester tester,
+  _Feed feed, {
+  Size size = const Size(360, 800),
+  NavigationScrollToTopController? navigation,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
   final accounts = AccountSessionController(initialUserId: 'viewer');
   await tester.pumpWidget(
     MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AccountSessionController>.value(value: accounts),
         RepositoryProvider<IFeedRepository>.value(value: feed),
+        if (navigation != null) RepositoryProvider.value(value: navigation),
       ],
       child: MaterialApp(
         locale: const Locale('en'),

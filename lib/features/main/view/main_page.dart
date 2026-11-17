@@ -137,6 +137,7 @@ class _MainView extends StatelessWidget {
                   final target = switch (index) {
                     0 => NavigationScrollTarget.chats,
                     1 => NavigationScrollTarget.nearby,
+                    2 => NavigationScrollTarget.recommendations,
                     3 => NavigationScrollTarget.friends,
                     _ => null,
                   };

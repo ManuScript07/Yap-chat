@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
+import 'package:yap_chat/ui/ui.dart';
 
 import 'feed_post_body.dart';
 import 'feed_post_controls.dart';
@@ -28,60 +29,90 @@ class FeedPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Card(
-        margin: EdgeInsets.zero,
-        color: context.scaffoldBackgroundColor,
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FeedPostHeader(
+    final safe = MediaQuery.paddingOf(context);
+    const gutter = PrimaryHeaderGeometry.horizontalPadding;
+    final contentInsets = details
+        ? const EdgeInsets.symmetric(horizontal: 14)
+        : EdgeInsets.only(left: safe.left + gutter, right: safe.right + gutter);
+    Widget inset(Widget child) => Padding(padding: contentInsets, child: child);
+
+    const separatorSpacing = 14.0;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: context.scaffoldBackgroundColor,
+      elevation: 0,
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: separatorSpacing,
+          bottom: details ? 24 : 0,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            inset(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FeedPostHeader(
+                    post: post,
+                    timeline: timeline,
+                    visible: visible,
+                    details: details,
+                  ),
+                  if (post.coordinates != null || post.nearby)
+                    FeedPostLocation(post: post),
+                  if (post.text.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    FeedPostBody(
+                      post: post,
+                      timeline: timeline,
+                      details: details,
+                      onOpen: () => onOpenPost(post.id),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (post.photos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _FeedPhotos(
                 post: post,
                 timeline: timeline,
                 visible: visible,
-                details: details,
-              ),
-              if (post.coordinates != null || post.nearby)
-                FeedPostLocation(post: post),
-              if (post.text.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                FeedPostBody(
-                  post: post,
-                  timeline: timeline,
-                  details: details,
-                  onOpen: () => onOpenPost(post.id),
-                ),
-              ],
-              if (post.photos.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _FeedPhotos(post: post, timeline: timeline, visible: visible),
-              ],
-              if (post.isQuote)
-                FeedQuotePreview(
-                  post: post.original,
-                  timeline: timeline,
-                  onOpenPost: onOpenPost,
-                ),
-              FeedPostFooter(
-                post: post,
-                timeline: timeline,
-                details: details,
-                onOpenPost: onOpenPost,
-              ),
-              Divider(
-                height: 1,
-                color: context.colorScheme.onSurface.withValues(alpha: .12),
+                padding: contentInsets,
               ),
             ],
-          ),
+            inset(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (post.isQuote)
+                    FeedQuotePreview(
+                      post: post.original,
+                      timeline: timeline,
+                      onOpenPost: onOpenPost,
+                    ),
+                  FeedPostFooter(
+                    post: post,
+                    timeline: timeline,
+                    details: details,
+                    onOpenPost: onOpenPost,
+                  ),
+                ],
+              ),
+            ),
+            if (!details) const SizedBox(height: separatorSpacing),
+            if (details) inset(_divider(context)) else _divider(context),
+          ],
         ),
       ),
     );
   }
+
+  Widget _divider(BuildContext context) => Divider(
+    height: 1,
+    color: context.colorScheme.onSurface.withValues(alpha: .12),
+  );
 }
 
 class _FeedPhotos extends StatefulWidget {
@@ -89,11 +120,13 @@ class _FeedPhotos extends StatefulWidget {
     required this.post,
     required this.timeline,
     required this.visible,
+    required this.padding,
   });
 
   final FeedPost post;
   final FeedCubit timeline;
   final bool visible;
+  final EdgeInsets padding;
 
   @override
   State<_FeedPhotos> createState() => _FeedPhotosState();
@@ -124,7 +157,7 @@ class _FeedPhotosState extends State<_FeedPhotos> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final photos = widget.post.photos;
-      final width = constraints.maxWidth;
+      final width = constraints.maxWidth - widget.padding.horizontal;
       final tile = width < 360
           ? 132.0
           : width < 600
@@ -133,9 +166,10 @@ class _FeedPhotosState extends State<_FeedPhotos> {
       return SizedBox(
         height: tile,
         child: ListView.separated(
+          key: PageStorageKey(('feed-photos', widget.post.id)),
           primary: false,
           scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.zero,
+          padding: widget.padding,
           itemCount: photos.length,
           separatorBuilder: (_, _) => const SizedBox(width: 6),
           itemBuilder: (_, index) {

@@ -31,8 +31,23 @@ bool _isGlobalFriendQuery(String query) {
   return query.length >= 3;
 }
 
-class _FriendsPageView extends StatelessWidget {
+class _FriendsPageView extends StatefulWidget {
   const _FriendsPageView();
+
+  @override
+  State<_FriendsPageView> createState() => _FriendsPageViewState();
+}
+
+class _FriendsPageViewState extends State<_FriendsPageView> {
+  late final _pages = SwipeTabController(
+    initialPage: context.read<FriendsBloc>().state.activeTab.index,
+  );
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +132,7 @@ class _FriendsPageView extends StatelessWidget {
                                             ),
                                             child: _FriendsTabs(
                                               state: state,
+                                              pages: _pages,
                                               horizontalPadding: 0,
                                             ),
                                           ),
@@ -142,6 +158,7 @@ class _FriendsPageView extends StatelessWidget {
                               },
                             ),
                       body: _FriendsBody(
+                        pages: _pages,
                         isLandscape:
                             mediaQuery.orientation == Orientation.landscape,
                         contentTop: hideAppBar ? 0 : appBarHeight,
@@ -157,10 +174,15 @@ class _FriendsPageView extends StatelessWidget {
 }
 
 class _FriendsBody extends StatefulWidget {
-  const _FriendsBody({required this.isLandscape, required this.contentTop});
+  const _FriendsBody({
+    required this.isLandscape,
+    required this.contentTop,
+    required this.pages,
+  });
 
   final bool isLandscape;
   final double contentTop;
+  final SwipeTabController pages;
 
   @override
   State<_FriendsBody> createState() => _FriendsBodyState();
@@ -221,7 +243,6 @@ class _FriendsBodyState extends State<_FriendsBody> {
 
     return BlocBuilder<FriendsBloc, FriendsState>(
       builder: (context, state) {
-        final activeIndex = state.activeTab.index;
         return NavigationScrollToTopTarget(
           target: NavigationScrollTarget.friends,
           controller: state.activeTab == FriendsTab.friends
@@ -232,21 +253,32 @@ class _FriendsBodyState extends State<_FriendsBody> {
             alignment: Alignment.bottomCenter,
             children: [
               Positioned.fill(
-                child: IndexedStack(
-                  index: activeIndex,
+                child: SwipeTabView(
+                  controller: widget.pages,
+                  onSettled: (index) {
+                    final bloc = context.read<FriendsBloc>();
+                    final tab = FriendsTab.values[index];
+                    if (tab == bloc.state.activeTab) return;
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    bloc.add(FriendsTabChanged(tab));
+                  },
                   children: [
-                    _FriendsList(
-                      controller: _friendsScroll,
-                      isReturningToTop: () => _returningToTop,
-                      isLandscape: widget.isLandscape,
-                      topPadding: listTopPadding,
-                      bottomPadding: contentBottomPadding,
+                    _KeepFriendsTab(
+                      child: _FriendsList(
+                        controller: _friendsScroll,
+                        isReturningToTop: () => _returningToTop,
+                        isLandscape: widget.isLandscape,
+                        topPadding: listTopPadding,
+                        bottomPadding: contentBottomPadding,
+                      ),
                     ),
-                    _RequestsList(
-                      controller: _requestsScroll,
-                      isLandscape: widget.isLandscape,
-                      topPadding: listTopPadding,
-                      bottomPadding: contentBottomPadding,
+                    _KeepFriendsTab(
+                      child: _RequestsList(
+                        controller: _requestsScroll,
+                        isLandscape: widget.isLandscape,
+                        topPadding: listTopPadding,
+                        bottomPadding: contentBottomPadding,
+                      ),
                     ),
                   ],
                 ),
@@ -263,7 +295,7 @@ class _FriendsBodyState extends State<_FriendsBody> {
                   top: tabsTop,
                   left: 0,
                   right: 0,
-                  child: _FriendsTabs(state: state),
+                  child: _FriendsTabs(state: state, pages: widget.pages),
                 ),
               AnimatedPositioned(
                 duration: Duration.zero,
@@ -303,9 +335,14 @@ class _FriendsBodyState extends State<_FriendsBody> {
 }
 
 class _FriendsTabs extends StatelessWidget {
-  const _FriendsTabs({required this.state, this.horizontalPadding = 16});
+  const _FriendsTabs({
+    required this.state,
+    required this.pages,
+    this.horizontalPadding = PrimaryHeaderGeometry.horizontalPadding,
+  });
 
   final FriendsState state;
+  final SwipeTabController pages;
   final double horizontalPadding;
 
   @override
@@ -313,6 +350,8 @@ class _FriendsTabs extends StatelessWidget {
     return PrimarySegmentedControl(
       compact: true,
       horizontalPadding: horizontalPadding,
+      applySafeArea: horizontalPadding != 0,
+      pages: pages,
       items: [
         PrimarySegmentItem(label: context.l10n.friendsTabFriends),
         PrimarySegmentItem(
@@ -323,11 +362,30 @@ class _FriendsTabs extends StatelessWidget {
       selectedIndex: state.activeTab.index,
       onChanged: (index) {
         FocusManager.instance.primaryFocus?.unfocus();
-        context.read<FriendsBloc>().add(
-          FriendsTabChanged(FriendsTab.values[index]),
-        );
+        pages.select(index);
       },
     );
+  }
+}
+
+class _KeepFriendsTab extends StatefulWidget {
+  const _KeepFriendsTab({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepFriendsTab> createState() => _KeepFriendsTabState();
+}
+
+class _KeepFriendsTabState extends State<_KeepFriendsTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
@@ -406,7 +464,11 @@ class _FriendsListState extends State<_FriendsList> {
               }
               return NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
-                  if (!widget.isReturningToTop() &&
+                  if (notification.depth == 0 &&
+                      notification.metrics.axis == Axis.vertical &&
+                      context.read<FriendsBloc>().state.activeTab ==
+                          FriendsTab.friends &&
+                      !widget.isReturningToTop() &&
                       query.isEmpty &&
                       !showGlobal &&
                       notification.metrics.extentAfter < 320) {
