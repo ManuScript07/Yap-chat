@@ -107,7 +107,9 @@ class _FeedPostBodyState extends State<FeedPostBody> {
 
   @override
   Widget build(BuildContext context) {
-    final style = context.textTheme.bodyLarge ?? const TextStyle();
+    final style = (context.textTheme.bodyLarge ?? const TextStyle()).copyWith(
+      height: 1.3,
+    );
     final color = context.colorScheme.primary;
     if (_body == null || _style != style || _linkColor != color) {
       _style = style;

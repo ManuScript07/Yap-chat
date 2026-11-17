@@ -97,6 +97,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedUnfollow => 'unfollow';
 
   @override
+  String get feedConfirmUnfollow => 'unfollow this author?';
+
+  @override
   String get feedPostOptions => 'post options';
 
   @override
@@ -104,6 +107,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get feedReport => 'report';
+
+  @override
+  String get feedConfirmReport => 'send a report about this publication?';
 
   @override
   String get feedLessSimilar => 'less like this';
@@ -145,6 +151,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedRepost => 'repost';
 
   @override
+  String get feedConfirmRepost => 'share this publication in the feed?';
+
+  @override
   String get feedViews => 'views';
 
   @override
@@ -176,17 +185,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String feedMinutesAgo(int count) {
-    return '$count min ago';
+    return '${count}m';
   }
 
   @override
   String feedHoursAgo(int count) {
-    return '$count hr ago';
+    return '${count}h';
   }
 
   @override
   String feedDaysAgo(int count) {
-    return '$count d ago';
+    return '${count}d';
   }
 
   @override

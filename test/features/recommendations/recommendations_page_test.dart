@@ -143,7 +143,15 @@ void main() {
     expect(tabsRect.top, PrimaryHeaderGeometry.compactTabsTop);
     expect(tester.getTopLeft(list).dy, lessThan(tabsRect.top));
     expect(tester.getTopLeft(firstCard).dy, greaterThan(tabsRect.bottom));
-    expect(tester.getTopLeft(find.text('forYou post 0')).dx, 16);
+    final avatar = find.descendant(
+      of: firstCard,
+      matching: find.byType(FeedPostAuthorAvatar),
+    );
+    expect(tester.getTopLeft(avatar).dx, 16);
+    expect(
+      tester.getTopLeft(find.text('forYou post 0')).dx,
+      greaterThan(tester.getTopRight(avatar).dx),
+    );
     final divider = find.descendant(
       of: firstCard,
       matching: find.byType(Divider),
@@ -322,14 +330,13 @@ void main() {
     tester,
   ) async {
     await _mount(tester, _Feed());
-    final footer = find.byType(FeedPostFooter).first;
+    final like = find.byIcon(Icons.favorite_border).first;
     final divider = find.byType(Divider).first;
-    final header = find.byType(FeedPostHeader).at(1);
-    final before =
-        tester.getTopLeft(divider).dy - tester.getBottomLeft(footer).dy;
-    final after =
-        tester.getTopLeft(header).dy - tester.getBottomLeft(divider).dy;
-    expect(before, greaterThan(0));
+    final avatar = find.byType(FeedPostAuthorAvatar).at(1);
+    final line = tester.getCenter(divider).dy;
+    final before = line - tester.getBottomLeft(like).dy;
+    final after = tester.getTopLeft(avatar).dy - line;
+    expect(before, greaterThanOrEqualTo(14));
     expect(before, closeTo(after, .01));
   });
 
@@ -359,6 +366,14 @@ void main() {
       const PageStorageKey(('feed-photos', 'media-post')),
     );
     expect(tester.getSize(photos).width, 360);
+    final firstPhoto = find.descendant(
+      of: photos,
+      matching: find.byKey(const ValueKey('0')),
+    );
+    expect(
+      tester.getTopLeft(firstPhoto).dx,
+      tester.getTopLeft(find.text('media body')).dx,
+    );
     final position = tester
         .state<ScrollableState>(
           find.descendant(of: photos, matching: find.byType(Scrollable)),

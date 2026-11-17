@@ -5,3 +5,4 @@ export 'profile_avatar_hero.dart';
 export 'profile_ambient_glow.dart';
 export 'profile_photo_username_transition.dart';
 export 'profile_days_label.dart';
+export 'profile_action_sheet.dart';

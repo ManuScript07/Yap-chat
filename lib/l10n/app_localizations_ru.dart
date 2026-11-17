@@ -97,6 +97,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedUnfollow => 'отписаться';
 
   @override
+  String get feedConfirmUnfollow => 'убрать подписку на этого автора?';
+
+  @override
   String get feedPostOptions => 'действия с публикацией';
 
   @override
@@ -104,6 +107,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get feedReport => 'пожаловаться';
+
+  @override
+  String get feedConfirmReport => 'отправить жалобу на эту публикацию?';
 
   @override
   String get feedLessSimilar => 'меньше похожего';
@@ -145,6 +151,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedRepost => 'репост';
 
   @override
+  String get feedConfirmRepost => 'поделиться этой публикацией в ленте?';
+
+  @override
   String get feedViews => 'просмотры';
 
   @override
@@ -177,17 +186,17 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String feedMinutesAgo(int count) {
-    return '$count мин. назад';
+    return '$count м';
   }
 
   @override
   String feedHoursAgo(int count) {
-    return '$count ч. назад';
+    return '$count ч';
   }
 
   @override
   String feedDaysAgo(int count) {
-    return '$count дн. назад';
+    return '$count д';
   }
 
   @override

@@ -516,135 +516,105 @@ class _ProfileScaffoldState extends State<_ProfileScaffold>
 
   Future<void> _showActions(BuildContext pageContext) async {
     final cubit = pageContext.read<ViewedProfileCubit>();
-    await showModalBottomSheet<void>(
-      context: pageContext,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: pageContext.scaffoldBackgroundColor,
-      barrierColor: pageContext.colorScheme.primary.withValues(alpha: .22),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        final size = MediaQuery.sizeOf(sheetContext);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: math.min(size.width, 720),
-            maxHeight: size.height * .72,
-          ),
-          child: SingleChildScrollView(
-            child: BlocProvider.value(
-              value: cubit,
-              child: BlocBuilder<BlocklistCubit, BlocklistState>(
-                builder: (_, blocklistState) =>
-                    BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
-                      builder: (_, currentState) {
-                        final currentProfile =
-                            currentState.viewedProfile ?? viewedProfile;
-                        final isBlockedByMe = blocklistState.blocks(
-                          currentProfile.profile.id,
-                        );
-                        return _ProfileActionsSheet(
-                          viewedProfile: currentProfile,
-                          chatIsMuted: currentState.chat?.isMuted ?? false,
-                          canMute: currentProfile.isFriend && !isBlockedByMe,
-                          onMute: () async {
-                            Navigator.of(sheetContext).pop();
-                            await cubit.toggleMute();
-                          },
-                          onRemove: currentProfile.isFriend && !isBlockedByMe
-                              ? () async {
-                                  final confirmed =
-                                      await showConfirmationDialog(
-                                        pageContext,
-                                        title: pageContext
-                                            .l10n
-                                            .viewedProfileRemoveFriendTitle,
-                                        content: pageContext.l10n
-                                            .viewedProfileRemoveFriendContent(
-                                              currentProfile
-                                                  .profile
-                                                  .displayName,
-                                            ),
-                                        confirmLabel: pageContext
-                                            .l10n
-                                            .viewedProfileRemoveFriend,
-                                      );
-                                  if (confirmed != true ||
-                                      !pageContext.mounted) {
-                                    return;
-                                  }
-                                  Navigator.of(sheetContext).pop();
-                                  await cubit.removeFriend();
-                                }
-                              : null,
-                          isBlockedByMe: isBlockedByMe,
-                          isBlockActionPending:
-                              blocklistState.isPending(
-                                currentProfile.profile.id,
-                              ) ||
-                              currentState.isActionPending,
-                          onBlock: () async {
+    await showProfileActionSheet<void>(
+      pageContext,
+      builder: (sheetContext) => BlocProvider.value(
+        value: cubit,
+        child: BlocBuilder<BlocklistCubit, BlocklistState>(
+          builder: (_, blocklistState) =>
+              BlocBuilder<ViewedProfileCubit, ViewedProfileState>(
+                builder: (_, currentState) {
+                  final currentProfile =
+                      currentState.viewedProfile ?? viewedProfile;
+                  final isBlockedByMe = blocklistState.blocks(
+                    currentProfile.profile.id,
+                  );
+                  return _ProfileActionsSheet(
+                    viewedProfile: currentProfile,
+                    chatIsMuted: currentState.chat?.isMuted ?? false,
+                    canMute: currentProfile.isFriend && !isBlockedByMe,
+                    onMute: () async {
+                      Navigator.of(sheetContext).pop();
+                      await cubit.toggleMute();
+                    },
+                    onRemove: currentProfile.isFriend && !isBlockedByMe
+                        ? () async {
                             final confirmed = await showConfirmationDialog(
                               pageContext,
-                              title: pageContext.l10n.viewedProfileBlockTitle,
+                              title: pageContext
+                                  .l10n
+                                  .viewedProfileRemoveFriendTitle,
                               content: pageContext.l10n
-                                  .viewedProfileBlockContent(
+                                  .viewedProfileRemoveFriendContent(
                                     currentProfile.profile.displayName,
                                   ),
-                              confirmLabel: pageContext.l10n.viewedProfileBlock,
+                              confirmLabel:
+                                  pageContext.l10n.viewedProfileRemoveFriend,
                             );
-                            if (confirmed != true || !pageContext.mounted)
+                            if (confirmed != true || !pageContext.mounted) {
                               return;
-                            Navigator.of(sheetContext).pop();
-                            await cubit.blockUser();
-                          },
-                          onUnblock: () async {
-                            final confirmed = await showConfirmationDialog(
-                              pageContext,
-                              title: pageContext.l10n.unblockUserTitle,
-                              content: pageContext.l10n.unblockUserContent(
-                                currentProfile.profile.displayName,
-                              ),
-                              confirmLabel: pageContext.l10n.unblockUser,
-                            );
-                            if (confirmed != true || !pageContext.mounted)
-                              return;
-                            Navigator.of(sheetContext).pop();
-                            try {
-                              await pageContext
-                                  .read<IBlocklistRepository>()
-                                  .unblockUser(currentProfile.profile.id);
-                            } catch (_) {
-                              if (pageContext.mounted) {
-                                showAppSnackBar(
-                                  pageContext,
-                                  message: pageContext.l10n.friendsActionFailed,
-                                  type: SnackBarType.error,
-                                );
-                              }
                             }
+                            Navigator.of(sheetContext).pop();
+                            await cubit.removeFriend();
+                          }
+                        : null,
+                    isBlockedByMe: isBlockedByMe,
+                    isBlockActionPending:
+                        blocklistState.isPending(currentProfile.profile.id) ||
+                        currentState.isActionPending,
+                    onBlock: () async {
+                      final confirmed = await showConfirmationDialog(
+                        pageContext,
+                        title: pageContext.l10n.viewedProfileBlockTitle,
+                        content: pageContext.l10n.viewedProfileBlockContent(
+                          currentProfile.profile.displayName,
+                        ),
+                        confirmLabel: pageContext.l10n.viewedProfileBlock,
+                      );
+                      if (confirmed != true || !pageContext.mounted) return;
+                      Navigator.of(sheetContext).pop();
+                      await cubit.blockUser();
+                    },
+                    onUnblock: () async {
+                      final confirmed = await showConfirmationDialog(
+                        pageContext,
+                        title: pageContext.l10n.unblockUserTitle,
+                        content: pageContext.l10n.unblockUserContent(
+                          currentProfile.profile.displayName,
+                        ),
+                        confirmLabel: pageContext.l10n.unblockUser,
+                      );
+                      if (confirmed != true || !pageContext.mounted) return;
+                      Navigator.of(sheetContext).pop();
+                      try {
+                        await pageContext
+                            .read<IBlocklistRepository>()
+                            .unblockUser(currentProfile.profile.id);
+                      } catch (_) {
+                        if (pageContext.mounted) {
+                          showAppSnackBar(
+                            pageContext,
+                            message: pageContext.l10n.friendsActionFailed,
+                            type: SnackBarType.error,
+                          );
+                        }
+                      }
+                    },
+                    onReport: currentState.isActionPending
+                        ? null
+                        : () async {
+                            Navigator.of(sheetContext).pop();
+                            await _reportUser(
+                              pageContext,
+                              cubit,
+                              currentProfile,
+                            );
                           },
-                          onReport: currentState.isActionPending
-                              ? null
-                              : () async {
-                                  Navigator.of(sheetContext).pop();
-                                  await _reportUser(
-                                    pageContext,
-                                    cubit,
-                                    currentProfile,
-                                  );
-                                },
-                        );
-                      },
-                    ),
+                  );
+                },
               ),
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -653,27 +623,9 @@ class _ProfileScaffoldState extends State<_ProfileScaffold>
     ViewedProfileCubit cubit,
     ViewedProfile profile,
   ) async {
-    final reason = await showModalBottomSheet<UserReportReason>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: context.scaffoldBackgroundColor,
-      barrierColor: context.colorScheme.primary.withValues(alpha: .22),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        final size = MediaQuery.sizeOf(sheetContext);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: math.min(size.width, 720),
-            maxHeight: size.height * .72,
-          ),
-          child: SingleChildScrollView(child: _ReportReasonSheet()),
-        );
-      },
+    final reason = await showProfileActionSheet<UserReportReason>(
+      context,
+      builder: (_) => const _ReportReasonSheet(),
     );
     if (reason == null || !context.mounted) return;
 
@@ -1595,163 +1547,90 @@ class _ProfileActionsSheet extends StatelessWidget {
   final VoidCallback? onRemove;
 
   @override
-  Widget build(BuildContext context) {
-    final itemStyle = TextStyle(
-      color: context.colorScheme.onSurface,
-      fontSize: 20,
-      fontWeight: FontWeight.w700,
-      height: 1.2,
-      letterSpacing: .5,
-    );
-    return Theme(
-      data: Theme.of(context).copyWith(
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          12,
-          0,
-          12,
-          MediaQuery.paddingOf(context).bottom + 12,
+  Widget build(BuildContext context) => ProfileActionSheetContent(
+    children: [
+      if (viewedProfile.isFriend && !isBlockedByMe)
+        ListTile(
+          enabled: canMute,
+          leading: Icon(
+            chatIsMuted
+                ? Icons.notifications_rounded
+                : Icons.notifications_off_rounded,
+          ),
+          title: Text(
+            chatIsMuted
+                ? context.l10n.viewedProfileUnmute.toLowerCase()
+                : context.l10n.viewedProfileMute.toLowerCase(),
+          ),
+          onTap: onMute,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (viewedProfile.isFriend && !isBlockedByMe)
-              ListTile(
-                enabled: canMute,
-                leading: Icon(
-                  chatIsMuted
-                      ? Icons.notifications_rounded
-                      : Icons.notifications_off_rounded,
-                ),
-                title: Text(
-                  chatIsMuted
-                      ? context.l10n.viewedProfileUnmute.toLowerCase()
-                      : context.l10n.viewedProfileMute.toLowerCase(),
-                  style: itemStyle,
-                ),
-                onTap: onMute,
-              ),
-            if (onRemove != null)
-              ListTile(
-                leading: const Icon(Icons.person_remove_rounded),
-                title: Text(
-                  context.l10n.viewedProfileRemoveFriend.toLowerCase(),
-                  style: itemStyle,
-                ),
-                onTap: onRemove,
-              ),
-            ListTile(
-              enabled: !isBlockActionPending,
-              leading: isBlockActionPending
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: context.colorScheme.onSurface,
-                      ),
-                    )
-                  : Icon(
-                      isBlockedByMe
-                          ? Icons.lock_open_rounded
-                          : Icons.block_rounded,
-                    ),
-              title: Text(
-                isBlockedByMe
-                    ? context.l10n.unblockUser.toLowerCase()
-                    : context.l10n.viewedProfileBlock.toLowerCase(),
-                style: itemStyle,
-              ),
-              onTap: isBlockActionPending
-                  ? null
-                  : (isBlockedByMe ? onUnblock : onBlock),
-            ),
-            ListTile(
-              enabled: onReport != null,
-              leading: const Icon(Icons.flag_rounded),
-              title: Text(
-                context.l10n.viewedProfileReport.toLowerCase(),
-                style: itemStyle,
-              ),
-              onTap: onReport,
-            ),
-          ],
+      if (onRemove != null)
+        ListTile(
+          leading: const Icon(Icons.person_remove_rounded),
+          title: Text(context.l10n.viewedProfileRemoveFriend.toLowerCase()),
+          onTap: onRemove,
         ),
+      ListTile(
+        enabled: !isBlockActionPending,
+        leading: isBlockActionPending
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: context.colorScheme.onSurface,
+                ),
+              )
+            : Icon(
+                isBlockedByMe ? Icons.lock_open_rounded : Icons.block_rounded,
+              ),
+        title: Text(
+          isBlockedByMe
+              ? context.l10n.unblockUser.toLowerCase()
+              : context.l10n.viewedProfileBlock.toLowerCase(),
+        ),
+        onTap: isBlockActionPending
+            ? null
+            : (isBlockedByMe ? onUnblock : onBlock),
       ),
-    );
-  }
+      ListTile(
+        enabled: onReport != null,
+        leading: const Icon(Icons.flag_rounded),
+        title: Text(context.l10n.viewedProfileReport.toLowerCase()),
+        onTap: onReport,
+      ),
+    ],
+  );
 }
 
 class _ReportReasonSheet extends StatelessWidget {
   const _ReportReasonSheet();
 
   @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      color: context.colorScheme.onSurface,
-      fontSize: 20,
-      fontWeight: FontWeight.w700,
-      height: 1.2,
-      letterSpacing: .5,
-    );
-    return Theme(
-      data: Theme.of(context).copyWith(
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        hoverColor: Colors.transparent,
+  Widget build(BuildContext context) => ProfileActionSheetContent(
+    children: [
+      ListTile(
+        leading: const Icon(Icons.chat_bubble_outline_rounded),
+        title: Text(context.l10n.viewedProfileReportSpam.toLowerCase()),
+        onTap: () => Navigator.of(context).pop(UserReportReason.spam),
       ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          12,
-          0,
-          12,
-          MediaQuery.paddingOf(context).bottom + 12,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline_rounded),
-              title: Text(
-                context.l10n.viewedProfileReportSpam.toLowerCase(),
-                style: style,
-              ),
-              onTap: () => Navigator.of(context).pop(UserReportReason.spam),
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: Text(
-                context.l10n.viewedProfileReportScam.toLowerCase(),
-                style: style,
-              ),
-              onTap: () => Navigator.of(context).pop(UserReportReason.scam),
-            ),
-            ListTile(
-              leading: const Icon(Icons.visibility_off_rounded),
-              title: Text(
-                context.l10n.viewedProfileReportPornography.toLowerCase(),
-                style: style,
-              ),
-              onTap: () =>
-                  Navigator.of(context).pop(UserReportReason.pornography),
-            ),
-            ListTile(
-              leading: const Icon(Icons.more_horiz_rounded),
-              title: Text(
-                context.l10n.viewedProfileReportOther.toLowerCase(),
-                style: style,
-              ),
-              onTap: () => Navigator.of(context).pop(UserReportReason.other),
-            ),
-          ],
-        ),
+      ListTile(
+        leading: const Icon(Icons.account_balance_wallet_outlined),
+        title: Text(context.l10n.viewedProfileReportScam.toLowerCase()),
+        onTap: () => Navigator.of(context).pop(UserReportReason.scam),
       ),
-    );
-  }
+      ListTile(
+        leading: const Icon(Icons.visibility_off_rounded),
+        title: Text(context.l10n.viewedProfileReportPornography.toLowerCase()),
+        onTap: () => Navigator.of(context).pop(UserReportReason.pornography),
+      ),
+      ListTile(
+        leading: const Icon(Icons.more_horiz_rounded),
+        title: Text(context.l10n.viewedProfileReportOther.toLowerCase()),
+        onTap: () => Navigator.of(context).pop(UserReportReason.other),
+      ),
+    ],
+  );
 }
 
 Future<void> _openGallery(

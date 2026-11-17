@@ -266,6 +266,12 @@ abstract class AppLocalizations {
   /// **'отписаться'**
   String get feedUnfollow;
 
+  /// No description provided for @feedConfirmUnfollow.
+  ///
+  /// In ru, this message translates to:
+  /// **'убрать подписку на этого автора?'**
+  String get feedConfirmUnfollow;
+
   /// No description provided for @feedPostOptions.
   ///
   /// In ru, this message translates to:
@@ -283,6 +289,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'пожаловаться'**
   String get feedReport;
+
+  /// No description provided for @feedConfirmReport.
+  ///
+  /// In ru, this message translates to:
+  /// **'отправить жалобу на эту публикацию?'**
+  String get feedConfirmReport;
 
   /// No description provided for @feedLessSimilar.
   ///
@@ -362,6 +374,12 @@ abstract class AppLocalizations {
   /// **'репост'**
   String get feedRepost;
 
+  /// No description provided for @feedConfirmRepost.
+  ///
+  /// In ru, this message translates to:
+  /// **'поделиться этой публикацией в ленте?'**
+  String get feedConfirmRepost;
+
   /// No description provided for @feedViews.
   ///
   /// In ru, this message translates to:
@@ -425,19 +443,19 @@ abstract class AppLocalizations {
   /// No description provided for @feedMinutesAgo.
   ///
   /// In ru, this message translates to:
-  /// **'{count} мин. назад'**
+  /// **'{count} м'**
   String feedMinutesAgo(int count);
 
   /// No description provided for @feedHoursAgo.
   ///
   /// In ru, this message translates to:
-  /// **'{count} ч. назад'**
+  /// **'{count} ч'**
   String feedHoursAgo(int count);
 
   /// No description provided for @feedDaysAgo.
   ///
   /// In ru, this message translates to:
-  /// **'{count} дн. назад'**
+  /// **'{count} д'**
   String feedDaysAgo(int count);
 
   /// No description provided for @searchHintChats.

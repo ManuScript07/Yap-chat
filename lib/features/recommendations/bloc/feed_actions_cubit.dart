@@ -49,6 +49,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   static const _toggleInterval = Duration(milliseconds: 350);
   Set<String> _blocked = const {};
   bool _detailOpening = false;
+  bool _profileOpening = false;
   int _projectionVersion = 0;
   int _accessVersion = 0;
   int _lastReconnect = 0;
@@ -114,6 +115,14 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   }
 
   void endDetail() => _detailOpening = false;
+
+  bool beginProfile() {
+    if (!active || _profileOpening) return false;
+    _profileOpening = true;
+    return true;
+  }
+
+  void endProfile() => _profileOpening = false;
 
   void friendshipRemoved(String id) {
     if (!active) return;

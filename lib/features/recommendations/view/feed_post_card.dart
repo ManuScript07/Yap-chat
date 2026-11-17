@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:yap_chat/core/core.dart';
+import 'package:yap_chat/features/profile/view/view.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
@@ -11,7 +12,7 @@ import 'feed_post_body.dart';
 import 'feed_post_controls.dart';
 import 'feed_post_gallery.dart';
 
-class FeedPostCard extends StatelessWidget {
+class FeedPostCard extends StatefulWidget {
   const FeedPostCard({
     super.key,
     required this.post,
@@ -28,82 +29,162 @@ class FeedPostCard extends StatelessWidget {
   final bool details;
 
   @override
+  State<FeedPostCard> createState() => _FeedPostCardState();
+}
+
+class _FeedPostCardState extends State<FeedPostCard> {
+  bool _openingProfile = false;
+
+  Future<void> _openProfile() async {
+    final timeline = widget.timeline;
+    final actions = timeline.actions;
+    if (_openingProfile ||
+        ModalRoute.isCurrentOf(context) == false ||
+        !timeline.isCurrentAccount() ||
+        actions?.canShow(widget.post) == false ||
+        actions?.beginProfile() == false) {
+      return;
+    }
+    final authorId = widget.post.authorId;
+    setState(() => _openingProfile = true);
+    try {
+      // Register just the tapped avatar with the navigator before the push.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted ||
+          !timeline.isCurrentAccount() ||
+          ModalRoute.isCurrentOf(context) == false ||
+          actions?.canShow(widget.post) == false ||
+          widget.post.authorId != authorId) {
+        return;
+      }
+      await openViewedProfile(context, userId: authorId, waitForClose: true);
+      await WidgetsBinding.instance.endOfFrame;
+    } finally {
+      actions?.endProfile();
+      if (mounted) setState(() => _openingProfile = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+    final timeline = widget.timeline;
+    final details = widget.details;
     final safe = MediaQuery.paddingOf(context);
     const gutter = PrimaryHeaderGeometry.horizontalPadding;
     final contentInsets = details
         ? const EdgeInsets.symmetric(horizontal: 14)
         : EdgeInsets.only(left: safe.left + gutter, right: safe.right + gutter);
-    Widget inset(Widget child) => Padding(padding: contentInsets, child: child);
+    const avatarSize = 40.0;
+    const authorGap = 10.0;
+    const headerEndAdjustment = 4.0;
+    final leftToRight = Directionality.of(context) == TextDirection.ltr;
+    final headerInsets = details
+        ? contentInsets
+        : leftToRight
+        ? contentInsets.copyWith(
+            right: contentInsets.right - headerEndAdjustment,
+          )
+        : contentInsets.copyWith(
+            left: contentInsets.left - headerEndAdjustment,
+          );
+    final textInsets = leftToRight
+        ? contentInsets.copyWith(
+            left: contentInsets.left + avatarSize + authorGap,
+          )
+        : contentInsets.copyWith(
+            right: contentInsets.right + avatarSize + authorGap,
+          );
+    final avatar = FeedPostAuthorAvatar(
+      post: post,
+      timeline: timeline,
+      visible: widget.visible,
+      size: avatarSize,
+      heroEnabled: _openingProfile,
+      onOpenProfile: post.authorId == timeline.account.userId
+          ? null
+          : _openProfile,
+    );
+    void openPost() {
+      if (timeline.actions?.canShow(post) != false) widget.onOpenPost(post.id);
+    }
+
+    final header = FeedPostHeader(
+      post: post,
+      timeline: timeline,
+      details: details,
+      avatar: avatar,
+      onOpenProfile: post.authorId == timeline.account.userId
+          ? null
+          : _openProfile,
+    );
 
     const separatorSpacing = 14.0;
     return Card(
       margin: EdgeInsets.zero,
       color: context.scaffoldBackgroundColor,
       elevation: 0,
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: separatorSpacing,
-          bottom: details ? 24 : 0,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            inset(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FeedPostHeader(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: details ? null : openPost,
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: separatorSpacing,
+            bottom: details ? 24 : 0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(padding: headerInsets, child: header),
+              if (post.text.isNotEmpty) ...[
+                SizedBox(height: details ? 6 : 4),
+                Padding(
+                  padding: details ? contentInsets : textInsets,
+                  child: FeedPostBody(
                     post: post,
                     timeline: timeline,
-                    visible: visible,
                     details: details,
+                    onOpen: openPost,
                   ),
-                  if (post.coordinates != null || post.nearby)
-                    FeedPostLocation(post: post, actions: timeline.actions),
-                  if (post.text.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    FeedPostBody(
+                ),
+              ],
+              if (post.photos.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _FeedPhotos(
+                  post: post,
+                  timeline: timeline,
+                  visible: widget.visible,
+                  padding: contentInsets,
+                  leadingInset: details ? 0 : avatarSize + authorGap,
+                ),
+              ],
+              Padding(
+                padding: details ? contentInsets : textInsets,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (post.isQuote)
+                      FeedQuotePreview(
+                        post: post.original,
+                        timeline: timeline,
+                        onOpenPost: widget.onOpenPost,
+                      ),
+                    FeedPostFooter(
                       post: post,
                       timeline: timeline,
                       details: details,
-                      onOpen: () => onOpenPost(post.id),
+                      bottomSpacing: details ? 0 : separatorSpacing,
+                      onOpenPost: widget.onOpenPost,
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-            if (post.photos.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _FeedPhotos(
-                post: post,
-                timeline: timeline,
-                visible: visible,
-                padding: contentInsets,
-              ),
+              if (details)
+                Padding(padding: contentInsets, child: _divider(context))
+              else
+                _divider(context),
             ],
-            inset(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (post.isQuote)
-                    FeedQuotePreview(
-                      post: post.original,
-                      timeline: timeline,
-                      onOpenPost: onOpenPost,
-                    ),
-                  FeedPostFooter(
-                    post: post,
-                    timeline: timeline,
-                    details: details,
-                    onOpenPost: onOpenPost,
-                  ),
-                ],
-              ),
-            ),
-            if (!details) const SizedBox(height: separatorSpacing),
-            if (details) inset(_divider(context)) else _divider(context),
-          ],
+          ),
         ),
       ),
     );
@@ -121,12 +202,14 @@ class _FeedPhotos extends StatefulWidget {
     required this.timeline,
     required this.visible,
     required this.padding,
+    required this.leadingInset,
   });
 
   final FeedPost post;
   final FeedCubit timeline;
   final bool visible;
   final EdgeInsets padding;
+  final double leadingInset;
 
   @override
   State<_FeedPhotos> createState() => _FeedPhotosState();
@@ -169,7 +252,9 @@ class _FeedPhotosState extends State<_FeedPhotos> {
           key: PageStorageKey(('feed-photos', widget.post.id)),
           primary: false,
           scrollDirection: Axis.horizontal,
-          padding: widget.padding,
+          padding: widget.padding.add(
+            EdgeInsetsDirectional.only(start: widget.leadingInset),
+          ),
           itemCount: photos.length,
           separatorBuilder: (_, _) => const SizedBox(width: 6),
           itemBuilder: (_, index) {
