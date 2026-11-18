@@ -476,6 +476,7 @@ class _PublicationState extends State<_Publication> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ComposerReplyTransition(
+                        fadeOutInPlace: true,
                         child: switch (_replyTo) {
                           final target? => Padding(
                             key: const ValueKey('feed_reply_preview'),

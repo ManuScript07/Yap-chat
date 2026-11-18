@@ -179,8 +179,8 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
     final l10n = context.l10n;
     final colors = context.colorScheme;
     final textStyle = AppTextStyles.chatName.copyWith(fontSize: 15);
-    const panelWidth = 168.0;
     const panelInset = 4.0;
+    final animate = !MediaQuery.disableAnimationsOf(context);
     final panelColor = Color.alphaBlend(
       colors.onSurface.withValues(alpha: .08),
       context.scaffoldBackgroundColor,
@@ -192,15 +192,17 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
     };
 
     return MenuAnchor(
+      animated: animate,
       clipBehavior: Clip.antiAlias,
       crossAxisUnconstrained: false,
-      onOpen: () => setState(() => _open = true),
-      onClose: () => setState(() => _open = false),
+      onAnimationStatusChanged: (status) {
+        final open = status.isForwardOrCompleted;
+        if (_open != open) setState(() => _open = open);
+      },
       style: MenuStyle(
         alignment: AlignmentDirectional.bottomStart,
         backgroundColor: WidgetStatePropertyAll(panelColor),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        minimumSize: const WidgetStatePropertyAll(Size(panelWidth, 0)),
         padding: const WidgetStatePropertyAll(EdgeInsets.all(panelInset)),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -217,7 +219,7 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
                       ? colors.primary
                       : colors.onSurface,
                   textStyle: textStyle,
-                  minimumSize: const Size(panelWidth - 2 * panelInset, 36),
+                  minimumSize: const Size(0, 36),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 4,
@@ -256,8 +258,7 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
             overlayColor: Colors.transparent,
             textStyle: textStyle,
           ),
-          onPressed: () =>
-              controller.isOpen ? controller.close() : controller.open(),
+          onPressed: () => _open ? controller.close() : controller.open(),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -272,9 +273,9 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
                 offset: const Offset(0, 2),
                 child: AnimatedRotation(
                   turns: _open ? .5 : 0,
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 180),
+                  duration: animate
+                      ? const Duration(milliseconds: 180)
+                      : Duration.zero,
                   curve: Curves.easeOutCubic,
                   child: const Icon(Icons.expand_more_rounded, size: 18),
                 ),

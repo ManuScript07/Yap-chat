@@ -309,8 +309,8 @@ void main() {
         greaterThan(tester.getCenter(sortLabel).dy),
       );
       await tester.tap(sortMenu);
-      await tester.pumpAndSettle();
-      expect(tester.widget<AnimatedRotation>(arrow).turns, .5);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
       final popular = find.widgetWithText(MenuItemButton, 'popular');
       final palette = Theme.of(tester.element(popular));
       expect(palette.colorScheme.surface, Colors.white);
@@ -325,9 +325,17 @@ void main() {
         ),
       );
       expect(panel, findsOneWidget);
+      final openingHeight = tester.getSize(panel).height;
+      await tester.pumpAndSettle();
+      expect(openingHeight, inExclusiveRange(0, tester.getSize(panel).height));
+      expect(tester.widget<AnimatedRotation>(arrow).turns, .5);
       expect(tester.widget<Material>(panel).clipBehavior, Clip.antiAlias);
-      expect(tester.getSize(panel).width, greaterThanOrEqualTo(168));
-      expect(tester.getSize(popular).width, tester.getSize(panel).width - 8);
+      final labels = find.descendant(of: panel, matching: find.byType(Text));
+      final longest = labels
+          .evaluate()
+          .map((element) => tester.getSize(find.byWidget(element.widget)).width)
+          .reduce((a, b) => a > b ? a : b);
+      expect(tester.getSize(panel).width, closeTo(longest + 32, 1));
       expect(tester.getSize(popular).height, lessThanOrEqualTo(40));
       expect(
         tester.widget<MenuItemButton>(popular).style!.overlayColor!.resolve({
@@ -350,9 +358,14 @@ void main() {
       await tester.tap(find.widgetWithText(MenuItemButton, 'newest'));
       await tester.pump();
       expect(tester.widget<AnimatedRotation>(arrow).turns, 0);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(panel, findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 101));
+      await tester.pump();
       expect(find.byType(MenuItemButton), findsNothing);
       await tester.tap(sortMenu);
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.widgetWithText(MenuItemButton, 'oldest'));
       await tester.pumpAndSettle();
       expect(find.text('old result'), findsOneWidget);
@@ -821,7 +834,7 @@ void main() {
       await tester.pump();
       final transition = find.descendant(
         of: find.byType(ComposerReplyTransition),
-        matching: find.byType(SizeTransition),
+        matching: find.byType(AnimatedSize),
       );
       await tester.pump(const Duration(milliseconds: 60));
       final appearingHeight = tester.getSize(transition).height;
@@ -867,13 +880,20 @@ void main() {
       expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
       expect(tester.widget<TextField>(field).controller!.text, 'draft reply');
       expect(replyBar, findsOneWidget);
+      final replyPosition = tester.getTopLeft(replyBar);
+      final fade = find.descendant(
+        of: find.byType(ComposerReplyTransition),
+        matching: find.byType(FadeTransition),
+      );
       await tester.tap(find.byTooltip('cancel'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 90));
       expect(
-        tester.getSize(transition).height,
-        inExclusiveRange(0, fullHeight),
+        tester.widget<FadeTransition>(fade).opacity.value,
+        inExclusiveRange(0, 1),
       );
+      expect(tester.getTopLeft(replyBar), replyPosition);
+      expect(tester.getSize(transition).height, fullHeight);
       await tester.pumpAndSettle();
       expect(replyBar, findsNothing);
       expect(tester.widget<TextField>(field).controller!.text, 'draft reply');
