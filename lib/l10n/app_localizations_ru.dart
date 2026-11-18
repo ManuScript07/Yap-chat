@@ -112,6 +112,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedConfirmReport => 'отправить жалобу на эту публикацию?';
 
   @override
+  String get feedConfirmCommentReport =>
+      'отправить жалобу на этот комментарий?';
+
+  @override
   String get feedLessSimilar => 'меньше похожего';
 
   @override
@@ -173,6 +177,38 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get feedNoComments => 'пока нет комментариев';
+
+  @override
+  String get feedCommentsSort => 'сортировка комментариев';
+
+  @override
+  String get feedCommentsPopular => 'популярные';
+
+  @override
+  String get feedCommentsNew => 'новые';
+
+  @override
+  String get feedCommentsOld => 'старые';
+
+  @override
+  String get feedShowReplies => 'показать ответы';
+
+  @override
+  String get feedHideReplies => 'скрыть ответы';
+
+  @override
+  String get feedReplyComment => 'ответить';
+
+  @override
+  String get feedCommentMenu => 'действия с комментарием';
+
+  @override
+  String get feedUnlike => 'убрать лайк';
+
+  @override
+  String feedReplyingTo(String name) {
+    return 'ответ для $name';
+  }
 
   @override
   String get feedCommentUnavailable => 'комментарий недоступен';

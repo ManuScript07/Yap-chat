@@ -31,12 +31,50 @@ class FeedPhoto {
   }
 }
 
-typedef FeedComment = ({
-  String id,
-  String? authorId,
-  String? authorName,
-  String? text,
-});
+enum FeedCommentSort { popular, newFirst, old }
+
+typedef FeedCommentLike = ({int version, bool liked, bool changed});
+
+class FeedComment {
+  const FeedComment({
+    required this.id,
+    this.rootId,
+    this.authorId,
+    this.authorName,
+    this.username,
+    this.avatarUrl,
+    this.avatarPath,
+    this.avatarRevision,
+    this.text,
+    this.createdAt,
+    this.replyTo,
+    this.replyPreview,
+    this.replyCount = 0,
+    this.commentVersion = 0,
+    this.postVersion = 0,
+    this.reaction = (version: 0, liked: false, likes: 0),
+  });
+
+  final String id;
+  final String? rootId;
+  final String? authorId;
+  final String? authorName;
+  final String? username;
+  final String? avatarUrl;
+  final String? avatarPath;
+  final String? avatarRevision;
+  final String? text;
+  final DateTime? createdAt;
+  final ({String id, String username})? replyTo;
+  final FeedComment? replyPreview;
+  final int replyCount;
+  final int commentVersion;
+  final int postVersion;
+  final FeedReaction reaction;
+
+  bool get available => authorId != null && text != null;
+  String get threadId => rootId ?? id;
+}
 
 typedef FeedCommentsCursor = ({String sessionId, int position});
 typedef FeedCommentsPage = ({

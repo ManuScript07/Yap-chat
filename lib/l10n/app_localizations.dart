@@ -296,6 +296,12 @@ abstract class AppLocalizations {
   /// **'отправить жалобу на эту публикацию?'**
   String get feedConfirmReport;
 
+  /// No description provided for @feedConfirmCommentReport.
+  ///
+  /// In ru, this message translates to:
+  /// **'отправить жалобу на этот комментарий?'**
+  String get feedConfirmCommentReport;
+
   /// No description provided for @feedLessSimilar.
   ///
   /// In ru, this message translates to:
@@ -421,6 +427,66 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'пока нет комментариев'**
   String get feedNoComments;
+
+  /// No description provided for @feedCommentsSort.
+  ///
+  /// In ru, this message translates to:
+  /// **'сортировка комментариев'**
+  String get feedCommentsSort;
+
+  /// No description provided for @feedCommentsPopular.
+  ///
+  /// In ru, this message translates to:
+  /// **'популярные'**
+  String get feedCommentsPopular;
+
+  /// No description provided for @feedCommentsNew.
+  ///
+  /// In ru, this message translates to:
+  /// **'новые'**
+  String get feedCommentsNew;
+
+  /// No description provided for @feedCommentsOld.
+  ///
+  /// In ru, this message translates to:
+  /// **'старые'**
+  String get feedCommentsOld;
+
+  /// No description provided for @feedShowReplies.
+  ///
+  /// In ru, this message translates to:
+  /// **'показать ответы'**
+  String get feedShowReplies;
+
+  /// No description provided for @feedHideReplies.
+  ///
+  /// In ru, this message translates to:
+  /// **'скрыть ответы'**
+  String get feedHideReplies;
+
+  /// No description provided for @feedReplyComment.
+  ///
+  /// In ru, this message translates to:
+  /// **'ответить'**
+  String get feedReplyComment;
+
+  /// No description provided for @feedCommentMenu.
+  ///
+  /// In ru, this message translates to:
+  /// **'действия с комментарием'**
+  String get feedCommentMenu;
+
+  /// No description provided for @feedUnlike.
+  ///
+  /// In ru, this message translates to:
+  /// **'убрать лайк'**
+  String get feedUnlike;
+
+  /// No description provided for @feedReplyingTo.
+  ///
+  /// In ru, this message translates to:
+  /// **'ответ для {name}'**
+  String feedReplyingTo(String name);
 
   /// No description provided for @feedCommentUnavailable.
   ///

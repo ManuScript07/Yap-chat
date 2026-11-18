@@ -208,10 +208,11 @@ class FeedPostDetailsRoute
   FeedPostDetailsRoute({
     _i24.Key? key,
     required String id,
+    _i9.FeedPostDetailsPreview? preview,
     List<_i21.PageRouteInfo>? children,
   }) : super(
          FeedPostDetailsRoute.name,
-         args: FeedPostDetailsRouteArgs(key: key, id: id),
+         args: FeedPostDetailsRouteArgs(key: key, id: id, preview: preview),
          rawPathParams: {'id': id},
          initialChildren: children,
        );
@@ -225,32 +226,38 @@ class FeedPostDetailsRoute
       final args = data.argsAs<FeedPostDetailsRouteArgs>(
         orElse: () => FeedPostDetailsRouteArgs(id: pathParams.getString('id')),
       );
-      return _i9.FeedPostDetailsPage(key: args.key, id: args.id);
+      return _i9.FeedPostDetailsPage(
+        key: args.key,
+        id: args.id,
+        preview: args.preview,
+      );
     },
   );
 }
 
 class FeedPostDetailsRouteArgs {
-  const FeedPostDetailsRouteArgs({this.key, required this.id});
+  const FeedPostDetailsRouteArgs({this.key, required this.id, this.preview});
 
   final _i24.Key? key;
 
   final String id;
 
+  final _i9.FeedPostDetailsPreview? preview;
+
   @override
   String toString() {
-    return 'FeedPostDetailsRouteArgs{key: $key, id: $id}';
+    return 'FeedPostDetailsRouteArgs{key: $key, id: $id, preview: $preview}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! FeedPostDetailsRouteArgs) return false;
-    return key == other.key && id == other.id;
+    return key == other.key && id == other.id && preview == other.preview;
   }
 
   @override
-  int get hashCode => key.hashCode ^ id.hashCode;
+  int get hashCode => key.hashCode ^ id.hashCode ^ preview.hashCode;
 }
 
 /// generated route for

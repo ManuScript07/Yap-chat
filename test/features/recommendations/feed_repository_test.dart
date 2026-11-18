@@ -15,6 +15,144 @@ import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 void main() {
+  test('uses the comment RPC target, sort and reaction revisions', () async {
+    const viewer = '10000000-0000-4000-8000-000000000001';
+    final requests = <(String, Map<String, dynamic>)>[];
+    final client = SupabaseClient(
+      'http://127.0.0.1:1',
+      'test-key',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+      httpClient: MockClient((request) async {
+        final rpc = request.url.pathSegments.last;
+        requests.add((rpc, jsonDecode(request.body) as Map<String, dynamic>));
+        final payload = switch (rpc) {
+          'set_feed_comment_liked' => {
+            'action_version': 5,
+            'liked': true,
+            'changed': true,
+          },
+          'submit_feed_content_report' => <String, Object?>{},
+          _ => {
+            'items': [
+              {
+                'id': 'comment',
+                'root_id': 'root',
+                'version': 2,
+                'post_version': 3,
+                'action_version': 4,
+                'liked': false,
+                'like_count': 8,
+                'text': 'reply',
+                'author': {
+                  'id': 'author',
+                  'avatar_storage_path': 'avatars/author.jpg',
+                },
+                'reply_to': {
+                  'comment_id': 'parent',
+                  'username': 'parent-handle',
+                },
+              },
+            ],
+            'next_cursor': null,
+          },
+        };
+        return http.Response(
+          jsonEncode(payload),
+          200,
+          request: request,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    addTearDown(client.dispose);
+    await _signIn(client, viewer);
+    final accounts = AccountSessionController(initialUserId: viewer);
+    final repository = FeedRepository(client: client, accounts: accounts);
+    final account = accounts.capture();
+    await repository.getComments(
+      'post',
+      account,
+      sort: FeedCommentSort.newFirst,
+    );
+    await repository.getComments('post', account, sort: FeedCommentSort.old);
+    final page = await repository.getComments(
+      'post',
+      account,
+      rootId: 'root',
+      cursor: (sessionId: 'thread-cursor', position: 19),
+    );
+    final comment = page.comments.single;
+    expect(comment.avatarPath, 'avatars/author.jpg');
+    expect(comment.replyTo, (id: 'parent', username: 'parent-handle'));
+    expect(
+      await repository.setCommentLiked(
+        comment,
+        comment.reaction,
+        'react',
+        account,
+      ),
+      (version: 5, liked: true, changed: true),
+    );
+    await repository.reportComment(
+      comment.id,
+      FeedReportReason.spam,
+      'report',
+      account,
+    );
+    final expected = [
+      (
+        'get_feed_comments',
+        {
+          'requested_post': 'post',
+          'requested_sort': 'new',
+          'requested_limit': 20,
+        },
+      ),
+      (
+        'get_feed_comments',
+        {
+          'requested_post': 'post',
+          'requested_sort': 'old',
+          'requested_limit': 20,
+        },
+      ),
+      (
+        'get_feed_comment_replies',
+        {
+          'requested_post': 'post',
+          'requested_root': 'root',
+          'requested_session': 'thread-cursor',
+          'after_position': 19,
+          'requested_limit': 20,
+        },
+      ),
+      (
+        'set_feed_comment_liked',
+        {
+          'requested_id': 'react',
+          'requested_comment': 'comment',
+          'requested_liked': true,
+          'expected_version': 4,
+          'expected_comment_version': 2,
+          'expected_post_version': 3,
+        },
+      ),
+      (
+        'submit_feed_content_report',
+        {
+          'requested_id': 'report',
+          'requested_type': 'comment',
+          'requested_content': 'comment',
+          'requested_reason': 'spam',
+        },
+      ),
+    ];
+    expect(
+      requests.map((request) => [request.$1, request.$2]),
+      expected.map((request) => [request.$1, request.$2]),
+    );
+  });
+
   test('sends the correct RPC and cursor shape for each tab', () async {
     const viewer = '10000000-0000-4000-8000-000000000001';
     const serverSession = '10000000-0000-4000-8000-000000000002';

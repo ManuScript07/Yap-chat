@@ -33,8 +33,42 @@ class FeedPostAuthorAvatar extends StatelessWidget {
   final VoidCallback? onOpenProfile;
 
   @override
+  Widget build(BuildContext context) => FeedAuthorAvatar(
+    authorId: post.authorId,
+    avatarUrl: post.avatarUrl,
+    avatarPath: post.avatarPath,
+    avatarRevision: post.avatarRevision,
+    timeline: timeline,
+    visible: visible,
+    size: size,
+    heroEnabled: heroEnabled,
+    onOpenProfile: onOpenProfile,
+  );
+}
+
+class FeedAuthorAvatar extends StatelessWidget {
+  const FeedAuthorAvatar({
+    super.key,
+    required this.authorId,
+    this.avatarUrl,
+    this.avatarPath,
+    this.avatarRevision,
+    required this.timeline,
+    this.visible = true,
+    required this.heroEnabled,
+    required this.size,
+    this.onOpenProfile,
+  });
+
+  final String? authorId, avatarUrl, avatarPath, avatarRevision;
+  final FeedCubit timeline;
+  final bool visible, heroEnabled;
+  final double size;
+  final VoidCallback? onOpenProfile;
+
+  @override
   Widget build(BuildContext context) {
-    final path = post.avatarPath;
+    final path = avatarPath;
     final repository = timeline.repository;
     // The feed stops being current during a push. Keep both the selected
     // Hero and its image available to the Navigator for the whole transition.
@@ -46,13 +80,13 @@ class FeedPostAuthorAvatar extends StatelessWidget {
       child: HeroMode(
         enabled: heroEnabled,
         child: ProfileAvatarHero(
-          profileId: heroEnabled ? post.authorId : null,
-          avatarUrl: post.avatarUrl,
+          profileId: heroEnabled ? authorId : null,
+          avatarUrl: avatarUrl,
           avatarStoragePath: path,
           child: UserAvatar(
             size: size,
-            avatarUrl: showAvatar && path == null ? post.avatarUrl : null,
-            avatarRevision: post.avatarRevision,
+            avatarUrl: showAvatar && path == null ? avatarUrl : null,
+            avatarRevision: path ?? avatarUrl ?? avatarRevision,
             preferAvatarLoader: path != null,
             avatarLoader:
                 showAvatar && path != null && repository is FeedRepository
@@ -88,7 +122,7 @@ class FeedPostHeader extends StatelessWidget {
     final own = post.authorId == timeline.account.userId;
     final name = post.authorName ?? l10n.feedUnknownAuthor;
     final metadata = _metadataStyle(context);
-    final time = _postTime(context, post.createdAt);
+    final time = feedRelativeTime(context, post.createdAt);
     final timestamp = post.edited ? '$time · ${l10n.feedEdited}' : time;
     final authorName = GestureDetector(
       onTap: onOpenProfile ?? () {},
@@ -112,9 +146,7 @@ class FeedPostHeader extends StatelessWidget {
             child: Text('↻ @$username', style: context.textTheme.bodySmall),
           ),
         Row(
-          crossAxisAlignment: details
-              ? CrossAxisAlignment.center
-              : CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             avatar,
             const SizedBox(width: 10),
@@ -122,31 +154,16 @@ class FeedPostHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) => Row(
-                      crossAxisAlignment: details
-                          ? CrossAxisAlignment.center
-                          : CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Flexible(child: authorName),
-                        const SizedBox(width: 6),
-                        if (details)
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth * .55,
-                            ),
-                            child: FittedBox(
-                              alignment: AlignmentDirectional.centerStart,
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                timestamp,
-                                maxLines: 1,
-                                style: metadata,
-                              ),
-                            ),
-                          )
-                        else
+                  if (details)
+                    authorName
+                  else
+                    LayoutBuilder(
+                      builder: (context, constraints) => Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Flexible(child: authorName),
+                          const SizedBox(width: 6),
                           _FeedTimestamp(
                             timestamp: timestamp,
                             style: metadata.copyWith(
@@ -154,9 +171,9 @@ class FeedPostHeader extends StatelessWidget {
                             ),
                             maxWidth: constraints.maxWidth * .55,
                           ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   if (post.coordinates != null || post.nearby)
                     FeedPostLocation(
                       post: post,
@@ -278,29 +295,11 @@ class FeedPostHeader extends StatelessWidget {
           ),
         );
       case 'report':
-        final reason = await _options(context, [
-          (Icons.flag_outlined, l10n.feedSpam, FeedReportReason.spam),
-          (Icons.flag_outlined, l10n.feedScam, FeedReportReason.scam),
-          (
-            Icons.flag_outlined,
-            l10n.feedPornography,
-            FeedReportReason.pornography,
-          ),
-          (Icons.flag_outlined, l10n.feedOther, FeedReportReason.other),
-        ]);
-        if (reason == null ||
-            !context.mounted ||
-            !timeline.isCurrentAccount()) {
-          return;
-        }
-        final confirmed = await showConfirmationDialog(
+        final reason = await showFeedReportReason(
           context,
-          title: l10n.feedReport,
-          content: l10n.feedConfirmReport,
-          confirmLabel: l10n.feedReport,
-          cancelLabel: l10n.cancel.toLowerCase(),
+          timeline.isCurrentAccount,
         );
-        if (confirmed == true && context.mounted) {
+        if (reason != null && context.mounted) {
           await _perform(context, () => actions!.report(post, reason));
         }
       case 'less':
@@ -545,6 +544,7 @@ class FeedPostFooter extends StatelessWidget {
     required this.onOpenPost,
     required this.details,
     required this.bottomSpacing,
+    this.onComments,
   });
 
   final FeedPost post;
@@ -552,6 +552,7 @@ class FeedPostFooter extends StatelessWidget {
   final ValueChanged<String> onOpenPost;
   final bool details;
   final double bottomSpacing;
+  final VoidCallback? onComments;
   static final _thousandsSuffix = RegExp(r'[\s\u00a0]*тыс\.?$');
 
   @override
@@ -588,9 +589,9 @@ class FeedPostFooter extends StatelessWidget {
     final colorScheme = context.colorScheme;
     const shareWidth = 44.0;
     const buttonHeight = 44.0;
-    final iconSize = details ? 19.0 : 22.0;
-    final counterSize = details ? 12.0 : 14.0;
-    final counterGap = details ? 3.0 : 5.0;
+    const iconSize = 22.0;
+    const counterSize = 14.0;
+    const counterGap = 5.0;
 
     Widget item(
       IconData icon,
@@ -619,7 +620,7 @@ class FeedPostFooter extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.metadata.copyWith(
                 fontSize: counterSize,
-                fontWeight: details ? null : FontWeight.w600,
+                fontWeight: FontWeight.w600,
                 color: color,
               ),
             );
@@ -697,7 +698,11 @@ class FeedPostFooter extends StatelessWidget {
                 Icons.chat_bubble_outline,
                 l10n.feedComments,
                 post.commentCount,
-                actions != null && !details ? () => onOpenPost(post.id) : null,
+                details
+                    ? onComments
+                    : actions != null
+                    ? () => onOpenPost(post.id)
+                    : null,
                 stacked: stacked,
               ),
             ),
@@ -784,7 +789,7 @@ Uri _postLink(FeedPost post) => FeedPostLink.create(post.id);
 TextStyle _metadataStyle(BuildContext context) => AppTextStyles.metadata
     .copyWith(color: context.colorScheme.onSurfaceVariant, fontSize: 12);
 
-String _postTime(BuildContext context, DateTime createdAt) {
+String feedRelativeTime(BuildContext context, DateTime createdAt) {
   final elapsed = DateTime.now().difference(createdAt);
   final l10n = context.l10n;
   if (elapsed.isNegative || elapsed.inDays >= 7) {
@@ -796,6 +801,29 @@ String _postTime(BuildContext context, DateTime createdAt) {
   if (elapsed.inHours < 1) return l10n.feedMinutesAgo(elapsed.inMinutes);
   if (elapsed.inDays < 1) return l10n.feedHoursAgo(elapsed.inHours);
   return l10n.feedDaysAgo(elapsed.inDays);
+}
+
+Future<FeedReportReason?> showFeedReportReason(
+  BuildContext context,
+  bool Function() isCurrent, {
+  bool comment = false,
+}) async {
+  final l10n = context.l10n;
+  final reason = await _options(context, [
+    (Icons.flag_outlined, l10n.feedSpam, FeedReportReason.spam),
+    (Icons.flag_outlined, l10n.feedScam, FeedReportReason.scam),
+    (Icons.flag_outlined, l10n.feedPornography, FeedReportReason.pornography),
+    (Icons.flag_outlined, l10n.feedOther, FeedReportReason.other),
+  ]);
+  if (reason == null || !context.mounted || !isCurrent()) return null;
+  final confirmed = await showConfirmationDialog(
+    context,
+    title: l10n.feedReport,
+    content: comment ? l10n.feedConfirmCommentReport : l10n.feedConfirmReport,
+    confirmLabel: l10n.feedReport,
+    cancelLabel: l10n.cancel.toLowerCase(),
+  );
+  return confirmed == true && isCurrent() ? reason : null;
 }
 
 Future<T?> _options<T>(

@@ -22,6 +22,7 @@ class FeedPostCard extends StatefulWidget {
     required this.visible,
     required this.onOpenPost,
     this.details = false,
+    this.onComments,
   });
 
   final FeedPost post;
@@ -29,6 +30,7 @@ class FeedPostCard extends StatefulWidget {
   final bool visible;
   final ValueChanged<String> onOpenPost;
   final bool details;
+  final VoidCallback? onComments;
 
   @override
   State<FeedPostCard> createState() => _FeedPostCardState();
@@ -75,7 +77,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
     final safe = MediaQuery.paddingOf(context);
     const gutter = PrimaryHeaderGeometry.horizontalPadding;
     final contentInsets = details
-        ? const EdgeInsets.symmetric(horizontal: 14)
+        ? EdgeInsets.only(left: safe.left + 14, right: safe.right + 14)
         : EdgeInsets.only(left: safe.left + gutter, right: safe.right + gutter);
     const avatarSize = 40.0;
     const authorGap = 10.0;
@@ -171,20 +173,19 @@ class _FeedPostCardState extends State<FeedPostCard> {
                         timeline: timeline,
                         onOpenPost: widget.onOpenPost,
                       ),
+                    if (details) _DetailsTimestamp(post: post),
                     FeedPostFooter(
                       post: post,
                       timeline: timeline,
                       details: details,
                       bottomSpacing: details ? 0 : separatorSpacing,
                       onOpenPost: widget.onOpenPost,
+                      onComments: widget.onComments,
                     ),
                   ],
                 ),
               ),
-              if (details)
-                Padding(padding: contentInsets, child: _divider(context))
-              else
-                _divider(context),
+              _divider(context),
             ],
           ),
         ),
@@ -196,6 +197,31 @@ class _FeedPostCardState extends State<FeedPostCard> {
     height: 1,
     color: context.colorScheme.onSurface.withValues(alpha: .12),
   );
+}
+
+class _DetailsTimestamp extends StatelessWidget {
+  const _DetailsTimestamp({required this.post});
+  final FeedPost post;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = post.createdAt.toLocal();
+    final format = MaterialLocalizations.of(context);
+    final time = format.formatTimeOfDay(
+      TimeOfDay.fromDateTime(date),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 2),
+      child: Text(
+        '$time · ${format.formatMediumDate(date)} · ${date.year}'
+        '${post.edited ? ' · ${context.l10n.feedEdited}' : ''}',
+        style: AppTextStyles.metadata.copyWith(
+          color: context.colorScheme.outline,
+        ),
+      ),
+    );
+  }
 }
 
 class _FeedPhotos extends StatefulWidget {

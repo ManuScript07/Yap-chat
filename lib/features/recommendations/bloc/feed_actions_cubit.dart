@@ -7,6 +7,8 @@ import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/recommendations/data/feed_media_frames.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
+import 'feed_comment_cache.dart';
+
 typedef FeedActionsState = ({
   Map<String, FeedFollowState> follows,
   Map<String, FeedReaction> reactions,
@@ -36,6 +38,16 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   final IFeedPostRepository repository;
   final thumbnailFrames = FeedMediaFrames(maxBytes: 8 * 1024 * 1024);
+  final commentCache = FeedCommentCache();
+  final _hiddenComments = <String>{};
+
+  bool commentHidden(String id) => _hiddenComments.contains(id);
+
+  void hideComment(String postId, String id) {
+    _hiddenComments.add(id);
+    commentCache.removePost(postId);
+  }
+
   final AccountSessionSnapshot account;
   final bool Function() isCurrent;
   final _follows = <String, FeedFollowState>{};
@@ -428,6 +440,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         !identical(state.blocked, _blocked) ||
         state.accessVersion != _accessVersion) {
       thumbnailFrames.removeUnavailable(canShow);
+      commentCache.clear();
     }
     _trim(_follows);
     _trim(_reactions);
@@ -446,6 +459,8 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   @override
   Future<void> close() {
     thumbnailFrames.clear();
+    commentCache.clear();
+    _hiddenComments.clear();
     return super.close();
   }
 

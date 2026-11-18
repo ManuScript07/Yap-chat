@@ -273,7 +273,12 @@ class _FeedRowsState extends State<_FeedRows> {
             post: post,
             timeline: timeline,
             visible: widget.visible,
-            onOpenPost: (id) => openFeedPost(this.context, timeline, id),
+            onOpenPost: (id) => openFeedPost(
+              this.context,
+              timeline,
+              id,
+              initial: post.id == id ? post : post.original,
+            ),
           );
         },
       ),

@@ -112,6 +112,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedConfirmReport => 'send a report about this publication?';
 
   @override
+  String get feedConfirmCommentReport => 'send a report about this comment?';
+
+  @override
   String get feedLessSimilar => 'less like this';
 
   @override
@@ -173,6 +176,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get feedNoComments => 'no comments yet';
+
+  @override
+  String get feedCommentsSort => 'comment order';
+
+  @override
+  String get feedCommentsPopular => 'popular';
+
+  @override
+  String get feedCommentsNew => 'newest';
+
+  @override
+  String get feedCommentsOld => 'oldest';
+
+  @override
+  String get feedShowReplies => 'show replies';
+
+  @override
+  String get feedHideReplies => 'hide replies';
+
+  @override
+  String get feedReplyComment => 'reply';
+
+  @override
+  String get feedCommentMenu => 'comment options';
+
+  @override
+  String get feedUnlike => 'unlike';
+
+  @override
+  String feedReplyingTo(String name) {
+    return 'replying to $name';
+  }
 
   @override
   String get feedCommentUnavailable => 'comment unavailable';

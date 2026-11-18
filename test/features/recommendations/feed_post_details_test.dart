@@ -2,15 +2,21 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yap_chat/core/services/services.dart';
+import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
+import 'package:yap_chat/features/recommendations/view/feed_comments_sliver.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_details.dart';
+import 'package:yap_chat/features/recommendations/view/feed_post_controls.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_gallery.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
+import 'package:yap_chat/router/router.dart';
+import 'package:yap_chat/router/router.gr.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 const _postId = '07d220f5-ae02-4a69-b52f-0452f1637e1a';
@@ -30,15 +36,24 @@ void main() {
     scope.dispose();
   });
 
-  Future<void> show(WidgetTester tester, {String id = _postId}) async {
+  Widget providers(Widget child) => MultiRepositoryProvider(
+    providers: [
+      RepositoryProvider.value(value: accounts),
+      RepositoryProvider<IFeedRepository>.value(value: repository),
+      RepositoryProvider.value(value: scope),
+    ],
+    child: child,
+  );
+
+  Future<void> show(
+    WidgetTester tester, {
+    String id = _postId,
+    FeedPostDetailsPreview? preview,
+    bool settle = true,
+  }) async {
     await tester.pumpWidget(
-      MultiRepositoryProvider(
-        providers: [
-          RepositoryProvider.value(value: accounts),
-          RepositoryProvider<IFeedRepository>.value(value: repository),
-          RepositoryProvider.value(value: scope),
-        ],
-        child: MaterialApp(
+      providers(
+        MaterialApp(
           locale: const Locale('en'),
           theme: ThemeData(
             brightness: Brightness.dark,
@@ -50,12 +65,336 @@ void main() {
           ),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: FeedPostDetailsPage(id: id),
+          home: FeedPostDetailsPage(id: id, preview: preview),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
+
+  testWidgets('warm publication paints before RPC and keeps focus and draft', (
+    tester,
+  ) async {
+    final pending = Completer<FeedPost?>();
+    repository.pendingPost = pending.future;
+    final initial = _postWithLocation();
+    await show(
+      tester,
+      preview: FeedPostDetailsPreview(initial, accounts.capture()),
+      settle: false,
+    );
+    expect(find.text(initial.text), findsOneWidget);
+    expect(repository.postReads, 1);
+    expect(repository.commentReads, 0);
+    final field = find.byType(TextField);
+    await tester.tap(find.byTooltip('comments'));
+    await tester.pump();
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+    await tester.enterText(field, 'retained draft');
+    tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 250);
+    addTearDown(tester.view.reset);
+    await tester.pump();
+    expect(
+      tester.getBottomLeft(field).dy,
+      lessThan(
+        (tester.view.physicalSize.height - 250) / tester.view.devicePixelRatio,
+      ),
+    );
+    pending.complete(repository.post);
+    await tester.pumpAndSettle();
+    expect(repository.postReads, 1);
+    expect(repository.commentReads, 1);
+    expect(tester.widget<TextField>(field).controller!.text, 'retained draft');
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+  });
+
+  testWidgets(
+    'switches server sort, renders replies in line and serializes a comment like',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(440, 960);
+      addTearDown(tester.view.reset);
+      const preview = FeedComment(
+        id: 'first-reply',
+        rootId: 'root',
+        authorId: 'another-account',
+        authorName: 'reply author',
+        text: 'first reply',
+      );
+      const root = FeedComment(
+        id: 'root',
+        authorId: 'comment-account',
+        authorName: 'root author',
+        text: 'root text',
+        replyCount: 2,
+        replyPreview: preview,
+        commentVersion: 2,
+        postVersion: 3,
+        reaction: (version: 4, liked: false, likes: 2),
+      );
+      final newest = Completer<FeedCommentsPage>();
+      repository.commentPage = (sort, thread) async {
+        if (thread != null) {
+          return (
+            comments: [
+              preview,
+              const FeedComment(
+                id: 'next-reply',
+                rootId: 'root',
+                authorId: 'other',
+                authorName: 'other',
+                text: 'next reply',
+              ),
+            ],
+            next: null,
+          );
+        }
+        if (sort == FeedCommentSort.newFirst) return newest.future;
+        if (sort == FeedCommentSort.old) {
+          return (
+            comments: [
+              const FeedComment(
+                id: 'old',
+                authorId: 'other',
+                authorName: 'other',
+                text: 'old result',
+              ),
+            ],
+            next: null,
+          );
+        }
+        return (comments: [root], next: null);
+      };
+      await show(tester);
+      expect(repository.commentQueries, [(FeedCommentSort.popular, null)]);
+      expect(
+        tester.getTopLeft(find.text('root author')).dx,
+        tester.getTopLeft(find.text('reply author')).dx,
+      );
+      await tester.tap(find.text('show replies'));
+      await tester.pumpAndSettle();
+      expect(find.text('next reply'), findsOneWidget);
+      expect(repository.commentQueries.last, (FeedCommentSort.old, 'root'));
+      await tester.tap(find.text('hide replies'));
+      await tester.pumpAndSettle();
+
+      final rootRow = find.byKey(const ValueKey('root'));
+      final like = find.descendant(
+        of: rootRow,
+        matching: find.byIcon(Icons.favorite_border),
+      );
+      await tester.tap(like);
+      await tester.tap(like);
+      expect(repository.likes, hasLength(1));
+      expect(repository.likes.single.$2.version, 4);
+      repository.pendingLike!.complete((
+        version: 5,
+        liked: true,
+        changed: true,
+      ));
+      await tester.pump();
+      await tester.pumpAndSettle();
+      final sliver = tester.widget<FeedCommentsSliver>(
+        find.byType(FeedCommentsSliver),
+      );
+      expect(sliver.comments.reactionFor(root), (
+        version: 5,
+        liked: true,
+        likes: 3,
+      ));
+      expect(
+        find.descendant(of: rootRow, matching: find.byIcon(Icons.favorite)),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.descendant(
+          of: rootRow,
+          matching: find.byTooltip('comment options'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('report'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('spam'));
+      await tester.pumpAndSettle();
+      expect(find.text('send a report about this comment?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'report'));
+      await tester.pumpAndSettle();
+      expect(repository.reported, [('root', FeedReportReason.spam)]);
+      expect(find.text('comment unavailable'), findsOneWidget);
+      expect(find.text('first reply'), findsOneWidget);
+
+      final sortMenu = find.byType(PopupMenuButton<FeedCommentSort>);
+      await tester.tap(sortMenu);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('newest'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+      expect(find.byType(PopupMenuItem<FeedCommentSort>), findsNothing);
+      await tester.tap(sortMenu);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('oldest'));
+      await tester.pumpAndSettle();
+      expect(find.text('old result'), findsOneWidget);
+      newest.complete((
+        comments: [
+          const FeedComment(
+            id: 'new',
+            authorId: 'other',
+            authorName: 'other',
+            text: 'late newest result',
+          ),
+        ],
+        next: null,
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('old result'), findsOneWidget);
+      expect(find.text('late newest result'), findsNothing);
+      expect(repository.commentQueries, [
+        (FeedCommentSort.popular, null),
+        (FeedCommentSort.old, 'root'),
+        (FeedCommentSort.newFirst, null),
+        (FeedCommentSort.old, null),
+      ]);
+    },
+  );
+
+  testWidgets('comment cache keeps the avatar row mounted during a warm read', (
+    tester,
+  ) async {
+    const first = FeedComment(
+      id: 'cached',
+      authorId: 'commenter',
+      authorName: 'cached author',
+      avatarPath: 'avatars/commenter/one.jpg',
+      text: 'cached text',
+    );
+    repository.commentPage = (_, _) async => (comments: [first], next: null);
+    await show(tester);
+    expect(find.text('cached text'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    final revalidation = Completer<FeedCommentsPage>();
+    repository.commentPage = (_, _) => revalidation.future;
+    await show(tester, settle: false);
+    await tester.pump();
+    final avatar = find.descendant(
+      of: find.byKey(const ValueKey('cached')),
+      matching: find.byType(FeedAuthorAvatar),
+    );
+    expect(find.text('cached text'), findsOneWidget);
+    expect(find.byType(PullRefreshIndicator), findsOneWidget);
+    final element = tester.element(avatar);
+    revalidation.complete((
+      comments: [
+        const FeedComment(
+          id: 'cached',
+          authorId: 'commenter',
+          authorName: 'cached author',
+          avatarPath: 'avatars/commenter/one.jpg',
+          text: 'updated text',
+        ),
+      ],
+      next: null,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('updated text'), findsOneWidget);
+    expect(tester.element(avatar), same(element));
+    expect(repository.commentReads, 2);
+  });
+
+  testWidgets(
+    'only the selected comment avatar flies to the profile and back',
+    (tester) async {
+      const path = 'avatars/comment-hero.png';
+      repository.commentPage = (_, _) async => (
+        comments: [
+          const FeedComment(
+            id: 'first',
+            authorId: 'commenter',
+            authorName: 'same author',
+            avatarPath: path,
+            text: 'first comment',
+          ),
+          const FeedComment(
+            id: 'second',
+            authorId: 'commenter',
+            authorName: 'same author',
+            avatarPath: path,
+            text: 'second comment',
+          ),
+        ],
+        next: null,
+      );
+      final router = RootStackRouter.build(
+        routes: [
+          NamedRouteDef(
+            name: AuthGateRoute.name,
+            path: '/',
+            builder: (_, _) => const AutoRouter(),
+            children: [
+              NamedRouteDef(
+                name: 'CommentFixture',
+                path: '',
+                builder: (_, _) => const FeedPostDetailsPage(id: _postId),
+              ),
+              NamedRouteDef(
+                name: ViewedProfileRoute.name,
+                path: 'profile',
+                builder: (_, _) {
+                  final snapshot = ProfileAvatarHero.snapshotFor('commenter')!;
+                  return Scaffold(
+                    body: Center(
+                      child: ProfileAvatarHero(
+                        avatarStoragePath: snapshot.avatarStoragePath,
+                        child: const UserAvatar(size: 176),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        providers(
+          MaterialApp.router(
+            routerConfig: router.config(
+              navigatorObservers: createAppNavigatorObservers,
+            ),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final avatar = find.descendant(
+        of: find.byKey(const ValueKey('second')),
+        matching: find.byType(FeedAuthorAvatar),
+      );
+      await tester.tap(avatar);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final flight = find.byKey(const ValueKey('profile-photo-flight-clip'));
+      expect(flight, findsOneWidget);
+      await tester.pumpAndSettle();
+      router.innerRouterOf<StackRouter>(AuthGateRoute.name)!.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(flight, findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(avatar, findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      router.dispose();
+    },
+  );
 
   testWidgets('invalid and inaccessible posts issue no comment requests', (
     tester,
@@ -136,12 +475,14 @@ void main() {
     await tester.pump();
     expect(repository.writes, hasLength(2));
     expect(repository.writes.last.$1, repository.writes.first.$1);
-    repository.writes.last.$2.complete((
-      id: repository.writes.last.$1,
-      authorId: 'viewer',
-      authorName: 'viewer',
-      text: 'my comment',
-    ));
+    repository.writes.last.$2.complete(
+      FeedComment(
+        id: repository.writes.last.$1,
+        authorId: 'viewer',
+        authorName: 'viewer',
+        text: 'my comment',
+      ),
+    );
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller!.text, isEmpty);
     expect(find.text('my comment'), findsOneWidget);
@@ -458,6 +799,12 @@ class _Repository extends MockFeedRepository
     createdAt: DateTime.utc(2026),
   );
   final writes = <(String, Completer<FeedComment>)>[];
+  final likes = <(FeedComment, FeedReaction)>[];
+  final reported = <(String, FeedReportReason)>[];
+  Completer<FeedCommentLike>? pendingLike;
+  final commentQueries = <(FeedCommentSort, String?)>[];
+  Future<FeedCommentsPage> Function(FeedCommentSort, String?)? commentPage;
+  Future<FeedPost?>? pendingPost;
   int postReads = 0;
   int commentReads = 0;
   final photoReads = <String>[];
@@ -467,6 +814,7 @@ class _Repository extends MockFeedRepository
   @override
   Future<FeedPost?> getPost(String id, AccountSessionSnapshot account) async {
     postReads++;
+    if (pendingPost case final pending?) return pending;
     return post;
   }
 
@@ -475,18 +823,42 @@ class _Repository extends MockFeedRepository
     String id,
     AccountSessionSnapshot account, {
     FeedCommentsCursor? cursor,
+    FeedCommentSort sort = FeedCommentSort.popular,
+    String? rootId,
   }) async {
     commentReads++;
+    commentQueries.add((sort, rootId));
+    if (commentPage case final handler?) return handler(sort, rootId);
     return (comments: <FeedComment>[], next: null);
   }
+
+  @override
+  Future<FeedCommentLike> setCommentLiked(
+    FeedComment comment,
+    FeedReaction current,
+    String requestId,
+    AccountSessionSnapshot account,
+  ) {
+    likes.add((comment, current));
+    return (pendingLike ??= Completer<FeedCommentLike>()).future;
+  }
+
+  @override
+  Future<void> reportComment(
+    String id,
+    FeedReportReason reason,
+    String requestId,
+    AccountSessionSnapshot account,
+  ) async => reported.add((id, reason));
 
   @override
   Future<FeedComment> createComment(
     String id,
     String requestId,
     String text,
-    AccountSessionSnapshot account,
-  ) {
+    AccountSessionSnapshot account, {
+    String? replyTo,
+  }) {
     final result = Completer<FeedComment>();
     writes.add((requestId, result));
     return result.future;

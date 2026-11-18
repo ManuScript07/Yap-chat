@@ -513,7 +513,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery>
       avatar: UserAvatar(
         size: MediaGalleryHeader.buttonSize,
         avatarUrl: path == null ? post.avatarUrl : null,
-        avatarRevision: post.avatarRevision,
+        avatarRevision: path ?? post.avatarUrl ?? post.avatarRevision,
         preferAvatarLoader: path != null,
         avatarLoader: path != null && repository is FeedRepository
             ? () => repository.loadAvatar(path, widget.timeline.account)
