@@ -242,6 +242,12 @@ void main() {
         of: rootRow,
         matching: find.byIcon(Icons.favorite_border),
       );
+      final count = find.descendant(of: rootRow, matching: find.text('2'));
+      final menuGlyph = find.descendant(
+        of: rootRow,
+        matching: find.byIcon(Icons.more_vert),
+      );
+      expect(tester.getTopRight(count).dx, tester.getTopRight(menuGlyph).dx);
       await tester.tap(like);
       await tester.tap(like);
       expect(repository.likes, hasLength(1));
@@ -289,10 +295,41 @@ void main() {
         of: sortMenu,
         matching: find.byType(AnimatedRotation),
       );
+      final sortLabel = find.descendant(
+        of: sortMenu,
+        matching: find.text('popular'),
+      );
+      expect(
+        tester.getCenter(arrow).dy,
+        greaterThan(tester.getCenter(sortLabel).dy),
+      );
       await tester.tap(sortMenu);
       await tester.pumpAndSettle();
       expect(tester.widget<AnimatedRotation>(arrow).turns, .5);
       final popular = find.widgetWithText(MenuItemButton, 'popular');
+      final palette = Theme.of(tester.element(popular));
+      expect(palette.colorScheme.surface, Colors.white);
+      final panelColor = Color.alphaBlend(
+        palette.colorScheme.onSurface.withValues(alpha: .08),
+        palette.scaffoldBackgroundColor,
+      );
+      final panel = find.ancestor(
+        of: popular,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Material && widget.color == panelColor,
+        ),
+      );
+      expect(panel, findsOneWidget);
+      expect(tester.widget<Material>(panel).clipBehavior, Clip.antiAlias);
+      expect(tester.getSize(panel).width, greaterThanOrEqualTo(168));
+      expect(tester.getSize(popular).width, tester.getSize(panel).width - 8);
+      expect(tester.getSize(popular).height, lessThanOrEqualTo(40));
+      expect(
+        tester.widget<MenuItemButton>(popular).style!.overlayColor!.resolve({
+          WidgetState.pressed,
+        }),
+        Colors.transparent,
+      );
       expect(
         tester.getTopLeft(popular).dy,
         greaterThanOrEqualTo(tester.getBottomLeft(sortMenu).dy),
@@ -669,7 +706,16 @@ void main() {
         tester.getTopLeft(find.text('root text')).dx,
       );
       await tester.tap(reply);
+      await tester.pump();
+      final transition = find.descendant(
+        of: find.byType(ComposerReplyTransition),
+        matching: find.byType(SizeTransition),
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      final appearingHeight = tester.getSize(transition).height;
       await tester.pumpAndSettle();
+      final fullHeight = tester.getSize(transition).height;
+      expect(appearingHeight, inExclusiveRange(0, fullHeight));
       final replyBar = find.ancestor(
         of: find.text('replying to author of comment'),
         matching: find.byType(ChatGlassSurface),
@@ -709,6 +755,16 @@ void main() {
       expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
       expect(tester.widget<TextField>(field).controller!.text, 'draft reply');
       expect(replyBar, findsOneWidget);
+      await tester.tap(find.byTooltip('cancel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(
+        tester.getSize(transition).height,
+        inExclusiveRange(0, fullHeight),
+      );
+      await tester.pumpAndSettle();
+      expect(replyBar, findsNothing);
+      expect(tester.widget<TextField>(field).controller!.text, 'draft reply');
     },
   );
 

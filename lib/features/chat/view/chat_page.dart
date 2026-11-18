@@ -697,20 +697,7 @@ class _KeyboardAwareInput extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          reverseDuration: const Duration(milliseconds: 180),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(
-                                opacity: animation,
-                                child: SizeTransition(
-                                  sizeFactor: animation,
-                                  axisAlignment: -1,
-                                  child: child,
-                                ),
-                              ),
+                        ComposerReplyTransition(
                           child: switch (chatState.replyToMessage) {
                             final reply? => Padding(
                               key: ValueKey('reply_${reply.id}'),
@@ -735,9 +722,7 @@ class _KeyboardAwareInput extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            null => const SizedBox(
-                              key: ValueKey('reply_empty'),
-                            ),
+                            null => null,
                           },
                         ),
                         AnimatedSwitcher(

@@ -179,6 +179,12 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
     final l10n = context.l10n;
     final colors = context.colorScheme;
     final textStyle = AppTextStyles.chatName.copyWith(fontSize: 15);
+    const panelWidth = 168.0;
+    const panelInset = 4.0;
+    final panelColor = Color.alphaBlend(
+      colors.onSurface.withValues(alpha: .08),
+      context.scaffoldBackgroundColor,
+    );
     String label(FeedCommentSort sort) => switch (sort) {
       FeedCommentSort.popular => l10n.feedCommentsPopular,
       FeedCommentSort.newFirst => l10n.feedCommentsNew,
@@ -186,13 +192,16 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
     };
 
     return MenuAnchor(
-      alignmentOffset: const Offset(0, 4),
+      clipBehavior: Clip.antiAlias,
+      crossAxisUnconstrained: false,
       onOpen: () => setState(() => _open = true),
       onClose: () => setState(() => _open = false),
       style: MenuStyle(
         alignment: AlignmentDirectional.bottomStart,
-        backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHigh),
+        backgroundColor: WidgetStatePropertyAll(panelColor),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        minimumSize: const WidgetStatePropertyAll(Size(panelWidth, 0)),
+        padding: const WidgetStatePropertyAll(EdgeInsets.all(panelInset)),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
@@ -201,12 +210,34 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
         for (final sort in FeedCommentSort.values)
           MenuItemButton(
             key: ValueKey(sort),
-            style: MenuItemButton.styleFrom(
-              foregroundColor: sort == widget.selected
-                  ? colors.primary
-                  : colors.onSurface,
-              textStyle: textStyle,
-            ),
+            clipBehavior: Clip.antiAlias,
+            style:
+                MenuItemButton.styleFrom(
+                  foregroundColor: sort == widget.selected
+                      ? colors.primary
+                      : colors.onSurface,
+                  textStyle: textStyle,
+                  minimumSize: const Size(panelWidth - 2 * panelInset, 36),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.standard,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ).copyWith(
+                  overlayColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.pressed)) {
+                      return Colors.transparent;
+                    }
+                    return states.contains(WidgetState.focused) ||
+                            states.contains(WidgetState.hovered)
+                        ? colors.onSurface.withValues(alpha: .08)
+                        : Colors.transparent;
+                  }),
+                ),
             onPressed: () => widget.onSelected(sort),
             child: Semantics(
               selected: sort == widget.selected,
@@ -237,13 +268,16 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
                 ),
               ),
               const SizedBox(width: 4),
-              AnimatedRotation(
-                turns: _open ? .5 : 0,
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                child: const Icon(Icons.expand_more_rounded, size: 18),
+              Transform.translate(
+                offset: const Offset(0, 2),
+                child: AnimatedRotation(
+                  turns: _open ? .5 : 0,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: const Icon(Icons.expand_more_rounded, size: 18),
+                ),
               ),
             ],
           ),
@@ -652,26 +686,29 @@ class _CommentRowState extends State<_CommentRow> {
                                 ),
                               ),
                             ),
-                            Flexible(
-                              child: FeedActionButton(
-                                icon: reaction.liked
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                label: reaction.liked
-                                    ? l10n.feedUnlike
-                                    : l10n.feedLike,
-                                count: reaction.likes,
-                                active: reaction.liked,
+                            Expanded(
+                              child: Align(
                                 alignment: AlignmentDirectional.centerEnd,
-                                compact: widget.compactCount,
-                                complete: widget.fullCount,
-                                onPressed: canAct
-                                    ? () => unawaited(
-                                        _perform(
-                                          () => comments.toggleLike(item),
-                                        ),
-                                      )
-                                    : null,
+                                child: FeedActionButton(
+                                  icon: reaction.liked
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  label: reaction.liked
+                                      ? l10n.feedUnlike
+                                      : l10n.feedLike,
+                                  count: reaction.likes,
+                                  active: reaction.liked,
+                                  alignment: AlignmentDirectional.centerEnd,
+                                  compact: widget.compactCount,
+                                  complete: widget.fullCount,
+                                  onPressed: canAct
+                                      ? () => unawaited(
+                                          _perform(
+                                            () => comments.toggleLike(item),
+                                          ),
+                                        )
+                                      : null,
+                                ),
                               ),
                             ),
                           ],

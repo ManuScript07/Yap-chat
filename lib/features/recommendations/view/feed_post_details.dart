@@ -292,10 +292,10 @@ class _Publication extends StatefulWidget {
 class _PublicationState extends State<_Publication> {
   final _controller = ScrollController();
   final _focus = FocusNode();
+  final _composerHeight = ValueNotifier<double?>(null);
   FeedCommentsCubit? _comments;
   String? _submitError;
   FeedComment? _replyTo;
-  double? _composerHeight;
 
   @override
   void initState() {
@@ -411,7 +411,6 @@ class _PublicationState extends State<_Publication> {
       0.0,
       media.viewInsets.bottom - media.viewPadding.bottom,
     );
-    final composerHeight = _composerHeight ?? (70 + media.viewPadding.bottom);
     return BlocListener<FeedActionsCubit, FeedActionsState>(
       bloc: widget.actions,
       listenWhen: (previous, current) => previous.blocked != current.blocked,
@@ -461,13 +460,22 @@ class _PublicationState extends State<_Publication> {
                     ),
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: comments != null
-                      ? composerHeight + keyboard + 12
-                      : media.viewPadding.bottom,
+              if (comments != null)
+                ValueListenableBuilder(
+                  valueListenable: _composerHeight,
+                  builder: (_, height, _) => SliverToBoxAdapter(
+                    child: SizedBox(
+                      height:
+                          (height ?? 70 + media.viewPadding.bottom) +
+                          keyboard +
+                          12,
+                    ),
+                  ),
+                )
+              else
+                SliverToBoxAdapter(
+                  child: SizedBox(height: media.viewPadding.bottom),
                 ),
-              ),
             ],
           ),
           if (comments != null)
@@ -479,45 +487,48 @@ class _PublicationState extends State<_Publication> {
                 data: media.copyWith(viewInsets: EdgeInsets.zero),
                 child: SizeReporter(
                   onSizeChanged: (size) {
-                    if (mounted && _composerHeight != size.height) {
-                      setState(() => _composerHeight = size.height);
-                    }
+                    if (mounted) _composerHeight.value = size.height;
                   },
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_replyTo case final target?)
-                        Padding(
-                          padding: composerInsets,
-                          child: ChatGlassSurface(
-                            borderRadius: 16,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsetsDirectional.only(
-                                      start: 12,
-                                    ),
-                                    child: Text(
-                                      context.l10n.feedReplyingTo(
-                                        target.authorName ??
-                                            context.l10n.feedUnknownAuthor,
+                      ComposerReplyTransition(
+                        child: switch (_replyTo) {
+                          final target? => Padding(
+                            key: const ValueKey('feed_reply_preview'),
+                            padding: composerInsets,
+                            child: ChatGlassSurface(
+                              borderRadius: 16,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                        start: 12,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                      child: Text(
+                                        context.l10n.feedReplyingTo(
+                                          target.authorName ??
+                                              context.l10n.feedUnknownAuthor,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                IconButton(
-                                  tooltip: context.l10n.cancel.toLowerCase(),
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () =>
-                                      setState(() => _replyTo = null),
-                                ),
-                              ],
+                                  IconButton(
+                                    tooltip: context.l10n.cancel.toLowerCase(),
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () =>
+                                        setState(() => _replyTo = null),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                          null => null,
+                        },
+                      ),
                       if (_submitError case final error?)
                         Semantics(
                           liveRegion: true,
@@ -554,6 +565,7 @@ class _PublicationState extends State<_Publication> {
   void dispose() {
     _controller.dispose();
     _focus.dispose();
+    _composerHeight.dispose();
     unawaited(_comments?.close());
     super.dispose();
   }
