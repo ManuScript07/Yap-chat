@@ -192,12 +192,11 @@ class _FeedTabViewState extends State<FeedTabView>
     if (failure == FeedFailure.locationRequired) {
       return const SliverToBoxAdapter();
     }
-    Widget? content;
-    if (empty && !state.loaded && failure == null) {
-      return const SliverToBoxAdapter();
-    }
-    if (state.loading) {
+    Widget content = const SizedBox.shrink(key: ValueKey('feed_footer_idle'));
+    // PullRefresh owns first-load feedback under the header.
+    if (state.loading && (!empty || state.loaded)) {
       content = const Padding(
+        key: ValueKey('feed_footer_loading'),
         padding: EdgeInsets.all(16),
         child: PullRefreshIndicator(
           opacity: 1,
@@ -209,24 +208,37 @@ class _FeedTabViewState extends State<FeedTabView>
       );
     } else if (failure != null) {
       content = Column(
+        key: const ValueKey('feed_footer_error'),
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(l10n.feedLoadFailed, textAlign: TextAlign.center),
-          TextButton(onPressed: timeline.retry, child: Text(l10n.feedRetry)),
+          EmptyChatState(message: l10n.feedLoadFailed, showImage: false),
+          const SizedBox(height: 8),
+          RetryPillButton(onPressed: timeline.retry, label: l10n.feedRetry),
         ],
       );
     } else if (state.canContinue) {
       content = TextButton(
+        key: const ValueKey('feed_footer_more'),
         onPressed: timeline.loadMore,
         child: Text(l10n.feedLoadMore),
       );
-    } else if (empty) {
-      content = EmptyChatState(message: l10n.feedEmpty);
+    } else if (empty && state.loaded) {
+      content = EmptyChatState(
+        key: const ValueKey('feed_footer_empty'),
+        message: l10n.feedEmpty,
+        showImage: false,
+      );
     }
 
     final body = Padding(
       padding: EdgeInsets.fromLTRB(24, 12, 24, widget.bottomPadding),
-      child: Center(child: content),
+      child: AnimatedStatusSwitcher(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 180),
+        scaleTransition: false,
+        child: content,
+      ),
     );
     return empty
         ? SliverFillRemaining(hasScrollBody: false, child: body)

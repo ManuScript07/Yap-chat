@@ -175,11 +175,7 @@ class FeedPostHeader extends StatelessWidget {
                       ),
                     ),
                   if (post.coordinates != null || post.nearby)
-                    FeedPostLocation(
-                      post: post,
-                      actions: actions,
-                      inFeed: !details,
-                    ),
+                    FeedPostLocation(post: post, actions: actions),
                 ],
               ),
             ),
@@ -201,7 +197,7 @@ class FeedPostHeader extends StatelessWidget {
                     return const SizedBox.shrink();
                   }
                   return Padding(
-                    padding: EdgeInsetsDirectional.only(start: details ? 0 : 4),
+                    padding: const EdgeInsetsDirectional.only(start: 4),
                     child: Tooltip(
                       message: follow.following
                           ? l10n.feedUnfollow
@@ -224,16 +220,12 @@ class FeedPostHeader extends StatelessWidget {
               ),
             IconButton(
               tooltip: l10n.feedPostOptions,
-              alignment: details ? null : AlignmentDirectional.centerEnd,
-              padding: details ? null : EdgeInsets.zero,
-              constraints: details
-                  ? null
-                  : const BoxConstraints.tightFor(width: 36, height: 36),
-              style: details
-                  ? null
-                  : const ButtonStyle(
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+              alignment: AlignmentDirectional.centerEnd,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              style: const ButtonStyle(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               icon: const Icon(Icons.more_vert),
               onPressed: () => _showOptions(context),
             ),
@@ -386,12 +378,10 @@ class FeedPostLocation extends StatelessWidget {
     super.key,
     required this.post,
     required this.actions,
-    required this.inFeed,
   });
 
   final FeedPost post;
   final FeedActionsCubit? actions;
-  final bool inFeed;
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +402,7 @@ class FeedPostLocation extends StatelessWidget {
     if (point == null) {
       if (!post.nearby) return const SizedBox.shrink();
       return Padding(
-        padding: EdgeInsets.only(top: inFeed ? 2 : 0),
+        padding: const EdgeInsets.only(top: 2),
         child: Text(context.l10n.feedNearYou, style: metadata),
       );
     }
@@ -428,8 +418,8 @@ class FeedPostLocation extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: metadata.copyWith(
               color: colorScheme.primary,
-              fontWeight: inFeed ? FontWeight.w700 : FontWeight.w500,
-              letterSpacing: inFeed ? .25 : null,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .25,
             ),
           ),
         ),
@@ -440,24 +430,22 @@ class FeedPostLocation extends StatelessWidget {
       child: TextButton(
         style: TextButton.styleFrom(
           foregroundColor: colorScheme.primary,
-          minimumSize: Size(0, inFeed ? 0 : 28),
+          minimumSize: Size.zero,
           padding: EdgeInsets.zero,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           iconSize: 19,
-          alignment: inFeed ? AlignmentDirectional.centerStart : null,
-          overlayColor: inFeed ? Colors.transparent : null,
+          alignment: AlignmentDirectional.centerStart,
+          overlayColor: Colors.transparent,
         ),
         // Compensate for the pin glyph's own inset without moving the hit box.
-        child: inFeed
-            ? Transform.translate(
-                offset: Offset(
-                  Directionality.of(context) == TextDirection.ltr ? -3 : 3,
-                  0,
-                ),
-                transformHitTests: false,
-                child: locationLabel,
-              )
-            : locationLabel,
+        child: Transform.translate(
+          offset: Offset(
+            Directionality.of(context) == TextDirection.ltr ? -3 : 3,
+            0,
+          ),
+          transformHitTests: false,
+          child: locationLabel,
+        ),
         onPressed: () => _perform(context, () async {
           final actions = this.actions;
           final current = actions == null
@@ -603,9 +591,7 @@ class FeedPostFooter extends StatelessWidget {
       bool readOnly = false,
     }) {
       final color = active ? colorScheme.primary : colorScheme.outline;
-      final alignment = details
-          ? Alignment.center
-          : count == null
+      final alignment = count == null
           ? AlignmentDirectional.centerEnd
           : AlignmentDirectional.centerStart;
       final glyph = Icon(icon, size: iconSize, color: color);
@@ -629,16 +615,11 @@ class FeedPostFooter extends StatelessWidget {
           : stacked
           ? Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: details
-                  ? CrossAxisAlignment.center
-                  : CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [glyph, counter],
             )
           : Row(
-              mainAxisSize: details ? MainAxisSize.max : MainAxisSize.min,
-              mainAxisAlignment: details
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 glyph,
                 SizedBox(width: counterGap),
@@ -678,7 +659,7 @@ class FeedPostFooter extends StatelessWidget {
         ).scale(counterSize);
         final stacked =
             (constraints.maxWidth - shareWidth) / 4 <
-            iconSize + counterGap + scaledCounterSize * (details ? 3 : 2);
+            iconSize + counterGap + scaledCounterSize * 2;
         final row = Row(
           children: [
             Expanded(

@@ -1019,7 +1019,7 @@ class _ChatsEmptyPresentation extends StatelessWidget {
         final actionText = TextPainter(
           text: TextSpan(
             text: context.l10n.repeat,
-            style: _ChatsRetryButton.textStyle(context),
+            style: RetryPillButton.labelStyle(context),
           ),
           textDirection: Directionality.of(context),
           textScaler: media.textScaler,
@@ -1134,27 +1134,12 @@ class _ChatsFeedbackViewport extends StatelessWidget {
 class _ChatsRetryButton extends StatelessWidget {
   const _ChatsRetryButton();
 
-  static TextStyle textStyle(BuildContext context) => Theme.of(context)
-      .textTheme
-      .labelLarge!
-      .copyWith(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: .5);
-
   @override
-  Widget build(BuildContext context) => FilledButton(
-    style: FilledButton.styleFrom(
-      backgroundColor: context.colorScheme.primary,
-      foregroundColor: context.colorScheme.onPrimary,
-      textStyle: textStyle(context),
-      minimumSize: const Size(64, 36),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: const StadiumBorder(),
-      tapTargetSize: MaterialTapTargetSize.padded,
-      visualDensity: VisualDensity.standard,
-    ),
+  Widget build(BuildContext context) => RetryPillButton(
+    label: context.l10n.repeat,
     onPressed: () => context.read<ChatsBloc>().add(
       const ChatsLoadMoreRequested(retry: true),
     ),
-    child: Text(context.l10n.repeat),
   );
 }
 

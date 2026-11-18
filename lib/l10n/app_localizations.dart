@@ -428,6 +428,12 @@ abstract class AppLocalizations {
   /// **'пока нет комментариев'**
   String get feedNoComments;
 
+  /// No description provided for @feedCommentsLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось загрузить комментарии'**
+  String get feedCommentsLoadFailed;
+
   /// No description provided for @feedCommentsSort.
   ///
   /// In ru, this message translates to:

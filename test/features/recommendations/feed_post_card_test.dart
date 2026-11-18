@@ -42,6 +42,7 @@ void main() {
     double scale = 1,
     Locale locale = const Locale('en'),
     Size viewport = const Size(320, 760),
+    bool details = false,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = viewport;
@@ -67,6 +68,7 @@ void main() {
                   post: post,
                   timeline: timeline,
                   visible: true,
+                  details: details,
                   onOpenPost: onOpen,
                 ),
             ],
@@ -76,6 +78,43 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('details reuse the location and action layout of the timeline', (
+    tester,
+  ) async {
+    final post = _post('author', coordinates: (latitude: 1, longitude: 2));
+    final name = find.text(post.authorName!);
+    final location = find.text('location');
+    final menu = find.byTooltip('post options');
+    final follow = find.byType(PrimaryIconButton);
+    final footer = find.byType(FeedPostFooter);
+    final like = find.byIcon(Icons.favorite);
+    await mount(tester, [post], onOpen: (_) {});
+    final locationStyle = tester.widget<Text>(location).style;
+    final locationOffset =
+        tester.getTopLeft(location) - tester.getTopLeft(name);
+    final menuLeft = tester.getTopLeft(menu).dx;
+    final followLeft = tester.getTopLeft(follow).dx;
+    final likeInset = tester.getTopLeft(like).dx - tester.getTopLeft(footer).dx;
+
+    await mount(tester, [post], onOpen: (_) {}, details: true);
+    expect(tester.widget<Text>(location).style, locationStyle);
+    expect(
+      tester.getTopLeft(location) - tester.getTopLeft(name),
+      locationOffset,
+    );
+    expect(tester.getTopLeft(menu).dx, menuLeft);
+    expect(tester.getTopLeft(follow).dx, followLeft);
+    expect(
+      tester.getTopLeft(like).dx - tester.getTopLeft(footer).dx,
+      likeInset,
+    );
+    expect(
+      tester.getTopLeft(find.text(post.text)).dx,
+      tester.getTopLeft(find.byType(FeedPostAuthorAvatar)).dx,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('long names and large counters fit on a compact card at 200%', (
     tester,

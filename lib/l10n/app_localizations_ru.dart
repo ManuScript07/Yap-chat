@@ -179,6 +179,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedNoComments => 'пока нет комментариев';
 
   @override
+  String get feedCommentsLoadFailed => 'не удалось загрузить комментарии';
+
+  @override
   String get feedCommentsSort => 'сортировка комментариев';
 
   @override

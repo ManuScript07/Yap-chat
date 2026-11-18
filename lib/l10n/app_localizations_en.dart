@@ -178,6 +178,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedNoComments => 'no comments yet';
 
   @override
+  String get feedCommentsLoadFailed => 'couldn’t load comments';
+
+  @override
   String get feedCommentsSort => 'comment order';
 
   @override

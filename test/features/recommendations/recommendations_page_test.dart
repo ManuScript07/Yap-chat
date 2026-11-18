@@ -583,9 +583,39 @@ void main() {
       expect(indicator.spinning, isTrue);
       pending.complete(const FeedPageResult(posts: []));
       await tester.pumpAndSettle();
-      expect(find.text('no posts yet'), findsOneWidget);
+      final empty = find.text('no posts yet');
+      expect(tester.widget<Text>(empty).style!.fontWeight, FontWeight.w700);
+      expect(
+        tester.widget<EmptyChatState>(find.byType(EmptyChatState)).showImage,
+        isFalse,
+      );
     },
   );
+
+  testWidgets('failed feed uses the shared retry pill on the active tab', (
+    tester,
+  ) async {
+    final feed = _Feed();
+    await _mount(tester, feed);
+    final pending = Completer<FeedPageResult>();
+    feed.next = pending.future;
+    await tester.tap(find.text('friends'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    pending.completeError(StateError('offline'));
+    await tester.pumpAndSettle();
+    final button = find.widgetWithText(FilledButton, 'try again');
+    final style = tester.widget<FilledButton>(button).style!;
+    expect(style.shape!.resolve({}), isA<StadiumBorder>());
+    expect(
+      style.backgroundColor!.resolve({}),
+      Theme.of(tester.element(button)).colorScheme.primary,
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(feed.calls, [FeedTab.forYou, FeedTab.friends, FeedTab.friends]);
+    expect(find.text('friends post 0'), findsOneWidget);
+  });
 }
 
 Future<AccountSessionController> _mount(

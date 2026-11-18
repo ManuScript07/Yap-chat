@@ -32,6 +32,7 @@ class _CommentPage {
   bool started = false;
   bool loading = false;
   bool failed = false;
+  bool failedRefresh = false;
   bool more = true;
 }
 
@@ -157,10 +158,11 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   }
 
   Future<void> _load(_CommentPage page, {bool refresh = false}) {
-    if (!_active || !page.more && !refresh) return Future.value();
+    final fromStart = refresh || page.failedRefresh;
+    if (!_active || !page.more && !fromStart) return Future.value();
     return page.pending ??= _read(
       page,
-      refresh: refresh,
+      refresh: fromStart,
     ).whenComplete(() => page.pending = null);
   }
 
@@ -169,6 +171,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     final cursor = refresh ? null : page.cursor;
     page.loading = true;
     page.failed = false;
+    page.failedRefresh = false;
     _publish();
     try {
       final response = await repository.getComments(
@@ -196,6 +199,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
           page.cursor = null;
         }
         page.failed = true;
+        page.failedRefresh = refresh;
       }
     } finally {
       page.loading = false;

@@ -110,6 +110,64 @@ void main() {
   });
 
   testWidgets(
+    'publication title centers in the safe area and shares its gutter',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(760, 500);
+      tester.view.padding = const FakeViewPadding(left: 32, right: 12);
+      addTearDown(tester.view.reset);
+      await show(tester);
+
+      expect(tester.getCenter(find.text('post')).dx, 390);
+      expect(
+        tester.getTopLeft(find.byType(GlassIconButton)).dx,
+        tester.getTopLeft(find.byType(FeedPostAuthorAvatar)).dx,
+      );
+    },
+  );
+
+  testWidgets(
+    'comment loading fades into a text-only error and retries to empty',
+    (tester) async {
+      final initial = Completer<FeedCommentsPage>();
+      final retry = Completer<FeedCommentsPage>();
+      repository.commentPage = (_, _) =>
+          repository.commentReads == 1 ? initial.future : retry.future;
+      await show(tester, settle: false);
+      await tester.pump();
+      final progress = find.byType(PullRefreshIndicator);
+      expect(progress, findsOneWidget);
+      final progressTop = tester.getTopLeft(progress).dy;
+
+      initial.completeError(StateError('offline'));
+      await tester.pump();
+      final error = find.text('couldn’t load comments');
+      expect(error, findsOneWidget);
+      expect(progress, findsOneWidget);
+      expect(tester.getTopLeft(progress).dy, progressTop);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(progress, findsNothing);
+      final retryButton = find.byType(RetryPillButton);
+      expect(retryButton, findsOneWidget);
+      await tester.tap(retryButton);
+      await tester.tap(retryButton);
+      await tester.pump();
+      expect(repository.commentReads, 2);
+
+      retry.complete((comments: <FeedComment>[], next: null));
+      await tester.pumpAndSettle();
+      final empty = find.text('no comments yet');
+      expect(tester.widget<Text>(empty).style!.fontSize, 22);
+      expect(tester.widget<Text>(empty).style!.fontWeight, FontWeight.w700);
+      expect(
+        tester.widget<EmptyChatState>(find.byType(EmptyChatState)).showImage,
+        isFalse,
+      );
+      expect(retryButton, findsNothing);
+    },
+  );
+
+  testWidgets(
     'switches server sort, renders replies in line and serializes a comment like',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -226,18 +284,34 @@ void main() {
       expect(find.text('comment unavailable'), findsOneWidget);
       expect(find.text('first reply'), findsOneWidget);
 
-      final sortMenu = find.byType(PopupMenuButton<FeedCommentSort>);
+      final sortMenu = find.byTooltip('comment order');
+      final arrow = find.descendant(
+        of: sortMenu,
+        matching: find.byType(AnimatedRotation),
+      );
       await tester.tap(sortMenu);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('newest'));
+      expect(tester.widget<AnimatedRotation>(arrow).turns, .5);
+      final popular = find.widgetWithText(MenuItemButton, 'popular');
+      expect(
+        tester.getTopLeft(popular).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(sortMenu).dy),
+      );
+      expect(
+        tester
+            .widget<MenuItemButton>(popular)
+            .style!
+            .foregroundColor!
+            .resolve({}),
+        Theme.of(tester.element(popular)).colorScheme.primary,
+      );
+      await tester.tap(find.widgetWithText(MenuItemButton, 'newest'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pump();
-      expect(find.byType(PopupMenuItem<FeedCommentSort>), findsNothing);
+      expect(tester.widget<AnimatedRotation>(arrow).turns, 0);
+      expect(find.byType(MenuItemButton), findsNothing);
       await tester.tap(sortMenu);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.text('oldest'));
+      await tester.tap(find.widgetWithText(MenuItemButton, 'oldest'));
       await tester.pumpAndSettle();
       expect(find.text('old result'), findsOneWidget);
       newest.complete((

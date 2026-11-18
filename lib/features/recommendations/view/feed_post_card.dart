@@ -76,16 +76,15 @@ class _FeedPostCardState extends State<FeedPostCard> {
     final details = widget.details;
     final safe = MediaQuery.paddingOf(context);
     const gutter = PrimaryHeaderGeometry.horizontalPadding;
-    final contentInsets = details
-        ? EdgeInsets.only(left: safe.left + 14, right: safe.right + 14)
-        : EdgeInsets.only(left: safe.left + gutter, right: safe.right + gutter);
+    final contentInsets = EdgeInsets.only(
+      left: safe.left + gutter,
+      right: safe.right + gutter,
+    );
     const avatarSize = 40.0;
     const authorGap = 10.0;
     const headerEndAdjustment = 4.0;
     final leftToRight = Directionality.of(context) == TextDirection.ltr;
-    final headerInsets = details
-        ? contentInsets
-        : leftToRight
+    final headerInsets = leftToRight
         ? contentInsets.copyWith(
             right: contentInsets.right - headerEndAdjustment,
           )
@@ -132,16 +131,13 @@ class _FeedPostCardState extends State<FeedPostCard> {
         behavior: HitTestBehavior.opaque,
         onTap: details ? null : openPost,
         child: Padding(
-          padding: EdgeInsets.only(
-            top: separatorSpacing,
-            bottom: details ? 24 : 0,
-          ),
+          padding: const EdgeInsets.only(top: separatorSpacing),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(padding: headerInsets, child: header),
               if (post.text.isNotEmpty) ...[
-                SizedBox(height: details ? 6 : 4),
+                const SizedBox(height: 4),
                 Padding(
                   padding: details ? contentInsets : textInsets,
                   child: FeedPostBody(
@@ -178,7 +174,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
                       post: post,
                       timeline: timeline,
                       details: details,
-                      bottomSpacing: details ? 0 : separatorSpacing,
+                      bottomSpacing: separatorSpacing,
                       onOpenPost: widget.onOpenPost,
                       onComments: widget.onComments,
                     ),
@@ -218,6 +214,7 @@ class _DetailsTimestamp extends StatelessWidget {
         '${post.edited ? ' · ${context.l10n.feedEdited}' : ''}',
         style: AppTextStyles.metadata.copyWith(
           color: context.colorScheme.outline,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

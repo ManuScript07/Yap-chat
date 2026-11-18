@@ -448,12 +448,17 @@ class _RecommendationsPageState extends State<RecommendationsPage>
       extendBodyBehindAppBar: true,
       appBar: _repository == null ? appBar : null,
       body: _repository == null
-          ? EmptyChatState(message: l10n.recommendationsEmpty)
+          ? EmptyChatState(message: l10n.recommendationsEmpty, showImage: false)
           : !hasAccount
           ? Column(
               children: [
                 header,
-                Expanded(child: EmptyChatState(message: l10n.feedEmpty)),
+                Expanded(
+                  child: EmptyChatState(
+                    message: l10n.feedEmpty,
+                    showImage: false,
+                  ),
+                ),
               ],
             )
           : PageStorage(

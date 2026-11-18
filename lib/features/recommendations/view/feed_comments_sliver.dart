@@ -32,11 +32,6 @@ class FeedCommentsSliver extends StatelessWidget {
     builder: (context, state) {
       final l10n = context.l10n;
       final padding = MediaQuery.paddingOf(context);
-      String label(FeedCommentSort sort) => switch (sort) {
-        FeedCommentSort.popular => l10n.feedCommentsPopular,
-        FeedCommentSort.newFirst => l10n.feedCommentsNew,
-        FeedCommentSort.old => l10n.feedCommentsOld,
-      };
       final rows = <(Key, Widget Function())>[];
       for (final root in state.rows) {
         final replies = comments.replies(root);
@@ -81,14 +76,15 @@ class FeedCommentsSliver extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (expanded && status.loading) const _CommentProgress(),
-                  if (expanded &&
-                      !status.loading &&
-                      (status.more || status.failed))
+                  if (expanded && !status.loading && status.failed)
+                    RetryPillButton(
+                      label: l10n.feedRetry,
+                      onPressed: () => comments.nextReplies(root.id),
+                    )
+                  else if (expanded && !status.loading && status.more)
                     TextButton(
                       onPressed: () => comments.nextReplies(root.id),
-                      child: Text(
-                        status.failed ? l10n.feedRetry : l10n.feedLoadMore,
-                      ),
+                      child: Text(l10n.feedLoadMore),
                     ),
                   if (expanded ||
                       root.replyCount > replies.length ||
@@ -115,33 +111,14 @@ class FeedCommentsSliver extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.only(
-                left: padding.left + 14,
-                right: padding.right + 14,
+                left: padding.left + PrimaryHeaderGeometry.horizontalPadding,
+                right: padding.right + PrimaryHeaderGeometry.horizontalPadding,
               ),
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: PopupMenuButton<FeedCommentSort>(
-                  tooltip: l10n.feedCommentsSort,
-                  initialValue: state.sort,
+                child: _CommentSortMenu(
+                  selected: state.sort,
                   onSelected: comments.selectSort,
-                  itemBuilder: (_) => [
-                    for (final sort in FeedCommentSort.values)
-                      PopupMenuItem(value: sort, child: Text(label(sort))),
-                  ],
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          label(state.sort),
-                          style: AppTextStyles.chatName.copyWith(fontSize: 15),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.expand_more_rounded, size: 18),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -153,21 +130,16 @@ class FeedCommentsSliver extends StatelessWidget {
                 KeyedSubtree(key: rows[index].$1, child: rows[index].$2()),
           ),
           SliverToBoxAdapter(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: state.loading
-                    ? const _CommentProgress()
-                    : state.failed || state.hasMore
-                    ? TextButton(
-                        onPressed: comments.next,
-                        child: Text(
-                          state.failed ? l10n.feedRetry : l10n.feedLoadMore,
-                        ),
-                      )
-                    : state.rows.isEmpty
-                    ? EmptyChatState(message: l10n.feedNoComments)
-                    : const SizedBox.shrink(),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                padding.left + PrimaryHeaderGeometry.horizontalPadding,
+                12,
+                padding.right + PrimaryHeaderGeometry.horizontalPadding,
+                12,
+              ),
+              child: _CommentLoadFeedback(
+                state: state,
+                onRequest: comments.next,
               ),
             ),
           ),
@@ -177,8 +149,153 @@ class FeedCommentsSliver extends StatelessWidget {
   );
 }
 
+class _CommentSortMenu extends StatefulWidget {
+  const _CommentSortMenu({required this.selected, required this.onSelected});
+
+  final FeedCommentSort selected;
+  final ValueChanged<FeedCommentSort> onSelected;
+
+  @override
+  State<_CommentSortMenu> createState() => _CommentSortMenuState();
+}
+
+class _CommentSortMenuState extends State<_CommentSortMenu> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.colorScheme;
+    final textStyle = AppTextStyles.chatName.copyWith(fontSize: 15);
+    String label(FeedCommentSort sort) => switch (sort) {
+      FeedCommentSort.popular => l10n.feedCommentsPopular,
+      FeedCommentSort.newFirst => l10n.feedCommentsNew,
+      FeedCommentSort.old => l10n.feedCommentsOld,
+    };
+
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 4),
+      onOpen: () => setState(() => _open = true),
+      onClose: () => setState(() => _open = false),
+      style: MenuStyle(
+        alignment: AlignmentDirectional.bottomStart,
+        backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHigh),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      menuChildren: [
+        for (final sort in FeedCommentSort.values)
+          MenuItemButton(
+            key: ValueKey(sort),
+            style: MenuItemButton.styleFrom(
+              foregroundColor: sort == widget.selected
+                  ? colors.primary
+                  : colors.onSurface,
+              textStyle: textStyle,
+            ),
+            onPressed: () => widget.onSelected(sort),
+            child: Semantics(
+              selected: sort == widget.selected,
+              child: Text(label(sort)),
+            ),
+          ),
+      ],
+      builder: (context, controller, _) => Tooltip(
+        message: l10n.feedCommentsSort,
+        child: TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: colors.onSurface,
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 36),
+            visualDensity: VisualDensity.standard,
+            overlayColor: Colors.transparent,
+            textStyle: textStyle,
+          ),
+          onPressed: () =>
+              controller.isOpen ? controller.close() : controller.open(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label(widget.selected),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              AnimatedRotation(
+                turns: _open ? .5 : 0,
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: const Icon(Icons.expand_more_rounded, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentLoadFeedback extends StatelessWidget {
+  const _CommentLoadFeedback({required this.state, required this.onRequest});
+
+  final FeedCommentsState state;
+  final VoidCallback onRequest;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final Widget content;
+    if (state.loading) {
+      content = const _CommentProgress(key: ValueKey('loading'));
+    } else if (state.failed) {
+      content = Column(
+        key: const ValueKey('failed'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (state.rows.isEmpty) ...[
+            EmptyChatState(
+              message: l10n.feedCommentsLoadFailed,
+              showImage: false,
+            ),
+            const SizedBox(height: 8),
+          ],
+          RetryPillButton(label: l10n.feedRetry, onPressed: onRequest),
+        ],
+      );
+    } else if (state.hasMore) {
+      content = TextButton(
+        key: const ValueKey('more'),
+        onPressed: onRequest,
+        child: Text(l10n.feedLoadMore),
+      );
+    } else if (state.rows.isEmpty) {
+      content = EmptyChatState(
+        key: const ValueKey('empty'),
+        message: l10n.feedNoComments,
+        showImage: false,
+      );
+    } else {
+      content = const SizedBox.shrink(key: ValueKey('finished'));
+    }
+    return AnimatedStatusSwitcher(
+      alignment: Alignment.topCenter,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      scaleTransition: false,
+      child: content,
+    );
+  }
+}
+
 class _CommentProgress extends StatelessWidget {
-  const _CommentProgress();
+  const _CommentProgress({super.key});
 
   @override
   Widget build(BuildContext context) => const PullRefreshIndicator(

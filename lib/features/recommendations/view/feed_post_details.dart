@@ -117,6 +117,7 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
     final accounts = _accounts;
     final padding = MediaQuery.paddingOf(context);
     const toolbar = 64.0;
+    const gutter = PrimaryHeaderGeometry.horizontalPadding;
     final top = padding.top + toolbar;
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -147,29 +148,36 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
               ),
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  padding.left + 16,
+                  padding.left + gutter,
                   padding.top,
-                  padding.right + 16,
+                  padding.right + gutter,
                   0,
                 ),
-                child: Row(
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Tooltip(
-                      message: MaterialLocalizations.of(
-                        context,
-                      ).backButtonTooltip.toLowerCase(),
-                      child: MediaGalleryHeader.backButton(
-                        () => Navigator.of(context).maybePop(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: MediaGalleryHeader.buttonSize + 12,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
                       child: Text(
                         context.l10n.feedPublication,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                         style: context.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    PositionedDirectional(
+                      start: 0,
+                      child: Tooltip(
+                        message: MaterialLocalizations.of(
+                          context,
+                        ).backButtonTooltip.toLowerCase(),
+                        child: MediaGalleryHeader.backButton(
+                          () => Navigator.of(context).maybePop(),
                         ),
                       ),
                     ),
@@ -183,8 +191,10 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
     );
   }
 
-  Widget _unavailable(BuildContext context) =>
-      Center(child: Text(context.l10n.feedPostUnavailable));
+  Widget _unavailable(BuildContext context) => EmptyChatState(
+    message: context.l10n.feedPostUnavailable,
+    showImage: false,
+  );
 
   Widget _body(BuildContext context, double top) {
     final timeline = _timeline;
@@ -217,8 +227,15 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
                 );
               }
               if (state.loading && post == null) {
+                final safe = MediaQuery.paddingOf(context);
+                const gutter = PrimaryHeaderGeometry.horizontalPadding;
                 return Padding(
-                  padding: EdgeInsets.fromLTRB(16, top + 16, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    safe.left + gutter,
+                    top + gutter,
+                    safe.right + gutter,
+                    0,
+                  ),
                   child: const Align(
                     alignment: Alignment.topCenter,
                     child: _PublicationPlaceholder(),
@@ -227,9 +244,9 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
               }
               if (state.failed && post == null) {
                 return Center(
-                  child: FilledButton(
+                  child: RetryPillButton(
                     onPressed: details.load,
-                    child: Text(context.l10n.feedRetry),
+                    label: context.l10n.feedRetry,
                   ),
                 );
               }
@@ -397,9 +414,9 @@ class _PublicationState extends State<_Publication> {
               if (widget.failed)
                 SliverToBoxAdapter(
                   child: Center(
-                    child: TextButton(
+                    child: RetryPillButton(
                       onPressed: widget.onRetry,
-                      child: Text(context.l10n.feedRetry),
+                      label: context.l10n.feedRetry,
                     ),
                   ),
                 ),
