@@ -220,7 +220,6 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
                   timeline: timeline,
                   actions: actions,
                   confirmed: state.confirmed,
-                  refreshing: state.loading,
                   failed: state.failed,
                   onRetry: details.load,
                   headerHeight: top,
@@ -270,7 +269,6 @@ class _Publication extends StatefulWidget {
     required this.timeline,
     required this.actions,
     required this.confirmed,
-    required this.refreshing,
     required this.failed,
     required this.onRetry,
     required this.headerHeight,
@@ -280,7 +278,6 @@ class _Publication extends StatefulWidget {
   final FeedCubit timeline;
   final FeedActionsCubit actions;
   final bool confirmed;
-  final bool refreshing;
   final bool failed;
   final VoidCallback onRetry;
   final double headerHeight;
@@ -337,6 +334,7 @@ class _PublicationState extends State<_Publication> {
   void _maybeLoadMore() {
     final comments = _comments;
     if (comments == null ||
+        !widget.confirmed ||
         !_controller.hasClients ||
         comments.state.failed ||
         _controller.position.extentAfter > 350) {
@@ -439,26 +437,11 @@ class _PublicationState extends State<_Publication> {
                     ),
                   ),
                 ),
-              if (comments != null && widget.confirmed)
+              if (comments != null && comments.canDisplay)
                 FeedCommentsSliver(
                   comments: comments,
                   timeline: widget.timeline,
                   onReply: _reply,
-                )
-              else if (widget.refreshing)
-                const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: PullRefreshIndicator(
-                        opacity: 1,
-                        progress: 1,
-                        spinning: true,
-                        size: 22,
-                        strokeWidth: 2.5,
-                      ),
-                    ),
-                  ),
                 ),
               if (comments != null)
                 ValueListenableBuilder(

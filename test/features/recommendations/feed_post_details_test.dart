@@ -136,7 +136,11 @@ void main() {
       await show(tester, settle: false);
       await tester.pump();
       final progress = find.byType(PullRefreshIndicator);
+      await tester.pump(const Duration(milliseconds: 179));
+      expect(progress, findsNothing);
+      await tester.pump(const Duration(milliseconds: 1));
       expect(progress, findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 180));
       final progressTop = tester.getTopLeft(progress).dy;
 
       initial.completeError(StateError('offline'));
@@ -156,6 +160,7 @@ void main() {
 
       retry.complete((comments: <FeedComment>[], next: null));
       await tester.pumpAndSettle();
+      expect(progress, findsNothing);
       final empty = find.text('no comments yet');
       expect(tester.widget<Text>(empty).style!.fontSize, 22);
       expect(tester.widget<Text>(empty).style!.fontWeight, FontWeight.w700);
@@ -419,23 +424,80 @@ void main() {
     ]);
   });
 
-  testWidgets('comment cache keeps the avatar row mounted during a warm read', (
+  testWidgets('warm entry restores cached pages, branches and sorts offline', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(440, 1100);
+    addTearDown(tester.view.reset);
     const first = FeedComment(
       id: 'cached',
       authorId: 'commenter',
       authorName: 'cached author',
       avatarPath: 'avatars/commenter/one.jpg',
       text: 'cached text',
+      replyCount: 2,
     );
-    repository.commentPage = (_, _) async => (comments: [first], next: null);
+    repository.commentPage = (sort, root) async {
+      final call = repository.commentQueries
+          .where((query) => query == (sort, root))
+          .length;
+      if (root != null) {
+        return (
+          comments: [
+            FeedComment(
+              id: 'reply-$call',
+              rootId: root,
+              authorId: 'reply-author',
+              text: 'cached reply $call',
+            ),
+          ],
+          next: call == 1 ? (sessionId: 'replies', position: 0) : null,
+        );
+      }
+      if (sort == FeedCommentSort.newFirst) throw TimeoutException('offline');
+      if (sort == FeedCommentSort.old) {
+        return (
+          comments: [
+            const FeedComment(
+              id: 'old',
+              authorId: 'author',
+              text: 'cached oldest row',
+            ),
+          ],
+          next: null,
+        );
+      }
+      if (call == 1) {
+        return (comments: [first], next: (sessionId: 'roots', position: 0));
+      }
+      return (
+        comments: [
+          const FeedComment(
+            id: 'tail',
+            authorId: 'author',
+            text: 'cached tail',
+          ),
+        ],
+        next: null,
+      );
+    };
     await show(tester);
     expect(find.text('cached text'), findsOneWidget);
+    final comments = tester
+        .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+        .comments;
+    await comments.next();
+    await comments.expand(first.id);
+    await comments.nextReplies(first.id);
+    comments.selectSort(FeedCommentSort.old);
+    await tester.pumpAndSettle();
+    expect(find.text('cached oldest row'), findsOneWidget);
+    final reads = repository.commentReads;
     await tester.pumpWidget(const SizedBox.shrink());
 
-    final revalidation = Completer<FeedCommentsPage>();
-    repository.commentPage = (_, _) => revalidation.future;
+    final revalidation = Completer<FeedPost?>();
+    repository.pendingPost = revalidation.future;
     await show(tester, settle: false);
     await tester.pump();
     final avatar = find.descendant(
@@ -443,24 +505,74 @@ void main() {
       matching: find.byType(FeedAuthorAvatar),
     );
     expect(find.text('cached text'), findsOneWidget);
-    expect(find.byType(PullRefreshIndicator), findsOneWidget);
+    expect(find.text('cached tail'), findsOneWidget);
+    expect(find.text('cached reply 2'), findsOneWidget);
+    expect(find.byType(PullRefreshIndicator), findsNothing);
+    expect(repository.commentReads, reads);
     final element = tester.element(avatar);
-    revalidation.complete((
+    revalidation.completeError(TimeoutException('offline'));
+    await tester.pumpAndSettle();
+    expect(find.text('cached reply 2'), findsOneWidget);
+    expect(tester.element(avatar), same(element));
+    final restored = tester
+        .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+        .comments;
+    restored.selectSort(FeedCommentSort.old);
+    await tester.pumpAndSettle();
+    expect(find.text('cached oldest row'), findsOneWidget);
+    expect(repository.commentReads, reads);
+    restored.selectSort(FeedCommentSort.newFirst);
+    await tester.pumpAndSettle();
+    expect(find.text('couldn’t load comments'), findsOneWidget);
+    expect(repository.commentReads, reads + 1);
+    restored.selectSort(FeedCommentSort.popular);
+    await tester.pumpAndSettle();
+    expect(find.text('cached tail'), findsOneWidget);
+    expect(find.text('cached reply 2'), findsOneWidget);
+    expect(repository.commentReads, reads + 1);
+    await tester.pump(const Duration(minutes: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('cached text'), findsNothing);
+    expect(find.text('cached reply 2'), findsNothing);
+  });
+
+  testWidgets('authoritative denial clears the warm publication and replies', (
+    tester,
+  ) async {
+    repository.post = _postWithLocation(friendsOnly: true);
+    repository.commentPage = (_, _) async => (
       comments: [
         const FeedComment(
-          id: 'cached',
-          authorId: 'commenter',
-          authorName: 'cached author',
-          avatarPath: 'avatars/commenter/one.jpg',
-          text: 'updated text',
+          id: 'secret',
+          authorId: 'peer',
+          text: 'cached private comment',
         ),
       ],
       next: null,
-    ));
+    );
+    await show(tester);
+    expect(find.text('cached private comment'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    final denial = Completer<FeedPost?>();
+    repository.pendingPost = denial.future;
+    await show(tester, settle: false);
+    await tester.pump();
+    expect(find.text('cached private comment'), findsOneWidget);
+    denial.complete(null);
     await tester.pumpAndSettle();
-    expect(find.text('updated text'), findsOneWidget);
-    expect(tester.element(avatar), same(element));
-    expect(repository.commentReads, 2);
+    expect(find.text('post unavailable'), findsOneWidget);
+    expect(find.text('cached private comment'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    final nextCheck = Completer<FeedPost?>();
+    repository.pendingPost = nextCheck.future;
+    await show(tester, settle: false);
+    expect(find.text('cached private comment'), findsNothing);
+    expect(find.text('test publication'), findsNothing);
+    expect(repository.commentReads, 1);
+    nextCheck.complete(null);
+    await tester.pumpAndSettle();
   });
 
   testWidgets(

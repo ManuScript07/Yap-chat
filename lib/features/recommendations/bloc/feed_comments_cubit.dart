@@ -6,19 +6,25 @@ import 'package:uuid/uuid.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 import 'feed_actions_cubit.dart';
+import 'feed_publication_cache.dart';
 
 typedef FeedCommentsState = ({
   List<FeedComment> rows,
   FeedCommentSort sort,
   bool loading,
   bool failed,
+  bool loaded,
   bool hasMore,
 });
 
 class _CommentPage {
-  _CommentPage(this.sort, this.root, FeedCommentsPage? cached) {
+  _CommentPage(this.sort, this.root, [CachedFeedComments? cached]) {
     if (cached != null) {
-      rows.addEntries(cached.comments.map((row) => MapEntry(row.id, row)));
+      rows.addEntries(cached.page.comments.map((row) => MapEntry(row.id, row)));
+      started = true;
+      cursor = cached.page.next;
+      more = cursor != null;
+      expiresAt = cached.expiresAt;
     }
   }
 
@@ -26,6 +32,7 @@ class _CommentPage {
   final String? root;
   final rows = <String, FeedComment>{};
   FeedCommentsCursor? cursor;
+  DateTime? expiresAt;
   Future<void>? pending;
   Future<void>? revalidation;
   bool started = false;
@@ -42,6 +49,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         sort: FeedCommentSort.popular,
         loading: false,
         failed: false,
+        loaded: false,
         hasMore: true,
       ));
 
@@ -57,24 +65,44 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   final _clock = Stopwatch()..start();
   ({String text, String? replyTo, String id})? _pending;
   bool _ready = false;
+  bool _hydrated = false;
+  bool _hasCachedPages = false;
   bool _submitting = false;
   int _revision = 0;
   FeedCommentSort _sort = FeedCommentSort.popular;
 
-  bool get _active => _ready && !isClosed && actions.canShow(_post);
+  bool get canDisplay => _ready || _hasCachedPages;
+  bool get canMutate => _ready && _active;
+  bool get _active => canDisplay && !isClosed && actions.canShow(_post);
   _CommentPage get _root => _roots.putIfAbsent(_sort, () => _page(_sort, null));
 
   _CommentPage _page(FeedCommentSort sort, String? root) => _CommentPage(
     sort,
     root,
-    actions.commentCache.read((_post.id, sort, root)),
+    actions.publicationCache.read((_post.id, sort, root)),
   );
 
   void updatePost(FeedPost post, {required bool confirmed}) {
     _post = post;
+    if (!_hydrated) {
+      _hydrated = true;
+      final cached = actions.publicationCache.readForPost(post.id);
+      _hasCachedPages = cached.isNotEmpty;
+      for (final entry in cached.entries) {
+        final (_, sort, root) = entry.key;
+        final page = _CommentPage(sort, root, entry.value);
+        page.rows.removeWhere((_, comment) => _isBlocked(comment));
+        if (root == null) {
+          _roots[sort] = page;
+        } else {
+          _threads[root] = page;
+        }
+      }
+      if (_hasCachedPages) _publish();
+    }
     if (_ready || !confirmed) return;
     _ready = true;
-    unawaited(next());
+    if (!_root.started) unawaited(next());
   }
 
   bool available(FeedComment comment) =>
@@ -173,13 +201,23 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       if (!_active || revision != _revision) return;
       if (cursor == null) {
         page.rows.clear();
-        actions.commentCache.write((_post.id, page.sort, page.root), response);
+        page.expiresAt = actions.publicationCache.expiresFromNow();
       }
       page.started = true;
       page.more = response.next != null && response.next != cursor;
       page.cursor = response.next;
       for (final row in response.comments) {
         if (!_isBlocked(row)) page.rows[row.id] = row;
+      }
+      if (page.expiresAt case final expires?) {
+        actions.publicationCache.write(
+          (_post.id, page.sort, page.root),
+          (
+            comments: page.rows.values.toList(growable: false),
+            next: page.cursor,
+          ),
+          expiresAt: expires,
+        );
       }
     } catch (error) {
       _handleAccessError(error);
@@ -218,6 +256,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
 
   Future<bool> submit(String text, {FeedComment? replyTo}) async {
     if (!_active ||
+        !_ready ||
         _submitting ||
         text.trim().isEmpty ||
         text.runes.length > 200 ||
@@ -243,7 +282,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       if (!_active) return false;
       _pending = null;
       _sent[comment.id] = comment;
-      actions.commentCache.removePost(_post.id);
+      actions.publicationCache.removeComments(_post.id);
       if (replyTo != null && !isExpanded(replyTo.threadId)) {
         unawaited(expand(replyTo.threadId));
       }
@@ -277,7 +316,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         likes: (current.likes + (result.changed ? (result.liked ? 1 : -1) : 0))
             .clamp(0, 0x7fffffff),
       );
-      actions.commentCache.removePost(_post.id);
+      actions.publicationCache.removeComments(_post.id);
     } catch (error) {
       _handleAccessError(error, comment: comment);
       if (error is PostgrestException && error.code == 'PT409') {
@@ -309,7 +348,9 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   }
 
   bool _begin(FeedComment comment) {
-    if (!_active || !available(comment) || !_busy.add(comment.id)) return false;
+    if (!_active || !_ready || !available(comment) || !_busy.add(comment.id)) {
+      return false;
+    }
     _publish();
     return true;
   }
@@ -361,6 +402,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       sort: _sort,
       loading: root.loading,
       failed: root.failed,
+      loaded: root.started,
       hasMore: root.more,
     ));
   }

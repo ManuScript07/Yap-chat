@@ -287,18 +287,60 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
   }
 }
 
-class _CommentLoadFeedback extends StatelessWidget {
+class _CommentLoadFeedback extends StatefulWidget {
   const _CommentLoadFeedback({required this.state, required this.onRequest});
 
   final FeedCommentsState state;
   final VoidCallback onRequest;
 
   @override
+  State<_CommentLoadFeedback> createState() => _CommentLoadFeedbackState();
+}
+
+class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
+  Timer? _progressDelay;
+  bool _showProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateProgress();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CommentLoadFeedback oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state.loading != widget.state.loading ||
+        oldWidget.state.sort != widget.state.sort) {
+      _updateProgress();
+    }
+  }
+
+  void _updateProgress() {
+    _progressDelay?.cancel();
+    _showProgress = false;
+    if (widget.state.loading) {
+      _progressDelay = Timer(const Duration(milliseconds: 180), () {
+        setState(() => _showProgress = true);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressDelay?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final l10n = context.l10n;
     final Widget content;
     if (state.loading) {
-      content = const _CommentProgress(key: ValueKey('loading'));
+      content = _showProgress
+          ? const _CommentProgress(key: ValueKey('loading'))
+          : const SizedBox(height: 22, key: ValueKey('waiting'));
     } else if (state.failed) {
       content = Column(
         key: const ValueKey('failed'),
@@ -311,13 +353,15 @@ class _CommentLoadFeedback extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          RetryPillButton(label: l10n.feedRetry, onPressed: onRequest),
+          RetryPillButton(label: l10n.feedRetry, onPressed: widget.onRequest),
         ],
       );
+    } else if (!state.loaded) {
+      content = const SizedBox.shrink(key: ValueKey('pending_head'));
     } else if (state.hasMore) {
       content = TextButton(
         key: const ValueKey('more'),
-        onPressed: onRequest,
+        onPressed: widget.onRequest,
         child: Text(l10n.feedLoadMore),
       );
     } else if (state.rows.isEmpty) {
@@ -506,7 +550,7 @@ class _CommentRowState extends State<_CommentRow> {
     final author = item.authorName ?? l10n.feedUnknownAuthor;
     final actions = comments.actions;
     final canOpen = available && item.authorId != actions.account.userId;
-    final canAct = available && !comments.busy(item);
+    final canAct = available && comments.canMutate && !comments.busy(item);
     final target = item.replyTo;
     final mention =
         available &&
