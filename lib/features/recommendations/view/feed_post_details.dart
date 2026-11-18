@@ -108,6 +108,9 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
       widget.id,
       actions,
       initial,
+      networkAvailability: context
+          .read<AppConnectionStatus?>()
+          ?.networkAvailability,
     );
     unawaited(details.load());
   }

@@ -26,6 +26,7 @@ class RepositoryContainer {
     required this.settingsRepository,
     required this.nearbyRepository,
     required this.feedRepository,
+    this.feedPostSnapshots,
   });
 
   factory RepositoryContainer.prod({
@@ -110,6 +111,11 @@ class RepositoryContainer {
       config: config,
     );
     final profileCache = ProfileCacheDataSource(database: config.database);
+    final blocklistCache = BlocklistCacheDataSource(
+      database: config.database,
+      preferences: config.preferences,
+      namespace: config.environment.name,
+    );
     final viewedProfileCache = ViewedProfileCacheDataSource(
       database: config.database,
       profileCache: profileCache,
@@ -220,11 +226,7 @@ class RepositoryContainer {
         accountSessionController: config.accountSessionController,
       ),
       blocklistRepository: BlocklistRepository(
-        cache: BlocklistCacheDataSource(
-          database: config.database,
-          preferences: config.preferences,
-          namespace: config.environment.name,
-        ),
+        cache: blocklistCache,
         remote: BlocklistRemoteDataSource(
           client: client,
           diagnostics: config.diagnostics,
@@ -251,6 +253,11 @@ class RepositoryContainer {
         connection: connectionStatus,
         diagnostics: config.diagnostics,
         mediaCache: mediaCache,
+      ),
+      feedPostSnapshots: FeedPostSnapshotStore(
+        config.database,
+        config.accountSessionController,
+        blocklist: blocklistCache,
       ),
     );
   }
@@ -313,6 +320,7 @@ class RepositoryContainer {
   final ISettingsRepository settingsRepository;
   final INearbyRepository nearbyRepository;
   final IFeedRepository feedRepository;
+  final FeedPostSnapshotStore? feedPostSnapshots;
 
   Future<void> dispose() async {
     mediaCache.dispose();

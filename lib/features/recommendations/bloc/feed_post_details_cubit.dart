@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
@@ -17,8 +18,9 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
   factory FeedPostDetailsCubit(
     String id,
     FeedActionsCubit actions,
-    FeedPost? initial,
-  ) {
+    FeedPost? initial, {
+    ValueListenable<bool?>? networkAvailability,
+  }) {
     final cached = actions.publicationCache.readPost(id);
     final cachedPost = cached?.post;
     final usable = cachedPost != null && actions.canShow(cachedPost);
@@ -27,6 +29,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
       actions,
       initial ?? (usable ? cachedPost : null),
       usable ? cached?.expiresAt : null,
+      networkAvailability,
     );
   }
 
@@ -35,18 +38,43 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     this.actions,
     FeedPost? initial,
     this._snapshotExpiresAt,
-  ) : super((post: initial, loading: false, confirmed: false, failed: false));
+    this._networkAvailability,
+  ) : super((post: initial, loading: false, confirmed: false, failed: false)) {
+    _lastNetworkAvailability = _networkAvailability?.value;
+    _networkAvailability?.addListener(_networkChanged);
+  }
 
   final String id;
   final FeedActionsCubit actions;
-  final DateTime? _snapshotExpiresAt;
+  final ValueListenable<bool?>? _networkAvailability;
+  bool? _lastNetworkAvailability;
+  DateTime? _snapshotExpiresAt;
   Future<void>? _request;
   Timer? _expiry;
+  int _readGeneration = 0;
 
   Future<void> load() =>
       _request ??= _read().whenComplete(() => _request = null);
 
   bool get _active => !isClosed && actions.active;
+
+  void _networkChanged() {
+    final previouslyUnavailable = _lastNetworkAvailability == false;
+    _lastNetworkAvailability = _networkAvailability?.value;
+    if (previouslyUnavailable && _lastNetworkAvailability == true) {
+      unawaited(_recheckAfterReconnect());
+    }
+  }
+
+  Future<void> _recheckAfterReconnect() async {
+    await _request;
+    if (_active &&
+        _lastNetworkAvailability == true &&
+        state.failed &&
+        !state.confirmed) {
+      await load();
+    }
+  }
 
   Future<void> _read() async {
     if (!_active) return;
@@ -57,19 +85,9 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
       failed: false,
     ));
     final requestedAt = actions.projectionVersion;
-    final expires = _snapshotExpiresAt;
-    if (!state.confirmed && state.post != null && expires != null) {
-      _expiry ??= Timer(expires.difference(DateTime.now()), () {
-        if (_active && !state.confirmed) {
-          emit((
-            post: null,
-            loading: state.loading,
-            confirmed: false,
-            failed: state.failed,
-          ));
-        }
-      });
-    }
+    final generation = ++_readGeneration;
+    final restoring = state.post == null ? _restore(generation) : null;
+    _scheduleExpiry();
     try {
       final post = await actions.repository.getPost(id, actions.account);
       if (!_active) return;
@@ -78,7 +96,10 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
       _expiry?.cancel();
       _expiry = null;
       if (allowed) {
-        actions.publicationCache.writePost(post);
+        actions.publicationCache.writePost(
+          post,
+          allowed: () => actions.canShow(post),
+        );
       } else {
         actions.publicationCache.removePost(id);
       }
@@ -97,6 +118,9 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
         _expiry?.cancel();
         _expiry = null;
         actions.publicationCache.removePost(id);
+      } else {
+        await restoring;
+        if (!_active) return;
       }
       final retained = state.post;
       final allowed = !denied && retained != null && actions.canShow(retained);
@@ -109,8 +133,41 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     }
   }
 
+  Future<void> _restore(int generation) async {
+    final snapshot = await actions.publicationCache.restorePost(id);
+    if (snapshot == null ||
+        !_active ||
+        generation != _readGeneration ||
+        !state.loading ||
+        state.post != null ||
+        !actions.canShow(snapshot.post)) {
+      return;
+    }
+    _snapshotExpiresAt = snapshot.expiresAt;
+    actions.publicationCache.rememberPost(snapshot);
+    emit((post: snapshot.post, loading: true, confirmed: false, failed: false));
+    _scheduleExpiry();
+  }
+
+  void _scheduleExpiry() {
+    final expires = _snapshotExpiresAt;
+    if (state.confirmed || state.post == null || expires == null) return;
+    _expiry ??= Timer(expires.difference(DateTime.now()), () {
+      _expiry = null;
+      if (_active && !state.confirmed) {
+        emit((
+          post: null,
+          loading: state.loading,
+          confirmed: false,
+          failed: state.failed,
+        ));
+      }
+    });
+  }
+
   @override
   Future<void> close() {
+    _networkAvailability?.removeListener(_networkChanged);
     _expiry?.cancel();
     return super.close();
   }

@@ -112,6 +112,7 @@ class _AppInitializerState extends State<AppInitializer>
       blocklistRepository: _repositories.blocklistRepository,
       userReportsRepository: _repositories.userReportsRepository,
       nearbyRepository: _repositories.nearbyRepository,
+      feedPostSnapshots: _repositories.feedPostSnapshots,
       talker: widget.config.talker,
     );
     _prepareFirstAvatarFrames();
@@ -206,6 +207,7 @@ class _AppInitializerState extends State<AppInitializer>
               return FeedAccountScope(
                 widget.config.accountSessionController,
                 _repositories.feedRepository,
+                postSnapshots: _repositories.feedPostSnapshots,
                 blocks: _repositories.blocklistRepository,
                 friends: friends is IFriendAccessRepository
                     ? friends as IFriendAccessRepository

@@ -143,4 +143,11 @@ class FeedPost {
   final FeedPost? original;
   final String? repostedBy;
   final bool reposted;
+
+  bool containsPost(String postId) {
+    for (FeedPost? post = this; post != null; post = post.original) {
+      if (post.id == postId) return true;
+    }
+    return false;
+  }
 }

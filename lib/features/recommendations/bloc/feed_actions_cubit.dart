@@ -26,7 +26,12 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     this.account,
     this.isCurrent, {
     Duration Function()? elapsed,
-  }) : _elapsedOverride = elapsed,
+    FeedPostSnapshotStore? postSnapshots,
+  }) : publicationCache = FeedPublicationCache(
+         store: postSnapshots,
+         account: account,
+       ),
+       _elapsedOverride = elapsed,
        super((
          follows: const {},
          reactions: const {},
@@ -40,7 +45,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   final IFeedPostRepository repository;
   final thumbnailFrames = FeedMediaFrames(maxBytes: 8 * 1024 * 1024);
-  final publicationCache = FeedPublicationCache();
+  final FeedPublicationCache publicationCache;
   final _hiddenComments = <String>{};
 
   bool commentHidden(String id) => _hiddenComments.contains(id);
@@ -80,10 +85,11 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   int get projectionVersion => _projectionVersion;
 
   bool canShow(FeedPost post) {
-    if (!active || _hidden.contains(post.id)) return false;
+    if (!active) return false;
     for (FeedPost? item = post; item != null; item = item.original) {
       final blockedAt = _blockedAt[item.authorId];
-      if (_blocked.contains(item.authorId) ||
+      if (_hidden.contains(item.id) ||
+          _blocked.contains(item.authorId) ||
           blockedAt != null && (_projectionVersions[item] ?? 0) < blockedAt ||
           item.friendsOnly && !_hasFriendAccess(item)) {
         return false;
@@ -487,6 +493,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         state.accessVersion != _accessVersion) {
       thumbnailFrames.removeUnavailable(canShow);
       publicationCache.clear();
+      publicationCache.removeUnavailablePosts(canShow);
     }
     _trim(_follows);
     _trim(_reactions);

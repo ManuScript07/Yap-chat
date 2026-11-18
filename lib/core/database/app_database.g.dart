@@ -13918,6 +13918,339 @@ class CachedChatUnreadTotalsCompanion
   }
 }
 
+class $CachedFeedPostSnapshotsTable extends CachedFeedPostSnapshots
+    with TableInfo<$CachedFeedPostSnapshotsTable, CachedFeedPostSnapshot> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedFeedPostSnapshotsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _postIdMeta = const VerificationMeta('postId');
+  @override
+  late final GeneratedColumn<String> postId = GeneratedColumn<String>(
+    'post_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _expiresAtMicrosMeta = const VerificationMeta(
+    'expiresAtMicros',
+  );
+  @override
+  late final GeneratedColumn<int> expiresAtMicros = GeneratedColumn<int>(
+    'expires_at_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    postId,
+    payload,
+    expiresAtMicros,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_feed_post_snapshots';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedFeedPostSnapshot> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('post_id')) {
+      context.handle(
+        _postIdMeta,
+        postId.isAcceptableOrUnknown(data['post_id']!, _postIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_postIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('expires_at_micros')) {
+      context.handle(
+        _expiresAtMicrosMeta,
+        expiresAtMicros.isAcceptableOrUnknown(
+          data['expires_at_micros']!,
+          _expiresAtMicrosMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_expiresAtMicrosMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, postId};
+  @override
+  CachedFeedPostSnapshot map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedFeedPostSnapshot(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      postId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}post_id'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      expiresAtMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}expires_at_micros'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedFeedPostSnapshotsTable createAlias(String alias) {
+    return $CachedFeedPostSnapshotsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedFeedPostSnapshot extends DataClass
+    implements Insertable<CachedFeedPostSnapshot> {
+  final String ownerUserId;
+  final String postId;
+  final String payload;
+  final int expiresAtMicros;
+  const CachedFeedPostSnapshot({
+    required this.ownerUserId,
+    required this.postId,
+    required this.payload,
+    required this.expiresAtMicros,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['post_id'] = Variable<String>(postId);
+    map['payload'] = Variable<String>(payload);
+    map['expires_at_micros'] = Variable<int>(expiresAtMicros);
+    return map;
+  }
+
+  CachedFeedPostSnapshotsCompanion toCompanion(bool nullToAbsent) {
+    return CachedFeedPostSnapshotsCompanion(
+      ownerUserId: Value(ownerUserId),
+      postId: Value(postId),
+      payload: Value(payload),
+      expiresAtMicros: Value(expiresAtMicros),
+    );
+  }
+
+  factory CachedFeedPostSnapshot.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedFeedPostSnapshot(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      postId: serializer.fromJson<String>(json['postId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      expiresAtMicros: serializer.fromJson<int>(json['expiresAtMicros']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'postId': serializer.toJson<String>(postId),
+      'payload': serializer.toJson<String>(payload),
+      'expiresAtMicros': serializer.toJson<int>(expiresAtMicros),
+    };
+  }
+
+  CachedFeedPostSnapshot copyWith({
+    String? ownerUserId,
+    String? postId,
+    String? payload,
+    int? expiresAtMicros,
+  }) => CachedFeedPostSnapshot(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    postId: postId ?? this.postId,
+    payload: payload ?? this.payload,
+    expiresAtMicros: expiresAtMicros ?? this.expiresAtMicros,
+  );
+  CachedFeedPostSnapshot copyWithCompanion(
+    CachedFeedPostSnapshotsCompanion data,
+  ) {
+    return CachedFeedPostSnapshot(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      postId: data.postId.present ? data.postId.value : this.postId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      expiresAtMicros: data.expiresAtMicros.present
+          ? data.expiresAtMicros.value
+          : this.expiresAtMicros,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFeedPostSnapshot(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('postId: $postId, ')
+          ..write('payload: $payload, ')
+          ..write('expiresAtMicros: $expiresAtMicros')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(ownerUserId, postId, payload, expiresAtMicros);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedFeedPostSnapshot &&
+          other.ownerUserId == this.ownerUserId &&
+          other.postId == this.postId &&
+          other.payload == this.payload &&
+          other.expiresAtMicros == this.expiresAtMicros);
+}
+
+class CachedFeedPostSnapshotsCompanion
+    extends UpdateCompanion<CachedFeedPostSnapshot> {
+  final Value<String> ownerUserId;
+  final Value<String> postId;
+  final Value<String> payload;
+  final Value<int> expiresAtMicros;
+  final Value<int> rowid;
+  const CachedFeedPostSnapshotsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.postId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.expiresAtMicros = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedFeedPostSnapshotsCompanion.insert({
+    required String ownerUserId,
+    required String postId,
+    required String payload,
+    required int expiresAtMicros,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       postId = Value(postId),
+       payload = Value(payload),
+       expiresAtMicros = Value(expiresAtMicros);
+  static Insertable<CachedFeedPostSnapshot> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? postId,
+    Expression<String>? payload,
+    Expression<int>? expiresAtMicros,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (postId != null) 'post_id': postId,
+      if (payload != null) 'payload': payload,
+      if (expiresAtMicros != null) 'expires_at_micros': expiresAtMicros,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedFeedPostSnapshotsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? postId,
+    Value<String>? payload,
+    Value<int>? expiresAtMicros,
+    Value<int>? rowid,
+  }) {
+    return CachedFeedPostSnapshotsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      postId: postId ?? this.postId,
+      payload: payload ?? this.payload,
+      expiresAtMicros: expiresAtMicros ?? this.expiresAtMicros,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (postId.present) {
+      map['post_id'] = Variable<String>(postId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (expiresAtMicros.present) {
+      map['expires_at_micros'] = Variable<int>(expiresAtMicros.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFeedPostSnapshotsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('postId: $postId, ')
+          ..write('payload: $payload, ')
+          ..write('expiresAtMicros: $expiresAtMicros, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -13965,6 +14298,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedChatListStatesTable(this);
   late final $CachedChatUnreadTotalsTable cachedChatUnreadTotals =
       $CachedChatUnreadTotalsTable(this);
+  late final $CachedFeedPostSnapshotsTable cachedFeedPostSnapshots =
+      $CachedFeedPostSnapshotsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -13994,6 +14329,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedChatListEntries,
     cachedChatListStates,
     cachedChatUnreadTotals,
+    cachedFeedPostSnapshots,
   ];
 }
 
@@ -21303,6 +21639,222 @@ typedef $$CachedChatUnreadTotalsTableProcessedTableManager =
       CachedChatUnreadTotal,
       PrefetchHooks Function()
     >;
+typedef $$CachedFeedPostSnapshotsTableCreateCompanionBuilder =
+    CachedFeedPostSnapshotsCompanion Function({
+      required String ownerUserId,
+      required String postId,
+      required String payload,
+      required int expiresAtMicros,
+      Value<int> rowid,
+    });
+typedef $$CachedFeedPostSnapshotsTableUpdateCompanionBuilder =
+    CachedFeedPostSnapshotsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> postId,
+      Value<String> payload,
+      Value<int> expiresAtMicros,
+      Value<int> rowid,
+    });
+
+class $$CachedFeedPostSnapshotsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedFeedPostSnapshotsTable> {
+  $$CachedFeedPostSnapshotsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get postId => $composableBuilder(
+    column: $table.postId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get expiresAtMicros => $composableBuilder(
+    column: $table.expiresAtMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedFeedPostSnapshotsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedFeedPostSnapshotsTable> {
+  $$CachedFeedPostSnapshotsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get postId => $composableBuilder(
+    column: $table.postId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get expiresAtMicros => $composableBuilder(
+    column: $table.expiresAtMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedFeedPostSnapshotsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedFeedPostSnapshotsTable> {
+  $$CachedFeedPostSnapshotsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get postId =>
+      $composableBuilder(column: $table.postId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<int> get expiresAtMicros => $composableBuilder(
+    column: $table.expiresAtMicros,
+    builder: (column) => column,
+  );
+}
+
+class $$CachedFeedPostSnapshotsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedFeedPostSnapshotsTable,
+          CachedFeedPostSnapshot,
+          $$CachedFeedPostSnapshotsTableFilterComposer,
+          $$CachedFeedPostSnapshotsTableOrderingComposer,
+          $$CachedFeedPostSnapshotsTableAnnotationComposer,
+          $$CachedFeedPostSnapshotsTableCreateCompanionBuilder,
+          $$CachedFeedPostSnapshotsTableUpdateCompanionBuilder,
+          (
+            CachedFeedPostSnapshot,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedFeedPostSnapshotsTable,
+              CachedFeedPostSnapshot
+            >,
+          ),
+          CachedFeedPostSnapshot,
+          PrefetchHooks Function()
+        > {
+  $$CachedFeedPostSnapshotsTableTableManager(
+    _$AppDatabase db,
+    $CachedFeedPostSnapshotsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedFeedPostSnapshotsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedFeedPostSnapshotsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedFeedPostSnapshotsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> postId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> expiresAtMicros = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFeedPostSnapshotsCompanion(
+                ownerUserId: ownerUserId,
+                postId: postId,
+                payload: payload,
+                expiresAtMicros: expiresAtMicros,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String postId,
+                required String payload,
+                required int expiresAtMicros,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFeedPostSnapshotsCompanion.insert(
+                ownerUserId: ownerUserId,
+                postId: postId,
+                payload: payload,
+                expiresAtMicros: expiresAtMicros,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedFeedPostSnapshotsTable,
+                    CachedFeedPostSnapshot
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedFeedPostSnapshotsTable,
+                    CachedFeedPostSnapshot
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedFeedPostSnapshotsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedFeedPostSnapshotsTable,
+      CachedFeedPostSnapshot,
+      $$CachedFeedPostSnapshotsTableFilterComposer,
+      $$CachedFeedPostSnapshotsTableOrderingComposer,
+      $$CachedFeedPostSnapshotsTableAnnotationComposer,
+      $$CachedFeedPostSnapshotsTableCreateCompanionBuilder,
+      $$CachedFeedPostSnapshotsTableUpdateCompanionBuilder,
+      (
+        CachedFeedPostSnapshot,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedFeedPostSnapshotsTable,
+          CachedFeedPostSnapshot
+        >,
+      ),
+      CachedFeedPostSnapshot,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -21393,5 +21945,10 @@ class $AppDatabaseManager {
       $$CachedChatUnreadTotalsTableTableManager(
         _db,
         _db.cachedChatUnreadTotals,
+      );
+  $$CachedFeedPostSnapshotsTableTableManager get cachedFeedPostSnapshots =>
+      $$CachedFeedPostSnapshotsTableTableManager(
+        _db,
+        _db.cachedFeedPostSnapshots,
       );
 }

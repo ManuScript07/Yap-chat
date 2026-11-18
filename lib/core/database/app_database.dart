@@ -382,6 +382,16 @@ class CachedAppLanguages extends Table {
   Set<Column> get primaryKey => {ownerUserId};
 }
 
+class CachedFeedPostSnapshots extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get postId => text()();
+  TextColumn get payload => text()();
+  IntColumn get expiresAtMicros => integer()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, postId};
+}
+
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -408,6 +418,7 @@ class CachedAppLanguages extends Table {
     CachedChatListEntries,
     CachedChatListStates,
     CachedChatUnreadTotals,
+    CachedFeedPostSnapshots,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -426,7 +437,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 30;
+  int get schemaVersion => 31;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -744,12 +755,17 @@ class AppDatabase extends _$AppDatabase {
         final columns = await customSelect(
           'PRAGMA table_info(cached_search_privacy_settings)',
         ).get();
-        if (!columns.any((row) => row.read<String>('name') == 'nearby_visible')) {
+        if (!columns.any(
+          (row) => row.read<String>('name') == 'nearby_visible',
+        )) {
           await migrator.addColumn(
             cachedSearchPrivacySettings,
             cachedSearchPrivacySettings.nearbyVisible,
           );
         }
+      }
+      if (from < 31) {
+        await migrator.createTable(cachedFeedPostSnapshots);
       }
     },
     beforeOpen: (details) async {

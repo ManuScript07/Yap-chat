@@ -790,7 +790,7 @@ void main() {
             connection.select('PRAGMA user_version').single['user_version'],
             db.schemaVersion,
           );
-          expect(db.schemaVersion, 30);
+          expect(db.schemaVersion, 31);
           for (final entry in tables.entries) {
             final after = _snapshot(connection, entry.key, entry.value);
             if (entry.key == 'cached_chats') {

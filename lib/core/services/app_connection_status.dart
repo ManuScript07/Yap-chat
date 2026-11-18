@@ -49,7 +49,9 @@ class AppConnectionStatus {
       _presentationState.removeListener(listener);
   AccountSessionSnapshot? _session;
   _Availability _api = _Availability.unknown, _realtime = _Availability.unknown;
-  bool? _networkAvailable;
+  final _networkAvailability = ValueNotifier<bool?>(null);
+  ValueListenable<bool?> get networkAvailability => _networkAvailability;
+  bool? get _networkAvailable => _networkAvailability.value;
   int? _nativeNetworkGeneration;
   bool _visible = true, _suspended = false, _active = true, _disposed = false;
   bool _channelConfirmed = false;
@@ -105,7 +107,6 @@ class AppConnectionStatus {
       return;
     }
     synchronizeSession(active: _active);
-    _networkAvailable = available;
     _nativeNetworkGeneration = generation;
     _network++;
     if (!available) {
@@ -115,6 +116,7 @@ class AppConnectionStatus {
         _realtime = _Availability.connecting;
       }
     }
+    _networkAvailability.value = available;
     _publish();
   }
 
@@ -311,6 +313,7 @@ class AppConnectionStatus {
     _presentation?.cancel();
     unawaited(_heartbeats?.cancel());
     _presentationState.dispose();
+    _networkAvailability.dispose();
   }
 }
 

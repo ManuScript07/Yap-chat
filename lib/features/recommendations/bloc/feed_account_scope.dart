@@ -12,6 +12,7 @@ class FeedAccountScope {
     this._repository, {
     this.blocks,
     this.friends,
+    this.postSnapshots,
   }) {
     _accounts.generationChanges.addListener(_reset);
   }
@@ -20,6 +21,7 @@ class FeedAccountScope {
   final IFeedRepository _repository;
   final IBlocklistRepository? blocks;
   final IFriendAccessRepository? friends;
+  final FeedPostSnapshotStore? postSnapshots;
   FeedActionsCubit? _actions;
   StreamSubscription<Set<String>>? _blocks;
   StreamSubscription<FriendAccessChange>? _friendAccess;
@@ -34,6 +36,7 @@ class FeedAccountScope {
       repository as IFeedPostRepository,
       account,
       () => _accounts.isCurrent(account),
+      postSnapshots: postSnapshots,
     );
     _blocks = blocks?.watchBlockedUserIds().listen(
       actions.setBlocked,

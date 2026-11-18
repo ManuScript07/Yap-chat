@@ -9,6 +9,7 @@ import 'package:yap_chat/repositories/settings/abstract_settings_repository.dart
 import 'package:yap_chat/repositories/blocks/abstract_blocklist_repository.dart';
 import 'package:yap_chat/repositories/reports/abstract_user_reports_repository.dart';
 import 'package:yap_chat/repositories/nearby/abstract_nearby_repository.dart';
+import 'package:yap_chat/repositories/feed/feed.dart';
 
 /// Durable, account-scoped cleanup used by logout and startup recovery.
 class UserDataCleanupCoordinator {
@@ -22,6 +23,7 @@ class UserDataCleanupCoordinator {
     IBlocklistRepository? blocklistRepository,
     IUserReportsRepository? userReportsRepository,
     INearbyRepository? nearbyRepository,
+    this._feedPostSnapshots,
     required Talker talker,
   }) : _preferences = preferences,
        _pendingKey = 'auth.cleanup.pending.$environment',
@@ -43,6 +45,7 @@ class UserDataCleanupCoordinator {
   final IBlocklistRepository? _blocklistRepository;
   final IUserReportsRepository? _userReportsRepository;
   final INearbyRepository? _nearbyRepository;
+  final FeedPostSnapshotStore? _feedPostSnapshots;
   final Talker _talker;
 
   Future<void> _operation = Future<void>.value();
@@ -84,6 +87,8 @@ class UserDataCleanupCoordinator {
           repository.clearUserCache(userId),
         if (_nearbyRepository case final repository?)
           repository.clearUserCache(userId),
+        if (_feedPostSnapshots case final snapshots?)
+          snapshots.clearUser(userId),
         _clearPreferences(userId),
       ]);
       final pending = _pendingUsers()..remove(userId);
