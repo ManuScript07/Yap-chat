@@ -4,12 +4,12 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {PaginationLab} from './lab.mjs';
 
-const commands = ['seed','seedFeed','verifyFeed','status','prepare','verify','serve','cleanup','action'];
+const commands = ['seed','seedFeed','verifyFeed','seedFeedPhotos','verifyFeedPhotos','status','prepare','verify','serve','cleanup','action'];
 const args = process.argv.slice(2);
 const command = args[0] || 'status';
 const named = key => { const i=args.indexOf(key); return i<0?undefined:args[i+1]; };
 if (args.includes('--help')) {
-  console.log('node tools/pagination_lab/main.mjs seed|seedFeed|verifyFeed|status|prepare|verify|serve|cleanup|action <name> [--name manual]');
+  console.log('node tools/pagination_lab/main.mjs seed|seedFeed|verifyFeed|seedFeedPhotos|verifyFeedPhotos|status|prepare|verify|serve|cleanup|action <name> [--name manual]');
   process.exit(0);
 }
 if (!commands.includes(command)) throw Error('Unknown lab command');

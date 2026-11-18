@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';
+import {seedFeedPhotos as seedPhotos, verifyFeedPhotos as verifyPhotos} from './feed_photos.mjs';
 
 const postCount = 65;
 const pageSize = 20;
@@ -12,7 +13,7 @@ function fixture(lab) {
   return {owner, prefix};
 }
 
-export function seedFeed(lab) {
+export async function seedFeed(lab) {
   const {owner, prefix} = fixture(lab);
   const authorIds = lab.state.users.filter(user => user.index >= 2)
     .map(user => "'" + user.id + "'").join(',');
@@ -64,7 +65,16 @@ export function seedFeed(lab) {
     commit;
   `);
   assert.deepEqual(result, {posts: postCount, authors: 13});
-  return result;
+  return {...result, ...await seedPhotos(lab, prefix, owner)};
+}
+
+export function seedFeedPhotos(lab) {
+  const {prefix, owner} = fixture(lab);
+  return seedPhotos(lab, prefix, owner);
+}
+
+export function verifyFeedPhotos(lab) {
+  return verifyPhotos(lab, fixture(lab).prefix);
 }
 
 export async function verifyFeed(lab) {
@@ -74,6 +84,7 @@ export async function verifyFeed(lab) {
   const expected = Array.from({length: postCount}, (_, i) =>
     prefix + String(i + 1).padStart(12, '0'));
   const report = {};
+  const posts = new Map();
   for (const rpc of ['get_for_you_feed_v2', 'get_nearby_feed', 'get_friends_feed']) {
     const personalized = rpc === 'get_for_you_feed_v2';
     const sessionId = personalized ? randomUUID() : null;
@@ -91,6 +102,9 @@ export async function verifyFeed(lab) {
       const fixtureIds = page.items.map(item => item.post.id).filter(id => id.startsWith(prefix));
       if (fixtureIds.length) pageSizes.push(fixtureIds.length);
       observed.push(...fixtureIds);
+      if (rpc === 'get_friends_feed') {
+        for (const {post} of page.items) posts.set(post.id, post);
+      }
       if (request === 1) {
         const replay = await lab.rpc(owner, rpc, params, session);
         assert.deepEqual(replay.items.map(item => item.post.id), page.items.map(item => item.post.id), rpc + ': replay changed rows');
@@ -109,5 +123,5 @@ export async function verifyFeed(lab) {
     assert.deepEqual(pageSizes, expectedSizes, rpc + ': unexpected fixture page sizes');
     report[rpc] = {pages: pageSizes, posts: observed.length, replayed};
   }
-  return report;
+  return {...report, media: await verifyPhotos(lab, prefix, {posts, session})};
 }

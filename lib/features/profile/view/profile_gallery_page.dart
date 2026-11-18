@@ -113,72 +113,56 @@ class _ProfileGalleryPageState extends State<ProfileGalleryPage> {
                 top: systemPadding.top + 16,
                 left: systemPadding.left + 16,
                 right: systemPadding.right + 16,
-                child: IgnorePointer(
-                  ignoring: !_showChrome,
-                  child: AnimatedOpacity(
-                    opacity: _showChrome ? 1 : 0,
-                    duration: const Duration(milliseconds: 140),
-                    curve: Curves.easeInOut,
-                    child: Row(
-                      children: [
-                        GlassIconButton(
-                          icon: Icons.arrow_back_rounded,
-                          onTap: _close,
-                          width: 44,
-                          height: 44,
-                          borderRadius: 16,
-                          iconSize: 26,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                child: MediaGalleryChromeVisibility(
+                  settled: true,
+                  visible: _showChrome,
+                  child: Row(
+                    children: [
+                      MediaGalleryHeader.backButton(_close),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: colorScheme.onSurface,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: .4,
+                              ),
+                            ),
+                            if (addedAt != null) ...[
+                              const SizedBox(height: 2),
                               Text(
-                                widget.displayName,
+                                DateFormat(
+                                  'd MMMM yyyy',
+                                  Localizations.localeOf(context).toString(),
+                                ).format(addedAt),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: colorScheme.onSurface,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: .4,
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: .68,
+                                  ),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: .2,
                                 ),
                               ),
-                              if (addedAt != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  DateFormat(
-                                    'd MMMM yyyy',
-                                    Localizations.localeOf(context).toString(),
-                                  ).format(addedAt),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: colorScheme.onSurface.withValues(
-                                      alpha: .68,
-                                    ),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w400,
-                                    letterSpacing: .2,
-                                  ),
-                                ),
-                              ],
                             ],
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        GlassIconButton(
-                          icon: Icons.download_rounded,
-                          onTap: _isSaving ? () {} : _saveCurrent,
-                          width: 44,
-                          height: 44,
-                          borderRadius: 16,
-                          iconSize: 24,
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+                      MediaGalleryHeader.saveButton(
+                        _isSaving ? () {} : _saveCurrent,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -186,40 +170,12 @@ class _ProfileGalleryPageState extends State<ProfileGalleryPage> {
                 top: systemPadding.top + (isLandscape ? 18 : 76),
                 left: 0,
                 right: 0,
-                child: IgnorePointer(
-                  ignoring: !_showChrome,
-                  child: AnimatedOpacity(
-                    opacity: _showChrome ? 1 : 0,
-                    duration: const Duration(milliseconds: 140),
-                    curve: Curves.easeInOut,
-                    child: Center(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: context.colorScheme.scrim.withValues(
-                            alpha: .52,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          child: Text(
-                            context.l10n.profilePhotoCounter(
-                              _currentIndex + 1,
-                              widget.photos.length,
-                            ),
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: .3,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                child: MediaGalleryChromeVisibility(
+                  settled: true,
+                  visible: _showChrome,
+                  child: MediaGalleryCounter(
+                    index: _currentIndex,
+                    total: widget.photos.length,
                   ),
                 ),
               ),

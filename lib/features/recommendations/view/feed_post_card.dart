@@ -332,7 +332,7 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
   @override
   void initState() {
     super.initState();
-    if (widget.visible) unawaited(_load());
+    unawaited(_load());
   }
 
   @override
@@ -352,7 +352,9 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
       _generation++;
       _loading = false;
     }
-    if (widget.visible && _frameSize != widget.decodeSize && !_loading) {
+    if (_frameSize != widget.decodeSize &&
+        !_loading &&
+        (widget.visible || _image == null)) {
       unawaited(_load());
     }
   }
@@ -372,11 +374,18 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
         timeline.actions?.canShow(post) != false;
     try {
       if (!isCurrent()) return;
-      timeline.actions?.trackMedia(post);
       var frame = frames?.find(post, photo.thumbnailPath, decodeSize);
       if (frame == null) {
+        // PageView builds an incoming tab before it becomes active. Resolve a
+        // cached frame synchronously, including after a change of tile size.
+        if (_image == null) {
+          final fallback = frames?.findPreview(post, photo.thumbnailPath);
+          if (fallback != null) _showFrame(fallback, null);
+        }
+        if (!widget.visible) return;
         final bytes = await timeline.repository.downloadThumbnail(
           photo,
+          post: post,
           account: timeline.account,
           stillNeeded: () => isCurrent() && widget.visible,
         );
@@ -388,17 +397,21 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
         }
         frames?.store(post, photo.thumbnailPath, decodeSize, frame);
       }
-      final preceding = _image;
-      setState(() {
-        _image = frame;
-        _frameSize = decodeSize;
-      });
-      preceding?.dispose();
+      _showFrame(frame, decodeSize);
     } catch (_) {
       // Keep the tile's dimensions on storage or decoding errors.
     } finally {
       if (generation == _generation) _loading = false;
     }
+  }
+
+  void _showFrame(ui.Image frame, int? decodeSize) {
+    final preceding = _image;
+    setState(() {
+      _image = frame;
+      _frameSize = decodeSize;
+    });
+    preceding?.dispose();
   }
 
   @override
@@ -415,6 +428,11 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
         ),
       );
     }
+    final ratio = feedPhotoDisplayRatio(
+      widget.photo.aspectRatio ?? image.width / image.height,
+      MediaQuery.sizeOf(context),
+      MediaQuery.devicePixelRatioOf(context),
+    );
     return Semantics(
       button: true,
       label: context.l10n.feedOpenPhoto,
@@ -424,7 +442,7 @@ class _FeedThumbnailState extends State<_FeedThumbnail> {
           tag: widget.heroTag,
           child: ClipRRect(
             borderRadius: _radius,
-            child: RawImage(image: image, fit: BoxFit.cover),
+            child: feedPhotoFrame(image, ratio, BoxFit.cover),
           ),
         ),
       ),

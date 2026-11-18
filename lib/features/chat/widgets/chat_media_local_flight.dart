@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:yap_chat/ui/ui.dart';
 
 import 'widgets.dart';
 
@@ -98,8 +99,8 @@ class ChatMediaLocalFlight extends ChangeNotifier {
     _sourceRect = _sources[tag]?.rect;
     _fade = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      curve: MediaGalleryRoute.openingFade,
+      reverseCurve: MediaGalleryRoute.closingFade,
     );
     _local =
         hasHost &&

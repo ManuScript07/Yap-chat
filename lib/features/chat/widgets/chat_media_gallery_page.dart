@@ -48,8 +48,6 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
   ModalRoute<dynamic>? _route;
   bool _routeSettled = false;
 
-  bool get _chromeVisible => _showChrome && _routeSettled;
-
   static const _overlayStyle = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
@@ -195,30 +193,24 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                 top: systemPadding.top + 16,
                 left: systemPadding.left + 16,
                 right: systemPadding.right + 16,
-                child: IgnorePointer(
-                  ignoring: !_chromeVisible,
-                  child: AnimatedOpacity(
-                    opacity: _chromeVisible ? 1 : 0,
-                    duration: _routeSettled
-                        ? const Duration(milliseconds: 140)
-                        : Duration.zero,
-                    curve: Curves.easeInOut,
-                    child: MediaGalleryHeader(
-                      name: widget.senderName,
-                      date: DateFormat(
-                        'd MMMM yyyy',
-                        Localizations.localeOf(context).toString(),
-                      ).format(sentAt),
-                      avatar: UserAvatar(
-                        avatarUrl: widget.senderAvatarUrl,
-                        avatarLoader: widget.senderAvatarLoader,
-                        avatarImage: widget.senderAvatarImage,
-                        avatarRevision: widget.senderAvatarUrl,
-                        size: MediaGalleryHeader.buttonSize,
-                      ),
-                      onBack: () => Navigator.of(context).pop(),
-                      onSave: _saveCurrentImage,
+                child: MediaGalleryChromeVisibility(
+                  settled: _routeSettled,
+                  visible: _showChrome,
+                  child: MediaGalleryHeader(
+                    name: widget.senderName,
+                    date: DateFormat(
+                      'd MMMM yyyy',
+                      Localizations.localeOf(context).toString(),
+                    ).format(sentAt),
+                    avatar: UserAvatar(
+                      avatarUrl: widget.senderAvatarUrl,
+                      avatarLoader: widget.senderAvatarLoader,
+                      avatarImage: widget.senderAvatarImage,
+                      avatarRevision: widget.senderAvatarUrl,
+                      size: MediaGalleryHeader.buttonSize,
                     ),
+                    onBack: () => Navigator.of(context).pop(),
+                    onSave: _saveCurrentImage,
                   ),
                 ),
               ),
@@ -226,18 +218,12 @@ class _ChatMediaGalleryPageState extends State<ChatMediaGalleryPage> {
                 top: systemPadding.top + (isLandscape ? 18 : 76),
                 left: 0,
                 right: 0,
-                child: IgnorePointer(
-                  ignoring: !_chromeVisible,
-                  child: AnimatedOpacity(
-                    opacity: _chromeVisible ? 1 : 0,
-                    duration: _routeSettled
-                        ? const Duration(milliseconds: 140)
-                        : Duration.zero,
-                    curve: Curves.easeInOut,
-                    child: MediaGalleryCounter(
-                      index: _currentIndex,
-                      total: widget.imagePaths.length,
-                    ),
+                child: MediaGalleryChromeVisibility(
+                  settled: _routeSettled,
+                  visible: _showChrome,
+                  child: MediaGalleryCounter(
+                    index: _currentIndex,
+                    total: widget.imagePaths.length,
                   ),
                 ),
               ),

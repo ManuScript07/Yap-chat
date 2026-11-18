@@ -4,7 +4,7 @@ import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'no
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
-import {seedFeed, verifyFeed} from './feed.mjs';
+import {seedFeed, verifyFeed, seedFeedPhotos, verifyFeedPhotos} from './feed.mjs';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const marker = 'yap-pagination-lab-v1';
@@ -74,11 +74,12 @@ export class PaginationLab {
     writeFileSync(temp, JSON.stringify(this.state, null, 2), {mode: 0o600});
     renameSync(temp, this.statePath);
   }
-  async request(path, {token = this.adminKey, method = 'GET', body, bytes, contentType = 'application/json'} = {}) {
+  async request(path, {token = this.adminKey, method = 'GET', body, bytes, contentType = 'application/json', binary = false} = {}) {
     const response = await fetch(`${this.api}${path}`, {
       method, headers: {apikey: this.key, Authorization: `Bearer ${token}`, 'Content-Type': contentType},
       body: bytes ?? (body === undefined ? undefined : JSON.stringify(body)), signal: AbortSignal.timeout(30000),
     });
+    if (binary && response.ok) return Buffer.from(await response.arrayBuffer());
     const text = await response.text();
     let data; try { data = text ? JSON.parse(text) : null; } catch { data = null; }
     if (!response.ok) throw Error(`Local API ${path.split('?')[0]}: ${response.status} ${String(data?.msg || data?.message || data?.error_description || data?.error || 'request failed').slice(0, 220)}`);
@@ -218,6 +219,14 @@ export class PaginationLab {
     this.requireSeed();
     return seedFeed(this);
   }
+  seedFeedPhotos() {
+    this.requireSeed();
+    return seedFeedPhotos(this);
+  }
+  verifyFeedPhotos() {
+    this.requireSeed();
+    return verifyFeedPhotos(this);
+  }
   verifyFeed() {
     this.requireSeed();
     return verifyFeed(this);
@@ -329,7 +338,7 @@ export class PaginationLab {
     if (!this.state) return {cleaned:0};
     const users=this.data(`select coalesce(jsonb_agg(id),'[]'::jsonb) from auth.users where raw_user_meta_data->>'pagination_lab'=${literal(marker)} and raw_user_meta_data->>'pagination_run'=${literal(this.state.run)};`);
     if (users.length) {
-      for (const bucket of ['avatars','chat-images','chat-audio']) {
+      for (const bucket of ['avatars','chat-images','chat-audio','feed-media','feed-uploads']) {
         const paths=this.data(`select coalesce(jsonb_agg(name),'[]'::jsonb) from storage.objects where bucket_id=${literal(bucket)} and split_part(name,'/',1) in (${ids(users)});`);
         for(let i=0;i<paths.length;i+=100) await this.request(`/storage/v1/object/${bucket}`,{method:'DELETE',body:{prefixes:paths.slice(i,i+100)}});
       }

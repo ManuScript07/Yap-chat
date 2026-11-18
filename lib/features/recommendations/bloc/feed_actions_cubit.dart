@@ -36,7 +36,6 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   final IFeedPostRepository repository;
   final thumbnailFrames = FeedMediaFrames(maxBytes: 8 * 1024 * 1024);
-  final _mediaPosts = <String, FeedPost>{};
   final AccountSessionSnapshot account;
   final bool Function() isCurrent;
   final _follows = <String, FeedFollowState>{};
@@ -64,13 +63,6 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   bool get active => !isClosed && isCurrent();
   int get projectionVersion => _projectionVersion;
-
-  void trackMedia(FeedPost post) {
-    if (!canShow(post)) return;
-    _mediaPosts.remove(post.id);
-    _mediaPosts[post.id] = post;
-    if (_mediaPosts.length > 128) _mediaPosts.remove(_mediaPosts.keys.first);
-  }
 
   bool canShow(FeedPost post) {
     if (!active || _hidden.contains(post.id)) return false;
@@ -115,7 +107,9 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   }
 
   void hidePost(String id) {
-    if (active && _hidden.add(id)) _publish();
+    if (!active || !_hidden.add(id)) return;
+    _publish();
+    _evictMedia(postId: id);
   }
 
   bool beginDetail() {
@@ -138,6 +132,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     if (!active) return;
     _markFriendshipRemoved(id);
     _publishAccessChange();
+    _evictMedia(removedFriends: {id});
   }
 
   void _markFriendshipRemoved(String id) {
@@ -158,6 +153,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     if (!active) return;
     _markPeerBlocked(id);
     _publishAccessChange();
+    _evictMedia(blocked: {id});
   }
 
   void _markPeerBlocked(String id) {
@@ -180,6 +176,11 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         reconnect = _lastReconnect;
         final requestedAt = _projectionVersion;
         final authors = Set<String>.of(_observedFriends);
+        final source = repository;
+        if (source is FeedRepository) {
+          authors.addAll(await source.cachedMediaFriends(account));
+        }
+        if (!active || reconnect != _lastReconnect) continue;
         if (authors.isEmpty) return;
         final Set<String> confirmed;
         try {
@@ -190,15 +191,18 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
           continue;
         }
         if (!active || reconnect != _lastReconnect) continue;
-        var revoked = false;
+        final revoked = <String>{};
         for (final id in authors.difference(confirmed)) {
           if ((_friendshipChanges[id]?.changedAt ?? 0) > requestedAt) {
             continue;
           }
           _markFriendshipRemoved(id);
-          revoked = true;
+          revoked.add(id);
         }
-        if (revoked) _publishAccessChange();
+        if (revoked.isNotEmpty) {
+          _publishAccessChange();
+          _evictMedia(removedFriends: revoked);
+        }
       } while (active && reconnect != _lastReconnect);
     } finally {
       _checkingFriends = false;
@@ -215,11 +219,30 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         _blocked.length == blocked.length && _blocked.containsAll(blocked)) {
       return;
     }
-    for (final id in blocked.difference(_blocked)) {
+    final newlyBlocked = blocked.difference(_blocked);
+    for (final id in newlyBlocked) {
       _markPeerBlocked(id);
     }
     _blocked = Set.unmodifiable(blocked);
     _publish();
+    if (newlyBlocked.isNotEmpty) _evictMedia(blocked: newlyBlocked);
+  }
+
+  void _evictMedia({
+    String? postId,
+    Set<String> blocked = const {},
+    Set<String> removedFriends = const {},
+  }) {
+    final source = repository;
+    if (source is! FeedRepository) return;
+    unawaited(
+      source.evictMedia(
+        account,
+        postId: postId,
+        blocked: blocked,
+        removedFriends: removedFriends,
+      ),
+    );
   }
 
   FeedFollowState? followFor(FeedPost post) {
@@ -405,14 +428,6 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
         !identical(state.blocked, _blocked) ||
         state.accessVersion != _accessVersion) {
       thumbnailFrames.removeUnavailable(canShow);
-      final source = repository;
-      _mediaPosts.removeWhere((_, post) {
-        if (canShow(post)) return false;
-        if (source is FeedRepository) {
-          unawaited(source.evictPostMedia(post, account));
-        }
-        return true;
-      });
     }
     _trim(_follows);
     _trim(_reactions);
@@ -431,7 +446,6 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   @override
   Future<void> close() {
     thumbnailFrames.clear();
-    _mediaPosts.clear();
     return super.close();
   }
 

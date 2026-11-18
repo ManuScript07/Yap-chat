@@ -3,6 +3,35 @@ import 'package:yap_chat/core/core.dart';
 
 import 'glass_icon_button.dart';
 
+/// Keep the controls mounted out of sight until the moving photo has landed.
+class MediaGalleryChromeVisibility extends StatelessWidget {
+  const MediaGalleryChromeVisibility({
+    super.key,
+    required this.settled,
+    required this.visible,
+    required this.child,
+  });
+
+  final bool settled;
+  final bool visible;
+  final Widget child;
+  static const animationDuration = Duration(milliseconds: 140);
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = settled && visible;
+    return IgnorePointer(
+      ignoring: !shown,
+      child: AnimatedOpacity(
+        opacity: shown ? 1 : 0,
+        duration: settled ? animationDuration : Duration.zero,
+        curve: Curves.easeInOut,
+        child: child,
+      ),
+    );
+  }
+}
+
 class MediaGalleryHeader extends StatelessWidget {
   const MediaGalleryHeader({
     super.key,
@@ -33,16 +62,18 @@ class MediaGalleryHeader extends StatelessWidget {
     iconSize: 26,
   );
 
+  static Widget saveButton(VoidCallback onTap) => GlassIconButton(
+    icon: Icons.download_rounded,
+    onTap: onTap,
+    width: buttonSize,
+    height: buttonSize,
+    borderRadius: 16,
+    iconSize: 24,
+  );
+
   @override
   Widget build(BuildContext context) {
-    final save = GlassIconButton(
-      icon: Icons.download_rounded,
-      onTap: onSave,
-      width: buttonSize,
-      height: buttonSize,
-      borderRadius: 16,
-      iconSize: 24,
-    );
+    final save = saveButton(onSave);
     final back = backButton(onBack);
     return Row(
       children: [
@@ -114,8 +145,8 @@ class MediaGalleryCounter extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: Text(
           context.l10n.profilePhotoCounter(index + 1, total),
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: context.colorScheme.onSurface,
             fontSize: 14,
             fontWeight: FontWeight.w700,
             letterSpacing: .3,

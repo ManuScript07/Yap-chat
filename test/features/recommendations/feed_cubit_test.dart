@@ -395,6 +395,7 @@ class _Feed extends Fake implements IFeedRepository, IFeedPostRepository {
   @override
   Future<Uint8List> downloadThumbnail(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   }) async => throw UnimplementedError();

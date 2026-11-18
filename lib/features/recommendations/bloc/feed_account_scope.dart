@@ -40,6 +40,9 @@ class FeedAccountScope {
       onError: (Object _) {},
     );
     if (friends case final access?) {
+      if (repository is FeedRepository) {
+        unawaited(actions.recheckFriendships(access.verifyCurrentFriends));
+      }
       _friendAccess = access.watchFriendAccessChanges().listen((change) {
         switch (change) {
           case (kind: FriendAccessChangeKind.removed, peerId: final String id):

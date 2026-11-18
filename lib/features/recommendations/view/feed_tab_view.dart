@@ -35,8 +35,24 @@ class FeedTabView extends StatefulWidget {
   State<FeedTabView> createState() => _FeedTabViewState();
 }
 
-class _FeedTabViewState extends State<FeedTabView> {
+class _FeedTabViewState extends State<FeedTabView>
+    with AutomaticKeepAliveClientMixin<FeedTabView> {
   bool _scrollingTowardEnd = false;
+  late bool _visited = widget.visible;
+
+  // Retain the visited viewport across horizontal swipes. Its vertical sliver
+  // still disposes cards outside the viewport and scroll cache.
+  @override
+  bool get wantKeepAlive => _visited;
+
+  @override
+  void didUpdateWidget(covariant FeedTabView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_visited && widget.visible) {
+      _visited = true;
+      updateKeepAlive();
+    }
+  }
 
   void _onScroll(ScrollNotification notification) {
     if (!widget.visible ||
@@ -84,6 +100,7 @@ class _FeedTabViewState extends State<FeedTabView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final timeline = widget.timeline;
     if (timeline.tab != FeedTab.nearby) return _scroll();
     return BlocSelector<FeedCubit, FeedState, bool>(

@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('seed','seedFeed','verifyFeed','panel','run','verify','status','cleanup')][string]$Action = 'status',
+  [ValidateSet('seed','seedFeed','verifyFeed','seedFeedPhotos','verifyFeedPhotos','panel','run','verify','status','cleanup')][string]$Action = 'status',
   [string]$Device,
   [switch]$DebugBuild
 )

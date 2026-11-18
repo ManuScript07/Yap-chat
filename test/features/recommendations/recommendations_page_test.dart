@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yap_chat/core/services/services.dart';
+import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/features/recommendations/recommendations.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_controls.dart';
 import 'package:yap_chat/l10n/app_localizations.dart';
@@ -397,6 +400,74 @@ void main() {
     expect(find.text('media body'), findsOneWidget);
   });
 
+  testWidgets('returning across tabs keeps the first preview painted', (
+    tester,
+  ) async {
+    final feed = _FeedWithPhotos();
+    final accounts = AccountSessionController(initialUserId: 'viewer');
+    final scope = FeedAccountScope(accounts, feed);
+    addTearDown(scope.dispose);
+    final post = FeedPost(
+      id: 'cached',
+      authorId: 'author',
+      authorName: 'author',
+      text: 'cached picture',
+      createdAt: DateTime.utc(2026),
+      photos: const [FeedPhoto(id: 'picture', thumbnailPath: 'thumb')],
+    );
+    feed.next = Future.value(FeedPageResult(posts: [post]));
+    final image = (await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      ui.Canvas(recorder).drawPaint(ui.Paint()..color = Colors.blue);
+      final picture = recorder.endRecording();
+      try {
+        return await picture.toImage(24, 24);
+      } finally {
+        picture.dispose();
+      }
+    }))!;
+    addTearDown(image.dispose);
+    final frames = scope.actionsFor(accounts.capture())!.thumbnailFrames;
+    frames.store(post, 'thumb', 208, image);
+    final router = _FeedTabsRouter();
+    addTearDown(router.dispose);
+    await _mount(
+      tester,
+      feed,
+      accounts: accounts,
+      scope: scope,
+      size: const Size(500, 900),
+      router: router,
+    );
+    final preview = find.descendant(
+      of: find.byKey(const PageStorageKey(('feed-photos', 'cached'))),
+      matching: find.byType(RawImage),
+    );
+    expect(preview, findsOneWidget);
+    final mountedPreview = tester.element(preview);
+    expect(feed.thumbnailReads, isEmpty);
+    frames.clear();
+
+    await tester.tap(find.text('friends'));
+    await tester.pumpAndSettle();
+    expect(find.text('friends post 0'), findsOneWidget);
+    await tester.tap(find.text('for you'));
+    await tester.pump();
+    expect(tester.element(preview), same(mountedPreview));
+    await tester.pumpAndSettle();
+    final tabs = AutoTabsRouter.of(tester.element(find.text('feed')));
+    tabs.setActiveIndex(1);
+    await tester.pumpAndSettle();
+    expect(find.text('other main tab'), findsOneWidget);
+    tabs.setActiveIndex(0);
+    await tester.pump();
+    expect(tester.element(preview), same(mountedPreview));
+    await tester.pumpAndSettle();
+    expect(feed.calls, [FeedTab.forYou, FeedTab.friends]);
+    expect(feed.thumbnailReads, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('landscape puts the tabs between title and inbox', (
     tester,
   ) async {
@@ -523,26 +594,37 @@ Future<AccountSessionController> _mount(
   Size size = const Size(360, 800),
   NavigationScrollToTopController? navigation,
   ILocationRepository? location,
+  AccountSessionController? accounts,
+  FeedAccountScope? scope,
+  RootStackRouter? router,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
-  final accounts = AccountSessionController(initialUserId: 'viewer');
+  accounts ??= AccountSessionController(initialUserId: 'viewer');
   await tester.pumpWidget(
     MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AccountSessionController>.value(value: accounts),
         RepositoryProvider<IFeedRepository>.value(value: feed),
+        if (scope != null) RepositoryProvider.value(value: scope),
         if (location != null) RepositoryProvider.value(value: location),
         if (navigation != null) RepositoryProvider.value(value: navigation),
       ],
-      child: MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const RecommendationsPage(),
-      ),
+      child: router == null
+          ? MaterialApp(
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const RecommendationsPage(),
+            )
+          : MaterialApp.router(
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              routerConfig: router.config(),
+            ),
     ),
   );
   await tester.pumpAndSettle();
@@ -599,7 +681,63 @@ class _Feed implements IFeedRepository {
   @override
   Future<Uint8List> downloadThumbnail(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   }) async => throw UnimplementedError();
+}
+
+class _FeedWithPhotos extends _Feed implements IFeedPostRepository {
+  final thumbnailReads = <String>[];
+
+  @override
+  Future<Uint8List> downloadThumbnail(
+    FeedPhoto photo, {
+    required FeedPost post,
+    required AccountSessionSnapshot account,
+    required bool Function() stillNeeded,
+  }) {
+    thumbnailReads.add(photo.thumbnailPath);
+    return super.downloadThumbnail(
+      photo,
+      post: post,
+      account: account,
+      stillNeeded: stillNeeded,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FeedTabsRouter extends RootStackRouter {
+  @override
+  List<AutoRoute> get routes => [
+    NamedRouteDef(
+      name: 'Shell',
+      path: '/',
+      initial: true,
+      builder: (_, _) => AutoTabsRouter(
+        routes: const [
+          PageRouteInfo('RecommendationsRoute'),
+          PageRouteInfo('OtherTab'),
+        ],
+        duration: Duration.zero,
+        transitionBuilder: (_, child, _) => child,
+      ),
+      children: [
+        NamedRouteDef(
+          name: 'RecommendationsRoute',
+          path: 'feed',
+          initial: true,
+          builder: (_, _) => const RecommendationsPage(),
+        ),
+        NamedRouteDef(
+          name: 'OtherTab',
+          path: 'other',
+          builder: (_, _) => const Scaffold(body: Text('other main tab')),
+        ),
+      ],
+    ),
+  ];
 }

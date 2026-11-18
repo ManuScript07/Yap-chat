@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yap_chat/core/services/services.dart';
@@ -77,6 +79,7 @@ abstract interface class IFeedRepository {
 
   Future<Uint8List> downloadThumbnail(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   });
@@ -96,6 +99,7 @@ abstract interface class IFeedPublicationRepository {
   );
   Future<Uint8List> downloadPhoto(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   });
@@ -122,8 +126,9 @@ class FeedRepository
   final AppConnectionStatus? _connection;
   final AppDiagnostics? _diagnostics;
   final MediaCacheService? _mediaCache;
-  final _thumbnails = <(int, String), Future<Uint8List>>{};
-  final _photos = <(int, String), Future<Uint8List>>{};
+  final _thumbnails = <(int, String, String?), Future<Uint8List>>{};
+  final _photos = <(int, String, String?), Future<Uint8List>>{};
+  final _mediaGroups = Expando<String>();
 
   @override
   Future<FeedPageResult> fetch(
@@ -324,7 +329,11 @@ class FeedRepository
     final row = await _postRpc<Map<String, dynamic>?>('get_feed_post', {
       'requested_id': id,
     }, account);
-    return row == null ? null : _decodePost(row, delivery: _delivery(row));
+    if (row == null) {
+      unawaited(evictMedia(account, postId: id));
+      return null;
+    }
+    return _decodePost(row, delivery: _delivery(row));
   }
 
   @override
@@ -425,10 +434,12 @@ class FeedRepository
   @override
   Future<Uint8List> downloadThumbnail(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   }) => _downloadMedia(
     photo.thumbnailPath,
+    post,
     account,
     stillNeeded,
     _thumbnails,
@@ -439,10 +450,12 @@ class FeedRepository
   @override
   Future<Uint8List> downloadPhoto(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   }) => _downloadMedia(
     photo.path ?? photo.thumbnailPath,
+    post,
     account,
     stillNeeded,
     _photos,
@@ -452,13 +465,17 @@ class FeedRepository
 
   Future<Uint8List> _downloadMedia(
     String path,
+    FeedPost post,
     AccountSessionSnapshot account,
     bool Function() stillNeeded,
-    Map<(int, String), Future<Uint8List>> inFlight, {
+    Map<(int, String, String?), Future<Uint8List>> inFlight, {
     required int limit,
     required String metric,
   }) async {
-    final key = (account.generation, path);
+    final group = _mediaCache == null || kIsWeb
+        ? null
+        : _mediaGroups[post] ??= _feedMediaGroup(post);
+    final key = (account.generation, path, group);
     while (stillNeeded() &&
         !inFlight.containsKey(key) &&
         inFlight.length >= limit) {
@@ -477,7 +494,7 @@ class FeedRepository
       if (!stillNeeded()) throw const StaleAccountSessionException();
       return bytes;
     }
-    final download = _download(path, account, metric, stillNeeded);
+    final download = _download(path, group, account, metric, stillNeeded);
     inFlight[key] = download;
     try {
       final bytes = await download;
@@ -491,23 +508,48 @@ class FeedRepository
 
   Future<Uint8List> _download(
     String path,
+    String? group,
     AccountSessionSnapshot account,
     String metric,
     bool Function() stillNeeded,
   ) async {
     final cache = _mediaCache;
-    if (cache != null) {
+    if (cache != null && group != null) {
       try {
         final local = await cache.findStorageFile(
           ownerUserId: account.userId,
           bucket: _mediaBucket,
           storagePath: path,
           mimeType: 'image/jpeg',
+          cacheGroup: group,
         );
         if (local != null) {
           final bytes = await File(local).readAsBytes();
           _ensureAccount(account);
           if (bytes.isNotEmpty) return bytes;
+        }
+        if (stillNeeded()) {
+          final legacy = await cache.findStorageFile(
+            ownerUserId: account.userId,
+            bucket: _mediaBucket,
+            storagePath: path,
+            mimeType: 'image/jpeg',
+          );
+          if (legacy != null) {
+            final bytes = await File(legacy).readAsBytes();
+            if (bytes.isNotEmpty) {
+              await _storeMedia(
+                cache,
+                account,
+                group,
+                path,
+                bytes,
+                stillNeeded,
+              );
+              _ensureAccount(account);
+              return bytes;
+            }
+          }
         }
       } on StaleAccountSessionException {
         rethrow;
@@ -522,47 +564,82 @@ class FeedRepository
       () => _client.storage.from(_mediaBucket).download(path).timeout(_timeout),
     );
     _ensureAccount(account);
-    if (cache != null && stillNeeded()) {
-      try {
-        await _accounts.commit(account, () async {
-          if (!stillNeeded()) return;
-          await cache.storeBytes(
-            ownerUserId: account.userId,
-            bucket: _mediaBucket,
-            storagePath: path,
-            mimeType: 'image/jpeg',
-            bytes: bytes,
-          );
-        });
-      } on StaleAccountSessionException {
-        rethrow;
-      } catch (_) {
-        // The authorized network result remains usable without a disk write.
-      }
+    if (cache != null && group != null && stillNeeded()) {
+      await _storeMedia(cache, account, group, path, bytes, stillNeeded);
     }
     _ensureAccount(account);
     return bytes;
   }
 
-  Future<void> evictPostMedia(
-    FeedPost post,
+  Future<void> _storeMedia(
+    MediaCacheService cache,
     AccountSessionSnapshot account,
+    String group,
+    String path,
+    Uint8List bytes,
+    bool Function() stillNeeded,
   ) async {
+    try {
+      await _accounts.commit(account, () async {
+        if (!stillNeeded()) return;
+        await cache.storeBytes(
+          ownerUserId: account.userId,
+          bucket: _mediaBucket,
+          storagePath: path,
+          mimeType: 'image/jpeg',
+          bytes: bytes,
+          cacheGroup: group,
+        );
+      });
+    } on StaleAccountSessionException {
+      rethrow;
+    } catch (_) {
+      // The authorized bytes remain usable without a disk write.
+    }
+  }
+
+  Future<Set<String>> cachedMediaFriends(AccountSessionSnapshot account) async {
     final cache = _mediaCache;
-    if (cache == null || post.photos.isEmpty) return;
+    if (cache == null || !_accounts.isCurrent(account)) return {};
+    try {
+      final groups = await cache.storageGroups(
+        ownerUserId: account.userId,
+        bucket: _mediaBucket,
+      );
+      if (!_accounts.isCurrent(account)) return {};
+      return {
+        for (final group in groups)
+          if (_readFeedMediaGroup(group) case final scope?)
+            for (final entry in scope.authors.entries)
+              if (entry.value && entry.key != account.userId) entry.key,
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> evictMedia(
+    AccountSessionSnapshot account, {
+    String? postId,
+    Set<String> blocked = const {},
+    Set<String> removedFriends = const {},
+  }) async {
+    final cache = _mediaCache;
+    if (cache == null) return;
     try {
       await _accounts.commit(
         account,
-        () => cache.removeStorageFiles(
+        () => cache.removeStorageGroups(
           ownerUserId: account.userId,
           bucket: _mediaBucket,
-          storagePaths: {
-            for (final photo in post.photos) ...[
-              photo.thumbnailPath,
-              ?photo.path,
-            ],
+          removeUngrouped: true,
+          matches: (group) {
+            final scope = _readFeedMediaGroup(group);
+            return scope == null ||
+                scope.postId == postId ||
+                scope.authors.keys.any(blocked.contains) ||
+                removedFriends.any((id) => scope.authors[id] == true);
           },
-          mimeType: 'image/jpeg',
         ),
       );
     } catch (_) {
@@ -629,6 +706,61 @@ class FeedRepository
   }
 }
 
+String _feedMediaGroup(FeedPost post) {
+  final authors = <String, bool>{};
+  for (FeedPost? item = post; item != null; item = item.original) {
+    authors[item.authorId] = item.friendsOnly || authors[item.authorId] == true;
+  }
+  final scope = [
+    _packMediaId(post.id),
+    for (final entry in authors.entries)
+      '${entry.value ? 'f' : 'p'}${_packMediaId(entry.key)}',
+  ];
+  return _unpaddedBase64(utf8.encode(jsonEncode(scope)));
+}
+
+typedef _MediaScope = ({String postId, Map<String, bool> authors});
+
+_MediaScope? _readFeedMediaGroup(String group) {
+  try {
+    final bytes = base64Url.decode(base64Url.normalize(group));
+    final data = jsonDecode(utf8.decode(bytes));
+    if (data case [final String postId, ...final authors]) {
+      return (
+        postId: _unpackMediaId(postId),
+        authors: {
+          for (final author in authors.cast<String>())
+            _unpackMediaId(author.substring(1)): switch (author[0]) {
+              'f' => true,
+              'p' => false,
+              _ => throw const FormatException('Unknown media access'),
+            },
+        },
+      );
+    }
+  } catch (_) {
+    // Unknown or damaged groups cannot be matched to an access scope.
+  }
+  return null;
+}
+
+final _mediaUuid = RegExp(
+  r'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$',
+  caseSensitive: false,
+);
+
+// Six 16-byte IDs fit in one cache directory name even at maximum quote depth.
+String _packMediaId(String id) => _mediaUuid.hasMatch(id)
+    ? _unpaddedBase64(Uuid.parse(id, validate: false))
+    : '~$id';
+
+String _unpackMediaId(String id) => id.startsWith('~')
+    ? id.substring(1)
+    : Uuid.unparse(base64Url.decode(base64Url.normalize(id)));
+
+String _unpaddedBase64(List<int> bytes) =>
+    base64Url.encode(bytes).replaceAll('=', '');
+
 class MockFeedRepository implements IFeedRepository {
   const MockFeedRepository();
 
@@ -642,6 +774,7 @@ class MockFeedRepository implements IFeedRepository {
   @override
   Future<Uint8List> downloadThumbnail(
     FeedPhoto photo, {
+    required FeedPost post,
     required AccountSessionSnapshot account,
     required bool Function() stillNeeded,
   }) async => throw StateError('The mock feed has no photos');

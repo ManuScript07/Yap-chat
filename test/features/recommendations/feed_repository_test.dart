@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 
@@ -138,12 +140,18 @@ void main() {
         await directory.delete(recursive: true);
       });
       final requests = <String>[];
+      final pendingDownload = Completer<void>();
+      final downloadStarted = Completer<void>();
       final client = SupabaseClient(
         'http://127.0.0.1:1',
         'test-key',
         authOptions: const AuthClientOptions(autoRefreshToken: false),
         httpClient: MockClient((request) async {
           requests.add(request.url.path);
+          if (request.url.path.endsWith('/pending.jpg')) {
+            downloadStarted.complete();
+            await pendingDownload.future;
+          }
           return http.Response.bytes(
             [255, 216, 42, 255, 217],
             200,
@@ -163,11 +171,21 @@ void main() {
         thumbnailPath: 'fixture/thumb.jpg',
         path: 'fixture/full.jpg',
       );
+      final post = FeedPost(
+        id: 'post',
+        authorId: 'a99ae948-e8cb-4080-b82e-3d11652af383',
+        authorName: null,
+        text: '',
+        createdAt: DateTime.utc(2026),
+        photos: const [photo],
+        friendsOnly: true,
+      );
       await Future.wait(
         List.generate(
           4,
           (_) => first.downloadThumbnail(
             photo,
+            post: post,
             account: account,
             stillNeeded: () => true,
           ),
@@ -175,6 +193,7 @@ void main() {
       );
       await first.downloadPhoto(
         photo,
+        post: post,
         account: account,
         stillNeeded: () => true,
       );
@@ -182,11 +201,13 @@ void main() {
       final restarted = repository();
       await restarted.downloadThumbnail(
         photo,
+        post: post,
         account: account,
         stillNeeded: () => true,
       );
       await restarted.downloadPhoto(
         photo,
+        post: post,
         account: account,
         stillNeeded: () => true,
       );
@@ -197,39 +218,129 @@ void main() {
         () => accounts.isCurrent(account),
       );
       addTearDown(actions.close);
-      final post = FeedPost(
-        id: 'post',
-        authorId: 'author',
+      final public = FeedPost(
+        id: 'public',
+        authorId: 'public-author',
         authorName: null,
         text: '',
         createdAt: DateTime.utc(2026),
         photos: const [photo],
-        friendsOnly: true,
       );
-      actions.trackMedia(post);
-      actions.friendshipRemoved(post.authorId);
+      var quote = post;
+      for (final author in [
+        'e71f448b-ad69-471d-98e3-6161ebc2324e',
+        '244d2477-d007-4178-92d9-0e3bd3e44efb',
+        '2835e454-7623-4771-8b18-98eba7c29413',
+        '71bfe58e-0a33-4686-964f-708a56bdb100',
+      ]) {
+        quote = FeedPost(
+          id: author,
+          authorId: author,
+          authorName: null,
+          text: '',
+          createdAt: DateTime.utc(2026),
+          photos: const [photo],
+          original: quote,
+        );
+      }
+      for (final item in [public, quote]) {
+        await first.downloadThumbnail(
+          photo,
+          post: item,
+          account: account,
+          stillNeeded: () => true,
+        );
+      }
+      expect(requests, hasLength(4));
+      expect(
+        await cache.storageGroups(ownerUserId: viewer, bucket: 'feed-media'),
+        hasLength(3),
+      );
+      await cache.storeBytes(
+        ownerUserId: viewer,
+        bucket: 'feed-media',
+        storagePath: 'legacy.jpg',
+        bytes: Uint8List.fromList([1]),
+      );
+      // A fresh actions scope has not rendered or tracked any of these posts.
+      await actions.recheckFriendships((ids) async {
+        expect(ids, {post.authorId});
+        return {};
+      });
       await accounts.drainCommits();
       expect(actions.canShow(post), isFalse);
+      expect(actions.canShow(quote), isFalse);
+      expect(actions.canShow(public), isTrue);
+      expect(
+        await cache.storageGroups(ownerUserId: viewer, bucket: 'feed-media'),
+        hasLength(1),
+      );
       expect(
         await cache.findStorageFile(
           ownerUserId: viewer,
           bucket: 'feed-media',
-          storagePath: photo.path!,
+          storagePath: 'legacy.jpg',
           mimeType: 'image/jpeg',
         ),
         isNull,
       );
       await restarted.downloadThumbnail(
         photo,
+        post: public,
         account: account,
         stillNeeded: () => true,
       );
-      expect(requests, hasLength(3));
+      expect(requests, hasLength(4));
+      await restarted.downloadThumbnail(
+        photo,
+        post: post,
+        account: account,
+        stillNeeded: () => true,
+      );
+      expect(requests, hasLength(5));
+      const pendingPhoto = FeedPhoto(
+        id: 'pending',
+        thumbnailPath: 'pending.jpg',
+      );
+      final inFlightPost = FeedPost(
+        id: 'late-post',
+        authorId: 'late-author',
+        authorName: null,
+        text: '',
+        createdAt: DateTime.utc(2026),
+        friendsOnly: true,
+        photos: const [pendingPhoto],
+      );
+      final beforeRevocation = await cache.storageGroups(
+        ownerUserId: viewer,
+        bucket: 'feed-media',
+      );
+      final late = restarted.downloadThumbnail(
+        pendingPhoto,
+        post: inFlightPost,
+        account: account,
+        stillNeeded: () => actions.canShow(inFlightPost),
+      );
+      final discard = expectLater(
+        late,
+        throwsA(isA<StaleAccountSessionException>()),
+      );
+      await downloadStarted.future;
+      actions.friendshipRemoved(inFlightPost.authorId);
+      pendingDownload.complete();
+      await discard;
+      await accounts.drainCommits();
+      expect(
+        await cache.storageGroups(ownerUserId: viewer, bucket: 'feed-media'),
+        beforeRevocation,
+      );
+      expect(requests, hasLength(6));
       accounts.setAuthenticatedUser(other);
       await _signIn(client, other);
       await expectLater(
         first.downloadThumbnail(
           photo,
+          post: post,
           account: account,
           stillNeeded: () => true,
         ),
@@ -237,10 +348,11 @@ void main() {
       );
       await restarted.downloadThumbnail(
         photo,
+        post: post,
         account: accounts.capture(),
         stillNeeded: () => true,
       );
-      expect(requests, hasLength(4));
+      expect(requests, hasLength(7));
     },
   );
 }

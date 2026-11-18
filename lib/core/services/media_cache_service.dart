@@ -13,19 +13,16 @@ import 'package:yap_chat/core/database/database.dart';
 
 class MediaCacheService {
   MediaCacheService({
-    required AppDatabase database,
-    SupabaseClient? client,
+    required this._database,
+    this._client,
     this.maxCacheBytes = 256 * 1024 * 1024,
     this.maxSingleFileBytes = 16 * 1024 * 1024,
     this.environment = 'prod',
     this.trimDelay = const Duration(seconds: 2),
-    Talker? talker,
+    this._talker,
     Future<Directory> Function()? cacheDirectoryProvider,
     Future<Directory> Function()? supportDirectoryProvider,
-  }) : _database = database,
-       _client = client,
-       _talker = talker,
-       _cacheDirectoryProvider =
+  }) : _cacheDirectoryProvider =
            cacheDirectoryProvider ?? getTemporaryDirectory,
        _supportDirectoryProvider =
            supportDirectoryProvider ?? getApplicationSupportDirectory;
@@ -158,9 +155,16 @@ class MediaCacheService {
     required String bucket,
     required String storagePath,
     String? mimeType,
+    String? cacheGroup,
   }) async {
     await _ensureMaintenance(ownerUserId);
-    return _readExisting(ownerUserId, bucket, storagePath, mimeType);
+    return _readExisting(
+      ownerUserId,
+      bucket,
+      storagePath,
+      mimeType,
+      cacheGroup: cacheGroup,
+    );
   }
 
   Future<String> cacheNetworkFile({
@@ -228,6 +232,7 @@ class MediaCacheService {
     required String storagePath,
     required Uint8List bytes,
     String? mimeType,
+    String? cacheGroup,
   }) async {
     await _ensureMaintenance(ownerUserId);
     _validateFileSize(bytes.lengthInBytes);
@@ -235,7 +240,7 @@ class MediaCacheService {
     final localPath = await _runOnce(
       ownerUserId,
       bucket,
-      storagePath,
+      cacheGroup == null ? storagePath : '$cacheGroup\u0000$storagePath',
       () => _writeBytes(
         ownerUserId: ownerUserId,
         bucket: bucket,
@@ -243,6 +248,7 @@ class MediaCacheService {
         bytes: bytes,
         mimeType: mimeType,
         expectedGeneration: generation,
+        cacheGroup: cacheGroup,
       ),
     );
     _ensureGeneration(ownerUserId, generation);
@@ -289,6 +295,59 @@ class MediaCacheService {
       _forgetResolvedPath(file.path);
       _forgetResolvedPath(legacyFile.path);
     }
+  }
+
+  Future<Set<String>> storageGroups({
+    required String ownerUserId,
+    required String bucket,
+  }) async {
+    final directory = Directory(
+      path.join((await _userDirectory(ownerUserId)).path, bucket),
+    );
+    if (!await directory.exists()) return {};
+    return {
+      await for (final entry in directory.list(followLinks: false))
+        if (entry is Directory)
+          if (_groupName(entry) case final String group) group,
+    };
+  }
+
+  /// Read group labels without opening or decoding any cached media. Direct
+  /// files predate grouping and have no access metadata.
+  Future<void> removeStorageGroups({
+    required String ownerUserId,
+    required String bucket,
+    required bool Function(String group) matches,
+    bool removeUngrouped = false,
+  }) async {
+    for (final locate in [
+      _userDirectory,
+      if (removeUngrouped) _legacyUserDirectory,
+    ]) {
+      final root = await locate(ownerUserId);
+      final bucketDirectory = Directory(path.join(root.path, bucket));
+      if (!await bucketDirectory.exists()) continue;
+      await for (final entry in bucketDirectory.list(followLinks: false)) {
+        try {
+          if (entry is File && removeUngrouped) {
+            await entry.delete();
+            _forgetResolvedPath(entry.path);
+          } else if (entry is Directory) {
+            final group = _groupName(entry);
+            if (group != null && matches(group)) {
+              await entry.delete(recursive: true);
+            }
+          }
+        } on PathNotFoundException {
+          // A cache trim may already have removed this entry.
+        }
+      }
+    }
+  }
+
+  String? _groupName(Directory directory) {
+    final name = path.basename(directory.path);
+    return name.startsWith('g-') ? name.substring(2) : null;
   }
 
   Future<void> removeLocalFiles(Iterable<String> paths) async {
@@ -472,15 +531,18 @@ class MediaCacheService {
     String ownerUserId,
     String bucket,
     String storagePath,
-    String? mimeType,
-  ) async {
+    String? mimeType, {
+    String? cacheGroup,
+  }) async {
     final file = await _destinationFile(
       ownerUserId,
       bucket,
       storagePath,
       mimeType,
+      cacheGroup: cacheGroup,
     );
     if (await _touchIfPresent(file)) return file.path;
+    if (cacheGroup != null) return null;
     final legacyFile = await _legacyDestinationFile(
       ownerUserId,
       bucket,
@@ -512,6 +574,7 @@ class MediaCacheService {
     required Uint8List bytes,
     String? mimeType,
     required int expectedGeneration,
+    String? cacheGroup,
   }) async {
     if (bytes.isEmpty) throw const FileSystemException('Empty media file');
     _validateFileSize(bytes.lengthInBytes);
@@ -521,6 +584,7 @@ class MediaCacheService {
       bucket,
       storagePath,
       mimeType,
+      cacheGroup: cacheGroup,
     );
     await destination.parent.create(recursive: true);
     final temporary = File('${destination.path}.tmp');
@@ -568,11 +632,25 @@ class MediaCacheService {
     }
     files.sort((left, right) => left.accessedAt.compareTo(right.accessedAt));
     var totalBytes = files.fold<int>(0, (sum, item) => sum + item.size);
+    final groups = <String>{};
     for (final item in files) {
       if (totalBytes <= maxCacheBytes) break;
-      if (await item.file.exists()) await item.file.delete();
+      try {
+        await item.file.delete();
+      } on PathNotFoundException {
+        // A targeted eviction already removed this file.
+      }
       _forgetResolvedPath(item.file.path);
       totalBytes -= item.size;
+      final parent = item.file.parent;
+      if (_groupName(parent) != null) groups.add(parent.path);
+    }
+    for (final group in groups) {
+      try {
+        await Directory(group).delete();
+      } on FileSystemException {
+        // The group still holds files or has already been removed.
+      }
     }
   }
 
@@ -598,15 +676,24 @@ class MediaCacheService {
     String ownerUserId,
     String bucket,
     String storagePath,
-    String? mimeType,
-  ) async {
-    final directory = Directory(
-      path.join((await _userDirectory(ownerUserId)).path, bucket),
-    );
+    String? mimeType, {
+    String? cacheGroup,
+  }) async {
+    final root = (await _userDirectory(ownerUserId)).path;
+    if (cacheGroup != null && !_validGroup.hasMatch(cacheGroup)) {
+      throw const FormatException('Invalid media cache group');
+    }
     return File(
-      path.join(directory.path, _fileName(bucket, storagePath, mimeType)),
+      path.joinAll([
+        root,
+        bucket,
+        if (cacheGroup != null) 'g-$cacheGroup',
+        _fileName(bucket, storagePath, mimeType),
+      ]),
     );
   }
+
+  static final _validGroup = RegExp(r'^[a-zA-Z0-9_-]{1,240}$');
 
   Future<File> _legacyDestinationFile(
     String ownerUserId,

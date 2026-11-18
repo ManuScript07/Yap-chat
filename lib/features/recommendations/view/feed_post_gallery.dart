@@ -14,6 +14,32 @@ import 'package:yap_chat/ui/ui.dart';
 
 const feedPhotoPreviewRadius = 16.0;
 
+// A valid file may have a one-pixel short edge. Keep that edge visible even
+// when fitting the long edge would make it smaller than one screen pixel.
+double feedPhotoDisplayRatio(double ratio, Size viewport, double pixelRatio) {
+  if (viewport.isEmpty) return ratio;
+  final minRatio = 1 / (viewport.height * pixelRatio);
+  final maxRatio = viewport.width * pixelRatio;
+  return minRatio <= maxRatio ? ratio.clamp(minRatio, maxRatio) : ratio;
+}
+
+/// The thumbnail codec rounds its shorter side to whole pixels. Use the
+/// prepared full image's aspect ratio for both ends of the flight.
+Widget feedPhotoFrame(ui.Image image, double ratio, BoxFit fit) {
+  if (ratio == image.width / image.height) {
+    return RawImage(image: image, fit: fit);
+  }
+  return FittedBox(
+    fit: fit,
+    clipBehavior: Clip.hardEdge,
+    child: SizedBox(
+      width: ratio * image.height,
+      height: image.height.toDouble(),
+      child: RawImage(image: image, fit: BoxFit.fill),
+    ),
+  );
+}
+
 Future<void> openFeedGallery(
   BuildContext context, {
   required FeedCubit timeline,
@@ -31,7 +57,6 @@ Future<void> openFeedGallery(
       ModalRoute.isCurrentOf(context) == false) {
     return;
   }
-  actions.trackMedia(post);
   final previews = <int, ui.Image>{index: preview.clone()};
   for (final (position, photo) in post.photos.indexed) {
     if (position == index) continue;
@@ -43,14 +68,24 @@ Future<void> openFeedGallery(
   }
   final accounts = context.read<AccountSessionController?>();
   final allowed = ValueNotifier(true);
+  void releasePreviews() {
+    for (final image in previews.values) {
+      image.dispose();
+    }
+    previews.clear();
+  }
+
   void checkAccess() {
-    if (!actions.canShow(post)) allowed.value = false;
+    if (!allowed.value || actions.canShow(post)) return;
+    allowed.value = false;
+    releasePreviews();
   }
 
   accounts?.generationChanges.addListener(checkAccess);
   final subscription = actions.stream.listen((_) => checkAccess());
   late final MediaGalleryRoute route;
   route = MediaGalleryRoute(
+    separateBackground: true,
     pageBuilder: (_, _, _) => _FeedPostGallery(
       timeline: timeline,
       post: post,
@@ -71,9 +106,7 @@ Future<void> openFeedGallery(
     accounts?.generationChanges.removeListener(checkAccess);
     await subscription.cancel();
     allowed.dispose();
-    for (final image in previews.values) {
-      image.dispose();
-    }
+    releasePreviews();
   }
 }
 
@@ -104,10 +137,12 @@ class _FeedPostGallery extends StatefulWidget {
   State<_FeedPostGallery> createState() => _FeedPostGalleryState();
 }
 
-class _FeedPostGalleryState extends State<_FeedPostGallery> {
+class _FeedPostGalleryState extends State<_FeedPostGallery>
+    with SingleTickerProviderStateMixin {
   late int _index = widget.initialIndex;
   late final _pages = PageController(initialPage: _index);
   final _transform = TransformationController();
+  AnimationController? _closeMotion;
   final _frames = <int, ui.Image>{};
   static const _frameBudget = 32 * 1024 * 1024;
   var _frameBytes = 0;
@@ -117,6 +152,8 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
   bool _saving = false;
   bool _zoomed = false;
   bool _showControls = true;
+  bool _closing = false;
+  bool _canPop = false;
 
   bool get _allowed =>
       widget.allowed.value && widget.timeline.actions!.canShow(widget.post);
@@ -135,7 +172,11 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     if (mounted) setState(() {});
     if (status != AnimationStatus.completed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _allowed && _settled && !_frames.containsKey(_index)) {
+      if (mounted &&
+          !_closing &&
+          _allowed &&
+          _settled &&
+          !_frames.containsKey(_index)) {
         unawaited(_load());
       }
     });
@@ -163,7 +204,48 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
       final existing = _frames.remove(index);
       if (existing != null) _frames[index] = existing;
     });
-    if (_settled && !_frames.containsKey(index)) unawaited(_load());
+    if (_settled && !_closing && !_frames.containsKey(index)) {
+      unawaited(_load());
+    }
+  }
+
+  Future<void> _close() async {
+    if (_closing) return;
+    final navigator = Navigator.of(context);
+    final fitted = Matrix4.identity();
+    final recenter = _allowed && _transform.value != fitted;
+    final fadeChrome = _allowed && _settled && _showControls;
+    setState(() => _closing = true);
+    if (recenter || fadeChrome) {
+      final motion = _closeMotion ??= AnimationController(
+        vsync: this,
+        duration: MediaGalleryChromeVisibility.animationDuration,
+      );
+      final zoom = recenter
+          ? Matrix4Tween(begin: _transform.value.clone(), end: fitted)
+          : null;
+      void tick() {
+        if (zoom == null) return;
+        _transform.value = zoom.transform(
+          Curves.easeInOut.transform(motion.value),
+        );
+      }
+
+      motion.addListener(tick);
+      try {
+        await motion.forward().orCancel;
+      } on TickerCanceled {
+        return;
+      } finally {
+        if (mounted) motion.removeListener(tick);
+      }
+    }
+    if (!mounted) return;
+    if (recenter) _transform.value = fitted;
+    setState(() => _canPop = true);
+    // Lay out the fitted endpoint before Navigator measures the reverse Hero.
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted && ModalRoute.isCurrentOf(context) == true) navigator.pop();
   }
 
   Future<void> _load() async {
@@ -176,6 +258,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     final maxSide = (viewport.longestSide * pixels * 1.5).ceil().clamp(1, 2560);
     bool current() =>
         mounted &&
+        !_closing &&
         _allowed &&
         timeline.isCurrentAccount() &&
         _settled &&
@@ -183,6 +266,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     try {
       final bytes = await widget.repository.downloadPhoto(
         photo,
+        post: widget.post,
         account: timeline.account,
         stillNeeded: current,
       );
@@ -234,6 +318,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
           _encoded ??
           await widget.repository.downloadPhoto(
             photo,
+            post: widget.post,
             account: timeline.account,
             stillNeeded: current,
           );
@@ -257,64 +342,76 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
   }
 
   @override
-  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
-    value: context.colorScheme.brightness == Brightness.dark
-        ? SystemUiOverlayStyle.light
-        : SystemUiOverlayStyle.dark,
-    child: Scaffold(
-      backgroundColor: context.scaffoldBackgroundColor,
-      body: !_allowed
-          ? SafeArea(
-              child: Column(
+  Widget build(BuildContext context) => PopScope(
+    canPop: _canPop,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) unawaited(_close());
+    },
+    child: AnnotatedRegion<SystemUiOverlayStyle>(
+      value: context.colorScheme.brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: !_allowed
+            ? SafeArea(
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: _back(context),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          context.l10n.feedPostUnavailable,
+                          style: context.textTheme.bodyMedium,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Stack(
+                fit: StackFit.expand,
                 children: [
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: _back(context),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        context.l10n.feedPostUnavailable,
-                        style: context.textTheme.bodyMedium,
+                  IgnorePointer(
+                    ignoring: _closing,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () =>
+                          setState(() => _showControls = !_showControls),
+                      child: InteractiveViewer(
+                        transformationController: _transform,
+                        minScale: 1,
+                        maxScale: 4,
+                        panEnabled: _zoomed,
+                        child: PageView.builder(
+                          controller: _pages,
+                          itemCount: widget.post.photos.length,
+                          onPageChanged: _select,
+                          physics: _zoomed
+                              ? const NeverScrollableScrollPhysics()
+                              : null,
+                          itemBuilder: (context, index) => _buildPhoto(index),
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            )
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _showControls = !_showControls),
-                  child: InteractiveViewer(
-                    transformationController: _transform,
-                    minScale: 1,
-                    maxScale: 4,
-                    panEnabled: _zoomed,
-                    child: PageView.builder(
-                      controller: _pages,
-                      itemCount: widget.post.photos.length,
-                      onPageChanged: _select,
-                      physics: _zoomed
-                          ? const NeverScrollableScrollPhysics()
-                          : null,
-                      itemBuilder: (context, index) => _buildPhoto(index),
-                    ),
-                  ),
-                ),
-                if (_showControls && _settled)
                   Positioned(
                     top: MediaQuery.paddingOf(context).top + 16,
                     left: MediaQuery.paddingOf(context).left + 16,
                     right: MediaQuery.paddingOf(context).right + 16,
-                    child: _header(context),
+                    child: MediaGalleryChromeVisibility(
+                      settled: _settled,
+                      visible: _showControls && !_closing,
+                      child: _header(context),
+                    ),
                   ),
-                if (_showControls && _settled && widget.post.photos.length > 1)
-                  _counter(context),
-              ],
-            ),
+                  if (widget.post.photos.length > 1) _counter(context),
+                ],
+              ),
+      ),
     ),
   );
 
@@ -338,7 +435,11 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final photo = widget.post.photos[index];
-        final ratio = photo.aspectRatio ?? image.width / image.height;
+        final ratio = feedPhotoDisplayRatio(
+          photo.aspectRatio ?? image.width / image.height,
+          constraints.biggest,
+          MediaQuery.devicePixelRatioOf(context),
+        );
         final size = applyBoxFit(
           BoxFit.contain,
           Size(ratio, 1),
@@ -346,29 +447,39 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
         ).destination;
         final framed = SizedBox.fromSize(
           size: size,
-          child: RawImage(image: image, fit: BoxFit.contain),
+          child: feedPhotoFrame(image, ratio, BoxFit.contain),
         );
         final heroTag =
             widget.heroTags?[index] ?? (initial ? widget.heroTag : null);
-        final content = heroTag != null && selected && !_zoomed
+        final content = heroTag != null && selected
             ? Hero(
                 tag: heroTag,
+                curve: Curves.linear,
+                reverseCurve: Curves.linear,
+                createRectTween: (begin, end) =>
+                    RectTween(begin: begin, end: end),
                 flightShuttleBuilder: (_, animation, direction, _, _) =>
                     ValueListenableBuilder(
                       valueListenable: widget.allowed,
-                      builder: (context, allowed, _) => allowed
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                feedPhotoPreviewRadius * (1 - animation.value),
-                              ),
-                              child: RawImage(
-                                image: direction == HeroFlightDirection.push
-                                    ? preview ?? image
-                                    : image,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : const SizedBox.expand(),
+                      child: AnimatedBuilder(
+                        animation: animation,
+                        builder: (_, child) => ClipRRect(
+                          key: const ValueKey('feed-gallery-flight'),
+                          borderRadius: BorderRadius.circular(
+                            feedPhotoPreviewRadius * (1 - animation.value),
+                          ),
+                          child: child,
+                        ),
+                        child: feedPhotoFrame(
+                          direction == HeroFlightDirection.push
+                              ? preview ?? image
+                              : image,
+                          ratio,
+                          BoxFit.cover,
+                        ),
+                      ),
+                      builder: (context, allowed, child) =>
+                          allowed ? child! : const SizedBox.expand(),
                     ),
                 child: framed,
               )
@@ -386,9 +497,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
 
   Widget _back(BuildContext context) => Tooltip(
     message: _backLabel(context),
-    child: MediaGalleryHeader.backButton(
-      () => Navigator.of(context).maybePop(),
-    ),
+    child: MediaGalleryHeader.backButton(_close),
   );
 
   Widget _header(BuildContext context) {
@@ -410,7 +519,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
             ? () => repository.loadAvatar(path, widget.timeline.account)
             : null,
       ),
-      onBack: () => Navigator.of(context).maybePop(),
+      onBack: _close,
       onSave: _save,
       backLabel: _backLabel(context),
       saveLabel: context.l10n.feedSavePhoto,
@@ -425,10 +534,14 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
           (media.orientation == Orientation.landscape ? 18 : 76),
       left: 0,
       right: 0,
-      child: IgnorePointer(
-        child: MediaGalleryCounter(
-          index: _index,
-          total: widget.post.photos.length,
+      child: MediaGalleryChromeVisibility(
+        settled: _settled,
+        visible: _showControls && !_closing,
+        child: IgnorePointer(
+          child: MediaGalleryCounter(
+            index: _index,
+            total: widget.post.photos.length,
+          ),
         ),
       ),
     );
@@ -439,6 +552,7 @@ class _FeedPostGalleryState extends State<_FeedPostGallery> {
     widget.allowed.removeListener(_accessChanged);
     widget.animation.removeStatusListener(_routeChanged);
     _pages.dispose();
+    _closeMotion?.dispose();
     _transform.dispose();
     _clearFrames();
     super.dispose();
