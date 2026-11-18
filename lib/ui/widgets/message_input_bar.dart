@@ -9,6 +9,7 @@ class MessageInputBar extends StatefulWidget {
     super.key,
     required this.onSend,
     this.onSubmit,
+    this.onDraftAccepted,
     this.onAddPhoto,
     this.onVoiceRecord,
     this.replyToMessageId,
@@ -29,6 +30,11 @@ class MessageInputBar extends StatefulWidget {
   /// false or throwing retains the draft. The caller handles typed limit dialogs.
   /// Accepted drafts are cleared only if no text edits occurred while awaiting.
   final Future<bool> Function(String)? onSubmit;
+
+  /// Called when an accepted send clears the draft without discarding newer edits.
+  final VoidCallback? onDraftAccepted;
+
+  static const horizontalGutter = 16.0;
 
   final VoidCallback? onAddPhoto;
   final VoidCallback? onVoiceRecord;
@@ -105,6 +111,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
       final accepted = await onSubmit(text);
       if (mounted && accepted && revision == _textRevision) {
         _controller.clear();
+        widget.onDraftAccepted?.call();
       }
     } catch (_) {
       // Submission failures leave the draft available for retry.
@@ -163,9 +170,9 @@ class _MessageInputBarState extends State<MessageInputBar> {
       maintainBottomViewPadding: true,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          systemPadding.left + 16,
+          systemPadding.left + MessageInputBar.horizontalGutter,
           8,
-          systemPadding.right + 16,
+          systemPadding.right + MessageInputBar.horizontalGutter,
           8,
         ),
         child: Column(

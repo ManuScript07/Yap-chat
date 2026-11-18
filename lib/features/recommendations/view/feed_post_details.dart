@@ -318,6 +318,22 @@ class _PublicationState extends State<_Publication> {
     _comments?.updatePost(widget.post, confirmed: widget.confirmed);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (ModalRoute.isCurrentOf(context) == false) _focus.unfocus();
+  }
+
+  void _showKeyboard() {
+    if (ModalRoute.isCurrentOf(context) == false) return;
+    final editor = _focus.context?.findAncestorStateOfType<EditableTextState>();
+    if (editor == null) {
+      _focus.requestFocus();
+    } else {
+      editor.requestKeyboard();
+    }
+  }
+
   void _maybeLoadMore() {
     final comments = _comments;
     if (comments == null ||
@@ -366,7 +382,7 @@ class _PublicationState extends State<_Publication> {
   void _reply(FeedComment comment) {
     if (_comments?.available(comment) != true) return;
     setState(() => _replyTo = comment);
-    _focus.requestFocus();
+    _showKeyboard();
   }
 
   @override
@@ -376,7 +392,7 @@ class _PublicationState extends State<_Publication> {
       timeline: widget.timeline,
       visible: true,
       details: true,
-      onComments: _comments == null ? null : _focus.requestFocus,
+      onComments: _comments == null ? null : _showKeyboard,
       onOpenPost: (id) => openFeedPost(
         context,
         widget.timeline,
@@ -387,6 +403,10 @@ class _PublicationState extends State<_Publication> {
     );
     final comments = _comments;
     final media = MediaQuery.of(context);
+    final composerInsets = EdgeInsets.only(
+      left: media.viewPadding.left + MessageInputBar.horizontalGutter,
+      right: media.viewPadding.right + MessageInputBar.horizontalGutter,
+    );
     final keyboard = math.max(
       0.0,
       media.viewInsets.bottom - media.viewPadding.bottom,
@@ -468,7 +488,7 @@ class _PublicationState extends State<_Publication> {
                     children: [
                       if (_replyTo case final target?)
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: composerInsets,
                           child: ChatGlassSurface(
                             borderRadius: 16,
                             child: Row(
@@ -502,7 +522,7 @@ class _PublicationState extends State<_Publication> {
                         Semantics(
                           liveRegion: true,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: composerInsets,
                             child: Text(
                               error,
                               style: context.textTheme.bodySmall?.copyWith(
@@ -514,8 +534,8 @@ class _PublicationState extends State<_Publication> {
                       MessageInputBar(
                         onSend: (_) {},
                         onSubmit: _submit,
+                        onDraftAccepted: _focus.unfocus,
                         focusNode: _focus,
-                        replyToMessageId: _replyTo?.id,
                         showAttachmentButton: false,
                         hintText: context.l10n.feedWriteComment,
                         sendTooltip: context.l10n.feedSendComment,

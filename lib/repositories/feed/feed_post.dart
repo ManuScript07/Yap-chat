@@ -65,7 +65,7 @@ class FeedComment {
   final String? avatarRevision;
   final String? text;
   final DateTime? createdAt;
-  final ({String id, String username})? replyTo;
+  final ({String id, String username, String? userId})? replyTo;
   final FeedComment? replyPreview;
   final int replyCount;
   final int commentVersion;

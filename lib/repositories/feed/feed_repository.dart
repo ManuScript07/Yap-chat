@@ -733,6 +733,7 @@ class FeedRepository
           ? (
               id: target!['comment_id'] as String,
               username: target['username'] as String,
+              userId: target['user_id'] as String?,
             )
           : null,
       replyPreview: preview == null ? null : _comment(preview),

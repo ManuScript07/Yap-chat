@@ -50,6 +50,7 @@ void main() {
                 'reply_to': {
                   'comment_id': 'parent',
                   'username': 'parent-handle',
+                  'user_id': 'parent-account',
                 },
               },
             ],
@@ -83,7 +84,11 @@ void main() {
     );
     final comment = page.comments.single;
     expect(comment.avatarPath, 'avatars/author.jpg');
-    expect(comment.replyTo, (id: 'parent', username: 'parent-handle'));
+    expect(comment.replyTo, (
+      id: 'parent',
+      username: 'parent-handle',
+      userId: 'parent-account',
+    ));
     expect(
       await repository.setCommentLiked(
         comment,

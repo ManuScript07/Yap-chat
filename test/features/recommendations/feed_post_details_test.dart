@@ -234,8 +234,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('next reply'), findsOneWidget);
       expect(repository.commentQueries.last, (FeedCommentSort.old, 'root'));
-      await tester.tap(find.text('hide replies'));
-      await tester.pumpAndSettle();
+      expect(find.text('hide replies'), findsNothing);
+      expect(find.byType(FeedDivider), findsOneWidget);
 
       final rootRow = find.byKey(const ValueKey('root'));
       final like = find.descendant(
@@ -337,6 +337,51 @@ void main() {
     },
   );
 
+  testWidgets('opening a second branch preserves the first and its replies', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(440, 1000);
+    addTearDown(tester.view.reset);
+    repository.commentPage = (_, thread) async => (
+      comments: thread == null
+          ? [
+              for (final id in ['a', 'b'])
+                FeedComment(
+                  id: id,
+                  authorId: 'other',
+                  text: 'thread $id',
+                  replyCount: 1,
+                ),
+            ]
+          : [
+              FeedComment(
+                id: 'reply-$thread',
+                rootId: thread,
+                authorId: 'other',
+                text: 'reply to $thread',
+              ),
+            ],
+      next: null,
+    );
+    await show(tester);
+    final expand = find.text('show replies');
+    await tester.tap(expand.first);
+    await tester.pumpAndSettle();
+    expect(find.text('reply to a'), findsOneWidget);
+    await tester.tap(expand);
+    await tester.pumpAndSettle();
+    expect(find.text('reply to a'), findsOneWidget);
+    expect(find.text('reply to b'), findsOneWidget);
+    expect(expand, findsNothing);
+    expect(find.byType(FeedDivider), findsNWidgets(2));
+    expect(repository.commentQueries, [
+      (FeedCommentSort.popular, null),
+      (FeedCommentSort.old, 'a'),
+      (FeedCommentSort.old, 'b'),
+    ]);
+  });
+
   testWidgets('comment cache keeps the avatar row mounted during a warm read', (
     tester,
   ) async {
@@ -384,6 +429,9 @@ void main() {
   testWidgets(
     'only the selected comment avatar flies to the profile and back',
     (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(440, 960);
+      addTearDown(tester.view.reset);
       const path = 'avatars/comment-hero.png';
       repository.commentPage = (_, _) async => (
         comments: [
@@ -393,6 +441,14 @@ void main() {
             authorName: 'same author',
             avatarPath: path,
             text: 'first comment',
+            replyCount: 1,
+            replyPreview: FeedComment(
+              id: 'mention',
+              rootId: 'first',
+              authorId: 'commenter',
+              text: 'mentioned in a reply',
+              replyTo: (id: 'parent', username: 'target', userId: 'mentioned'),
+            ),
           ),
           const FeedComment(
             id: 'second',
@@ -400,6 +456,14 @@ void main() {
             authorName: 'same author',
             avatarPath: path,
             text: 'second comment',
+            replyCount: 1,
+            replyPreview: FeedComment(
+              id: 'own-mention',
+              rootId: 'second',
+              authorId: 'commenter',
+              text: 'mentioned in a reply',
+              replyTo: (id: 'own-parent', username: 'me', userId: 'viewer'),
+            ),
           ),
         ],
         next: null,
@@ -419,8 +483,12 @@ void main() {
               NamedRouteDef(
                 name: ViewedProfileRoute.name,
                 path: 'profile',
-                builder: (_, _) {
-                  final snapshot = ProfileAvatarHero.snapshotFor('commenter')!;
+                builder: (_, data) {
+                  final user = data.argsAs<ViewedProfileRouteArgs>().userId;
+                  final snapshot = ProfileAvatarHero.snapshotFor(user);
+                  if (snapshot == null) {
+                    return Scaffold(body: Text('profile $user'));
+                  }
                   return Scaffold(
                     body: Center(
                       child: ProfileAvatarHero(
@@ -465,6 +533,14 @@ void main() {
       expect(flight, findsOneWidget);
       await tester.pumpAndSettle();
       expect(avatar, findsOneWidget);
+      final ownMention = find.text('@me mentioned in a reply');
+      await tester.tapAt(tester.getTopLeft(ownMention) + const Offset(8, 7));
+      await tester.pumpAndSettle();
+      expect(ownMention, findsOneWidget);
+      final mention = find.text('@target mentioned in a reply');
+      await tester.tapAt(tester.getTopLeft(mention) + const Offset(8, 7));
+      await tester.pumpAndSettle();
+      expect(find.text('profile mentioned'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       router.dispose();
     },
@@ -545,6 +621,7 @@ void main() {
     repository.writes.single.$2.completeError(TimeoutException('test'));
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller!.text, 'my comment');
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
     await tester.tap(send);
     await tester.pump();
     expect(repository.writes, hasLength(2));
@@ -559,9 +636,81 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
     expect(find.text('my comment'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'reply composer keeps its draft across routes and reopens the IME',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(760, 510);
+      tester.view.viewPadding = const FakeViewPadding(left: 32, right: 20);
+      tester.view.padding = const FakeViewPadding(left: 32, right: 20);
+      addTearDown(tester.view.reset);
+      repository.commentPage = (_, _) async => (
+        comments: [
+          const FeedComment(
+            id: 'root',
+            authorId: 'other',
+            authorName: 'author of comment',
+            text: 'root text',
+          ),
+        ],
+        next: null,
+      );
+      await show(tester);
+      final field = find.byType(TextField);
+      final reply = find.widgetWithText(TextButton, 'reply');
+      expect(
+        tester.getTopLeft(find.text('reply')).dx,
+        tester.getTopLeft(find.text('root text')).dx,
+      );
+      await tester.tap(reply);
+      await tester.pumpAndSettle();
+      final replyBar = find.ancestor(
+        of: find.text('replying to author of comment'),
+        matching: find.byType(ChatGlassSurface),
+      );
+      final inputSurface = find.ancestor(
+        of: field,
+        matching: find.byType(ChatGlassSurface),
+      );
+      expect(
+        tester.getTopLeft(replyBar).dx,
+        tester.getTopLeft(inputSurface).dx,
+      );
+      expect(
+        tester.getTopRight(replyBar).dx,
+        760 - 20 - MessageInputBar.horizontalGutter,
+      );
+
+      await tester.enterText(field, 'draft reply');
+      tester.testTextInput.hide();
+      expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+      await tester.tap(find.byTooltip('comments'));
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      final navigator = Navigator.of(tester.element(field));
+      unawaited(
+        navigator.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('overlaid route')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isFalse);
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+      expect(tester.widget<TextField>(field).controller!.text, 'draft reply');
+      expect(replyBar, findsOneWidget);
+    },
+  );
 
   testWidgets('account switch clears an open publication and its draft', (
     tester,

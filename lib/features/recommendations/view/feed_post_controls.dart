@@ -121,7 +121,6 @@ class FeedPostHeader extends StatelessWidget {
     final actions = timeline.actions;
     final own = post.authorId == timeline.account.userId;
     final name = post.authorName ?? l10n.feedUnknownAuthor;
-    final metadata = _metadataStyle(context);
     final time = feedRelativeTime(context, post.createdAt);
     final timestamp = post.edited ? '$time · ${l10n.feedEdited}' : time;
     final authorName = GestureDetector(
@@ -164,11 +163,8 @@ class FeedPostHeader extends StatelessWidget {
                         children: [
                           Flexible(child: authorName),
                           const SizedBox(width: 6),
-                          _FeedTimestamp(
+                          FeedTimestamp(
                             timestamp: timestamp,
-                            style: metadata.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
                             maxWidth: constraints.maxWidth * .55,
                           ),
                         ],
@@ -327,19 +323,19 @@ class FeedPostHeader extends StatelessWidget {
   }
 }
 
-class _FeedTimestamp extends StatelessWidget {
-  const _FeedTimestamp({
+class FeedTimestamp extends StatelessWidget {
+  const FeedTimestamp({
+    super.key,
     required this.timestamp,
-    required this.style,
     required this.maxWidth,
   });
 
   final String timestamp;
-  final TextStyle style;
   final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
+    final style = _metadataStyle(context).copyWith(fontWeight: FontWeight.w600);
     final scaler = MediaQuery.textScalerOf(context);
     final effectiveStyle = DefaultTextStyle.of(context).style.merge(style);
     final painter = TextPainter(
@@ -541,7 +537,6 @@ class FeedPostFooter extends StatelessWidget {
   final bool details;
   final double bottomSpacing;
   final VoidCallback? onComments;
-  static final _thousandsSuffix = RegExp(r'[\s\u00a0]*тыс\.?$');
 
   @override
   Widget build(BuildContext context) {
@@ -574,12 +569,11 @@ class FeedPostFooter extends StatelessWidget {
     final locale = Localizations.localeOf(context).toString();
     final compact = NumberFormat.compact(locale: locale);
     final complete = NumberFormat.decimalPattern(locale);
-    final colorScheme = context.colorScheme;
-    const shareWidth = 44.0;
-    const buttonHeight = 44.0;
-    const iconSize = 22.0;
-    const counterSize = 14.0;
-    const counterGap = 5.0;
+    const shareWidth = FeedActionButton.buttonHeight;
+    const buttonHeight = FeedActionButton.buttonHeight;
+    const iconSize = FeedActionButton.iconSize;
+    const counterSize = FeedActionButton.counterSize;
+    const counterGap = FeedActionButton.counterGap;
 
     Widget item(
       IconData icon,
@@ -590,65 +584,16 @@ class FeedPostFooter extends StatelessWidget {
       bool active = false,
       bool readOnly = false,
     }) {
-      final color = active ? colorScheme.primary : colorScheme.outline;
-      final alignment = count == null
-          ? AlignmentDirectional.centerEnd
-          : AlignmentDirectional.centerStart;
-      final glyph = Icon(icon, size: iconSize, color: color);
-      final counter = count == null
-          ? null
-          : Text(
-              compact
-                  .format(count)
-                  .toLowerCase()
-                  .replaceFirst(_thousandsSuffix, 'к'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.metadata.copyWith(
-                fontSize: counterSize,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            );
-      final content = counter == null
-          ? glyph
-          : stacked
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [glyph, counter],
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                glyph,
-                SizedBox(width: counterGap),
-                Flexible(child: counter),
-              ],
-            );
-      return Semantics(
+      return FeedActionButton(
+        icon: icon,
         label: label,
-        value: count == null ? null : complete.format(count),
-        child: Tooltip(
-          excludeFromSemantics: true,
-          message: label,
-          child: readOnly
-              ? Align(
-                  alignment: alignment,
-                  child: ExcludeSemantics(child: content),
-                )
-              : TextButton(
-                  style: TextButton.styleFrom(
-                    alignment: alignment,
-                    minimumSize: const Size(0, buttonHeight),
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    overlayColor: Colors.transparent,
-                  ),
-                  onPressed: onPressed,
-                  child: ExcludeSemantics(child: content),
-                ),
-        ),
+        count: count,
+        onPressed: onPressed,
+        compact: compact,
+        complete: complete,
+        stacked: stacked,
+        active: active,
+        readOnly: readOnly,
       );
     }
 
@@ -761,6 +706,121 @@ class FeedPostFooter extends StatelessWidget {
           child: row,
         );
       },
+    );
+  }
+}
+
+class FeedDivider extends StatelessWidget {
+  const FeedDivider({super.key});
+
+  static const spacing = 14.0;
+
+  @override
+  Widget build(BuildContext context) => Divider(
+    height: 1,
+    color: context.colorScheme.onSurface.withValues(alpha: .12),
+  );
+}
+
+class FeedActionButton extends StatelessWidget {
+  const FeedActionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.onPressed,
+    required this.compact,
+    required this.complete,
+    this.alignment,
+    this.stacked = false,
+    this.active = false,
+    this.readOnly = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final int? count;
+  final VoidCallback? onPressed;
+  final NumberFormat compact;
+  final NumberFormat complete;
+  final AlignmentGeometry? alignment;
+  final bool stacked;
+  final bool active;
+  final bool readOnly;
+
+  static const buttonHeight = 44.0;
+  static const iconSize = 22.0;
+  static const counterSize = 14.0;
+  static const counterGap = 5.0;
+  static final _thousandsSuffix = RegExp(r'[\s\u00a0]*тыс\.?$');
+
+  static ButtonStyle style(AlignmentGeometry alignment) => TextButton.styleFrom(
+    alignment: alignment,
+    minimumSize: const Size(0, buttonHeight),
+    padding: EdgeInsets.zero,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    overlayColor: Colors.transparent,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.colorScheme;
+    final count = this.count;
+    final color = active ? colorScheme.primary : colorScheme.outline;
+    final align =
+        alignment ??
+        (count == null
+            ? AlignmentDirectional.centerEnd
+            : AlignmentDirectional.centerStart);
+    final glyph = Icon(icon, size: iconSize, color: color);
+    final counter = count == null
+        ? null
+        : Text(
+            compact
+                .format(count)
+                .toLowerCase()
+                .replaceFirst(_thousandsSuffix, 'к'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.metadata.copyWith(
+              fontSize: counterSize,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          );
+    final content = counter == null
+        ? glyph
+        : stacked
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [glyph, counter],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              glyph,
+              SizedBox(width: counterGap),
+              Flexible(child: counter),
+            ],
+          );
+    return Semantics(
+      label: label,
+      value: count == null ? null : complete.format(count),
+      child: Tooltip(
+        excludeFromSemantics: true,
+        message: label,
+        child: readOnly
+            ? Align(
+                alignment: align,
+                child: ExcludeSemantics(child: content),
+              )
+            : TextButton(
+                style: style(align),
+                onPressed: onPressed,
+                child: ExcludeSemantics(child: content),
+              ),
+      ),
     );
   }
 }

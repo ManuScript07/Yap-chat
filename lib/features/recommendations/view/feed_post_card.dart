@@ -122,7 +122,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
           : _openProfile,
     );
 
-    const separatorSpacing = 14.0;
+    const separatorSpacing = FeedDivider.spacing;
     return Card(
       margin: EdgeInsets.zero,
       color: context.scaffoldBackgroundColor,
@@ -181,18 +181,13 @@ class _FeedPostCardState extends State<FeedPostCard> {
                   ],
                 ),
               ),
-              _divider(context),
+              const FeedDivider(),
             ],
           ),
         ),
       ),
     );
   }
-
-  Widget _divider(BuildContext context) => Divider(
-    height: 1,
-    color: context.colorScheme.onSurface.withValues(alpha: .12),
-  );
 }
 
 class _DetailsTimestamp extends StatelessWidget {

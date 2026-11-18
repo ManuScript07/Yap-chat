@@ -10,7 +10,6 @@ import 'feed_actions_cubit.dart';
 typedef FeedCommentsState = ({
   List<FeedComment> rows,
   FeedCommentSort sort,
-  String? expandedRoot,
   bool loading,
   bool failed,
   bool hasMore,
@@ -41,7 +40,6 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     : super((
         rows: const [],
         sort: FeedCommentSort.popular,
-        expandedRoot: null,
         loading: false,
         failed: false,
         hasMore: true,
@@ -62,7 +60,6 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   bool _submitting = false;
   int _revision = 0;
   FeedCommentSort _sort = FeedCommentSort.popular;
-  String? _expandedRoot;
 
   bool get _active => _ready && !isClosed && actions.canShow(_post);
   _CommentPage get _root => _roots.putIfAbsent(_sort, () => _page(_sort, null));
@@ -98,7 +95,6 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   void selectSort(FeedCommentSort sort) {
     if (!_active || sort == _sort) return;
     _sort = sort;
-    _expandedRoot = null;
     final page = _root;
     if (page.started || page.loading) {
       _publish();
@@ -112,18 +108,20 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   List<FeedComment> replies(FeedComment root) {
     final page = _threads[root.id];
     final preview = root.replyPreview;
-    if (_expandedRoot != root.id) return [?preview];
+    if (page == null) return [?preview];
     final rows = <String, FeedComment>{
-      if (preview != null && page?.started != true) preview.id: preview,
-      ...?page?.rows,
+      if (preview != null && !page.started) preview.id: preview,
+      ...page.rows,
       for (final row in _sent.values)
         if (row.id != row.threadId &&
             row.threadId == root.id &&
-            page?.rows.containsKey(row.id) != true)
+            !page.rows.containsKey(row.id))
           row.id: row,
     };
     return rows.values.toList(growable: false);
   }
+
+  bool isExpanded(String root) => _threads.containsKey(root);
 
   ({bool loading, bool failed, bool more}) threadStatus(String root) {
     final page = _threads[root];
@@ -136,20 +134,11 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
 
   Future<void> expand(String root) async {
     if (!_active) return;
-    if (_expandedRoot == root) {
-      _expandedRoot = null;
-      _publish();
-      return;
-    }
-    _expandedRoot = root;
-    final existing = _threads.remove(root);
-    final page = _threads[root] = existing ?? _page(FeedCommentSort.old, root);
-    if (_threads.length > 8) _threads.remove(_threads.keys.first);
-    if (page.started || page.loading) {
-      _publish();
-    } else {
-      await _load(page);
-    }
+    final page = _threads.putIfAbsent(
+      root,
+      () => _page(FeedCommentSort.old, root),
+    );
+    if (!page.started) await _load(page);
   }
 
   Future<void> nextReplies(String root) {
@@ -223,7 +212,6 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     _revision++;
     _roots.clear();
     _threads.clear();
-    _expandedRoot = null;
     _sent.removeWhere((_, comment) => _isBlocked(comment));
     unawaited(next());
   }
@@ -256,7 +244,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       _pending = null;
       _sent[comment.id] = comment;
       actions.commentCache.removePost(_post.id);
-      if (replyTo != null && _expandedRoot != replyTo.threadId) {
+      if (replyTo != null && !isExpanded(replyTo.threadId)) {
         unawaited(expand(replyTo.threadId));
       }
       _publish();
@@ -371,7 +359,6 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         if (_sort == FeedCommentSort.old) ...sent,
       ]),
       sort: _sort,
-      expandedRoot: _expandedRoot,
       loading: root.loading,
       failed: root.failed,
       hasMore: root.more,

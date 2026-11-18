@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' show NumberFormat;
@@ -32,10 +33,13 @@ class FeedCommentsSliver extends StatelessWidget {
     builder: (context, state) {
       final l10n = context.l10n;
       final padding = MediaQuery.paddingOf(context);
+      final locale = Localizations.localeOf(context).toString();
+      final compactCount = NumberFormat.compact(locale: locale);
+      final fullCount = NumberFormat.decimalPattern(locale);
       final rows = <(Key, Widget Function())>[];
-      for (final root in state.rows) {
+      for (final (index, root) in state.rows.indexed) {
         final replies = comments.replies(root);
-        final expanded = state.expandedRoot == root.id;
+        final expanded = comments.isExpanded(root.id);
         final hasBranch = root.replyCount > 0 || replies.isNotEmpty;
         void add(
           FeedComment comment, {
@@ -49,6 +53,8 @@ class FeedCommentsSliver extends StatelessWidget {
               comments: comments,
               timeline: timeline,
               onReply: onReply,
+              compactCount: compactCount,
+              fullCount: fullCount,
               before: before,
               after: after,
             ),
@@ -59,8 +65,10 @@ class FeedCommentsSliver extends StatelessWidget {
         for (final reply in replies) {
           add(reply, before: true, after: reply != replies.last);
         }
-        if (hasBranch) {
-          final status = comments.threadStatus(root.id);
+        final status = comments.threadStatus(root.id);
+        final canExpand = !expanded && root.replyCount > replies.length;
+        if (canExpand ||
+            expanded && (status.loading || status.failed || status.more)) {
           rows.add((
             ValueKey(('thread', root.id)),
             () => Padding(
@@ -69,8 +77,7 @@ class FeedCommentsSliver extends StatelessWidget {
                     (Directionality.of(context) == TextDirection.ltr
                         ? padding.left
                         : padding.right) +
-                    60,
-                bottom: 4,
+                    _CommentRow.contentInset,
               ),
               child: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -86,24 +93,29 @@ class FeedCommentsSliver extends StatelessWidget {
                       onPressed: () => comments.nextReplies(root.id),
                       child: Text(l10n.feedLoadMore),
                     ),
-                  if (expanded ||
-                      root.replyCount > replies.length ||
-                      replies.isEmpty)
+                  if (canExpand)
                     TextButton(
                       onPressed: () => comments.expand(root.id),
-                      child: Text(
-                        expanded ? l10n.feedHideReplies : l10n.feedShowReplies,
-                      ),
+                      style:
+                          FeedActionButton.style(
+                            AlignmentDirectional.centerStart,
+                          ).copyWith(
+                            textStyle: WidgetStatePropertyAll(
+                              context.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      child: Text(l10n.feedShowReplies),
                     ),
                 ],
               ),
             ),
           ));
         }
-        rows.add((
-          ValueKey(('divider', root.id)),
-          () => const Divider(height: 1),
-        ));
+        if (index + 1 < state.rows.length) {
+          rows.add((ValueKey(('divider', root.id)), FeedDivider.new));
+        }
       }
       final positions = {for (final (i, row) in rows.indexed) row.$1: i};
       return SliverMainAxisGroup(
@@ -315,6 +327,8 @@ class _CommentRow extends StatefulWidget {
     required this.onReply,
     required this.before,
     required this.after,
+    required this.compactCount,
+    required this.fullCount,
   });
 
   final FeedComment comment;
@@ -322,6 +336,12 @@ class _CommentRow extends StatefulWidget {
   final FeedCubit timeline;
   final ValueChanged<FeedComment> onReply;
   final bool before, after;
+  final NumberFormat compactCount;
+  final NumberFormat fullCount;
+  static const avatarSize = 36.0;
+  static const avatarGap = 10.0;
+  static const contentInset =
+      PrimaryHeaderGeometry.horizontalPadding + avatarSize + avatarGap;
 
   @override
   State<_CommentRow> createState() => _CommentRowState();
@@ -330,6 +350,35 @@ class _CommentRow extends StatefulWidget {
 class _CommentRowState extends State<_CommentRow> {
   bool _flying = false;
   bool _menuOpen = false;
+  TapGestureRecognizer? _mentionTap;
+
+  Future<void> _openMention() async {
+    final item = widget.comment;
+    final target = item.replyTo;
+    final actions = widget.comments.actions;
+    final id = target?.userId;
+    if (target == null ||
+        id == null ||
+        id == actions.account.userId ||
+        !_current(item) ||
+        actions.commentHidden(target.id) ||
+        actions.state.blocked.contains(id) ||
+        ModalRoute.isCurrentOf(context) == false ||
+        !actions.beginProfile()) {
+      return;
+    }
+    try {
+      await openViewedProfile(context, userId: id, waitForClose: true);
+    } finally {
+      actions.endProfile();
+    }
+  }
+
+  @override
+  void dispose() {
+    _mentionTap?.dispose();
+    super.dispose();
+  }
 
   bool _current(FeedComment item) =>
       mounted &&
@@ -421,15 +470,28 @@ class _CommentRowState extends State<_CommentRow> {
     final reaction = comments.reactionFor(item);
     final date = item.createdAt;
     final author = item.authorName ?? l10n.feedUnknownAuthor;
-    final canOpen =
-        available && item.authorId != comments.actions.account.userId;
+    final actions = comments.actions;
+    final canOpen = available && item.authorId != actions.account.userId;
     final canAct = available && !comments.busy(item);
     final target = item.replyTo;
-    const avatar = 36.0;
+    final mention =
+        available &&
+            target != null &&
+            target.id != item.threadId &&
+            !actions.commentHidden(target.id) &&
+            !actions.state.blocked.contains(target.userId)
+        ? target
+        : null;
+    final mentionOpensProfile =
+        mention?.userId != null && mention!.userId != actions.account.userId;
+    const avatar = _CommentRow.avatarSize;
+    const gutter = PrimaryHeaderGeometry.horizontalPadding;
+    const actionInset =
+        (FeedActionButton.buttonHeight - FeedActionButton.iconSize) / 2;
     return Padding(
       padding: EdgeInsets.only(
-        left: padding.left + 14,
-        right: padding.right + 14,
+        left: padding.left + gutter,
+        right: padding.right + gutter,
       ),
       child: Stack(
         children: [
@@ -443,7 +505,12 @@ class _CommentRowState extends State<_CommentRow> {
               child: ColoredBox(color: colors.outline.withValues(alpha: .4)),
             ),
           Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 7),
+            padding: EdgeInsets.only(
+              top: FeedDivider.spacing,
+              bottom: available
+                  ? FeedDivider.spacing - actionInset
+                  : FeedDivider.spacing,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -457,58 +524,101 @@ class _CommentRowState extends State<_CommentRow> {
                   heroEnabled: _flying && available,
                   onOpenProfile: canOpen ? _openProfile : null,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: _CommentRow.avatarGap),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (available)
-                        Row(
+                        Stack(
+                          alignment: AlignmentDirectional.topStart,
                           children: [
-                            Flexible(
-                              child: GestureDetector(
-                                onTap: canOpen ? _openProfile : null,
-                                child: Text(
-                                  author,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.chatName.copyWith(
-                                    fontSize: 16,
-                                    color: colors.onSurface,
-                                  ),
+                            if (canOpen) const SizedBox(height: 28),
+                            Padding(
+                              padding: EdgeInsetsDirectional.only(
+                                end: canOpen ? 36 : 0,
+                              ),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) => Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Flexible(
+                                      child: GestureDetector(
+                                        onTap: canOpen ? _openProfile : null,
+                                        child: Text(
+                                          author,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTextStyles.chatName
+                                              .copyWith(
+                                                fontSize: 16,
+                                                color: colors.onSurface,
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (date != null) ...[
+                                      const SizedBox(width: 6),
+                                      FeedTimestamp(
+                                        timestamp: feedRelativeTime(
+                                          context,
+                                          date,
+                                        ),
+                                        maxWidth: constraints.maxWidth * .55,
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ),
-                            if (date != null) ...[
-                              const SizedBox(width: 6),
-                              Text(
-                                feedRelativeTime(context, date),
-                                maxLines: 1,
-                                style: AppTextStyles.metadata.copyWith(
-                                  color: colors.outline,
-                                  fontWeight: FontWeight.w600,
+                            if (canOpen)
+                              PositionedDirectional(
+                                top: 0,
+                                end: 0,
+                                child: IconButton(
+                                  tooltip: l10n.feedCommentMenu,
+                                  iconSize: 20,
+                                  alignment: AlignmentDirectional.topEnd,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 36,
+                                    height: 28,
+                                  ),
+                                  style: const ButtonStyle(
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: canAct ? _report : null,
+                                  icon: Icon(
+                                    Icons.more_vert,
+                                    color: colors.outline,
+                                  ),
                                 ),
                               ),
-                            ],
                           ],
                         ),
                       Text.rich(
                         TextSpan(
                           children: [
-                            if (available &&
-                                target != null &&
-                                target.id != item.threadId &&
-                                !comments.actions.commentHidden(target.id))
+                            if (mention != null)
                               TextSpan(
-                                text: '@${target.username} ',
+                                text: '@${mention.username}',
+                                recognizer: mentionOpensProfile
+                                    ? (_mentionTap ??= TapGestureRecognizer()
+                                        ..onTap = _openMention)
+                                    : null,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: colors.primary,
+                                  color: mentionOpensProfile
+                                      ? colors.primary
+                                      : null,
                                 ),
                               ),
                             TextSpan(
                               text: available
-                                  ? item.text!
+                                  ? '${mention == null ? '' : ' '}${item.text!}'
                                   : l10n.feedCommentUnavailable,
                             ),
                           ],
@@ -518,44 +628,50 @@ class _CommentRowState extends State<_CommentRow> {
                         ),
                       ),
                       if (available)
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                        Row(
                           children: [
-                            IconButton(
-                              tooltip: l10n.feedReplyComment,
-                              iconSize: 20,
-                              onPressed: () => widget.onReply(item),
-                              icon: Icon(
-                                Icons.chat_bubble_outline,
-                                color: colors.outline,
+                            Expanded(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: TextButton(
+                                  style:
+                                      FeedActionButton.style(
+                                        AlignmentDirectional.centerStart,
+                                      ).copyWith(
+                                        foregroundColor: WidgetStatePropertyAll(
+                                          colors.outline,
+                                        ),
+                                        textStyle: WidgetStatePropertyAll(
+                                          AppTextStyles.metadata.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  onPressed: () => widget.onReply(item),
+                                  child: Text(l10n.feedReplyComment),
+                                ),
                               ),
                             ),
-                            TextButton.icon(
-                              style: TextButton.styleFrom(
-                                foregroundColor: reaction.liked
-                                    ? colors.primary
-                                    : colors.outline,
-                              ),
-                              onPressed: canAct
-                                  ? () => unawaited(
-                                      _perform(() => comments.toggleLike(item)),
-                                    )
-                                  : null,
-                              icon: Icon(
-                                reaction.liked
+                            Flexible(
+                              child: FeedActionButton(
+                                icon: reaction.liked
                                     ? Icons.favorite
                                     : Icons.favorite_border,
-                                size: 20,
-                              ),
-                              label: Text(
-                                NumberFormat.compact(
-                                  locale: Localizations.localeOf(
-                                    context,
-                                  ).toString(),
-                                ).format(reaction.likes).toLowerCase(),
-                                semanticsLabel: reaction.liked
+                                label: reaction.liked
                                     ? l10n.feedUnlike
                                     : l10n.feedLike,
+                                count: reaction.likes,
+                                active: reaction.liked,
+                                alignment: AlignmentDirectional.centerEnd,
+                                compact: widget.compactCount,
+                                complete: widget.fullCount,
+                                onPressed: canAct
+                                    ? () => unawaited(
+                                        _perform(
+                                          () => comments.toggleLike(item),
+                                        ),
+                                      )
+                                    : null,
                               ),
                             ),
                           ],
@@ -563,13 +679,6 @@ class _CommentRowState extends State<_CommentRow> {
                     ],
                   ),
                 ),
-                if (canOpen)
-                  IconButton(
-                    tooltip: l10n.feedCommentMenu,
-                    iconSize: 20,
-                    onPressed: canAct ? _report : null,
-                    icon: Icon(Icons.more_vert, color: colors.outline),
-                  ),
               ],
             ),
           ),
