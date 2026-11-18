@@ -26,6 +26,40 @@ void main() {
   });
   tearDown(() => cubit.close());
 
+  test('post count is shared and ordered by its server revision', () {
+    FeedPost snapshot(int count, [int? revision]) => FeedPost(
+      id: 'post',
+      authorId: 'author',
+      authorName: 'author',
+      text: '',
+      createdAt: DateTime.utc(2026),
+      commentCount: count,
+      commentCountRevision: revision,
+    );
+
+    final feedCard = snapshot(5);
+    final details = snapshot(5, 10);
+    cubit.recordProjection(details, cubit.projectionVersion);
+    cubit.recordCommentCount(details, (count: 6, revision: 11));
+    expect(cubit.commentCountFor(feedCard), 6);
+    expect(cubit.commentCountFor(details), 6);
+
+    final afterCreation = cubit.state;
+    cubit.recordCommentCount(details, (count: 6, revision: 11));
+    cubit.recordProjection(snapshot(5, 10), cubit.projectionVersion);
+    expect(cubit.state, same(afterCreation));
+
+    // A newer projection can legitimately lower the number after a deletion.
+    cubit.recordProjection(snapshot(4, 13), cubit.projectionVersion);
+    cubit.recordCommentCount(details, (count: 7, revision: 12));
+    expect(cubit.commentCountFor(feedCard), 4);
+    expect(cubit.commentCountFor(details), 4);
+
+    accounts.setAuthenticatedUser('different-account');
+    cubit.recordCommentCount(details, (count: 9, revision: 14));
+    expect(cubit.state.commentCounts['post'], (count: 4, revision: 13));
+  });
+
   test(
     'two cards share one subscription mutation and its confirmed state',
     () async {

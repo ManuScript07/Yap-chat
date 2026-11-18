@@ -24,7 +24,8 @@ void main() {
       authOptions: const AuthClientOptions(autoRefreshToken: false),
       httpClient: MockClient((request) async {
         final rpc = request.url.pathSegments.last;
-        requests.add((rpc, jsonDecode(request.body) as Map<String, dynamic>));
+        final arguments = jsonDecode(request.body) as Map<String, dynamic>;
+        requests.add((rpc, arguments));
         final payload = switch (rpc) {
           'set_feed_comment_liked' => {
             'action_version': 5,
@@ -32,6 +33,15 @@ void main() {
             'changed': true,
           },
           'submit_feed_content_report' => <String, Object?>{},
+          'create_feed_comment' => {
+            'id': arguments['requested_id'],
+            'text': arguments['requested_text'],
+            'author': {'id': viewer},
+            if (arguments['requested_id'] != 'legacy') ...{
+              'post_comment_count': 21,
+              'post_comment_count_revision': 24,
+            },
+          },
           _ => {
             'items': [
               {
@@ -104,6 +114,23 @@ void main() {
       'report',
       account,
     );
+    final created = await repository.createComment(
+      'post',
+      'send',
+      'reply',
+      account,
+      replyTo: 'parent',
+    );
+    expect(created.comment.id, 'send');
+    expect(created.postCount, (count: 21, revision: 24));
+    final olderResponse = await repository.createComment(
+      'post',
+      'legacy',
+      'comment',
+      account,
+    );
+    expect(olderResponse.comment.id, 'legacy');
+    expect(olderResponse.postCount, isNull);
     final expected = [
       (
         'get_feed_comments',
@@ -149,6 +176,23 @@ void main() {
           'requested_type': 'comment',
           'requested_content': 'comment',
           'requested_reason': 'spam',
+        },
+      ),
+      (
+        'create_feed_comment',
+        {
+          'requested_id': 'send',
+          'requested_post': 'post',
+          'requested_text': 'reply',
+          'requested_reply_to': 'parent',
+        },
+      ),
+      (
+        'create_feed_comment',
+        {
+          'requested_id': 'legacy',
+          'requested_post': 'post',
+          'requested_text': 'comment',
         },
       ),
     ];

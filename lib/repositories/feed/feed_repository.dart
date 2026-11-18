@@ -93,7 +93,7 @@ abstract interface class IFeedPublicationRepository {
     FeedCommentSort sort = FeedCommentSort.popular,
     String? rootId,
   });
-  Future<FeedComment> createComment(
+  Future<FeedCommentCreation> createComment(
     String id,
     String requestId,
     String text,
@@ -287,6 +287,7 @@ class FeedRepository
       edited: row['edited'] == true,
       viewCount: row['view_count'] as int? ?? 0,
       commentCount: row['comment_count'] as int? ?? 0,
+      commentCountRevision: row['comment_count_revision'] as int?,
       repostCount: row['repost_count'] as int? ?? 0,
       reaction: (
         version: row['action_version'] as int? ?? 0,
@@ -698,7 +699,7 @@ class FeedRepository
   }
 
   @override
-  Future<FeedComment> createComment(
+  Future<FeedCommentCreation> createComment(
     String id,
     String requestId,
     String text,
@@ -711,7 +712,14 @@ class FeedRepository
       'requested_text': text,
       'requested_reply_to': ?replyTo,
     }, account);
-    return _comment(row);
+    final count = row['post_comment_count'];
+    final revision = row['post_comment_count_revision'];
+    return (
+      comment: _comment(row),
+      postCount: count is int && revision is int
+          ? (count: count, revision: revision)
+          : null,
+    );
   }
 
   FeedComment _comment(Map<String, dynamic> row) {

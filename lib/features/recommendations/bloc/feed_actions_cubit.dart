@@ -16,6 +16,7 @@ typedef FeedActionsState = ({
   Set<String> hidden,
   Set<String> blocked,
   Map<String, int> reposts,
+  Map<String, FeedCommentCount> commentCounts,
   int accessVersion,
 });
 
@@ -33,6 +34,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
          hidden: const {},
          blocked: const {},
          reposts: const {},
+         commentCounts: const {},
          accessVersion: 0,
        ));
 
@@ -55,6 +57,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   final _busy = <String>{};
   final _hidden = <String>{};
   final _reposts = <String, int>{};
+  final _commentCounts = <String, FeedCommentCount>{};
   final _followWrites = <String, Object>{};
   final _recentToggles = <String, Duration>{};
   final _clock = Stopwatch()..start();
@@ -97,7 +100,50 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       (_projectionVersions[post] ?? 0) >=
           (_friendshipChanges[post.authorId]?.removedAt ?? 0);
 
-  void recordProjection(FeedPost post, int requestedAt) {
+  int commentCountFor(FeedPost post) {
+    final count = state.commentCounts[post.id];
+    return count != null && count.revision > (post.commentCountRevision ?? -1)
+        ? count.count
+        : post.commentCount;
+  }
+
+  void recordCommentCount(FeedPost post, FeedCommentCount count) {
+    if (canShow(post) && _updateCommentCount(post.id, count)) _publish();
+  }
+
+  bool _updateCommentCount(String id, FeedCommentCount count) {
+    if (count.count < 0 ||
+        count.revision <= (_commentCounts[id]?.revision ?? -1)) {
+      return false;
+    }
+    _commentCounts.remove(id);
+    _commentCounts[id] = count;
+    return true;
+  }
+
+  void recordProjection(FeedPost post, int requestedAt) =>
+      recordProjections([post], requestedAt);
+
+  void recordProjections(Iterable<FeedPost> posts, int requestedAt) {
+    if (!active) return;
+    var countsChanged = false;
+    for (final post in posts) {
+      _recordProjectionAccess(post, requestedAt);
+      for (FeedPost? item = post; item != null; item = item.original) {
+        if (item.commentCountRevision case final revision? when canShow(item)) {
+          if (_updateCommentCount(item.id, (
+            count: item.commentCount,
+            revision: revision,
+          ))) {
+            countsChanged = true;
+          }
+        }
+      }
+    }
+    if (countsChanged) _publish();
+  }
+
+  void _recordProjectionAccess(FeedPost post, int requestedAt) {
     for (FeedPost? item = post; item != null; item = item.original) {
       final author = item.authorId;
       final sensitive =
@@ -445,6 +491,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     _trim(_follows);
     _trim(_reactions);
     _trim(_reposts);
+    _trim(_commentCounts);
     emit((
       follows: Map.unmodifiable(_follows),
       reactions: Map.unmodifiable(_reactions),
@@ -452,6 +499,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
       hidden: Set.unmodifiable(_hidden),
       blocked: _blocked,
       reposts: Map.unmodifiable(_reposts),
+      commentCounts: Map.unmodifiable(_commentCounts),
       accessVersion: _accessVersion,
     ));
   }

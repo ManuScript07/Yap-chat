@@ -541,20 +541,23 @@ class FeedPostFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = timeline.actions;
-    if (actions == null) return _buttons(context, post.reaction, false, null);
+    if (actions == null) {
+      return _buttons(context, post.reaction, false, null, post.commentCount);
+    }
     return BlocSelector<
       FeedActionsCubit,
       FeedActionsState,
-      (FeedReaction, bool, int?)
+      (FeedReaction, bool, int?, int)
     >(
       bloc: actions,
       selector: (state) => (
         actions.reactionFor(post),
         state.busy.contains(post.id),
         state.reposts[post.id],
+        actions.commentCountFor(post),
       ),
       builder: (context, value) =>
-          _buttons(context, value.$1, value.$2, value.$3),
+          _buttons(context, value.$1, value.$2, value.$3, value.$4),
     );
   }
 
@@ -563,6 +566,7 @@ class FeedPostFooter extends StatelessWidget {
     FeedReaction reaction,
     bool busy,
     int? repostCount,
+    int commentCount,
   ) {
     final l10n = context.l10n;
     final actions = timeline.actions;
@@ -623,7 +627,7 @@ class FeedPostFooter extends StatelessWidget {
               child: item(
                 Icons.chat_bubble_outline,
                 l10n.feedComments,
-                post.commentCount,
+                commentCount,
                 details
                     ? onComments
                     : actions != null

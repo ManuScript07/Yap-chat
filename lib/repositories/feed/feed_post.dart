@@ -34,6 +34,11 @@ class FeedPhoto {
 enum FeedCommentSort { popular, newFirst, old }
 
 typedef FeedCommentLike = ({int version, bool liked, bool changed});
+typedef FeedCommentCount = ({int count, int revision});
+typedef FeedCommentCreation = ({
+  FeedComment comment,
+  FeedCommentCount? postCount,
+});
 
 class FeedComment {
   const FeedComment({
@@ -98,6 +103,7 @@ class FeedPost {
     this.edited = false,
     this.viewCount = 0,
     this.commentCount = 0,
+    this.commentCountRevision,
     this.repostCount = 0,
     this.reaction = (version: 0, liked: false, likes: 0),
     this.follow,
@@ -125,6 +131,7 @@ class FeedPost {
   final bool edited;
   final int viewCount;
   final int commentCount;
+  final int? commentCountRevision;
   final int repostCount;
   final FeedReaction reaction;
   final FeedFollowState? follow;

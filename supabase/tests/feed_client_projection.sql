@@ -41,12 +41,35 @@ begin
   if (current_post #>> '{location,latitude}')::numeric is distinct from 55.75 then
     raise exception 'Author cannot see their publication location';
   end if;
-  perform public.create_feed_comment(root, post, 'Root', null);
+  current_post := public.get_feed_post(post);
+  if current_post -> 'comment_count' is distinct from '0'::jsonb
+     or current_post -> 'comment_count_revision' is distinct from '0'::jsonb then
+    raise exception 'A post without comments should start with count and revision zero';
+  end if;
+  attempt := public.create_feed_comment(root, post, 'Root', null);
+  if attempt -> 'post_comment_count' is distinct from '1'::jsonb
+     or attempt -> 'post_comment_count_revision' is distinct from '1'::jsonb then
+    raise exception 'Root receipt disagrees with the first count revision: %', attempt;
+  end if;
   reset role;
 
   perform set_config('request.jwt.claim.sub', replier::text, true);
   set local role authenticated;
-  perform public.create_feed_comment(reply, post, 'First reply', root);
+  attempt := public.create_feed_comment(reply, post, 'First reply', root);
+  if attempt -> 'post_comment_count' is distinct from '2'::jsonb
+     or attempt -> 'post_comment_count_revision' is distinct from '2'::jsonb then
+    raise exception 'Reply receipt disagrees with its post count revision: %', attempt;
+  end if;
+  reset role;
+
+  perform set_config('request.jwt.claim.sub', author::text, true);
+  set local role authenticated;
+  attempt := public.create_feed_comment(root, post, 'Root', null);
+  if attempt ->> 'id' is distinct from root::text
+     or attempt -> 'post_comment_count' is distinct from '2'::jsonb
+     or attempt -> 'post_comment_count_revision' is distinct from '2'::jsonb then
+    raise exception 'Replayed request did not return the current count: %', attempt;
+  end if;
   reset role;
 
   perform set_config('request.jwt.claim.sub', viewer::text, true);
@@ -70,6 +93,14 @@ begin
   where item #>> '{post,id}' = post::text and item #>> '{post,author,id}' = author::text;
   if second_delivery is null or second_delivery = first_delivery then
     raise exception 'Friends page did not expose a distinct delivery with the author projection';
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(first_page -> 'items') item
+    where item #>> '{post,id}' = post::text
+      and item #> '{post,comment_count}' = '2'::jsonb
+      and item #> '{post,comment_count_revision}' = '2'::jsonb
+  ) then
+    raise exception 'The friends page disagrees with the confirmed comment count';
   end if;
   attempt := public.apply_feed_action(extensions.gen_random_uuid(), first_delivery, 'like', 0);
   if attempt -> 'changed' is distinct from 'true'::jsonb then
@@ -100,7 +131,9 @@ begin
     'event_id', extensions.gen_random_uuid(), 'delivery_id', second_delivery)));
   current_post := public.get_feed_post(post);
   if current_post -> 'like_count' is distinct from '1'::jsonb
-     or current_post -> 'view_count' is distinct from '1'::jsonb then
+     or current_post -> 'view_count' is distinct from '1'::jsonb
+     or current_post -> 'comment_count' is distinct from '2'::jsonb
+     or current_post -> 'comment_count_revision' is distinct from '2'::jsonb then
     raise exception 'Duplicate like or view in aggregate: %', current_post;
   end if;
   for n in 1..27 loop
@@ -161,6 +194,16 @@ begin
   where item ->> 'id' = root::text;
   if root_row is null or root_row -> 'reply_preview' is distinct from 'null'::jsonb then
     raise exception 'A previously issued root page leaked the blocked reply';
+  end if;
+  reset role;
+
+  perform set_config('request.jwt.claim.sub', replier::text, true);
+  set local role authenticated;
+  perform public.delete_feed_comment(extensions.gen_random_uuid(), reply, 1);
+  current_post := public.get_feed_post(post);
+  if current_post -> 'comment_count' is distinct from '1'::jsonb
+     or current_post -> 'comment_count_revision' is distinct from '3'::jsonb then
+    raise exception 'Deleting a reply did not yield a newer, smaller count: %', current_post;
   end if;
   reset role;
 end;

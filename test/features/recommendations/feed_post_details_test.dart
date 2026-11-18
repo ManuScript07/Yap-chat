@@ -10,6 +10,7 @@ import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/features/recommendations/view/feed_comments_sliver.dart';
+import 'package:yap_chat/features/recommendations/view/feed_post_card.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_details.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_controls.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_gallery.dart';
@@ -788,21 +789,109 @@ void main() {
     await tester.pump();
     expect(repository.writes, hasLength(2));
     expect(repository.writes.last.$1, repository.writes.first.$1);
-    repository.writes.last.$2.complete(
-      FeedComment(
+    repository.writes.last.$2.complete((
+      comment: FeedComment(
         id: repository.writes.last.$1,
         authorId: 'viewer',
         authorName: 'viewer',
         text: 'my comment',
       ),
-    );
+      postCount: (count: 1, revision: 1),
+    ));
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller!.text, isEmpty);
     expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
     expect(tester.testTextInput.isVisible, isFalse);
     expect(find.text('my comment'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(FeedPostFooter),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'returning to the feed before acknowledgement still updates its count',
+    (tester) async {
+      final post = repository.post!;
+      final account = accounts.capture();
+      final timeline = FeedCubit(
+        tab: FeedTab.forYou,
+        repository: repository,
+        isCurrentAccount: () => accounts.isCurrent(account),
+        account: account,
+        actions: scope.actionsFor(account),
+      );
+      addTearDown(timeline.close);
+      await tester.pumpWidget(
+        providers(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => Column(
+                  children: [
+                    FeedPostCard(
+                      post: post,
+                      timeline: timeline,
+                      visible: true,
+                      onOpenPost: (_) {
+                        unawaited(
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  const FeedPostDetailsPage(id: _postId),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final footer = find.byType(FeedPostFooter);
+      expect(
+        find.descendant(of: footer, matching: find.text('1')),
+        findsNothing,
+      );
+      await tester.tap(find.byTooltip('comments'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'pending comment');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('send comment'));
+      await tester.pump();
+      final write = repository.writes.single;
+      await tester.tap(find.byTooltip('back'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FeedPostDetailsPage), findsNothing);
+      write.$2.complete((
+        comment: FeedComment(
+          id: write.$1,
+          authorId: 'viewer',
+          text: 'pending comment',
+        ),
+        postCount: (count: 1, revision: 1),
+      ));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: footer, matching: find.text('1')),
+        findsOneWidget,
+      );
+      expect(repository.postReads, 1);
+      expect(repository.commentReads, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets(
     'reply composer keeps its draft across routes and reopens the IME',
@@ -1209,7 +1298,7 @@ class _Repository extends MockFeedRepository
     text: 'test publication',
     createdAt: DateTime.utc(2026),
   );
-  final writes = <(String, Completer<FeedComment>)>[];
+  final writes = <(String, Completer<FeedCommentCreation>)>[];
   final likes = <(FeedComment, FeedReaction)>[];
   final reported = <(String, FeedReportReason)>[];
   Completer<FeedCommentLike>? pendingLike;
@@ -1263,14 +1352,14 @@ class _Repository extends MockFeedRepository
   ) async => reported.add((id, reason));
 
   @override
-  Future<FeedComment> createComment(
+  Future<FeedCommentCreation> createComment(
     String id,
     String requestId,
     String text,
     AccountSessionSnapshot account, {
     String? replyTo,
   }) {
-    final result = Completer<FeedComment>();
+    final result = Completer<FeedCommentCreation>();
     writes.add((requestId, result));
     return result.future;
   }

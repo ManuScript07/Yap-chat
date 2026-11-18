@@ -212,9 +212,7 @@ class FeedCubit extends Cubit<FeedState> {
       }
       if (!_isCurrent(generation)) return;
       if (accessVersion != null) {
-        for (final post in page.posts) {
-          actions!.recordProjection(post, accessVersion);
-        }
+        actions!.recordProjections(page.posts, accessVersion);
       }
 
       final atHead = cursor == null;

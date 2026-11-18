@@ -271,18 +271,25 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         ? pending.id
         : const Uuid().v4();
     _pending = (text: text, replyTo: target, id: requestId);
+    final post = _post;
     try {
-      final comment = await repository.createComment(
-        _post.id,
+      final receipt = await repository.createComment(
+        post.id,
         requestId,
         text,
         actions.account,
         replyTo: target,
       );
+      if (actions.canShow(post)) {
+        if (receipt.postCount case final count?) {
+          actions.recordCommentCount(post, count);
+        }
+        actions.publicationCache.removeComments(post.id);
+      }
       if (!_active) return false;
       _pending = null;
+      final comment = receipt.comment;
       _sent[comment.id] = comment;
-      actions.publicationCache.removeComments(_post.id);
       if (replyTo != null && !isExpanded(replyTo.threadId)) {
         unawaited(expand(replyTo.threadId));
       }
