@@ -19,11 +19,13 @@ class FeedCommentsSliver extends StatelessWidget {
     required this.comments,
     required this.timeline,
     required this.onReply,
+    required this.onRetryPublication,
   });
 
   final FeedCommentsCubit comments;
   final FeedCubit timeline;
   final ValueChanged<FeedComment> onReply;
+  final VoidCallback onRetryPublication;
 
   @override
   Widget build(
@@ -31,6 +33,7 @@ class FeedCommentsSliver extends StatelessWidget {
   ) => BlocBuilder<FeedCommentsCubit, FeedCommentsState>(
     bloc: comments,
     builder: (context, state) {
+      if (!comments.canDisplay) return const SliverToBoxAdapter();
       final l10n = context.l10n;
       final padding = MediaQuery.paddingOf(context);
       final locale = Localizations.localeOf(context).toString();
@@ -86,7 +89,9 @@ class FeedCommentsSliver extends StatelessWidget {
                   if (expanded && !status.loading && status.failed)
                     RetryPillButton(
                       label: l10n.feedRetry,
-                      onPressed: () => comments.nextReplies(root.id),
+                      onPressed: comments.canMutate
+                          ? () => comments.nextReplies(root.id)
+                          : onRetryPublication,
                     )
                   else if (expanded && !status.loading && status.more)
                     TextButton(
@@ -151,7 +156,9 @@ class FeedCommentsSliver extends StatelessWidget {
               ),
               child: _CommentLoadFeedback(
                 state: state,
-                onRequest: comments.next,
+                onRequest: state.failed && !comments.canMutate
+                    ? onRetryPublication
+                    : comments.next,
               ),
             ),
           ),

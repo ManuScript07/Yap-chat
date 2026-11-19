@@ -392,6 +392,19 @@ class CachedFeedPostSnapshots extends Table {
   Set<Column> get primaryKey => {ownerUserId, postId};
 }
 
+class CachedFeedCommentSnapshots extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get postId => text()();
+  TextColumn get sort => text()();
+  TextColumn get rootId => text()();
+  TextColumn get payload => text()();
+  IntColumn get rowCount => integer()();
+  IntColumn get expiresAtMicros => integer()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, postId, sort, rootId};
+}
+
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -419,6 +432,7 @@ class CachedFeedPostSnapshots extends Table {
     CachedChatListStates,
     CachedChatUnreadTotals,
     CachedFeedPostSnapshots,
+    CachedFeedCommentSnapshots,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -437,7 +451,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -766,6 +780,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 31) {
         await migrator.createTable(cachedFeedPostSnapshots);
+      }
+      if (from < 32) {
+        await migrator.createTable(cachedFeedCommentSnapshots);
       }
     },
     beforeOpen: (details) async {

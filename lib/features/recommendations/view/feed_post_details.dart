@@ -302,10 +302,14 @@ class _PublicationState extends State<_Publication> {
     super.initState();
     final repository = widget.timeline.repository;
     if (repository is IFeedPublicationRepository) {
+      final availability = context
+          .read<AppConnectionStatus?>()
+          ?.networkAvailability;
       _comments = FeedCommentsCubit(
         repository as IFeedPublicationRepository,
         widget.actions,
         widget.post,
+        networkAvailable: () => availability?.value,
       );
       _comments!.updatePost(widget.post, confirmed: widget.confirmed);
       _controller.addListener(_maybeLoadMore);
@@ -440,11 +444,12 @@ class _PublicationState extends State<_Publication> {
                     ),
                   ),
                 ),
-              if (comments != null && comments.canDisplay)
+              if (comments != null)
                 FeedCommentsSliver(
                   comments: comments,
                   timeline: widget.timeline,
                   onReply: _reply,
+                  onRetryPublication: widget.onRetry,
                 ),
               if (comments != null)
                 ValueListenableBuilder(

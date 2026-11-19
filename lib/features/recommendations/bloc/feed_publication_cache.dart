@@ -1,15 +1,11 @@
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
-typedef FeedCommentCacheKey = (String, FeedCommentSort, String?);
-typedef CachedFeedComments = ({FeedCommentsPage page, DateTime expiresAt});
-
 class FeedPublicationCache {
   FeedPublicationCache({this.store, this.account, DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
   static const _ttl = Duration(minutes: 5);
-  static const _maxRows = 1200;
   final FeedPostSnapshotStore? store;
   final AccountSessionSnapshot? account;
   final DateTime Function() _now;
@@ -83,21 +79,75 @@ class FeedPublicationCache {
       if (key.$1 == id) key: ?read(key),
   };
 
+  bool get hasDisk => store != null && account != null;
+
+  Future<Map<FeedCommentCacheKey, CachedFeedComments>> restoreComments(
+    String id,
+  ) async {
+    if (!hasDisk) return {};
+    try {
+      await _diskChanges;
+      return await store!.readComments(account!, id);
+    } catch (_) {
+      return {};
+    }
+  }
+
   void write(
     FeedCommentCacheKey key,
     FeedCommentsPage page, {
     required DateTime expiresAt,
+    required bool Function() allowed,
   }) {
-    _remove(key);
-    if (page.comments.length > _maxRows || !_now().isBefore(expiresAt)) return;
-    _entries[key] = (
+    final snapshot = (
       expiresAt: expiresAt,
-      page: (comments: List.unmodifiable(page.comments), next: page.next),
+      page: (
+        comments: List<FeedComment>.unmodifiable(page.comments),
+        next: page.next,
+      ),
     );
-    _rowCount += page.comments.length;
-    while (_entries.length > 24 || _rowCount > _maxRows) {
+    rememberComments(key, snapshot);
+    _onDisk(
+      (store, account) =>
+          store.writeCommentPage(account, key, snapshot, allowed: allowed),
+    );
+  }
+
+  void rememberComments(FeedCommentCacheKey key, CachedFeedComments snapshot) {
+    _remove(key);
+    if (snapshot.page.comments.length > FeedPostSnapshotStore.maximumComments ||
+        !_now().isBefore(snapshot.expiresAt)) {
+      return;
+    }
+    _entries[key] = snapshot;
+    _rowCount += snapshot.page.comments.length;
+    while (_entries.length > FeedPostSnapshotStore.maximumCommentPages ||
+        _rowCount > FeedPostSnapshotStore.maximumComments) {
       _remove(_entries.keys.first);
     }
+  }
+
+  void updateComments(
+    FeedCommentPageUpdate update, {
+    String? postId,
+    FeedCommentCount? postCount,
+  }) {
+    for (final key in _entries.keys.toList(growable: false)) {
+      if (postId != null && key.$1 != postId) continue;
+      final entry = _entries[key];
+      if (entry == null) continue;
+      final page = update(key, entry.page);
+      if (identical(page.comments, entry.page.comments)) continue;
+      rememberComments(key, (page: page, expiresAt: entry.expiresAt));
+    }
+    _onDisk(
+      (store, account) => store.updateCommentPages(
+        account,
+        update,
+        postId: postId,
+        postCount: postCount,
+      ),
+    );
   }
 
   CachedFeedComments? _remove(FeedCommentCacheKey key) {

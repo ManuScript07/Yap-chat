@@ -52,8 +52,20 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
 
   void hideComment(String postId, String id) {
     _hiddenComments.add(id);
-    publicationCache.removeComments(postId);
+    publicationCache.updateComments(
+      (_, page) => redactFeedCommentPage(page, comments: {id}),
+      postId: postId,
+    );
   }
+
+  FeedCommentsPage redactComments(FeedCommentsPage page) =>
+      _blocked.isEmpty && _hiddenComments.isEmpty
+      ? page
+      : redactFeedCommentPage(
+          page,
+          authors: _blocked,
+          comments: _hiddenComments,
+        );
 
   final AccountSessionSnapshot account;
   final bool Function() isCurrent;
@@ -217,6 +229,9 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     if (!active) return;
     _markPeerBlocked(id);
     _publishAccessChange();
+    publicationCache.updateComments(
+      (_, page) => redactFeedCommentPage(page, authors: {id}),
+    );
     _evictMedia(blocked: {id});
   }
 
@@ -289,7 +304,12 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     }
     _blocked = Set.unmodifiable(blocked);
     _publish();
-    if (newlyBlocked.isNotEmpty) _evictMedia(blocked: newlyBlocked);
+    if (newlyBlocked.isNotEmpty) {
+      publicationCache.updateComments(
+        (_, page) => redactFeedCommentPage(page, authors: newlyBlocked),
+      );
+      _evictMedia(blocked: newlyBlocked);
+    }
   }
 
   void _evictMedia({

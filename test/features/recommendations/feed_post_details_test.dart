@@ -538,12 +538,12 @@ void main() {
     restored.selectSort(FeedCommentSort.newFirst);
     await tester.pumpAndSettle();
     expect(find.text('couldn’t load comments'), findsOneWidget);
-    expect(repository.commentReads, reads + 1);
+    expect(repository.commentReads, reads);
     restored.selectSort(FeedCommentSort.popular);
     await tester.pumpAndSettle();
     expect(find.text('cached tail'), findsOneWidget);
     expect(find.text('cached reply 2'), findsOneWidget);
-    expect(repository.commentReads, reads + 1);
+    expect(repository.commentReads, reads);
     await tester.pump(const Duration(minutes: 5));
     await tester.pumpAndSettle();
     expect(find.text('cached text'), findsNothing);

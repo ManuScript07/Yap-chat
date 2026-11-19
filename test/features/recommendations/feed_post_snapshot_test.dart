@@ -242,6 +242,9 @@ void main() {
     () async {
       await database.customStatement('DROP TABLE cached_feed_post_snapshots');
       await database.customStatement(
+        'DROP TABLE cached_feed_comment_snapshots',
+      );
+      await database.customStatement(
         "INSERT INTO cached_app_languages VALUES ('owner', 'ru', 0)",
       );
       await database.customStatement('PRAGMA user_version = 30');

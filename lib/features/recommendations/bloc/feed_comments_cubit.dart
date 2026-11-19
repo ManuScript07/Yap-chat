@@ -6,7 +6,6 @@ import 'package:uuid/uuid.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 import 'feed_actions_cubit.dart';
-import 'feed_publication_cache.dart';
 
 typedef FeedCommentsState = ({
   List<FeedComment> rows,
@@ -43,18 +42,23 @@ class _CommentPage {
 }
 
 class FeedCommentsCubit extends Cubit<FeedCommentsState> {
-  FeedCommentsCubit(this.repository, this.actions, this._post)
-    : super((
-        rows: const [],
-        sort: FeedCommentSort.popular,
-        loading: false,
-        failed: false,
-        loaded: false,
-        hasMore: true,
-      ));
+  FeedCommentsCubit(
+    this.repository,
+    this.actions,
+    this._post, {
+    this._networkAvailable,
+  }) : super((
+         rows: const [],
+         sort: FeedCommentSort.popular,
+         loading: false,
+         failed: false,
+         loaded: false,
+         hasMore: true,
+       ));
 
   final IFeedPublicationRepository repository;
   final FeedActionsCubit actions;
+  final bool? Function()? _networkAvailable;
   FeedPost _post;
   final _roots = <FeedCommentSort, _CommentPage>{};
   final _threads = <String, _CommentPage>{};
@@ -66,9 +70,11 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   ({String text, String? replyTo, String id})? _pending;
   bool _ready = false;
   bool _hydrated = false;
+  bool _restoring = false;
   bool _hasCachedPages = false;
   bool _submitting = false;
   int _revision = 0;
+  Timer? _cacheExpiry;
   FeedCommentSort _sort = FeedCommentSort.popular;
 
   bool get canDisplay => _ready || _hasCachedPages;
@@ -86,23 +92,84 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     _post = post;
     if (!_hydrated) {
       _hydrated = true;
-      final cached = actions.publicationCache.readForPost(post.id);
-      _hasCachedPages = cached.isNotEmpty;
-      for (final entry in cached.entries) {
-        final (_, sort, root) = entry.key;
-        final page = _CommentPage(sort, root, entry.value);
-        page.rows.removeWhere((_, comment) => _isBlocked(comment));
-        if (root == null) {
-          _roots[sort] = page;
-        } else {
-          _threads[root] = page;
-        }
+      final cache = actions.publicationCache;
+      _applySnapshots(cache.readForPost(post.id));
+      if (cache.hasDisk) {
+        _restoring = true;
+        unawaited(_restore(post.id, _revision));
       }
-      if (_hasCachedPages) _publish();
     }
     if (_ready || !confirmed) return;
     _ready = true;
-    if (!_root.started) unawaited(next());
+    _cacheExpiry?.cancel();
+    if (!_restoring && !_root.started) unawaited(next());
+  }
+
+  Future<void> _restore(String id, int revision) async {
+    final cached = await actions.publicationCache.restoreComments(id);
+    if (isClosed ||
+        revision != _revision ||
+        id != _post.id ||
+        !actions.canShow(_post)) {
+      return;
+    }
+    _restoring = false;
+    _applySnapshots(cached, remember: true);
+    if (_ready && !_root.started) unawaited(next());
+  }
+
+  void _applySnapshots(
+    Map<FeedCommentCacheKey, CachedFeedComments> entries, {
+    bool remember = false,
+  }) {
+    for (final entry in entries.entries) {
+      final (_, sort, root) = entry.key;
+      final current = root == null ? _roots[sort] : _threads[root];
+      if (current != null && (current.started || current.loading)) continue;
+      final snapshot = (
+        page: actions.redactComments(entry.value.page),
+        expiresAt: entry.value.expiresAt,
+      );
+      final page = _CommentPage(sort, root, snapshot);
+      if (root == null) {
+        _roots[sort] = page;
+      } else {
+        _threads[root] = page;
+      }
+      if (remember) {
+        actions.publicationCache.rememberComments(entry.key, snapshot);
+      }
+      _hasCachedPages = true;
+    }
+    if (!_hasCachedPages) return;
+    if (!_ready && !_root.started) _root.failed = true;
+    _scheduleExpiry();
+    _publish();
+  }
+
+  void _scheduleExpiry() {
+    _cacheExpiry?.cancel();
+    if (_ready || !_hasCachedPages) return;
+    final now = DateTime.now();
+    DateTime? earliest;
+    for (final page in [..._roots.values, ..._threads.values]) {
+      final expiry = page.expiresAt;
+      if (expiry != null && (earliest == null || expiry.isBefore(earliest))) {
+        earliest = expiry;
+      }
+    }
+    if (earliest == null) return;
+    _cacheExpiry = Timer(earliest.difference(now), () {
+      if (!_active || _ready) return;
+      final current = DateTime.now();
+      bool expired(_, _CommentPage page) =>
+          page.expiresAt?.isAfter(current) == false;
+      _roots.removeWhere(expired);
+      _threads.removeWhere(expired);
+      if (!_root.started) _root.failed = true;
+      _scheduleExpiry();
+      _publish();
+    });
   }
 
   bool available(FeedComment comment) =>
@@ -176,7 +243,15 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
 
   Future<void> _load(_CommentPage page, {bool refresh = false}) {
     final fromStart = refresh || page.failedRefresh;
-    if (!_active || !page.more && !fromStart) return Future.value();
+    if (!_active || _restoring || !page.more && !fromStart) {
+      return Future.value();
+    }
+    if (page.pending != null) return page.pending!;
+    if (!_ready || _networkAvailable?.call() == false) {
+      page.failed = true;
+      _publish();
+      return Future.value();
+    }
     return page.pending ??= _read(
       page,
       refresh: fromStart,
@@ -205,9 +280,9 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       }
       page.started = true;
       page.more = response.next != null && response.next != cursor;
-      page.cursor = response.next;
-      for (final row in response.comments) {
-        if (!_isBlocked(row)) page.rows[row.id] = row;
+      page.cursor = page.more ? response.next : null;
+      for (final row in actions.redactComments(response).comments) {
+        page.rows[row.id] = _withCurrentReaction(row);
       }
       if (page.expiresAt case final expires?) {
         actions.publicationCache.write(
@@ -217,16 +292,22 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
             next: page.cursor,
           ),
           expiresAt: expires,
+          allowed: () => revision == _revision && actions.canShow(_post),
         );
       }
     } catch (error) {
       _handleAccessError(error);
       if (revision == _revision) {
-        if (error is PostgrestException && error.code == 'PT410') {
+        final expired =
+            error is PostgrestException &&
+            (error.code == 'PT410' ||
+                error.code == 'PT404' &&
+                    error.message == 'comment_session_not_found');
+        if (expired) {
           page.cursor = null;
         }
         page.failed = true;
-        page.failedRefresh = refresh;
+        page.failedRefresh = refresh || expired;
       }
     } finally {
       page.loading = false;
@@ -248,10 +329,22 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   void invalidateAccess() {
     if (!_active) return;
     _revision++;
-    _roots.clear();
-    _threads.clear();
+    for (final page in [..._roots.values, ..._threads.values]) {
+      final redacted = actions.redactComments((
+        comments: page.rows.values.toList(),
+        next: page.cursor,
+      ));
+      for (final row in redacted.comments) {
+        page.rows[row.id] = row;
+      }
+    }
     _sent.removeWhere((_, comment) => _isBlocked(comment));
-    unawaited(next());
+    _publish();
+    if (_restoring) {
+      unawaited(_restore(_post.id, _revision));
+    } else if (_ready && _networkAvailable?.call() != false) {
+      unawaited(_revalidateAfterConflict(_root));
+    }
   }
 
   Future<bool> submit(String text, {FeedComment? replyTo}) async {
@@ -284,7 +377,11 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         if (receipt.postCount case final count?) {
           actions.recordCommentCount(post, count);
         }
-        actions.publicationCache.removeComments(post.id);
+        actions.publicationCache.updateComments(
+          (key, page) => _includeSentComment(key, page, receipt.comment),
+          postId: post.id,
+          postCount: receipt.postCount,
+        );
       }
       if (!_active) return false;
       _pending = null;
@@ -316,14 +413,21 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         repository.setCommentLiked(comment, current, id, actions.account);
     try {
       final result = await _retry(send, comment);
-      if (!_active || !available(comment)) return;
-      _reactions[comment.id] = (
+      if (!actions.canShow(_post) || actions.commentHidden(comment.id)) return;
+      final reaction = (
         version: result.version,
         liked: result.liked,
         likes: (current.likes + (result.changed ? (result.liked ? 1 : -1) : 0))
             .clamp(0, 0x7fffffff),
       );
-      actions.publicationCache.removeComments(_post.id);
+      if (_active && available(comment)) _reactions[comment.id] = reaction;
+      actions.publicationCache.updateComments(
+        (_, saved) => mapFeedCommentPage(
+          saved,
+          (row) => _applyReaction(row, comment.id, reaction),
+        ),
+        postId: _post.id,
+      );
     } catch (error) {
       _handleAccessError(error, comment: comment);
       if (error is PostgrestException && error.code == 'PT409') {
@@ -345,7 +449,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         () => repository.reportComment(comment.id, reason, id, actions.account),
         comment,
       );
-      if (_active) actions.hideComment(_post.id, comment.id);
+      if (actions.canShow(_post)) actions.hideComment(_post.id, comment.id);
     } catch (error) {
       _handleAccessError(error, comment: comment);
       rethrow;
@@ -378,6 +482,21 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
 
   bool _isBlocked(FeedComment comment) =>
       actions.state.blocked.contains(comment.authorId);
+
+  FeedComment _withCurrentReaction(FeedComment row) {
+    final own = row.available ? reactionFor(row) : row.reaction;
+    final preview = row.replyPreview;
+    final next = preview == null ? null : _withCurrentReaction(preview);
+    return own == row.reaction && identical(next, preview)
+        ? row
+        : row.copyWith(reaction: own, replyPreview: next);
+  }
+
+  @override
+  Future<void> close() {
+    _cacheExpiry?.cancel();
+    return super.close();
+  }
 
   void _handleAccessError(Object error, {FeedComment? comment}) {
     if (!_active || error is! PostgrestException || error.code != 'PT404') {
@@ -413,4 +532,38 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       hasMore: root.more,
     ));
   }
+}
+
+FeedComment _applyReaction(FeedComment row, String id, FeedReaction reaction) {
+  if (row.id == id &&
+      row.available &&
+      reaction.version > row.reaction.version) {
+    return row.copyWith(reaction: reaction);
+  }
+  final preview = row.replyPreview;
+  if (preview == null) return row;
+  final updated = _applyReaction(preview, id, reaction);
+  return identical(updated, preview)
+      ? row
+      : row.copyWith(replyPreview: updated);
+}
+
+FeedCommentsPage _includeSentComment(
+  FeedCommentCacheKey key,
+  FeedCommentsPage page,
+  FeedComment comment,
+) {
+  final (_, sort, root) = key;
+  if (page.comments.any((row) => row.id == comment.id)) return page;
+  if (root == null &&
+      comment.id == comment.threadId &&
+      sort != FeedCommentSort.old) {
+    return (comments: [comment, ...page.comments], next: page.next);
+  }
+  if (page.next == null &&
+      (root == comment.threadId ||
+          root == null && comment.id == comment.threadId)) {
+    return (comments: [...page.comments, comment], next: null);
+  }
+  return page;
 }

@@ -14251,6 +14251,487 @@ class CachedFeedPostSnapshotsCompanion
   }
 }
 
+class $CachedFeedCommentSnapshotsTable extends CachedFeedCommentSnapshots
+    with
+        TableInfo<$CachedFeedCommentSnapshotsTable, CachedFeedCommentSnapshot> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedFeedCommentSnapshotsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _postIdMeta = const VerificationMeta('postId');
+  @override
+  late final GeneratedColumn<String> postId = GeneratedColumn<String>(
+    'post_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortMeta = const VerificationMeta('sort');
+  @override
+  late final GeneratedColumn<String> sort = GeneratedColumn<String>(
+    'sort',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rootIdMeta = const VerificationMeta('rootId');
+  @override
+  late final GeneratedColumn<String> rootId = GeneratedColumn<String>(
+    'root_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rowCountMeta = const VerificationMeta(
+    'rowCount',
+  );
+  @override
+  late final GeneratedColumn<int> rowCount = GeneratedColumn<int>(
+    'row_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _expiresAtMicrosMeta = const VerificationMeta(
+    'expiresAtMicros',
+  );
+  @override
+  late final GeneratedColumn<int> expiresAtMicros = GeneratedColumn<int>(
+    'expires_at_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    postId,
+    sort,
+    rootId,
+    payload,
+    rowCount,
+    expiresAtMicros,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_feed_comment_snapshots';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedFeedCommentSnapshot> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('post_id')) {
+      context.handle(
+        _postIdMeta,
+        postId.isAcceptableOrUnknown(data['post_id']!, _postIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_postIdMeta);
+    }
+    if (data.containsKey('sort')) {
+      context.handle(
+        _sortMeta,
+        sort.isAcceptableOrUnknown(data['sort']!, _sortMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortMeta);
+    }
+    if (data.containsKey('root_id')) {
+      context.handle(
+        _rootIdMeta,
+        rootId.isAcceptableOrUnknown(data['root_id']!, _rootIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rootIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('row_count')) {
+      context.handle(
+        _rowCountMeta,
+        rowCount.isAcceptableOrUnknown(data['row_count']!, _rowCountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rowCountMeta);
+    }
+    if (data.containsKey('expires_at_micros')) {
+      context.handle(
+        _expiresAtMicrosMeta,
+        expiresAtMicros.isAcceptableOrUnknown(
+          data['expires_at_micros']!,
+          _expiresAtMicrosMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_expiresAtMicrosMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, postId, sort, rootId};
+  @override
+  CachedFeedCommentSnapshot map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedFeedCommentSnapshot(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      postId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}post_id'],
+      )!,
+      sort: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sort'],
+      )!,
+      rootId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}root_id'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      rowCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_count'],
+      )!,
+      expiresAtMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}expires_at_micros'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedFeedCommentSnapshotsTable createAlias(String alias) {
+    return $CachedFeedCommentSnapshotsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedFeedCommentSnapshot extends DataClass
+    implements Insertable<CachedFeedCommentSnapshot> {
+  final String ownerUserId;
+  final String postId;
+  final String sort;
+  final String rootId;
+  final String payload;
+  final int rowCount;
+  final int expiresAtMicros;
+  const CachedFeedCommentSnapshot({
+    required this.ownerUserId,
+    required this.postId,
+    required this.sort,
+    required this.rootId,
+    required this.payload,
+    required this.rowCount,
+    required this.expiresAtMicros,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['post_id'] = Variable<String>(postId);
+    map['sort'] = Variable<String>(sort);
+    map['root_id'] = Variable<String>(rootId);
+    map['payload'] = Variable<String>(payload);
+    map['row_count'] = Variable<int>(rowCount);
+    map['expires_at_micros'] = Variable<int>(expiresAtMicros);
+    return map;
+  }
+
+  CachedFeedCommentSnapshotsCompanion toCompanion(bool nullToAbsent) {
+    return CachedFeedCommentSnapshotsCompanion(
+      ownerUserId: Value(ownerUserId),
+      postId: Value(postId),
+      sort: Value(sort),
+      rootId: Value(rootId),
+      payload: Value(payload),
+      rowCount: Value(rowCount),
+      expiresAtMicros: Value(expiresAtMicros),
+    );
+  }
+
+  factory CachedFeedCommentSnapshot.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedFeedCommentSnapshot(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      postId: serializer.fromJson<String>(json['postId']),
+      sort: serializer.fromJson<String>(json['sort']),
+      rootId: serializer.fromJson<String>(json['rootId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      rowCount: serializer.fromJson<int>(json['rowCount']),
+      expiresAtMicros: serializer.fromJson<int>(json['expiresAtMicros']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'postId': serializer.toJson<String>(postId),
+      'sort': serializer.toJson<String>(sort),
+      'rootId': serializer.toJson<String>(rootId),
+      'payload': serializer.toJson<String>(payload),
+      'rowCount': serializer.toJson<int>(rowCount),
+      'expiresAtMicros': serializer.toJson<int>(expiresAtMicros),
+    };
+  }
+
+  CachedFeedCommentSnapshot copyWith({
+    String? ownerUserId,
+    String? postId,
+    String? sort,
+    String? rootId,
+    String? payload,
+    int? rowCount,
+    int? expiresAtMicros,
+  }) => CachedFeedCommentSnapshot(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    postId: postId ?? this.postId,
+    sort: sort ?? this.sort,
+    rootId: rootId ?? this.rootId,
+    payload: payload ?? this.payload,
+    rowCount: rowCount ?? this.rowCount,
+    expiresAtMicros: expiresAtMicros ?? this.expiresAtMicros,
+  );
+  CachedFeedCommentSnapshot copyWithCompanion(
+    CachedFeedCommentSnapshotsCompanion data,
+  ) {
+    return CachedFeedCommentSnapshot(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      postId: data.postId.present ? data.postId.value : this.postId,
+      sort: data.sort.present ? data.sort.value : this.sort,
+      rootId: data.rootId.present ? data.rootId.value : this.rootId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      rowCount: data.rowCount.present ? data.rowCount.value : this.rowCount,
+      expiresAtMicros: data.expiresAtMicros.present
+          ? data.expiresAtMicros.value
+          : this.expiresAtMicros,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFeedCommentSnapshot(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('postId: $postId, ')
+          ..write('sort: $sort, ')
+          ..write('rootId: $rootId, ')
+          ..write('payload: $payload, ')
+          ..write('rowCount: $rowCount, ')
+          ..write('expiresAtMicros: $expiresAtMicros')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    postId,
+    sort,
+    rootId,
+    payload,
+    rowCount,
+    expiresAtMicros,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedFeedCommentSnapshot &&
+          other.ownerUserId == this.ownerUserId &&
+          other.postId == this.postId &&
+          other.sort == this.sort &&
+          other.rootId == this.rootId &&
+          other.payload == this.payload &&
+          other.rowCount == this.rowCount &&
+          other.expiresAtMicros == this.expiresAtMicros);
+}
+
+class CachedFeedCommentSnapshotsCompanion
+    extends UpdateCompanion<CachedFeedCommentSnapshot> {
+  final Value<String> ownerUserId;
+  final Value<String> postId;
+  final Value<String> sort;
+  final Value<String> rootId;
+  final Value<String> payload;
+  final Value<int> rowCount;
+  final Value<int> expiresAtMicros;
+  final Value<int> rowid;
+  const CachedFeedCommentSnapshotsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.postId = const Value.absent(),
+    this.sort = const Value.absent(),
+    this.rootId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.rowCount = const Value.absent(),
+    this.expiresAtMicros = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedFeedCommentSnapshotsCompanion.insert({
+    required String ownerUserId,
+    required String postId,
+    required String sort,
+    required String rootId,
+    required String payload,
+    required int rowCount,
+    required int expiresAtMicros,
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       postId = Value(postId),
+       sort = Value(sort),
+       rootId = Value(rootId),
+       payload = Value(payload),
+       rowCount = Value(rowCount),
+       expiresAtMicros = Value(expiresAtMicros);
+  static Insertable<CachedFeedCommentSnapshot> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? postId,
+    Expression<String>? sort,
+    Expression<String>? rootId,
+    Expression<String>? payload,
+    Expression<int>? rowCount,
+    Expression<int>? expiresAtMicros,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (postId != null) 'post_id': postId,
+      if (sort != null) 'sort': sort,
+      if (rootId != null) 'root_id': rootId,
+      if (payload != null) 'payload': payload,
+      if (rowCount != null) 'row_count': rowCount,
+      if (expiresAtMicros != null) 'expires_at_micros': expiresAtMicros,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedFeedCommentSnapshotsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? postId,
+    Value<String>? sort,
+    Value<String>? rootId,
+    Value<String>? payload,
+    Value<int>? rowCount,
+    Value<int>? expiresAtMicros,
+    Value<int>? rowid,
+  }) {
+    return CachedFeedCommentSnapshotsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      postId: postId ?? this.postId,
+      sort: sort ?? this.sort,
+      rootId: rootId ?? this.rootId,
+      payload: payload ?? this.payload,
+      rowCount: rowCount ?? this.rowCount,
+      expiresAtMicros: expiresAtMicros ?? this.expiresAtMicros,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (postId.present) {
+      map['post_id'] = Variable<String>(postId.value);
+    }
+    if (sort.present) {
+      map['sort'] = Variable<String>(sort.value);
+    }
+    if (rootId.present) {
+      map['root_id'] = Variable<String>(rootId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (rowCount.present) {
+      map['row_count'] = Variable<int>(rowCount.value);
+    }
+    if (expiresAtMicros.present) {
+      map['expires_at_micros'] = Variable<int>(expiresAtMicros.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedFeedCommentSnapshotsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('postId: $postId, ')
+          ..write('sort: $sort, ')
+          ..write('rootId: $rootId, ')
+          ..write('payload: $payload, ')
+          ..write('rowCount: $rowCount, ')
+          ..write('expiresAtMicros: $expiresAtMicros, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -14300,6 +14781,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedChatUnreadTotalsTable(this);
   late final $CachedFeedPostSnapshotsTable cachedFeedPostSnapshots =
       $CachedFeedPostSnapshotsTable(this);
+  late final $CachedFeedCommentSnapshotsTable cachedFeedCommentSnapshots =
+      $CachedFeedCommentSnapshotsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -14330,6 +14813,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedChatListStates,
     cachedChatUnreadTotals,
     cachedFeedPostSnapshots,
+    cachedFeedCommentSnapshots,
   ];
 }
 
@@ -21855,6 +22339,279 @@ typedef $$CachedFeedPostSnapshotsTableProcessedTableManager =
       CachedFeedPostSnapshot,
       PrefetchHooks Function()
     >;
+typedef $$CachedFeedCommentSnapshotsTableCreateCompanionBuilder =
+    CachedFeedCommentSnapshotsCompanion Function({
+      required String ownerUserId,
+      required String postId,
+      required String sort,
+      required String rootId,
+      required String payload,
+      required int rowCount,
+      required int expiresAtMicros,
+      Value<int> rowid,
+    });
+typedef $$CachedFeedCommentSnapshotsTableUpdateCompanionBuilder =
+    CachedFeedCommentSnapshotsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> postId,
+      Value<String> sort,
+      Value<String> rootId,
+      Value<String> payload,
+      Value<int> rowCount,
+      Value<int> expiresAtMicros,
+      Value<int> rowid,
+    });
+
+class $$CachedFeedCommentSnapshotsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedFeedCommentSnapshotsTable> {
+  $$CachedFeedCommentSnapshotsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get postId => $composableBuilder(
+    column: $table.postId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sort => $composableBuilder(
+    column: $table.sort,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rootId => $composableBuilder(
+    column: $table.rootId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rowCount => $composableBuilder(
+    column: $table.rowCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get expiresAtMicros => $composableBuilder(
+    column: $table.expiresAtMicros,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedFeedCommentSnapshotsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedFeedCommentSnapshotsTable> {
+  $$CachedFeedCommentSnapshotsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get postId => $composableBuilder(
+    column: $table.postId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sort => $composableBuilder(
+    column: $table.sort,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rootId => $composableBuilder(
+    column: $table.rootId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rowCount => $composableBuilder(
+    column: $table.rowCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get expiresAtMicros => $composableBuilder(
+    column: $table.expiresAtMicros,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedFeedCommentSnapshotsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedFeedCommentSnapshotsTable> {
+  $$CachedFeedCommentSnapshotsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get postId =>
+      $composableBuilder(column: $table.postId, builder: (column) => column);
+
+  GeneratedColumn<String> get sort =>
+      $composableBuilder(column: $table.sort, builder: (column) => column);
+
+  GeneratedColumn<String> get rootId =>
+      $composableBuilder(column: $table.rootId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<int> get rowCount =>
+      $composableBuilder(column: $table.rowCount, builder: (column) => column);
+
+  GeneratedColumn<int> get expiresAtMicros => $composableBuilder(
+    column: $table.expiresAtMicros,
+    builder: (column) => column,
+  );
+}
+
+class $$CachedFeedCommentSnapshotsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedFeedCommentSnapshotsTable,
+          CachedFeedCommentSnapshot,
+          $$CachedFeedCommentSnapshotsTableFilterComposer,
+          $$CachedFeedCommentSnapshotsTableOrderingComposer,
+          $$CachedFeedCommentSnapshotsTableAnnotationComposer,
+          $$CachedFeedCommentSnapshotsTableCreateCompanionBuilder,
+          $$CachedFeedCommentSnapshotsTableUpdateCompanionBuilder,
+          (
+            CachedFeedCommentSnapshot,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedFeedCommentSnapshotsTable,
+              CachedFeedCommentSnapshot
+            >,
+          ),
+          CachedFeedCommentSnapshot,
+          PrefetchHooks Function()
+        > {
+  $$CachedFeedCommentSnapshotsTableTableManager(
+    _$AppDatabase db,
+    $CachedFeedCommentSnapshotsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedFeedCommentSnapshotsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedFeedCommentSnapshotsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedFeedCommentSnapshotsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> postId = const Value.absent(),
+                Value<String> sort = const Value.absent(),
+                Value<String> rootId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> rowCount = const Value.absent(),
+                Value<int> expiresAtMicros = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFeedCommentSnapshotsCompanion(
+                ownerUserId: ownerUserId,
+                postId: postId,
+                sort: sort,
+                rootId: rootId,
+                payload: payload,
+                rowCount: rowCount,
+                expiresAtMicros: expiresAtMicros,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String postId,
+                required String sort,
+                required String rootId,
+                required String payload,
+                required int rowCount,
+                required int expiresAtMicros,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedFeedCommentSnapshotsCompanion.insert(
+                ownerUserId: ownerUserId,
+                postId: postId,
+                sort: sort,
+                rootId: rootId,
+                payload: payload,
+                rowCount: rowCount,
+                expiresAtMicros: expiresAtMicros,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedFeedCommentSnapshotsTable,
+                    CachedFeedCommentSnapshot
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CachedFeedCommentSnapshotsTable,
+                    CachedFeedCommentSnapshot
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedFeedCommentSnapshotsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedFeedCommentSnapshotsTable,
+      CachedFeedCommentSnapshot,
+      $$CachedFeedCommentSnapshotsTableFilterComposer,
+      $$CachedFeedCommentSnapshotsTableOrderingComposer,
+      $$CachedFeedCommentSnapshotsTableAnnotationComposer,
+      $$CachedFeedCommentSnapshotsTableCreateCompanionBuilder,
+      $$CachedFeedCommentSnapshotsTableUpdateCompanionBuilder,
+      (
+        CachedFeedCommentSnapshot,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedFeedCommentSnapshotsTable,
+          CachedFeedCommentSnapshot
+        >,
+      ),
+      CachedFeedCommentSnapshot,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -21950,5 +22707,11 @@ class $AppDatabaseManager {
       $$CachedFeedPostSnapshotsTableTableManager(
         _db,
         _db.cachedFeedPostSnapshots,
+      );
+  $$CachedFeedCommentSnapshotsTableTableManager
+  get cachedFeedCommentSnapshots =>
+      $$CachedFeedCommentSnapshotsTableTableManager(
+        _db,
+        _db.cachedFeedCommentSnapshots,
       );
 }

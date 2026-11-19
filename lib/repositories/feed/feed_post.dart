@@ -79,6 +79,34 @@ class FeedComment {
 
   bool get available => authorId != null && text != null;
   String get threadId => rootId ?? id;
+
+  FeedComment copyWith({
+    FeedReaction? reaction,
+    int? replyCount,
+    FeedComment? replyPreview,
+    bool clearPreview = false,
+    bool redactContent = false,
+    bool redactMention = false,
+  }) => FeedComment(
+    id: id,
+    rootId: rootId,
+    authorId: redactContent ? null : authorId,
+    authorName: redactContent ? null : authorName,
+    username: redactContent ? null : username,
+    avatarUrl: redactContent ? null : avatarUrl,
+    avatarPath: redactContent ? null : avatarPath,
+    avatarRevision: redactContent ? null : avatarRevision,
+    text: redactContent ? null : text,
+    createdAt: redactContent ? null : createdAt,
+    replyTo: redactContent || redactMention ? null : replyTo,
+    replyPreview: clearPreview ? null : replyPreview ?? this.replyPreview,
+    replyCount: replyCount ?? this.replyCount,
+    commentVersion: commentVersion,
+    postVersion: postVersion,
+    reaction: redactContent
+        ? (version: 0, liked: false, likes: 0)
+        : reaction ?? this.reaction,
+  );
 }
 
 typedef FeedCommentsCursor = ({String sessionId, int position});
@@ -86,6 +114,44 @@ typedef FeedCommentsPage = ({
   List<FeedComment> comments,
   FeedCommentsCursor? next,
 });
+
+FeedCommentsPage redactFeedCommentPage(
+  FeedCommentsPage page, {
+  Set<String> authors = const {},
+  Set<String> comments = const {},
+}) {
+  FeedComment redact(FeedComment row) {
+    final content = authors.contains(row.authorId) || comments.contains(row.id);
+    final target = row.replyTo;
+    final mention =
+        target != null &&
+        (authors.contains(target.userId) || comments.contains(target.id));
+    final preview = row.replyPreview;
+    final updated = preview == null ? null : redact(preview);
+    if (!content && !mention && identical(preview, updated)) return row;
+    return row.copyWith(
+      redactContent: content,
+      redactMention: mention,
+      clearPreview: updated != null && !updated.available,
+      replyPreview: updated,
+    );
+  }
+
+  return mapFeedCommentPage(page, redact);
+}
+
+FeedCommentsPage mapFeedCommentPage(
+  FeedCommentsPage page,
+  FeedComment Function(FeedComment) update,
+) {
+  List<FeedComment>? changed;
+  for (final (index, row) in page.comments.indexed) {
+    final result = update(row);
+    if (identical(result, row)) continue;
+    (changed ??= page.comments.toList(growable: false))[index] = result;
+  }
+  return changed == null ? page : (comments: changed, next: page.next);
+}
 
 class FeedPost {
   const FeedPost({
