@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 import 'feed_actions_cubit.dart';
+import 'feed_comments_cubit.dart';
 
 typedef FeedPostDetailsState = ({
   FeedPost? post,
@@ -20,6 +21,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     FeedActionsCubit actions,
     FeedPost? initial, {
     ValueListenable<bool?>? networkAvailability,
+    IFeedPublicationRepository? publicationRepository,
   }) {
     final cached = actions.publicationCache.readPost(id);
     final cachedPost = cached?.post;
@@ -30,6 +32,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
       initial ?? (usable ? cachedPost : null),
       usable ? cached?.expiresAt : null,
       networkAvailability,
+      publicationRepository,
     );
   }
 
@@ -39,22 +42,98 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     FeedPost? initial,
     this._snapshotExpiresAt,
     this._networkAvailability,
+    this._publicationRepository,
   ) : super((post: initial, loading: false, confirmed: false, failed: false)) {
     _lastNetworkAvailability = _networkAvailability?.value;
     _networkAvailability?.addListener(_networkChanged);
+    if (initial != null) _updateComments(initial, confirmed: false);
   }
 
   final String id;
   final FeedActionsCubit actions;
   final ValueListenable<bool?>? _networkAvailability;
+  final IFeedPublicationRepository? _publicationRepository;
+  final refreshProgress = ValueNotifier(false);
+  final _visibleThreads = <String>{};
+  final _clock = Stopwatch()..start();
+  Duration? _lastInteractive;
+  FeedCommentsCubit? _comments;
+  FeedCommentsCubit? get comments => _comments;
   bool? _lastNetworkAvailability;
   DateTime? _snapshotExpiresAt;
   Future<void>? _request;
   Timer? _expiry;
   int _readGeneration = 0;
 
-  Future<void> load() =>
-      _request ??= _read().whenComplete(() => _request = null);
+  Future<void> load({Set<String>? visibleThreads, bool accessOnly = false}) {
+    if (!_active) return Future.value();
+    final pending = _request;
+    if (visibleThreads != null) {
+      final last = _lastInteractive;
+      if (pending == null &&
+          last != null &&
+          _clock.elapsed - last < const Duration(milliseconds: 500)) {
+        return Future.value();
+      }
+      _visibleThreads.addAll(visibleThreads);
+      refreshProgress.value = true;
+    }
+    if (pending != null) return pending;
+    final completion = Completer<void>();
+    _request = completion.future;
+    completion.complete(
+      _refresh(accessOnly).whenComplete(() {
+        _request = null;
+        _visibleThreads.clear();
+        if (_active && refreshProgress.value) {
+          _lastInteractive = _clock.elapsed;
+          refreshProgress.value = false;
+        }
+      }),
+    );
+    return completion.future;
+  }
+
+  Future<void> _refresh(bool accessOnly) async {
+    if (!await _read() || !_active) return;
+    final threadIds = Set<String>.of(_visibleThreads);
+    final replies = comments;
+    if (replies == null) return;
+    if (!accessOnly || refreshProgress.value || !replies.state.loaded) {
+      await replies.refresh(
+        interactive: refreshProgress.value,
+        visibleThreads: threadIds,
+      );
+    }
+    if (!_active) return;
+    final remaining = _visibleThreads.difference(threadIds);
+    if (remaining.isNotEmpty) {
+      await replies.refresh(
+        interactive: true,
+        visibleThreads: remaining,
+        includeRoot: false,
+      );
+    }
+  }
+
+  void _updateComments(FeedPost post, {required bool confirmed}) {
+    final repository = _publicationRepository;
+    if (repository == null) return;
+    final cubit = _comments ??= FeedCommentsCubit(
+      repository,
+      actions,
+      post,
+      networkAvailable: () => _networkAvailability?.value,
+      autoLoad: false,
+    );
+    cubit.updatePost(post, confirmed: confirmed);
+  }
+
+  void _discardComments() {
+    final previous = _comments;
+    _comments = null;
+    unawaited(previous?.close());
+  }
 
   bool get _active => !isClosed && actions.active;
 
@@ -72,17 +151,17 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
         _lastNetworkAvailability == true &&
         state.failed &&
         !state.confirmed) {
-      await load();
+      await load(accessOnly: true);
     }
   }
 
-  Future<void> _read() async {
-    if (!_active) return;
+  Future<bool> _read() async {
+    if (!_active) return false;
     emit((
       post: state.post,
       loading: true,
       confirmed: state.confirmed,
-      failed: false,
+      failed: state.failed && refreshProgress.value,
     ));
     final requestedAt = actions.projectionVersion;
     final generation = ++_readGeneration;
@@ -90,7 +169,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     _scheduleExpiry();
     try {
       final post = await actions.repository.getPost(id, actions.account);
-      if (!_active) return;
+      if (!_active) return false;
       if (post != null) actions.recordProjection(post, requestedAt);
       final allowed = post != null && actions.canShow(post);
       _expiry?.cancel();
@@ -100,8 +179,10 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
           post,
           allowed: () => actions.canShow(post),
         );
+        _updateComments(post, confirmed: true);
       } else {
         actions.publicationCache.removePost(id);
+        _discardComments();
       }
       emit((
         post: allowed ? post : null,
@@ -109,8 +190,9 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
         confirmed: allowed,
         failed: false,
       ));
+      return allowed;
     } catch (error) {
-      if (!_active) return;
+      if (!_active) return false;
       final denied =
           error is PostgrestException &&
           const {'PT401', 'PT403', 'PT404', '42501'}.contains(error.code);
@@ -118,9 +200,10 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
         _expiry?.cancel();
         _expiry = null;
         actions.publicationCache.removePost(id);
+        _discardComments();
       } else {
         await restoring;
-        if (!_active) return;
+        if (!_active) return false;
       }
       final retained = state.post;
       final allowed = !denied && retained != null && actions.canShow(retained);
@@ -130,6 +213,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
         confirmed: allowed && state.confirmed,
         failed: !denied,
       ));
+      return false;
     }
   }
 
@@ -145,6 +229,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     }
     _snapshotExpiresAt = snapshot.expiresAt;
     actions.publicationCache.rememberPost(snapshot);
+    _updateComments(snapshot.post, confirmed: false);
     emit((post: snapshot.post, loading: true, confirmed: false, failed: false));
     _scheduleExpiry();
   }
@@ -155,6 +240,7 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
     _expiry ??= Timer(expires.difference(DateTime.now()), () {
       _expiry = null;
       if (_active && !state.confirmed) {
+        _discardComments();
         emit((
           post: null,
           loading: state.loading,
@@ -169,6 +255,8 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
   Future<void> close() {
     _networkAvailability?.removeListener(_networkChanged);
     _expiry?.cancel();
+    _discardComments();
+    refreshProgress.dispose();
     return super.close();
   }
 }

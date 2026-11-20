@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:yap_chat/core/core.dart';
@@ -13,33 +14,61 @@ import 'package:yap_chat/ui/ui.dart';
 
 import 'feed_post_controls.dart';
 
-class FeedCommentsSliver extends StatelessWidget {
+class FeedCommentsSliver extends StatefulWidget {
   const FeedCommentsSliver({
     super.key,
     required this.comments,
     required this.timeline,
     required this.onReply,
     required this.onRetryPublication,
+    required this.refreshing,
+    required this.postFailed,
   });
 
   final FeedCommentsCubit comments;
   final FeedCubit timeline;
   final ValueChanged<FeedComment> onReply;
   final VoidCallback onRetryPublication;
+  final bool refreshing;
+  final bool postFailed;
+
+  @override
+  State<FeedCommentsSliver> createState() => FeedCommentsSliverState();
+}
+
+class FeedCommentsSliverState extends State<FeedCommentsSliver> {
+  final _list = GlobalKey();
+  List<(Key, Widget Function(), String?)> _rows = const [];
+
+  Set<String> visibleThreads({required double top, required double bottom}) {
+    final list = _list.currentContext?.findRenderObject();
+    if (list is! RenderSliverMultiBoxAdaptor) return {};
+    final visible = <String>{};
+    for (var row = list.firstChild; row != null; row = list.childAfter(row)) {
+      final index = list.indexOf(row);
+      if (index >= _rows.length || !row.hasSize) continue;
+      final root = _rows[index].$3;
+      if (root == null || visible.contains(root)) continue;
+      final start = row.localToGlobal(Offset.zero).dy;
+      if (start < bottom && start + row.size.height > top) visible.add(root);
+    }
+    return visible;
+  }
 
   @override
   Widget build(
     BuildContext context,
   ) => BlocBuilder<FeedCommentsCubit, FeedCommentsState>(
-    bloc: comments,
+    bloc: widget.comments,
     builder: (context, state) {
+      final comments = widget.comments;
       if (!comments.canDisplay) return const SliverToBoxAdapter();
       final l10n = context.l10n;
       final padding = MediaQuery.paddingOf(context);
       final locale = Localizations.localeOf(context).toString();
       final compactCount = NumberFormat.compact(locale: locale);
       final fullCount = NumberFormat.decimalPattern(locale);
-      final rows = <(Key, Widget Function())>[];
+      final rows = <(Key, Widget Function(), String?)>[];
       for (final (index, root) in state.rows.indexed) {
         final replies = comments.replies(root);
         final expanded = comments.isExpanded(root.id);
@@ -54,13 +83,14 @@ class FeedCommentsSliver extends StatelessWidget {
             () => _CommentRow(
               comment: comment,
               comments: comments,
-              timeline: timeline,
-              onReply: onReply,
+              timeline: widget.timeline,
+              onReply: widget.onReply,
               compactCount: compactCount,
               fullCount: fullCount,
               before: before,
               after: after,
             ),
+            expanded ? root.id : null,
           ));
         }
 
@@ -85,15 +115,24 @@ class FeedCommentsSliver extends StatelessWidget {
               child: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  if (expanded && status.loading) const _CommentProgress(),
-                  if (expanded && !status.loading && status.failed)
+                  if (expanded && status.loading && !widget.refreshing)
+                    const _CommentProgress(),
+                  if (expanded &&
+                      !status.loading &&
+                      status.failed &&
+                      !widget.refreshing &&
+                      !widget.postFailed)
                     RetryPillButton(
                       label: l10n.feedRetry,
                       onPressed: comments.canMutate
                           ? () => comments.nextReplies(root.id)
-                          : onRetryPublication,
+                          : widget.onRetryPublication,
                     )
-                  else if (expanded && !status.loading && status.more)
+                  else if (expanded &&
+                      !status.loading &&
+                      !status.failed &&
+                      status.more &&
+                      !widget.refreshing)
                     TextButton(
                       onPressed: () => comments.nextReplies(root.id),
                       child: Text(l10n.feedLoadMore),
@@ -116,13 +155,15 @@ class FeedCommentsSliver extends StatelessWidget {
                 ],
               ),
             ),
+            expanded ? root.id : null,
           ));
         }
         if (index + 1 < state.rows.length) {
-          rows.add((ValueKey(('divider', root.id)), FeedDivider.new));
+          rows.add((ValueKey(('divider', root.id)), FeedDivider.new, null));
         }
       }
       final positions = {for (final (i, row) in rows.indexed) row.$1: i};
+      _rows = rows;
       return SliverMainAxisGroup(
         slivers: [
           SliverToBoxAdapter(
@@ -141,6 +182,7 @@ class FeedCommentsSliver extends StatelessWidget {
             ),
           ),
           SliverList.builder(
+            key: _list,
             itemCount: rows.length,
             findChildIndexCallback: (key) => positions[key],
             itemBuilder: (_, index) =>
@@ -156,8 +198,12 @@ class FeedCommentsSliver extends StatelessWidget {
               ),
               child: _CommentLoadFeedback(
                 state: state,
-                onRequest: state.failed && !comments.canMutate
-                    ? onRetryPublication
+                refreshing: widget.refreshing,
+                postFailed: widget.postFailed,
+                onRequest:
+                    state.failed &&
+                        (!comments.canMutate || comments.needsHeadRetry)
+                    ? widget.onRetryPublication
                     : comments.next,
               ),
             ),
@@ -296,10 +342,17 @@ class _CommentSortMenuState extends State<_CommentSortMenu> {
 }
 
 class _CommentLoadFeedback extends StatefulWidget {
-  const _CommentLoadFeedback({required this.state, required this.onRequest});
+  const _CommentLoadFeedback({
+    required this.state,
+    required this.onRequest,
+    required this.refreshing,
+    required this.postFailed,
+  });
 
   final FeedCommentsState state;
   final VoidCallback onRequest;
+  final bool refreshing;
+  final bool postFailed;
 
   @override
   State<_CommentLoadFeedback> createState() => _CommentLoadFeedbackState();
@@ -319,6 +372,7 @@ class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
   void didUpdateWidget(covariant _CommentLoadFeedback oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.state.loading != widget.state.loading ||
+        oldWidget.refreshing != widget.refreshing ||
         oldWidget.state.sort != widget.state.sort) {
       _updateProgress();
     }
@@ -327,7 +381,7 @@ class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
   void _updateProgress() {
     _progressDelay?.cancel();
     _showProgress = false;
-    if (widget.state.loading) {
+    if (widget.state.loading && !widget.refreshing) {
       _progressDelay = Timer(const Duration(milliseconds: 180), () {
         setState(() => _showProgress = true);
       });
@@ -345,7 +399,9 @@ class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
     final state = widget.state;
     final l10n = context.l10n;
     final Widget content;
-    if (state.loading) {
+    if (widget.refreshing) {
+      content = const SizedBox(height: 22, key: ValueKey('waiting'));
+    } else if (state.loading) {
       content = _showProgress
           ? const _CommentProgress(key: ValueKey('loading'))
           : const SizedBox(height: 22, key: ValueKey('waiting'));
@@ -359,9 +415,10 @@ class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
               message: l10n.feedCommentsLoadFailed,
               showImage: false,
             ),
-            const SizedBox(height: 8),
+            if (!widget.postFailed) const SizedBox(height: 24),
           ],
-          RetryPillButton(label: l10n.feedRetry, onPressed: widget.onRequest),
+          if (!widget.postFailed)
+            RetryPillButton(label: l10n.feedRetry, onPressed: widget.onRequest),
         ],
       );
     } else if (!state.loaded) {
@@ -381,28 +438,55 @@ class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
     } else {
       content = const SizedBox.shrink(key: ValueKey('finished'));
     }
-    return AnimatedStatusSwitcher(
-      alignment: Alignment.topCenter,
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 180),
-      scaleTransition: false,
-      child: content,
+    return _CommentRefreshScope(
+      refreshing: widget.refreshing,
+      child: ExcludeSemantics(
+        excluding: widget.refreshing,
+        child: IgnorePointer(
+          ignoring: widget.refreshing,
+          child: AnimatedStatusSwitcher(
+            alignment: Alignment.topCenter,
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            scaleTransition: false,
+            child: content,
+          ),
+        ),
+      ),
     );
   }
+}
+
+class _CommentRefreshScope extends InheritedWidget {
+  const _CommentRefreshScope({required this.refreshing, required super.child});
+
+  final bool refreshing;
+
+  @override
+  bool updateShouldNotify(_CommentRefreshScope oldWidget) =>
+      refreshing != oldWidget.refreshing;
 }
 
 class _CommentProgress extends StatelessWidget {
   const _CommentProgress({super.key});
 
   @override
-  Widget build(BuildContext context) => const PullRefreshIndicator(
-    opacity: 1,
-    progress: 1,
-    spinning: true,
-    size: 22,
-    strokeWidth: 2.5,
-  );
+  Widget build(BuildContext context) {
+    if (context
+            .dependOnInheritedWidgetOfExactType<_CommentRefreshScope>()
+            ?.refreshing ==
+        true) {
+      return const SizedBox.square(dimension: 22);
+    }
+    return const PullRefreshIndicator(
+      opacity: 1,
+      progress: 1,
+      spinning: true,
+      size: 22,
+      strokeWidth: 2.5,
+    );
+  }
 }
 
 class _CommentRow extends StatefulWidget {

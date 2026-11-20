@@ -127,6 +127,58 @@ void main() {
     },
   );
 
+  testWidgets('post retry fades in place and makes room for the top ring', (
+    tester,
+  ) async {
+    final initial = Completer<FeedPost?>();
+    repository.pendingPost = initial.future;
+    await show(
+      tester,
+      preview: FeedPostDetailsPreview(repository.post!, accounts.capture()),
+      settle: false,
+    );
+    initial.completeError(TimeoutException('offline'));
+    await tester.pumpAndSettle();
+
+    final retryButton = find.byType(RetryPillButton);
+    final card = find.byType(FeedPostCard);
+    final originalTop = tester.getTopLeft(card).dy;
+    final fade = find.descendant(
+      of: find.ancestor(
+        of: retryButton,
+        matching: find.byType(AnimatedOpacity),
+      ),
+      matching: find.byType(FadeTransition),
+    );
+    double opacity() => tester.widget<FadeTransition>(fade.first).opacity.value;
+    expect(opacity(), 1);
+
+    final retry = Completer<FeedPost?>();
+    repository.pendingPost = retry.future;
+    await tester.tap(retryButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(opacity(), inExclusiveRange(0.0, 1.0));
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is PullRefreshIndicator && widget.spinning,
+      ),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(opacity(), 0);
+    expect(tester.getTopLeft(card).dy - originalTop, closeTo(76, 1));
+    expect(repository.postReads, 2);
+
+    retry.completeError(TimeoutException('still offline'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(opacity(), inExclusiveRange(0.0, 1.0));
+    await tester.pumpAndSettle();
+    expect(opacity(), 1);
+    expect(tester.getTopLeft(card).dy, closeTo(originalTop, 1));
+  });
+
   testWidgets(
     'comment loading fades into a text-only error and retries to empty',
     (tester) async {
@@ -136,7 +188,9 @@ void main() {
           repository.commentReads == 1 ? initial.future : retry.future;
       await show(tester, settle: false);
       await tester.pump();
-      final progress = find.byType(PullRefreshIndicator);
+      final progress = find.byWidgetPredicate(
+        (widget) => widget is PullRefreshIndicator && widget.size == 22,
+      );
       await tester.pump(const Duration(milliseconds: 179));
       expect(progress, findsNothing);
       await tester.pump(const Duration(milliseconds: 1));
@@ -157,7 +211,20 @@ void main() {
       await tester.tap(retryButton);
       await tester.tap(retryButton);
       await tester.pump();
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 600));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(repository.postReads, 2);
       expect(repository.commentReads, 2);
+      expect(progress, findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is PullRefreshIndicator &&
+              widget.size == 36 &&
+              widget.spinning,
+        ),
+        findsOneWidget,
+      );
 
       retry.complete((comments: <FeedComment>[], next: null));
       await tester.pumpAndSettle();
@@ -170,6 +237,233 @@ void main() {
         isFalse,
       );
       expect(retryButton, findsNothing);
+    },
+  );
+
+  testWidgets('reopening renders cached comments during a quiet head check', (
+    tester,
+  ) async {
+    const old = FeedComment(
+      id: 'old',
+      authorId: 'author',
+      text: 'stored comment',
+    );
+    const fresh = FeedComment(
+      id: 'fresh',
+      authorId: 'author',
+      text: 'fresh from server',
+    );
+    final account = accounts.capture();
+    final cache = scope.actionsFor(account)!.publicationCache;
+    cache.rememberComments(
+      (_postId, FeedCommentSort.popular, null),
+      (
+        page: (comments: [old], next: null),
+        expiresAt: cache.expiresFromNow().subtract(const Duration(seconds: 30)),
+      ),
+    );
+    final response = Completer<FeedCommentsPage>();
+    repository.commentPage = (_, _) => response.future;
+    await show(tester, settle: false);
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(find.text(old.text!), findsOneWidget);
+    expect(repository.commentQueries, [(FeedCommentSort.popular, null)]);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is PullRefreshIndicator && widget.opacity > 0,
+      ),
+      findsNothing,
+    );
+    response.complete((comments: [fresh], next: null));
+    await tester.pumpAndSettle();
+    expect(find.text(fresh.text!), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await show(tester);
+    expect(find.text(fresh.text!), findsOneWidget);
+    expect(repository.commentReads, 1);
+  });
+
+  testWidgets('pull refresh joins the same cycle and fences an older cursor', (
+    tester,
+  ) async {
+    const initial = FeedComment(
+      id: 'initial',
+      authorId: 'author',
+      text: 'original list',
+    );
+    const stale = FeedComment(
+      id: 'stale',
+      authorId: 'author',
+      text: 'old cursor row',
+    );
+    const fresh = FeedComment(
+      id: 'fresh',
+      authorId: 'author',
+      text: 'new head row',
+    );
+    final tail = Completer<FeedCommentsPage>();
+    final refreshed = Completer<FeedCommentsPage>();
+    repository.commentPage = (_, _) => switch (repository.commentReads) {
+      1 => Future.value((
+        comments: [initial],
+        next: (sessionId: 'old', position: 0),
+      )),
+      2 => tail.future,
+      _ => refreshed.future,
+    };
+    await show(tester);
+    final comments = tester
+        .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+        .comments;
+    final oldRead = comments.next();
+    final gesture = await tester.startGesture(const Offset(200, 230));
+    await gesture.moveBy(const Offset(0, 480));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 220));
+    final refresh = tester.widget<PullRefresh>(find.byType(PullRefresh));
+    final secondTrigger = refresh.onRefresh();
+    await tester.pump();
+    expect(repository.postReads, 2);
+    expect(repository.commentReads, 3);
+    expect(find.text(initial.text!), findsOneWidget);
+    refreshed.complete((comments: [fresh], next: null));
+    await secondTrigger;
+    tail.complete((comments: [stale], next: null));
+    await oldRead;
+    await tester.pumpAndSettle();
+    expect(find.text(fresh.text!), findsOneWidget);
+    expect(find.text(stale.text!), findsNothing);
+  });
+
+  testWidgets(
+    'refresh checks the selected sort and only visible open branches',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(440, 900);
+      addTearDown(tester.view.reset);
+      final roots = [
+        for (var index = 0; index < 20; index++)
+          FeedComment(
+            id: 'root-$index',
+            authorId: 'author',
+            text: 'root text $index',
+            replyCount: 2,
+          ),
+      ];
+      repository.commentPage = (_, root) async => (
+        comments: root == null
+            ? roots
+            : [
+                FeedComment(
+                  id: 'reply-$root',
+                  rootId: root,
+                  authorId: 'author',
+                  text: 'reply to $root',
+                ),
+              ],
+        next: null,
+      );
+      await show(tester);
+      final comments = tester
+          .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+          .comments;
+      comments.selectSort(FeedCommentSort.newFirst);
+      await tester.pumpAndSettle();
+      await comments.expand(roots.first.id);
+      await comments.expand(roots.last.id);
+      await tester.pumpAndSettle();
+      expect(comments.isExpanded(roots.last.id), isTrue);
+      expect(find.text('reply to root-0'), findsOneWidget);
+      expect(find.text('reply to root-19'), findsNothing);
+      repository.commentQueries.clear();
+      final pull = tester.widget<PullRefresh>(find.byType(PullRefresh));
+      await pull.onRefresh();
+      await tester.pumpAndSettle();
+      expect(repository.commentQueries, [
+        (FeedCommentSort.newFirst, null),
+        (FeedCommentSort.old, roots.first.id),
+      ]);
+      expect(repository.postReads, 2);
+    },
+  );
+
+  testWidgets('pulling a short list never prefetches its old cursor', (
+    tester,
+  ) async {
+    final response = Completer<FeedCommentsPage>();
+    repository.commentPage = (_, _) => repository.commentReads == 1
+        ? Future.value((
+            comments: const [
+              FeedComment(id: 'head', authorId: 'author', text: 'first row'),
+            ],
+            next: (sessionId: 'old', position: 0),
+          ))
+        : response.future;
+    await show(tester);
+    final gesture = await tester.startGesture(const Offset(200, 280));
+    await gesture.moveBy(const Offset(0, 42));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, 32));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, 380));
+    await tester.pump();
+    expect(repository.commentReads, 1);
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(repository.postReads, 2);
+    expect(repository.commentReads, 2);
+    expect(repository.commentCursors, [null, null]);
+    response.complete((comments: const <FeedComment>[], next: null));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'a comment acknowledged during refresh stays visible and cached',
+    (tester) async {
+      const row = FeedComment(
+        id: 'row',
+        authorId: 'author',
+        text: 'server row',
+      );
+      final loading = Completer<FeedCommentsPage>();
+      repository.commentPage = (_, _) => repository.commentReads == 1
+          ? Future.value((comments: [row], next: null))
+          : loading.future;
+      await show(tester);
+      final cubit = tester
+          .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+          .comments;
+      final refreshing = tester
+          .widget<PullRefresh>(find.byType(PullRefresh))
+          .onRefresh();
+      await tester.pump();
+      expect(repository.commentReads, 2);
+      final sending = cubit.submit('sent during refresh');
+      final request = repository.writes.single;
+      request.$2.complete((
+        comment: FeedComment(
+          id: request.$1,
+          authorId: accounts.capture().userId,
+          text: 'sent during refresh',
+        ),
+        postCount: (count: 2, revision: 1),
+      ));
+      expect(await sending, isTrue);
+      loading.complete((comments: [row], next: null));
+      await refreshing;
+      await tester.pumpAndSettle();
+      expect(find.text('sent during refresh'), findsOneWidget);
+      expect(
+        cubit.actions.publicationCache
+            .read((_postId, FeedCommentSort.popular, null))
+            ?.page
+            .comments
+            .map((row) => row.id),
+        [request.$1, row.id],
+      );
     },
   );
 
@@ -521,7 +815,12 @@ void main() {
     expect(find.text('cached text'), findsOneWidget);
     expect(find.text('cached tail'), findsOneWidget);
     expect(find.text('cached reply 2'), findsOneWidget);
-    expect(find.byType(PullRefreshIndicator), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is PullRefreshIndicator && widget.opacity > 0,
+      ),
+      findsNothing,
+    );
     expect(repository.commentReads, reads);
     final element = tester.element(avatar);
     revalidation.completeError(TimeoutException('offline'));
@@ -1303,6 +1602,7 @@ class _Repository extends MockFeedRepository
   final reported = <(String, FeedReportReason)>[];
   Completer<FeedCommentLike>? pendingLike;
   final commentQueries = <(FeedCommentSort, String?)>[];
+  final commentCursors = <FeedCommentsCursor?>[];
   Future<FeedCommentsPage> Function(FeedCommentSort, String?)? commentPage;
   Future<FeedPost?>? pendingPost;
   int postReads = 0;
@@ -1328,6 +1628,7 @@ class _Repository extends MockFeedRepository
   }) async {
     commentReads++;
     commentQueries.add((sort, rootId));
+    commentCursors.add(cursor);
     if (commentPage case final handler?) return handler(sort, rootId);
     return (comments: <FeedComment>[], next: null);
   }

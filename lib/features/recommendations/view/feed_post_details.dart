@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yap_chat/core/core.dart';
 import 'package:yap_chat/features/chat/widgets/widgets.dart' show SizeReporter;
@@ -71,6 +72,11 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
   FeedCubit? _timeline;
   late final AccountSessionController? _accounts;
   FeedPostDetailsCubit? _details;
+  final _publication = GlobalKey<_PublicationState>();
+
+  Future<void> _refresh() => _details!.load(
+    visibleThreads: _publication.currentState?.visibleThreads() ?? const {},
+  );
 
   @override
   void initState() {
@@ -108,6 +114,9 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
       widget.id,
       actions,
       initial,
+      publicationRepository: repository is IFeedPublicationRepository
+          ? repository as IFeedPublicationRepository
+          : null,
       networkAvailability: context
           .read<AppConnectionStatus?>()
           ?.networkAvailability,
@@ -215,45 +224,70 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
       builder: (context, _) =>
           BlocBuilder<FeedPostDetailsCubit, FeedPostDetailsState>(
             bloc: details,
-            builder: (context, state) {
-              final post = state.post;
-              if (post != null && actions.canShow(post)) {
-                return _Publication(
-                  post: post,
-                  timeline: timeline,
-                  actions: actions,
-                  confirmed: state.confirmed,
-                  failed: state.failed,
-                  onRetry: details.load,
-                  headerHeight: top,
+            builder: (context, state) => ValueListenableBuilder(
+              valueListenable: details.refreshProgress,
+              builder: (context, refreshing, _) {
+                Widget body;
+                final post = state.post;
+                if (post != null && actions.canShow(post)) {
+                  body = _Publication(
+                    key: _publication,
+                    post: post,
+                    timeline: timeline,
+                    actions: actions,
+                    comments: details.comments,
+                    confirmed: state.confirmed,
+                    failed: state.failed,
+                    onRetry: _refresh,
+                    refreshing: refreshing,
+                    headerHeight: top,
+                  );
+                } else if (state.loading || state.failed) {
+                  final safe = MediaQuery.paddingOf(context);
+                  body = CustomScrollView(
+                    physics: PullRefresh.physics,
+                    slivers: [
+                      SliverToBoxAdapter(child: SizedBox(height: top)),
+                      const SliverPullRefreshGap(),
+                      if (state.failed)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: _PublicationRetry(
+                              refreshing: refreshing,
+                              onPressed: _refresh,
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(
+                            safe.left + PrimaryHeaderGeometry.horizontalPadding,
+                            PrimaryHeaderGeometry.horizontalPadding,
+                            safe.right +
+                                PrimaryHeaderGeometry.horizontalPadding,
+                            0,
+                          ),
+                          sliver: const SliverToBoxAdapter(
+                            child: _PublicationPlaceholder(),
+                          ),
+                        ),
+                    ],
+                  );
+                } else {
+                  return _unavailable(context);
+                }
+                return PullRefresh(
+                  indicatorTop: top,
+                  onRefresh: _refresh,
+                  refreshing: refreshing,
+                  useSliverInset: true,
+                  showExternalProgress: true,
+                  reserveExternalSpace: true,
+                  child: body,
                 );
-              }
-              if (state.loading && post == null) {
-                final safe = MediaQuery.paddingOf(context);
-                const gutter = PrimaryHeaderGeometry.horizontalPadding;
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    safe.left + gutter,
-                    top + gutter,
-                    safe.right + gutter,
-                    0,
-                  ),
-                  child: const Align(
-                    alignment: Alignment.topCenter,
-                    child: _PublicationPlaceholder(),
-                  ),
-                );
-              }
-              if (state.failed && post == null) {
-                return Center(
-                  child: RetryPillButton(
-                    onPressed: details.load,
-                    label: context.l10n.feedRetry,
-                  ),
-                );
-              }
-              return _unavailable(context);
-            },
+              },
+            ),
           ),
     );
   }
@@ -268,6 +302,7 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
 
 class _Publication extends StatefulWidget {
   const _Publication({
+    super.key,
     required this.post,
     required this.timeline,
     required this.actions,
@@ -275,6 +310,8 @@ class _Publication extends StatefulWidget {
     required this.failed,
     required this.onRetry,
     required this.headerHeight,
+    required this.comments,
+    required this.refreshing,
   });
 
   final FeedPost post;
@@ -282,6 +319,8 @@ class _Publication extends StatefulWidget {
   final FeedActionsCubit actions;
   final bool confirmed;
   final bool failed;
+  final bool refreshing;
+  final FeedCommentsCubit? comments;
   final VoidCallback onRetry;
   final double headerHeight;
 
@@ -293,33 +332,28 @@ class _PublicationState extends State<_Publication> {
   final _controller = ScrollController();
   final _focus = FocusNode();
   final _composerHeight = ValueNotifier<double?>(null);
-  FeedCommentsCubit? _comments;
+  final _commentList = GlobalKey<FeedCommentsSliverState>();
+  FeedCommentsCubit? get _comments => widget.comments;
   String? _submitError;
   FeedComment? _replyTo;
 
   @override
   void initState() {
     super.initState();
-    final repository = widget.timeline.repository;
-    if (repository is IFeedPublicationRepository) {
-      final availability = context
-          .read<AppConnectionStatus?>()
-          ?.networkAvailability;
-      _comments = FeedCommentsCubit(
-        repository as IFeedPublicationRepository,
-        widget.actions,
-        widget.post,
-        networkAvailable: () => availability?.value,
-      );
-      _comments!.updatePost(widget.post, confirmed: widget.confirmed);
-      _controller.addListener(_maybeLoadMore);
-    }
+    _controller.addListener(_maybeLoadMore);
   }
 
-  @override
-  void didUpdateWidget(covariant _Publication oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _comments?.updatePost(widget.post, confirmed: widget.confirmed);
+  Set<String> visibleThreads() {
+    final media = MediaQuery.of(context);
+    final bottom =
+        media.size.height -
+        math.max(media.viewInsets.bottom, media.viewPadding.bottom) -
+        (_composerHeight.value ?? 0);
+    return _commentList.currentState?.visibleThreads(
+          top: widget.headerHeight,
+          bottom: bottom,
+        ) ??
+        const {};
   }
 
   @override
@@ -342,9 +376,15 @@ class _PublicationState extends State<_Publication> {
     final comments = _comments;
     if (comments == null ||
         !widget.confirmed ||
+        widget.refreshing ||
         !_controller.hasClients ||
-        comments.state.failed ||
-        _controller.position.extentAfter > 350) {
+        comments.state.failed) {
+      return;
+    }
+    final position = _controller.position;
+    if (position.userScrollDirection != ScrollDirection.reverse ||
+        position.outOfRange ||
+        position.extentAfter > 350) {
       return;
     }
     unawaited(comments.next());
@@ -431,25 +471,28 @@ class _PublicationState extends State<_Publication> {
         children: [
           CustomScrollView(
             controller: _controller,
+            physics: PullRefresh.physics,
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
               SliverToBoxAdapter(child: SizedBox(height: widget.headerHeight)),
+              const SliverPullRefreshGap(),
               SliverToBoxAdapter(child: card),
               if (widget.failed)
                 SliverToBoxAdapter(
-                  child: Center(
-                    child: RetryPillButton(
-                      onPressed: widget.onRetry,
-                      label: context.l10n.feedRetry,
-                    ),
+                  child: _PublicationRetry(
+                    refreshing: widget.refreshing,
+                    onPressed: widget.onRetry,
                   ),
                 ),
               if (comments != null)
                 FeedCommentsSliver(
+                  key: _commentList,
                   comments: comments,
                   timeline: widget.timeline,
                   onReply: _reply,
                   onRetryPublication: widget.onRetry,
+                  refreshing: widget.refreshing,
+                  postFailed: widget.failed,
                 ),
               if (comments != null)
                 ValueListenableBuilder(
@@ -558,9 +601,40 @@ class _PublicationState extends State<_Publication> {
     _controller.dispose();
     _focus.dispose();
     _composerHeight.dispose();
-    unawaited(_comments?.close());
     super.dispose();
   }
+}
+
+class _PublicationRetry extends StatelessWidget {
+  const _PublicationRetry({required this.refreshing, required this.onPressed});
+
+  final bool refreshing;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 24, bottom: 12),
+    child: Center(
+      heightFactor: 1,
+      child: ExcludeSemantics(
+        excluding: refreshing,
+        child: IgnorePointer(
+          ignoring: refreshing,
+          child: AnimatedOpacity(
+            opacity: refreshing ? 0 : 1,
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            child: RetryPillButton(
+              label: context.l10n.feedRetry,
+              onPressed: onPressed,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _PublicationPlaceholder extends StatelessWidget {

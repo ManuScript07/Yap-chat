@@ -38,6 +38,9 @@ class _CommentPage {
   bool loading = false;
   bool failed = false;
   bool failedRefresh = false;
+  bool readingHead = false;
+  bool silent = false;
+  int request = 0;
   bool more = true;
 }
 
@@ -47,6 +50,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     this.actions,
     this._post, {
     this._networkAvailable,
+    this._autoLoad = true,
   }) : super((
          rows: const [],
          sort: FeedCommentSort.popular,
@@ -59,6 +63,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   final IFeedPublicationRepository repository;
   final FeedActionsCubit actions;
   final bool? Function()? _networkAvailable;
+  final bool _autoLoad;
   FeedPost _post;
   final _roots = <FeedCommentSort, _CommentPage>{};
   final _threads = <String, _CommentPage>{};
@@ -71,6 +76,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   bool _ready = false;
   bool _hydrated = false;
   bool _restoring = false;
+  Future<void>? _restoreRequest;
   bool _hasCachedPages = false;
   bool _submitting = false;
   int _revision = 0;
@@ -79,6 +85,8 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
 
   bool get canDisplay => _ready || _hasCachedPages;
   bool get canMutate => _ready && _active;
+  bool get needsHeadRetry =>
+      _root.failed && (!_root.started || _root.failedRefresh);
   bool get _active => canDisplay && !isClosed && actions.canShow(_post);
   _CommentPage get _root => _roots.putIfAbsent(_sort, () => _page(_sort, null));
 
@@ -96,13 +104,13 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       _applySnapshots(cache.readForPost(post.id));
       if (cache.hasDisk) {
         _restoring = true;
-        unawaited(_restore(post.id, _revision));
+        unawaited(_restoreRequest = _restore(post.id, _revision));
       }
     }
     if (_ready || !confirmed) return;
     _ready = true;
     _cacheExpiry?.cancel();
-    if (!_restoring && !_root.started) unawaited(next());
+    if (_autoLoad && !_restoring && !_root.started) unawaited(next());
   }
 
   Future<void> _restore(String id, int revision) async {
@@ -115,7 +123,31 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     }
     _restoring = false;
     _applySnapshots(cached, remember: true);
-    if (_ready && !_root.started) unawaited(next());
+    if (_autoLoad && _ready && !_root.started) unawaited(next());
+  }
+
+  Future<void> refresh({
+    required bool interactive,
+    Set<String> visibleThreads = const {},
+    bool includeRoot = true,
+  }) async {
+    await _restoreRequest;
+    if (!_active || !_ready) return;
+    final root = _root;
+    final expiry = root.expiresAt;
+    if (!interactive &&
+        !root.failed &&
+        expiry != null &&
+        actions.publicationCache.expiresFromNow().difference(expiry) <
+            const Duration(seconds: 15)) {
+      return;
+    }
+    await Future.wait([
+      if (includeRoot)
+        _load(root, refresh: true, silent: !interactive && root.started),
+      for (final id in visibleThreads)
+        if (_threads[id] case final page?) _load(page, refresh: true),
+    ]);
   }
 
   void _applySnapshots(
@@ -241,26 +273,42 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     return page == null ? Future.value() : _load(page);
   }
 
-  Future<void> _load(_CommentPage page, {bool refresh = false}) {
+  Future<void> _load(
+    _CommentPage page, {
+    bool refresh = false,
+    bool silent = false,
+  }) {
     final fromStart = refresh || page.failedRefresh;
     if (!_active || _restoring || !page.more && !fromStart) {
       return Future.value();
     }
-    if (page.pending != null) return page.pending!;
+    if (page.pending != null && (!fromStart || page.readingHead)) {
+      return page.pending!;
+    }
     if (!_ready || _networkAvailable?.call() == false) {
       page.failed = true;
+      page.failedRefresh = fromStart;
       _publish();
       return Future.value();
     }
-    return page.pending ??= _read(
-      page,
-      refresh: fromStart,
-    ).whenComplete(() => page.pending = null);
+    final request = ++page.request;
+    page.readingHead = fromStart || page.cursor == null;
+    page.silent = silent;
+    return page.pending = _read(page, refresh: fromStart, request: request)
+        .whenComplete(() {
+          if (page.request == request) page.pending = null;
+        });
   }
 
-  Future<void> _read(_CommentPage page, {required bool refresh}) async {
+  Future<void> _read(
+    _CommentPage page, {
+    required bool refresh,
+    required int request,
+  }) async {
     final revision = _revision;
     final cursor = refresh ? null : page.cursor;
+    final existingSent = cursor == null ? _sent.keys.toSet() : const <String>{};
+    bool current() => request == page.request && revision == _revision;
     page.loading = true;
     page.failed = false;
     page.failedRefresh = false;
@@ -273,10 +321,17 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         sort: page.sort,
         rootId: page.root,
       );
-      if (!_active || revision != _revision) return;
+      if (!_active || !current()) return;
       if (cursor == null) {
         page.rows.clear();
         page.expiresAt = actions.publicationCache.expiresFromNow();
+        _sent.removeWhere(
+          (id, comment) =>
+              existingSent.contains(id) &&
+              (page.root == null
+                  ? comment.id == comment.threadId
+                  : comment.threadId == page.root),
+        );
       }
       page.started = true;
       page.more = response.next != null && response.next != cursor;
@@ -285,19 +340,24 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         page.rows[row.id] = _withCurrentReaction(row);
       }
       if (page.expiresAt case final expires?) {
+        final key = (_post.id, page.sort, page.root);
+        FeedCommentsPage snapshot = (
+          comments: page.rows.values.toList(growable: false),
+          next: page.cursor,
+        );
+        for (final sent in _sent.values) {
+          snapshot = _includeSentComment(key, snapshot, sent);
+        }
         actions.publicationCache.write(
-          (_post.id, page.sort, page.root),
-          (
-            comments: page.rows.values.toList(growable: false),
-            next: page.cursor,
-          ),
+          key,
+          snapshot,
           expiresAt: expires,
-          allowed: () => revision == _revision && actions.canShow(_post),
+          allowed: () => current() && actions.canShow(_post),
         );
       }
     } catch (error) {
-      _handleAccessError(error);
-      if (revision == _revision) {
+      if (current()) {
+        _handleAccessError(error);
         final expired =
             error is PostgrestException &&
             (error.code == 'PT410' ||
@@ -310,8 +370,8 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         page.failedRefresh = refresh || expired;
       }
     } finally {
-      page.loading = false;
-      if (revision == _revision) _publish();
+      if (page.request == request) page.loading = false;
+      if (current()) _publish();
     }
   }
 
@@ -341,7 +401,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     _sent.removeWhere((_, comment) => _isBlocked(comment));
     _publish();
     if (_restoring) {
-      unawaited(_restore(_post.id, _revision));
+      unawaited(_restoreRequest = _restore(_post.id, _revision));
     } else if (_ready && _networkAvailable?.call() != false) {
       unawaited(_revalidateAfterConflict(_root));
     }
@@ -526,7 +586,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         if (_sort == FeedCommentSort.old) ...sent,
       ]),
       sort: _sort,
-      loading: root.loading,
+      loading: root.loading && !root.silent,
       failed: root.failed,
       loaded: root.started,
       hasMore: root.more,

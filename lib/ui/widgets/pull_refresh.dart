@@ -19,6 +19,7 @@ class PullRefresh extends StatefulWidget {
     this.overlayBuilder,
     this.useSliverInset = false,
     this.showExternalProgress = false,
+    this.reserveExternalSpace = false,
   });
 
   final double indicatorTop;
@@ -31,6 +32,7 @@ class PullRefresh extends StatefulWidget {
   final Widget Function(bool pullingToRefresh)? overlayBuilder;
   final bool useSliverInset;
   final bool showExternalProgress;
+  final bool reserveExternalSpace;
 
   static const physics = BouncingScrollPhysics(
     parent: AlwaysScrollableScrollPhysics(),
@@ -64,7 +66,11 @@ class _PullRefreshState extends State<PullRefresh> {
                   (_refreshTriggerExtent - _refreshRevealStart),
             );
 
-  double get _refreshInset => _isRefreshRunning || _isArmed || _isSnapping
+  double get _refreshInset =>
+      _isRefreshRunning ||
+          _isArmed ||
+          _isSnapping ||
+          widget.reserveExternalSpace && _externalProgress
       ? _refreshGap
       : _refreshGap * _dragProgress;
 
