@@ -13,6 +13,14 @@ import 'package:yap_chat/repositories/feed/feed.dart';
 import 'package:yap_chat/ui/ui.dart';
 
 import 'feed_post_controls.dart';
+import 'feed_comment_motion.dart';
+
+typedef _CommentListItem = ({
+  Key key,
+  Widget Function() build,
+  String? expandedThread,
+  FeedComment? comment,
+});
 
 class FeedCommentsSliver extends StatefulWidget {
   const FeedCommentsSliver({
@@ -23,6 +31,7 @@ class FeedCommentsSliver extends StatefulWidget {
     required this.onRetryPublication,
     required this.refreshing,
     required this.postFailed,
+    required this.viewport,
   });
 
   final FeedCommentsCubit comments;
@@ -31,6 +40,7 @@ class FeedCommentsSliver extends StatefulWidget {
   final VoidCallback onRetryPublication;
   final bool refreshing;
   final bool postFailed;
+  final Rect? Function() viewport;
 
   @override
   State<FeedCommentsSliver> createState() => FeedCommentsSliverState();
@@ -38,21 +48,97 @@ class FeedCommentsSliver extends StatefulWidget {
 
 class FeedCommentsSliverState extends State<FeedCommentsSliver> {
   final _list = GlobalKey();
-  List<(Key, Widget Function(), String?)> _rows = const [];
+  List<_CommentListItem> _rows = const [];
+  final _entering = <Key>{};
+  Timer? _entryWindow;
+  FeedCommentSort? _presentedSort;
+  bool _presentedHead = false;
 
-  Set<String> visibleThreads({required double top, required double bottom}) {
+  Iterable<(_CommentListItem, double)> _visibleRows(
+    double top,
+    double bottom,
+  ) sync* {
     final list = _list.currentContext?.findRenderObject();
-    if (list is! RenderSliverMultiBoxAdaptor) return {};
-    final visible = <String>{};
+    if (list is! RenderSliverMultiBoxAdaptor || !list.attached) return;
     for (var row = list.firstChild; row != null; row = list.childAfter(row)) {
       final index = list.indexOf(row);
       if (index >= _rows.length || !row.hasSize) continue;
-      final root = _rows[index].$3;
-      if (root == null || visible.contains(root)) continue;
       final start = row.localToGlobal(Offset.zero).dy;
-      if (start < bottom && start + row.size.height > top) visible.add(root);
+      final offset = list.childScrollOffset(row);
+      if (offset != null && start < bottom && start + row.size.height > top) {
+        yield (_rows[index], offset - list.constraints.scrollOffset);
+      }
     }
-    return visible;
+  }
+
+  Set<String> visibleThreads({required double top, required double bottom}) => {
+    for (final (row, _) in _visibleRows(top, bottom)) ?row.expandedThread,
+  };
+
+  Map<String?, String> visibleAnchors() {
+    final viewport = widget.viewport();
+    if (viewport == null) return {};
+    final anchors = <String?, String>{};
+    for (final (row, _) in _visibleRows(viewport.top, viewport.bottom)) {
+      final comment = row.comment;
+      if (comment == null) continue;
+      anchors.putIfAbsent(null, () => comment.threadId);
+      if (comment.id != comment.threadId) {
+        anchors.putIfAbsent(comment.threadId, () => comment.id);
+      }
+    }
+    return anchors;
+  }
+
+  FeedCommentScrollAnchor? _updateRows(
+    List<_CommentListItem> rows,
+    Map<Key, int> positions,
+    FeedCommentsState state,
+  ) {
+    final sameSort = _presentedSort == state.sort;
+    final changed =
+        rows.length != _rows.length ||
+        rows.indexed.any((item) => item.$2.key != _rows[item.$1].key);
+    FeedCommentScrollAnchor? anchor;
+    if (sameSort && changed) {
+      final viewport = widget.viewport();
+      if (viewport != null) {
+        for (final (row, offset) in _visibleRows(
+          viewport.top,
+          viewport.bottom,
+        )) {
+          if (row.comment == null) continue;
+          if (positions[row.key] case final index?) {
+            anchor = (index: index, offset: offset);
+            break;
+          }
+        }
+      }
+      if (_presentedHead && !MediaQuery.disableAnimationsOf(context)) {
+        final previous = {for (final item in _rows) item.key};
+        for (final row in rows) {
+          if (row.comment != null && !previous.contains(row.key)) {
+            _entering.add(row.key);
+          }
+        }
+        if (_entering.isNotEmpty) {
+          _entryWindow?.cancel();
+          _entryWindow = Timer(feedCommentMotionDuration, _entering.clear);
+        }
+      }
+    } else if (!sameSort) {
+      _entering.clear();
+    }
+    _presentedSort = state.sort;
+    _presentedHead = state.loaded;
+    _rows = rows;
+    return anchor;
+  }
+
+  @override
+  void dispose() {
+    _entryWindow?.cancel();
+    super.dispose();
   }
 
   @override
@@ -68,7 +154,7 @@ class FeedCommentsSliverState extends State<FeedCommentsSliver> {
       final locale = Localizations.localeOf(context).toString();
       final compactCount = NumberFormat.compact(locale: locale);
       final fullCount = NumberFormat.decimalPattern(locale);
-      final rows = <(Key, Widget Function(), String?)>[];
+      final rows = <_CommentListItem>[];
       for (final (index, root) in state.rows.indexed) {
         final replies = comments.replies(root);
         final expanded = comments.isExpanded(root.id);
@@ -79,8 +165,8 @@ class FeedCommentsSliverState extends State<FeedCommentsSliver> {
           required bool after,
         }) {
           rows.add((
-            ValueKey(comment.id),
-            () => _CommentRow(
+            key: ValueKey(comment.id),
+            build: () => _CommentRow(
               comment: comment,
               comments: comments,
               timeline: widget.timeline,
@@ -90,7 +176,8 @@ class FeedCommentsSliverState extends State<FeedCommentsSliver> {
               before: before,
               after: after,
             ),
-            expanded ? root.id : null,
+            expandedThread: expanded ? root.id : null,
+            comment: comment,
           ));
         }
 
@@ -100,11 +187,10 @@ class FeedCommentsSliverState extends State<FeedCommentsSliver> {
         }
         final status = comments.threadStatus(root.id);
         final canExpand = !expanded && root.replyCount > replies.length;
-        if (canExpand ||
-            expanded && (status.loading || status.failed || status.more)) {
+        if (canExpand || expanded) {
           rows.add((
-            ValueKey(('thread', root.id)),
-            () => Padding(
+            key: ValueKey(('thread', root.id)),
+            build: () => Padding(
               padding: EdgeInsetsDirectional.only(
                 start:
                     (Directionality.of(context) == TextDirection.ltr
@@ -112,106 +198,175 @@ class FeedCommentsSliverState extends State<FeedCommentsSliver> {
                         : padding.right) +
                     _CommentRow.contentInset,
               ),
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (expanded && status.loading && !widget.refreshing)
-                    const _CommentProgress(),
-                  if (expanded &&
-                      !status.loading &&
-                      status.failed &&
-                      !widget.refreshing &&
-                      !widget.postFailed)
-                    RetryPillButton(
-                      label: l10n.feedRetry,
-                      onPressed: comments.canMutate
-                          ? () => comments.nextReplies(root.id)
-                          : widget.onRetryPublication,
-                    )
-                  else if (expanded &&
-                      !status.loading &&
-                      !status.failed &&
-                      status.more &&
-                      !widget.refreshing)
-                    TextButton(
-                      onPressed: () => comments.nextReplies(root.id),
-                      child: Text(l10n.feedLoadMore),
-                    ),
-                  if (canExpand)
-                    TextButton(
-                      onPressed: () => comments.expand(root.id),
-                      style:
-                          FeedActionButton.style(
-                            AlignmentDirectional.centerStart,
-                          ).copyWith(
-                            textStyle: WidgetStatePropertyAll(
-                              context.textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
+              child: _ThreadFeedback(
+                loading: expanded && status.loading && !widget.refreshing,
+                retry:
+                    expanded &&
+                        !status.loading &&
+                        status.failed &&
+                        !widget.refreshing &&
+                        !widget.postFailed
+                    ? RetryPillButton(
+                        label: l10n.feedRetry,
+                        onPressed: comments.canMutate
+                            ? () => comments.nextReplies(root.id)
+                            : widget.onRetryPublication,
+                      )
+                    : null,
+                action:
+                    expanded &&
+                        !status.loading &&
+                        !status.failed &&
+                        status.more &&
+                        !widget.refreshing
+                    ? TextButton(
+                        onPressed: () => comments.nextReplies(root.id),
+                        child: Text(l10n.feedLoadMore),
+                      )
+                    : canExpand
+                    ? TextButton(
+                        onPressed: () => comments.expand(root.id),
+                        style:
+                            FeedActionButton.style(
+                              AlignmentDirectional.centerStart,
+                            ).copyWith(
+                              textStyle: WidgetStatePropertyAll(
+                                context.textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ),
-                      child: Text(l10n.feedShowReplies),
-                    ),
-                ],
+                        child: Text(l10n.feedShowReplies),
+                      )
+                    : null,
               ),
             ),
-            expanded ? root.id : null,
+            expandedThread: expanded ? root.id : null,
+            comment: null,
           ));
         }
         if (index + 1 < state.rows.length) {
-          rows.add((ValueKey(('divider', root.id)), FeedDivider.new, null));
+          rows.add((
+            key: ValueKey(('divider', root.id)),
+            build: FeedDivider.new,
+            expandedThread: null,
+            comment: null,
+          ));
         }
       }
-      final positions = {for (final (i, row) in rows.indexed) row.$1: i};
-      _rows = rows;
-      return SliverMainAxisGroup(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: padding.left + PrimaryHeaderGeometry.horizontalPadding,
-                right: padding.right + PrimaryHeaderGeometry.horizontalPadding,
-              ),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: _CommentSortMenu(
-                  selected: state.sort,
-                  onSelected: comments.selectSort,
+      final positions = {for (final (i, row) in rows.indexed) row.key: i};
+      final anchor = _updateRows(rows, positions, state);
+      return _CommentRefreshScope(
+        refreshing: widget.refreshing,
+        child: SliverMainAxisGroup(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: padding.left + PrimaryHeaderGeometry.horizontalPadding,
+                  right:
+                      padding.right + PrimaryHeaderGeometry.horizontalPadding,
+                ),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _CommentSortMenu(
+                    selected: state.sort,
+                    onSelected: comments.selectSort,
+                  ),
                 ),
               ),
             ),
-          ),
-          SliverList.builder(
-            key: _list,
-            itemCount: rows.length,
-            findChildIndexCallback: (key) => positions[key],
-            itemBuilder: (_, index) =>
-                KeyedSubtree(key: rows[index].$1, child: rows[index].$2()),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                padding.left + PrimaryHeaderGeometry.horizontalPadding,
-                12,
-                padding.right + PrimaryHeaderGeometry.horizontalPadding,
-                12,
-              ),
-              child: _CommentLoadFeedback(
-                state: state,
-                refreshing: widget.refreshing,
-                postFailed: widget.postFailed,
-                onRequest:
-                    state.failed &&
-                        (!comments.canMutate || comments.needsHeadRetry)
-                    ? widget.onRetryPublication
-                    : comments.next,
+            FeedCommentList(
+              key: _list,
+              anchor: anchor,
+              delegate: SliverChildBuilderDelegate(
+                (_, index) {
+                  final row = rows[index];
+                  return row.comment == null
+                      ? KeyedSubtree(key: row.key, child: row.build())
+                      : FeedCommentEntrance(
+                          key: row.key,
+                          animate: _entering.remove(row.key),
+                          child: row.build(),
+                        );
+                },
+                childCount: rows.length,
+                findChildIndexCallback: (key) => positions[key],
               ),
             ),
-          ),
-        ],
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  padding.left + PrimaryHeaderGeometry.horizontalPadding,
+                  12,
+                  padding.right + PrimaryHeaderGeometry.horizontalPadding,
+                  12,
+                ),
+                child: _CommentLoadFeedback(
+                  state: state,
+                  refreshing: widget.refreshing,
+                  postFailed: widget.postFailed,
+                  onRequest:
+                      state.failed &&
+                          (!comments.canMutate || comments.needsHeadRetry)
+                      ? widget.onRetryPublication
+                      : comments.next,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     },
   );
+}
+
+class _ThreadFeedback extends StatelessWidget {
+  const _ThreadFeedback({required this.loading, this.action, this.retry});
+
+  final bool loading;
+  final Widget? action;
+  final Widget? retry;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : feedCommentMotionDuration;
+    return IgnorePointer(
+      ignoring: loading,
+      child: AnimatedSize(
+        duration: duration,
+        alignment: AlignmentDirectional.topStart,
+        curve: Curves.easeOutCubic,
+        child: AnimatedStatusSwitcher(
+          duration: duration,
+          alignment: AlignmentDirectional.topStart,
+          scaleTransition: false,
+          child: switch ((loading, retry, action)) {
+            (true, _, _) => const SizedBox(
+              key: ValueKey('thread_loading'),
+              height: 44,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                widthFactor: 1,
+                child: _CommentProgress(),
+              ),
+            ),
+            (false, final button?, _) => KeyedSubtree(
+              key: const ValueKey('thread_retry'),
+              child: button,
+            ),
+            (false, null, final button?) => KeyedSubtree(
+              key: const ValueKey('thread_action'),
+              child: button,
+            ),
+            _ => const SizedBox.shrink(key: ValueKey('thread_idle')),
+          },
+        ),
+      ),
+    );
+  }
 }
 
 class _CommentSortMenu extends StatefulWidget {
@@ -438,20 +593,17 @@ class _CommentLoadFeedbackState extends State<_CommentLoadFeedback> {
     } else {
       content = const SizedBox.shrink(key: ValueKey('finished'));
     }
-    return _CommentRefreshScope(
-      refreshing: widget.refreshing,
-      child: ExcludeSemantics(
-        excluding: widget.refreshing,
-        child: IgnorePointer(
-          ignoring: widget.refreshing,
-          child: AnimatedStatusSwitcher(
-            alignment: Alignment.topCenter,
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 180),
-            scaleTransition: false,
-            child: content,
-          ),
+    return ExcludeSemantics(
+      excluding: widget.refreshing,
+      child: IgnorePointer(
+        ignoring: widget.refreshing,
+        child: AnimatedStatusSwitcher(
+          alignment: Alignment.topCenter,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          scaleTransition: false,
+          child: content,
         ),
       ),
     );

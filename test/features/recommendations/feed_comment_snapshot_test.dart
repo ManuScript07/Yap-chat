@@ -155,6 +155,61 @@ void main() {
   );
 
   test(
+    'expired cursors rebuild towards the visible row and resume the same bounded search',
+    () async {
+      await save(_popular, [_root], next: _cursor);
+      final repository = _Repository();
+      repository.read = (cursor) async {
+        if (cursor == _cursor) {
+          throw const PostgrestException(
+            message: 'comment_session_expired',
+            code: 'PT410',
+          );
+        }
+        final page = cursor == null ? 0 : cursor.position + 1;
+        return (
+          comments: [
+            if (page == 5)
+              _root
+            else
+              FeedComment(
+                id: 'new-$page',
+                authorId: 'author',
+                text: 'new page $page',
+              ),
+          ],
+          next: page == 5 ? null : (sessionId: 'replacement', position: page),
+        );
+      };
+      final comments = open(repository);
+      comments.visibleAnchors = () => {null: _root.id};
+      final restored = comments.stream.firstWhere((state) => state.loaded);
+      comments.updatePost(post, confirmed: true);
+      await restored;
+
+      await Future.wait([comments.next(), comments.next()]);
+      expect(repository.reads, [
+        _cursor,
+        null,
+        for (var page = 0; page < 4; page++)
+          (sessionId: 'replacement', position: page),
+      ]);
+      expect(comments.state.failed, isTrue);
+      expect(comments.state.rows.map((row) => row.id), [_root.id]);
+
+      await comments.next();
+      expect(repository.reads.last, (sessionId: 'replacement', position: 4));
+      expect(repository.reads, hasLength(7));
+      expect(comments.state.rows.map((row) => row.id), [
+        for (var page = 0; page < 5; page++) 'new-$page',
+        _root.id,
+      ]);
+      expect(comments.state.failed, isFalse);
+      expect(comments.state.hasMore, isFalse);
+    },
+  );
+
+  test(
     'confirmed mutations preserve other pages and hide reported bodies on disk',
     () async {
       await save(_popular, [_root]);

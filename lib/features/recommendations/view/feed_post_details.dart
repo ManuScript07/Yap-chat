@@ -341,17 +341,44 @@ class _PublicationState extends State<_Publication> {
   void initState() {
     super.initState();
     _controller.addListener(_maybeLoadMore);
+    _comments?.visibleAnchors = _visibleAnchors;
   }
 
-  Set<String> visibleThreads() {
+  @override
+  void didUpdateWidget(covariant _Publication oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.comments != _comments) {
+      oldWidget.comments?.visibleAnchors = null;
+      _comments?.visibleAnchors = _visibleAnchors;
+    }
+  }
+
+  Map<String?, String> _visibleAnchors() => mounted
+      ? _commentList.currentState?.visibleAnchors() ?? const {}
+      : const {};
+
+  Rect _commentBounds() {
     final media = MediaQuery.of(context);
     final bottom =
         media.size.height -
         math.max(media.viewInsets.bottom, media.viewPadding.bottom) -
         (_composerHeight.value ?? 0);
+    return Rect.fromLTRB(0, widget.headerHeight, media.size.width, bottom);
+  }
+
+  Rect? _readingViewport() =>
+      ModalRoute.isCurrentOf(context) == false ||
+          !_controller.hasClients ||
+          _controller.position.pixels <=
+              _controller.position.minScrollExtent + 1
+      ? null
+      : _commentBounds();
+
+  Set<String> visibleThreads() {
+    final bounds = _commentBounds();
     return _commentList.currentState?.visibleThreads(
-          top: widget.headerHeight,
-          bottom: bottom,
+          top: bounds.top,
+          bottom: bounds.bottom,
         ) ??
         const {};
   }
@@ -475,7 +502,7 @@ class _PublicationState extends State<_Publication> {
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
               SliverToBoxAdapter(child: SizedBox(height: widget.headerHeight)),
-              const SliverPullRefreshGap(),
+              const SliverPullRefreshGap(preserveOffscreenPosition: true),
               SliverToBoxAdapter(child: card),
               if (widget.failed)
                 SliverToBoxAdapter(
@@ -493,6 +520,7 @@ class _PublicationState extends State<_Publication> {
                   onRetryPublication: widget.onRetry,
                   refreshing: widget.refreshing,
                   postFailed: widget.failed,
+                  viewport: _readingViewport,
                 ),
               if (comments != null)
                 ValueListenableBuilder(
@@ -598,6 +626,7 @@ class _PublicationState extends State<_Publication> {
 
   @override
   void dispose() {
+    _comments?.visibleAnchors = null;
     _controller.dispose();
     _focus.dispose();
     _composerHeight.dispose();

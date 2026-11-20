@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 /// Pulls the scrollable down with the gesture and holds space for the ring
@@ -258,18 +259,69 @@ class _PullRefreshInset extends InheritedWidget {
 
 /// Reserves pull-to-refresh space after a pinned header.
 class SliverPullRefreshGap extends StatelessWidget {
-  const SliverPullRefreshGap({super.key});
+  const SliverPullRefreshGap({
+    super.key,
+    this.preserveOffscreenPosition = false,
+  });
+
+  final bool preserveOffscreenPosition;
 
   @override
-  Widget build(BuildContext context) => SliverToBoxAdapter(
-    child: SizedBox(
-      height:
-          context
-              .dependOnInheritedWidgetOfExactType<_PullRefreshInset>()
-              ?.inset ??
-          0,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final height =
+        context
+            .dependOnInheritedWidgetOfExactType<_PullRefreshInset>()
+            ?.inset ??
+        0.0;
+    if (preserveOffscreenPosition) return _PreservingRefreshGap(height);
+    return SliverToBoxAdapter(child: SizedBox(height: height));
+  }
+}
+
+class _PreservingRefreshGap extends SliverToBoxAdapter {
+  _PreservingRefreshGap(this.height) : super(child: SizedBox(height: height));
+
+  final double height;
+
+  @override
+  RenderSliverToBoxAdapter createRenderObject(BuildContext context) =>
+      _RenderPreservingRefreshGap(height);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    RenderSliverToBoxAdapter renderObject,
+  ) {
+    (renderObject as _RenderPreservingRefreshGap).height = height;
+  }
+}
+
+class _RenderPreservingRefreshGap extends RenderSliverToBoxAdapter {
+  _RenderPreservingRefreshGap(this._height);
+
+  double _height;
+  double? _previousHeight;
+
+  set height(double value) {
+    if (_height == value) return;
+    _height = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    final previous = _previousHeight;
+    _previousHeight = _height;
+    // The ring still moves content at the top. Changes above the viewport
+    // should instead keep the reader's position as the ring opens or closes.
+    if (previous != null &&
+        previous != _height &&
+        constraints.scrollOffset > previous + 0.5) {
+      geometry = SliverGeometry(scrollOffsetCorrection: _height - previous);
+      return;
+    }
+    super.performLayout();
+  }
 }
 
 /// Retains the current ring while fading out instead of replacing a spinning

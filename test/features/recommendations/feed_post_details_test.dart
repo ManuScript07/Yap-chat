@@ -6,9 +6,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/features/profile/widgets/widgets.dart';
 import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
+import 'package:yap_chat/features/recommendations/view/feed_comment_motion.dart';
 import 'package:yap_chat/features/recommendations/view/feed_comments_sliver.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_card.dart';
 import 'package:yap_chat/features/recommendations/view/feed_post_details.dart';
@@ -388,6 +390,189 @@ void main() {
       expect(repository.postReads, 2);
     },
   );
+
+  for (final expiredCursor in [false, true]) {
+    testWidgets(
+      'replacement keeps a deep visible comment in place (expired: $expiredCursor)',
+      (tester) async {
+        final rows = [
+          for (var index = 0; index < 45; index++)
+            FeedComment(
+              id: 'depth-$index',
+              authorId: 'author',
+              text: 'comment number $index',
+            ),
+        ];
+        const second = (sessionId: 'old', position: 19);
+        const third = (sessionId: 'old', position: 39);
+        const expired = (sessionId: 'old', position: 44);
+        repository.commentPage = (_, _) async =>
+            switch (repository.commentCursors.last) {
+              null => (comments: rows.sublist(0, 20), next: second),
+              second => (comments: rows.sublist(20, 40), next: third),
+              _ => (
+                comments: rows.sublist(40),
+                next: expiredCursor ? expired : null,
+              ),
+            };
+        await show(tester);
+        final comments = tester
+            .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+            .comments;
+        await comments.next();
+        await comments.next();
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('depth-27')),
+          330,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        final anchorId = comments.visibleAnchors!.call()[null]!;
+        final anchor = find.byKey(ValueKey(anchorId));
+        final originalOffset = tester.getTopLeft(anchor).dy;
+        final value = int.parse(anchorId.split('-').last);
+        expect(value, inInclusiveRange(20, 38));
+
+        const newCursor = (sessionId: 'new', position: 19);
+        const newTail = (sessionId: 'new', position: 39);
+        final pending = Completer<FeedCommentsPage>();
+        repository.commentPage = (_, _) async =>
+            switch (repository.commentCursors.last) {
+              expired => throw const PostgrestException(
+                message: 'comment_session_expired',
+                code: 'PT410',
+              ),
+              null => (
+                comments: [
+                  const FeedComment(
+                    id: 'new-root',
+                    authorId: 'author',
+                    text: 'new root',
+                  ),
+                  ...rows.sublist(0, 19),
+                ],
+                next: newCursor,
+              ),
+              _ => pending.future,
+            };
+        final refresh = expiredCursor
+            ? comments.next()
+            : tester.widget<PullRefresh>(find.byType(PullRefresh)).onRefresh();
+        await tester.pump();
+        expect(tester.getTopLeft(anchor).dy, closeTo(originalOffset, 1));
+        final expected = [if (expiredCursor) expired, null, newCursor];
+        expect(repository.commentCursors.skip(3), expected);
+        pending.complete((comments: rows.sublist(19, 39), next: newTail));
+        await refresh;
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(anchor).dy, closeTo(originalOffset, 1));
+        expect(comments.state.rows.first.id, 'new-root');
+        expect(repository.commentCursors.skip(3), expected);
+      },
+    );
+  }
+
+  testWidgets('pagination animates appended comments and retains the old row', (
+    tester,
+  ) async {
+    const first = FeedComment(
+      id: 'first',
+      authorId: 'author',
+      text: 'first row',
+    );
+    const second = FeedComment(
+      id: 'second',
+      authorId: 'author',
+      text: 'second row',
+    );
+    const continuation = (sessionId: 'page', position: 0);
+    repository.commentPage = (_, _) async =>
+        repository.commentCursors.last == null
+        ? (comments: [first], next: continuation)
+        : (comments: [second], next: null);
+    await show(tester);
+    final saved = find.byKey(const ValueKey('first'));
+    final element = tester.element(saved);
+    final comments = tester
+        .widget<FeedCommentsSliver>(find.byType(FeedCommentsSliver))
+        .comments;
+    await comments.next();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    final fade = find.descendant(
+      of: find.byKey(const ValueKey('second')),
+      matching: find.byType(Opacity),
+    );
+    expect(
+      tester.widget<Opacity>(fade.first).opacity,
+      inExclusiveRange(0.0, 1.0),
+    );
+    expect(tester.element(saved), same(element));
+    expect(repository.commentCursors, [null, continuation]);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Opacity>(fade.first).opacity, 1);
+  });
+
+  testWidgets('loading an expanded branch animates its new rows only once', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(440, 870);
+    addTearDown(tester.view.reset);
+    final pending = Completer<FeedCommentsPage>();
+    const root = FeedComment(
+      id: 'root',
+      authorId: 'author',
+      text: 'root comment',
+      replyCount: 1,
+    );
+    const reply = FeedComment(
+      id: 'reply',
+      rootId: 'root',
+      authorId: 'writer',
+      text: 'animated reply',
+    );
+    repository.commentPage = (_, rootId) => rootId == null
+        ? Future.value((comments: [root], next: null))
+        : pending.future;
+    await show(tester);
+    final rootFinder = find.byKey(const ValueKey('root'));
+    final rootElement = tester.element(rootFinder);
+    final top = tester.getTopLeft(rootFinder).dy;
+    expect(tester.widget<FeedCommentEntrance>(rootFinder).animate, isFalse);
+    await tester.tap(find.text('show replies'));
+    await tester.pump();
+    await tester.pump(feedCommentMotionDuration);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is PullRefreshIndicator && widget.size == 22,
+      ),
+      findsOneWidget,
+    );
+    pending.complete((comments: [reply], next: null));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    final replyFinder = find.byKey(const ValueKey('reply'));
+    final displayed = find.descendant(
+      of: replyFinder,
+      matching: find.byType(Opacity),
+    );
+    expect(
+      tester.widget<Opacity>(displayed.first).opacity,
+      inExclusiveRange(0.0, 1.0),
+    );
+    final replyElement = tester.element(replyFinder);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Opacity>(displayed.first).opacity, 1);
+    expect(tester.element(rootFinder), same(rootElement));
+    expect(tester.element(replyFinder), same(replyElement));
+    expect(tester.getTopLeft(rootFinder).dy, closeTo(top, 1));
+    expect(repository.commentQueries, [
+      (FeedCommentSort.popular, null),
+      (FeedCommentSort.old, root.id),
+    ]);
+  });
 
   testWidgets('pulling a short list never prefetches its old cursor', (
     tester,

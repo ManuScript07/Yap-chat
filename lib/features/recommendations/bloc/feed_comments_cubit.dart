@@ -42,6 +42,17 @@ class _CommentPage {
   bool silent = false;
   int request = 0;
   bool more = true;
+  _CommentRefresh? replacement;
+}
+
+// The replacement cursor belongs only to the unpublished server order.
+class _CommentRefresh {
+  _CommentRefresh(this.startedAt);
+
+  final Duration startedAt;
+  final rows = <String, FeedComment>{};
+  final cursors = <FeedCommentsCursor>{};
+  FeedCommentsCursor? next;
 }
 
 class FeedCommentsCubit extends Cubit<FeedCommentsState> {
@@ -80,6 +91,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   bool _hasCachedPages = false;
   bool _submitting = false;
   int _revision = 0;
+  Map<String?, String> Function()? visibleAnchors;
   Timer? _cacheExpiry;
   FeedCommentSort _sort = FeedCommentSort.popular;
 
@@ -273,6 +285,12 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     return page == null ? Future.value() : _load(page);
   }
 
+  static bool _expiredCursor(Object error) =>
+      error is PostgrestException &&
+      (error.code == 'PT410' ||
+          error.code == 'PT404' &&
+              error.message == 'comment_session_not_found');
+
   Future<void> _load(
     _CommentPage page, {
     bool refresh = false,
@@ -307,22 +325,39 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   }) async {
     final revision = _revision;
     final cursor = refresh ? null : page.cursor;
-    final existingSent = cursor == null ? _sent.keys.toSet() : const <String>{};
+    final existingSent = _sent.keys.toSet();
     bool current() => request == page.request && revision == _revision;
     page.loading = true;
     page.failed = false;
     page.failedRefresh = false;
     _publish();
     try {
-      final response = await repository.getComments(
-        _post.id,
-        actions.account,
-        cursor: cursor,
-        sort: page.sort,
-        rootId: page.root,
-      );
+      var replace = cursor == null;
+      FeedCommentsPage? response;
+      if (!replace) {
+        try {
+          response = await _getPage(page, cursor);
+        } catch (error) {
+          if (!_expiredCursor(error) ||
+              !_active ||
+              !current() ||
+              _anchorFor(page) == null) {
+            rethrow;
+          }
+          replace = true;
+          page.readingHead = true;
+        }
+      }
+      if (replace) {
+        response = await _replace(page, current);
+      }
       if (!_active || !current()) return;
-      if (cursor == null) {
+      if (response == null) {
+        page.failed = true;
+        page.failedRefresh = true;
+        return;
+      }
+      if (replace) {
         page.rows.clear();
         page.expiresAt = actions.publicationCache.expiresFromNow();
         _sent.removeWhere(
@@ -334,7 +369,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
         );
       }
       page.started = true;
-      page.more = response.next != null && response.next != cursor;
+      page.more = response.next != null && (replace || response.next != cursor);
       page.cursor = page.more ? response.next : null;
       for (final row in actions.redactComments(response).comments) {
         page.rows[row.id] = _withCurrentReaction(row);
@@ -358,21 +393,84 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     } catch (error) {
       if (current()) {
         _handleAccessError(error);
-        final expired =
-            error is PostgrestException &&
-            (error.code == 'PT410' ||
-                error.code == 'PT404' &&
-                    error.message == 'comment_session_not_found');
+        final expired = _expiredCursor(error);
         if (expired) {
           page.cursor = null;
+          page.replacement = null;
         }
         page.failed = true;
-        page.failedRefresh = refresh || expired;
+        page.failedRefresh = refresh || expired || page.replacement != null;
       }
     } finally {
       if (page.request == request) page.loading = false;
       if (current()) _publish();
     }
+  }
+
+  Future<FeedCommentsPage> _getPage(
+    _CommentPage page,
+    FeedCommentsCursor? cursor,
+  ) => repository.getComments(
+    _post.id,
+    actions.account,
+    cursor: cursor,
+    sort: page.sort,
+    rootId: page.root,
+  );
+
+  String? _anchorFor(_CommentPage page) {
+    if (page.root == null && page.sort != _sort) return null;
+    final id = visibleAnchors?.call()[page.root];
+    return id != null && page.rows.containsKey(id) ? id : null;
+  }
+
+  Future<FeedCommentsPage?> _replace(
+    _CommentPage page,
+    bool Function() current,
+  ) async {
+    final pending = page.replacement;
+    final now = _clock.elapsed;
+    final replacement =
+        pending != null && now - pending.startedAt < const Duration(minutes: 5)
+        ? pending
+        : _CommentRefresh(now);
+    page.replacement = replacement;
+    // Keep one cycle bounded even if a popular comment moves many pages.
+    const pagesPerCycle = 5;
+    for (var reads = 0; reads <= pagesPerCycle; reads++) {
+      final anchor = _anchorFor(page);
+      if (replacement.rows.isNotEmpty &&
+          (anchor == null ||
+              replacement.rows.containsKey(anchor) ||
+              replacement.next == null ||
+              replacement.rows.length >=
+                  FeedPostSnapshotStore.maximumComments)) {
+        page.replacement = null;
+        return (
+          comments: replacement.rows.values.toList(growable: false),
+          next: replacement.next,
+        );
+      }
+      if (reads == pagesPerCycle) return null;
+      final cursor = replacement.next;
+      final response = await _getPage(page, cursor);
+      if (!_active || !current()) return null;
+      for (final row in response.comments) {
+        replacement.rows[row.id] = row;
+      }
+      final next = response.next;
+      replacement.next = next != null && replacement.cursors.add(next)
+          ? next
+          : null;
+      if (replacement.next == null) {
+        page.replacement = null;
+        return (
+          comments: replacement.rows.values.toList(growable: false),
+          next: null,
+        );
+      }
+    }
+    return null;
   }
 
   Future<void> _revalidateAfterConflict(_CommentPage page) =>
@@ -390,6 +488,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     if (!_active) return;
     _revision++;
     for (final page in [..._roots.values, ..._threads.values]) {
+      page.replacement = null;
       final redacted = actions.redactComments((
         comments: page.rows.values.toList(),
         next: page.cursor,
@@ -555,6 +654,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   @override
   Future<void> close() {
     _cacheExpiry?.cancel();
+    visibleAnchors = null;
     return super.close();
   }
 
