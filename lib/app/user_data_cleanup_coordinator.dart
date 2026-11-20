@@ -24,6 +24,7 @@ class UserDataCleanupCoordinator {
     IUserReportsRepository? userReportsRepository,
     INearbyRepository? nearbyRepository,
     this._feedPostSnapshots,
+    this._feedCommentOutbox,
     required Talker talker,
   }) : _preferences = preferences,
        _pendingKey = 'auth.cleanup.pending.$environment',
@@ -46,6 +47,7 @@ class UserDataCleanupCoordinator {
   final IUserReportsRepository? _userReportsRepository;
   final INearbyRepository? _nearbyRepository;
   final FeedPostSnapshotStore? _feedPostSnapshots;
+  final FeedCommentOutbox? _feedCommentOutbox;
   final Talker _talker;
 
   Future<void> _operation = Future<void>.value();
@@ -89,6 +91,7 @@ class UserDataCleanupCoordinator {
           repository.clearUserCache(userId),
         if (_feedPostSnapshots case final snapshots?)
           snapshots.clearUser(userId),
+        if (_feedCommentOutbox case final outbox?) outbox.clearUser(userId),
         _clearPreferences(userId),
       ]);
       final pending = _pendingUsers()..remove(userId);

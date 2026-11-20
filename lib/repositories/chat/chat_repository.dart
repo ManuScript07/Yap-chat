@@ -10,7 +10,7 @@ import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/abstract_chat_repository.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/abstract_bounded_chat_history.dart';
-import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/chat/conversation_sync_service.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
@@ -943,12 +943,11 @@ class ChatRepository implements IChatRepository, IBoundedChatHistory {
       }
       if (_accountSessionController.isCurrent(scope)) {
         final attempts = operation.attempts + 1;
-        final exhausted =
-            attempts >= PendingMessageRetryPolicy.maxAutomaticAttempts;
+        final exhausted = attempts >= OutboxRetryPolicy.maxAutomaticAttempts;
         final nextAttemptAt = exhausted
             ? null
             : _now().toUtc().add(
-                PendingMessageRetryPolicy.delayAfterFailure(
+                OutboxRetryPolicy.delayAfterFailure(
                   attempts: attempts,
                   operationId: operation.id,
                   rateLimited: _isMessageRateLimitedError(error),

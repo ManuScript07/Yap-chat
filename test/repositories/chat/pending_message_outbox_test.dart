@@ -2,7 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
-import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
+import 'package:yap_chat/core/services/services.dart';
 
 void main() {
   const owner = 'owner';
@@ -71,7 +71,7 @@ void main() {
       await cache.markPendingFailure(
         'failed',
         StateError('offline'),
-        attempts: PendingMessageRetryPolicy.maxAutomaticAttempts,
+        attempts: OutboxRetryPolicy.maxAutomaticAttempts,
         nextAttemptAt: null,
       );
 
@@ -116,22 +116,22 @@ void main() {
   test(
     'uses bounded exponential backoff and protects a rate-limited sender',
     () {
-      final first = PendingMessageRetryPolicy.delayAfterFailure(
+      final first = OutboxRetryPolicy.delayAfterFailure(
         attempts: 1,
         operationId: 'one',
         rateLimited: false,
       );
-      final second = PendingMessageRetryPolicy.delayAfterFailure(
+      final second = OutboxRetryPolicy.delayAfterFailure(
         attempts: 2,
         operationId: 'two',
         rateLimited: false,
       );
-      final capped = PendingMessageRetryPolicy.delayAfterFailure(
+      final capped = OutboxRetryPolicy.delayAfterFailure(
         attempts: 20,
         operationId: 'three',
         rateLimited: false,
       );
-      final rateLimited = PendingMessageRetryPolicy.delayAfterFailure(
+      final rateLimited = OutboxRetryPolicy.delayAfterFailure(
         attempts: 1,
         operationId: 'four',
         rateLimited: true,

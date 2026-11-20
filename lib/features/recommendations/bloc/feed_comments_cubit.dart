@@ -32,6 +32,7 @@ class _CommentPage {
   final rows = <String, FeedComment>{};
   FeedCommentsCursor? cursor;
   DateTime? expiresAt;
+  DateTime? replacedFrom;
   Future<void>? pending;
   Future<void>? revalidation;
   bool started = false;
@@ -79,6 +80,8 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   final _roots = <FeedCommentSort, _CommentPage>{};
   final _threads = <String, _CommentPage>{};
   final _sent = <String, FeedComment>{};
+  Map<String, FeedCommentOutboxEntry> _queued = const {};
+  StreamSubscription<List<FeedCommentOutboxEntry>>? _outboxSubscription;
   final _reactions = <String, FeedReaction>{};
   final _busy = <String>{};
   final _recentActions = <String, Duration>{};
@@ -93,10 +96,14 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   int _revision = 0;
   Map<String?, String> Function()? visibleAnchors;
   Timer? _cacheExpiry;
+  DateTime? _offlineUntil;
   FeedCommentSort _sort = FeedCommentSort.popular;
 
-  bool get canDisplay => _ready || _hasCachedPages;
+  bool get _cachedPostWritable =>
+      actions.outbox != null && _offlineUntil?.isAfter(DateTime.now()) == true;
+  bool get canDisplay => _ready || _hasCachedPages || _cachedPostWritable;
   bool get canMutate => _ready && _active;
+  bool get canSubmit => _active && (_ready || _cachedPostWritable);
   bool get needsHeadRetry =>
       _root.failed && (!_root.started || _root.failedRefresh);
   bool get _active => canDisplay && !isClosed && actions.canShow(_post);
@@ -108,10 +115,18 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     actions.publicationCache.read((_post.id, sort, root)),
   );
 
-  void updatePost(FeedPost post, {required bool confirmed}) {
+  void updatePost(
+    FeedPost post, {
+    required bool confirmed,
+    DateTime? offlineUntil,
+  }) {
     _post = post;
+    _offlineUntil = offlineUntil;
     if (!_hydrated) {
       _hydrated = true;
+      _outboxSubscription = actions.outbox
+          ?.watch(actions.account, post.id)
+          .listen(_acceptOutbox, onError: (Object _) {});
       final cache = actions.publicationCache;
       _applySnapshots(cache.readForPost(post.id));
       if (cache.hasDisk) {
@@ -124,6 +139,64 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     _cacheExpiry?.cancel();
     if (_autoLoad && !_restoring && !_root.started) unawaited(next());
   }
+
+  void _acceptOutbox(List<FeedCommentOutboxEntry> entries) {
+    if (isClosed ||
+        !actions.canShow(_post) ||
+        entries.isEmpty && _queued.isEmpty) {
+      return;
+    }
+    _queued = {for (final entry in entries) entry.id: entry};
+    for (final entry in entries) {
+      if (entry.receipt?.postCount case final count?) {
+        actions.recordCommentCount(_post, count);
+      }
+      if (entry.rootId case final root?) {
+        _threads.putIfAbsent(root, () => _page(FeedCommentSort.old, root));
+      }
+    }
+    _publish();
+  }
+
+  Iterable<FeedComment> _outboxRows(_CommentPage page) sync* {
+    for (final entry in _queued.values) {
+      if (entry.rootId != page.root || page.rows.containsKey(entry.id)) {
+        continue;
+      }
+      if (entry.confirmedAt case final confirmed?) {
+        final replaced = page.replacedFrom;
+        final comment = entry.receipt?.comment;
+        if (comment != null &&
+            (replaced == null || confirmed.isAfter(replaced)) &&
+            !_isBlocked(comment) &&
+            !actions.commentHidden(comment.id)) {
+          yield comment;
+        }
+      } else {
+        yield entry.pendingComment(actions.account.userId);
+      }
+    }
+  }
+
+  FeedCommentOutboxEntry? pendingEntry(FeedComment comment) {
+    final entry = _queued[comment.id];
+    if (entry == null || entry.confirmedAt != null) return null;
+    final root = _root.rows[comment.threadId];
+    if (root?.id == comment.id ||
+        root?.replyPreview?.id == comment.id ||
+        _threads[comment.threadId]?.rows.containsKey(comment.id) == true) {
+      return null;
+    }
+    return entry;
+  }
+
+  Iterable<FeedCommentOutboxEntry> get detachedFailedReplies =>
+      _queued.values.where(
+        (entry) =>
+            entry.failure != null &&
+            entry.rootId != null &&
+            !_root.rows.containsKey(entry.rootId),
+      );
 
   Future<void> _restore(String id, int revision) async {
     final cached = await actions.publicationCache.restoreComments(id);
@@ -219,6 +292,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   bool available(FeedComment comment) =>
       _active &&
       comment.available &&
+      pendingEntry(comment) == null &&
       !actions.commentHidden(comment.id) &&
       !actions.state.blocked.contains(comment.authorId);
 
@@ -256,6 +330,8 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
             row.threadId == root.id &&
             !page.rows.containsKey(row.id))
           row.id: row,
+      for (final row in _outboxRows(page))
+        if (row.id != preview?.id) row.id: row,
     };
     return rows.values.toList(growable: false);
   }
@@ -326,6 +402,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
     final revision = _revision;
     final cursor = refresh ? null : page.cursor;
     final existingSent = _sent.keys.toSet();
+    final startedAt = DateTime.now();
     bool current() => request == page.request && revision == _revision;
     page.loading = true;
     page.failed = false;
@@ -359,6 +436,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
       }
       if (replace) {
         page.rows.clear();
+        page.replacedFrom = startedAt;
         page.expiresAt = actions.publicationCache.expiresFromNow();
         _sent.removeWhere(
           (id, comment) =>
@@ -507,15 +585,28 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   }
 
   Future<bool> submit(String text, {FeedComment? replyTo}) async {
-    if (!_active ||
-        !_ready ||
+    if (!canSubmit ||
         _submitting ||
         text.trim().isEmpty ||
-        text.runes.length > 200 ||
+        text.runes.length > FeedCommentOutbox.maximumLength ||
         replyTo != null && !available(replyTo)) {
       return false;
     }
     _submitting = true;
+    if (actions.outbox case final outbox?) {
+      try {
+        await outbox.enqueue(
+          actions.account,
+          _post.id,
+          text,
+          replyTo: replyTo?.id,
+          rootId: replyTo?.threadId,
+        );
+        return true;
+      } finally {
+        _submitting = false;
+      }
+    }
     final pending = _pending;
     final target = replyTo?.id;
     final requestId =
@@ -654,6 +745,7 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   @override
   Future<void> close() {
     _cacheExpiry?.cancel();
+    unawaited(_outboxSubscription?.cancel());
     visibleAnchors = null;
     return super.close();
   }
@@ -676,12 +768,15 @@ class FeedCommentsCubit extends Cubit<FeedCommentsState> {
   void _publish() {
     if (!_active) return;
     final root = _root;
-    final sent = _sent.values.where(
-      (row) => row.id == row.threadId && !root.rows.containsKey(row.id),
-    );
+    final sent = [
+      ..._sent.values.where(
+        (row) => row.id == row.threadId && !root.rows.containsKey(row.id),
+      ),
+      ..._outboxRows(root),
+    ];
     emit((
       rows: List.unmodifiable([
-        if (_sort != FeedCommentSort.old) ...sent.toList().reversed,
+        if (_sort != FeedCommentSort.old) ...sent.reversed,
         ...root.rows.values,
         if (_sort == FeedCommentSort.old) ...sent,
       ]),

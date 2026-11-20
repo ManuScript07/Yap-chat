@@ -15,6 +15,56 @@ import 'package:yap_chat/features/recommendations/bloc/bloc.dart';
 import 'package:yap_chat/repositories/feed/feed.dart';
 
 void main() {
+  test('comment writes stay bound to the originating session', () async {
+    const viewer = '10000000-0000-4000-8000-000000000011';
+    const other = '10000000-0000-4000-8000-000000000012';
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final authorization = <String?>[];
+    final client = SupabaseClient(
+      'http://127.0.0.1:1',
+      'test-key',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+      httpClient: MockClient((request) async {
+        authorization.add(request.headers['authorization']);
+        entered.complete();
+        await release.future;
+        return http.Response(
+          '{"id":"comment","author":{"id":"$viewer"},"text":"draft"}',
+          200,
+          request: request,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    addTearDown(client.dispose);
+    await _signIn(client, viewer);
+    final token = client.auth.currentSession!.accessToken;
+    final accounts = AccountSessionController(initialUserId: viewer);
+    final repository = FeedRepository(client: client, accounts: accounts);
+    final original = accounts.capture();
+    final request = repository.createComment(
+      'post',
+      'comment',
+      'draft',
+      original,
+    );
+    final completed = expectLater(
+      request,
+      throwsA(isA<StaleAccountSessionException>()),
+    );
+    await entered.future;
+    await _signIn(client, other);
+    accounts.setAuthenticatedUser(other);
+    release.complete();
+    await completed;
+    await expectLater(
+      repository.createComment('post', 'comment', 'draft', original),
+      throwsA(isA<StaleAccountSessionException>()),
+    );
+    expect(authorization, ['Bearer $token']);
+  });
+
   test('uses the comment RPC target, sort and reaction revisions', () async {
     const viewer = '10000000-0000-4000-8000-000000000001';
     final requests = <(String, Map<String, dynamic>)>[];

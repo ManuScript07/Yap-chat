@@ -6,7 +6,7 @@ import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
 import 'package:yap_chat/repositories/chat/chat_cache_data_source.dart';
 import 'package:yap_chat/repositories/chat/chat_remote_data_source.dart';
-import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/chats/chats_cache_data_source.dart';
 
 /// One durable, coalescing queue for the account, including closed chats.
@@ -300,12 +300,11 @@ class MessageReactionCoordinator {
             error.toString().contains('42501') ||
             error.toString().contains('22023') ||
             error.toString().contains('account_') ||
-            operation.attempts + 1 >=
-                PendingMessageRetryPolicy.maxAutomaticAttempts;
+            operation.attempts + 1 >= OutboxRetryPolicy.maxAutomaticAttempts;
         if (terminal) {
           await _complete(operation, scope);
         } else {
-          final delay = PendingMessageRetryPolicy.delayAfterFailure(
+          final delay = OutboxRetryPolicy.delayAfterFailure(
             attempts: operation.attempts + 1,
             operationId: operation.operationId,
             rateLimited: error.toString().contains('42901'),

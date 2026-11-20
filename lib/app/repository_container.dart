@@ -27,6 +27,7 @@ class RepositoryContainer {
     required this.nearbyRepository,
     required this.feedRepository,
     this.feedPostSnapshots,
+    this.feedCommentOutbox,
   });
 
   factory RepositoryContainer.prod({
@@ -140,6 +141,18 @@ class RepositoryContainer {
       onReactionError: (error, stack) =>
           config.talker.handle(error, stack, 'Reaction queue failed'),
     );
+    final feedRepository = FeedRepository(
+      client: client,
+      accounts: config.accountSessionController,
+      connection: connectionStatus,
+      diagnostics: config.diagnostics,
+      mediaCache: mediaCache,
+    );
+    final feedPostSnapshots = FeedPostSnapshotStore(
+      config.database,
+      config.accountSessionController,
+      blocklist: blocklistCache,
+    );
     return RepositoryContainer(
       mediaCache: mediaCache,
       chatsRepository: ChatsRepository(
@@ -247,17 +260,14 @@ class RepositoryContainer {
       contactsRepository: ContactsRepository(),
       settingsRepository: settingsRepository,
       nearbyRepository: nearbyRepository,
-      feedRepository: FeedRepository(
-        client: client,
-        accounts: config.accountSessionController,
-        connection: connectionStatus,
-        diagnostics: config.diagnostics,
-        mediaCache: mediaCache,
-      ),
-      feedPostSnapshots: FeedPostSnapshotStore(
+      feedRepository: feedRepository,
+      feedPostSnapshots: feedPostSnapshots,
+      feedCommentOutbox: FeedCommentOutbox(
         config.database,
         config.accountSessionController,
-        blocklist: blocklistCache,
+        feedRepository,
+        connectionStatus?.networkAvailability,
+        feedPostSnapshots,
       ),
     );
   }
@@ -321,10 +331,12 @@ class RepositoryContainer {
   final INearbyRepository nearbyRepository;
   final IFeedRepository feedRepository;
   final FeedPostSnapshotStore? feedPostSnapshots;
+  final FeedCommentOutbox? feedCommentOutbox;
 
   Future<void> dispose() async {
     mediaCache.dispose();
     await Future.wait([
+      if (feedCommentOutbox case final outbox?) outbox.dispose(),
       chatsRepository.pauseRealtime(),
       chatRepository.pauseNetwork(),
       presenceRepository.disconnect(),

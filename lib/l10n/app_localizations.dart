@@ -506,6 +506,54 @@ abstract class AppLocalizations {
   /// **'в комментарии может быть не больше 200 символов'**
   String get feedCommentTooLong;
 
+  /// No description provided for @feedCommentQueued.
+  ///
+  /// In ru, this message translates to:
+  /// **'ожидает отправки'**
+  String get feedCommentQueued;
+
+  /// No description provided for @feedCommentSendFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось отправить комментарий'**
+  String get feedCommentSendFailed;
+
+  /// No description provided for @feedCommentQueueFull.
+  ///
+  /// In ru, this message translates to:
+  /// **'очередь комментариев заполнена'**
+  String get feedCommentQueueFull;
+
+  /// No description provided for @feedCommentCopyText.
+  ///
+  /// In ru, this message translates to:
+  /// **'скопировать текст'**
+  String get feedCommentCopyText;
+
+  /// No description provided for @feedCommentDiscardLocal.
+  ///
+  /// In ru, this message translates to:
+  /// **'удалить локальную копию'**
+  String get feedCommentDiscardLocal;
+
+  /// No description provided for @feedCommentDiscardConfirmation.
+  ///
+  /// In ru, this message translates to:
+  /// **'сохранённый текст будет удалён с этого устройства'**
+  String get feedCommentDiscardConfirmation;
+
+  /// No description provided for @feedCommentReplyUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось отправить: комментарий для ответа недоступен'**
+  String get feedCommentReplyUnavailable;
+
+  /// No description provided for @feedCommentPostUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'не удалось отправить: публикация недоступна'**
+  String get feedCommentPostUnavailable;
+
   /// No description provided for @feedActionFailed.
   ///
   /// In ru, this message translates to:

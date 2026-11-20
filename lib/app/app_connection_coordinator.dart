@@ -18,6 +18,7 @@ class AppConnectionCoordinator {
     required IChatRepository chatRepository,
     required IPresenceRepository presenceRepository,
     required IFriendsRepository friendsRepository,
+    this._feedCommentOutbox,
     required Talker talker,
   }) : _chatsRepository = chatsRepository,
        _chatRepository = chatRepository,
@@ -29,6 +30,7 @@ class AppConnectionCoordinator {
   final IChatRepository _chatRepository;
   final IPresenceRepository _presenceRepository;
   final IFriendsRepository _friendsRepository;
+  final FeedCommentOutbox? _feedCommentOutbox;
   final Talker _talker;
 
   Future<void> _operation = Future<void>.value();
@@ -41,12 +43,14 @@ class AppConnectionCoordinator {
   Future<void> setForeground(bool isForeground) {
     if (_isDisposed || _isForeground == isForeground) return _operation;
     _isForeground = isForeground;
+    _feedCommentOutbox?.setForeground(isForeground);
     return _enqueueReconciliation();
   }
 
   Future<void> setAuthenticatedUser(String? userId) {
     if (_isDisposed || _desiredUserId == userId) return _operation;
     _desiredUserId = userId;
+    _feedCommentOutbox?.setAuthenticatedUser(userId);
     return _enqueueReconciliation();
   }
 
@@ -55,6 +59,7 @@ class AppConnectionCoordinator {
     _isDisposed = true;
     _isForeground = false;
     _desiredUserId = null;
+    _feedCommentOutbox?.setAuthenticatedUser(null);
     return _enqueueReconciliation(allowDisposed: true);
   }
 

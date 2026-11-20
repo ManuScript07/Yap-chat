@@ -90,6 +90,9 @@ class _AppInitializerState extends State<AppInitializer>
       chatRepository: _repositories.chatRepository,
       presenceRepository: _repositories.presenceRepository,
       friendsRepository: _repositories.friendsRepository,
+      feedCommentOutbox: widget.config.feedEnabled
+          ? _repositories.feedCommentOutbox
+          : null,
       talker: widget.config.talker,
     );
     _locationTrackingCoordinator = LocationTrackingCoordinator(
@@ -113,6 +116,7 @@ class _AppInitializerState extends State<AppInitializer>
       userReportsRepository: _repositories.userReportsRepository,
       nearbyRepository: _repositories.nearbyRepository,
       feedPostSnapshots: _repositories.feedPostSnapshots,
+      feedCommentOutbox: _repositories.feedCommentOutbox,
       talker: widget.config.talker,
     );
     _prepareFirstAvatarFrames();
@@ -208,6 +212,7 @@ class _AppInitializerState extends State<AppInitializer>
                 widget.config.accountSessionController,
                 _repositories.feedRepository,
                 postSnapshots: _repositories.feedPostSnapshots,
+                outbox: _repositories.feedCommentOutbox,
                 blocks: _repositories.blocklistRepository,
                 friends: friends is IFriendAccessRepository
                     ? friends as IFriendAccessRepository

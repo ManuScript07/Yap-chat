@@ -752,6 +752,7 @@ void main() {
           connection.execute(
             'ALTER TABLE cached_chats DROP COLUMN list_order_micros',
           );
+          connection.execute('DROP TABLE feed_comment_operations');
           connection.execute('PRAGMA user_version=27');
           expect(
             connection
@@ -790,7 +791,7 @@ void main() {
             connection.select('PRAGMA user_version').single['user_version'],
             db.schemaVersion,
           );
-          expect(db.schemaVersion, 32);
+          expect(db.schemaVersion, 33);
           for (final entry in tables.entries) {
             final after = _snapshot(connection, entry.key, entry.value);
             if (entry.key == 'cached_chats') {

@@ -14,6 +14,7 @@ import 'package:yap_chat/ui/ui.dart';
 
 import 'feed_post_controls.dart';
 import 'feed_comment_motion.dart';
+import 'feed_comment_delivery_status.dart';
 
 typedef _CommentListItem = ({
   Key key,
@@ -253,6 +254,26 @@ class FeedCommentsSliverState extends State<FeedCommentsSliver> {
             comment: null,
           ));
         }
+      }
+      for (final entry in comments.detachedFailedReplies) {
+        rows.add((
+          key: ValueKey(('failed-comment', entry.id)),
+          build: () => Padding(
+            padding: EdgeInsets.fromLTRB(
+              padding.left + _CommentRow.contentInset,
+              FeedDivider.spacing,
+              padding.right + PrimaryHeaderGeometry.horizontalPadding,
+              FeedDivider.spacing,
+            ),
+            child: FeedCommentDeliveryStatus(
+              entry: entry,
+              actions: comments.actions,
+              showText: true,
+            ),
+          ),
+          expandedThread: null,
+          comment: null,
+        ));
       }
       final positions = {for (final (i, row) in rows.indexed) row.key: i};
       final anchor = _updateRows(rows, positions, state);
@@ -789,6 +810,8 @@ class _CommentRowState extends State<_CommentRow> {
     final colors = context.colorScheme;
     final l10n = context.l10n;
     final available = comments.available(item);
+    final pending = comments.pendingEntry(item);
+    final showContent = available || pending != null;
     final reaction = comments.reactionFor(item);
     final date = item.createdAt;
     final author = item.authorName ?? l10n.feedUnknownAuthor;
@@ -837,7 +860,7 @@ class _CommentRowState extends State<_CommentRow> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 FeedAuthorAvatar(
-                  authorId: available ? item.authorId : null,
+                  authorId: showContent ? item.authorId : null,
                   avatarUrl: available ? item.avatarUrl : null,
                   avatarPath: available ? item.avatarPath : null,
                   avatarRevision: available ? item.avatarRevision : null,
@@ -939,16 +962,23 @@ class _CommentRowState extends State<_CommentRow> {
                                 ),
                               ),
                             TextSpan(
-                              text: available
+                              text: showContent
                                   ? '${mention == null ? '' : ' '}${item.text!}'
                                   : l10n.feedCommentUnavailable,
                             ),
                           ],
                         ),
                         style: context.textTheme.bodyMedium?.copyWith(
-                          color: available ? colors.onSurface : colors.outline,
+                          color: showContent
+                              ? colors.onSurface
+                              : colors.outline,
                         ),
                       ),
+                      if (pending != null)
+                        FeedCommentDeliveryStatus(
+                          entry: pending,
+                          actions: actions,
+                        ),
                       if (available)
                         Row(
                           children: [

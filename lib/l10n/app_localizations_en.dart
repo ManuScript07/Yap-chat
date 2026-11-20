@@ -219,6 +219,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedCommentTooLong => 'comments can contain up to 200 characters';
 
   @override
+  String get feedCommentQueued => 'waiting to send';
+
+  @override
+  String get feedCommentSendFailed => 'couldn’t send the comment';
+
+  @override
+  String get feedCommentQueueFull => 'comment queue is full';
+
+  @override
+  String get feedCommentCopyText => 'copy text';
+
+  @override
+  String get feedCommentDiscardLocal => 'remove local copy';
+
+  @override
+  String get feedCommentDiscardConfirmation =>
+      'this removes the saved text from this device';
+
+  @override
+  String get feedCommentReplyUnavailable =>
+      'couldn’t send: the reply target is unavailable';
+
+  @override
+  String get feedCommentPostUnavailable =>
+      'couldn’t send: the post is unavailable';
+
+  @override
   String get feedActionFailed => 'couldn’t complete the action';
 
   @override

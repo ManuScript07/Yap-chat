@@ -1,11 +1,11 @@
-/// Persisted retry policy for the chat outbox.
+/// Retry schedule for operations backed by a local outbox.
 ///
 /// The jitter is derived from the stable operation id instead of process-local
 /// randomness. Once a retry time is persisted it therefore remains meaningful
 /// after an application restart, while independently-created UUIDs still keep
 /// concurrent clients from retrying in lockstep.
-class PendingMessageRetryPolicy {
-  const PendingMessageRetryPolicy._();
+class OutboxRetryPolicy {
+  const OutboxRetryPolicy._();
 
   static const maxAutomaticAttempts = 8;
   static const _baseDelay = Duration(seconds: 5);

@@ -221,6 +221,33 @@ class AppLocalizationsRu extends AppLocalizations {
       'в комментарии может быть не больше 200 символов';
 
   @override
+  String get feedCommentQueued => 'ожидает отправки';
+
+  @override
+  String get feedCommentSendFailed => 'не удалось отправить комментарий';
+
+  @override
+  String get feedCommentQueueFull => 'очередь комментариев заполнена';
+
+  @override
+  String get feedCommentCopyText => 'скопировать текст';
+
+  @override
+  String get feedCommentDiscardLocal => 'удалить локальную копию';
+
+  @override
+  String get feedCommentDiscardConfirmation =>
+      'сохранённый текст будет удалён с этого устройства';
+
+  @override
+  String get feedCommentReplyUnavailable =>
+      'не удалось отправить: комментарий для ответа недоступен';
+
+  @override
+  String get feedCommentPostUnavailable =>
+      'не удалось отправить: публикация недоступна';
+
+  @override
   String get feedActionFailed => 'не удалось выполнить действие';
 
   @override

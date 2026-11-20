@@ -126,7 +126,11 @@ class FeedPostDetailsCubit extends Cubit<FeedPostDetailsState> {
       networkAvailable: () => _networkAvailability?.value,
       autoLoad: false,
     );
-    cubit.updatePost(post, confirmed: confirmed);
+    cubit.updatePost(
+      post,
+      confirmed: confirmed,
+      offlineUntil: _snapshotExpiresAt,
+    );
   }
 
   void _discardComments() {

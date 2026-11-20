@@ -14,6 +14,7 @@ import 'package:yap_chat/ui/ui.dart';
 
 import 'feed_post_card.dart';
 import 'feed_comments_sliver.dart';
+import 'feed_comment_delivery_status.dart';
 
 Future<void> openFeedPost(
   BuildContext context,
@@ -275,7 +276,15 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
                     ],
                   );
                 } else {
-                  return _unavailable(context);
+                  final outbox = actions.outbox;
+                  return outbox == null
+                      ? _unavailable(context)
+                      : _UnavailablePublication(
+                          postId: widget.id,
+                          actions: actions,
+                          headerHeight: top,
+                          outbox: outbox,
+                        );
                 }
                 return PullRefresh(
                   indicatorTop: top,
@@ -298,6 +307,70 @@ class _FeedPostDetailsPageState extends State<FeedPostDetailsPage> {
     unawaited(_details?.close());
     super.dispose();
   }
+}
+
+class _UnavailablePublication extends StatefulWidget {
+  const _UnavailablePublication({
+    required this.postId,
+    required this.actions,
+    required this.headerHeight,
+    required this.outbox,
+  });
+
+  final String postId;
+  final FeedActionsCubit actions;
+  final double headerHeight;
+  final FeedCommentOutbox outbox;
+
+  @override
+  State<_UnavailablePublication> createState() =>
+      _UnavailablePublicationState();
+}
+
+class _UnavailablePublicationState extends State<_UnavailablePublication> {
+  late final _entries = widget.outbox.watch(
+    widget.actions.account,
+    widget.postId,
+  );
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder(
+    stream: _entries,
+    builder: (context, snapshot) {
+      final failed = [
+        if (widget.actions.active)
+          for (final entry in snapshot.data ?? const <FeedCommentOutboxEntry>[])
+            if (entry.failure != null) entry,
+      ];
+      final message = context.l10n.feedPostUnavailable;
+      if (failed.isEmpty) {
+        return EmptyChatState(message: message, showImage: false);
+      }
+      final safe = MediaQuery.paddingOf(context);
+      const gutter = PrimaryHeaderGeometry.horizontalPadding;
+      return ListView(
+        padding: EdgeInsets.fromLTRB(
+          safe.left + gutter,
+          widget.headerHeight + gutter,
+          safe.right + gutter,
+          safe.bottom + gutter,
+        ),
+        children: [
+          Text(message, style: context.textTheme.titleMedium),
+          for (final entry in failed)
+            Padding(
+              key: ValueKey(entry.id),
+              padding: const EdgeInsets.only(top: 12),
+              child: FeedCommentDeliveryStatus(
+                entry: entry,
+                actions: widget.actions,
+                showText: true,
+              ),
+            ),
+        ],
+      );
+    },
+  );
 }
 
 class _Publication extends StatefulWidget {
@@ -419,12 +492,10 @@ class _PublicationState extends State<_Publication> {
 
   Future<bool> _submit(String text) async {
     final comments = _comments;
-    if (comments == null ||
-        !widget.confirmed ||
-        !widget.actions.canShow(widget.post)) {
+    if (comments == null || !comments.canSubmit) {
       return false;
     }
-    if (text.runes.length > 200) {
+    if (text.runes.length > FeedCommentOutbox.maximumLength) {
       setState(() => _submitError = context.l10n.feedCommentTooLong);
       return false;
     }
@@ -443,9 +514,13 @@ class _PublicationState extends State<_Publication> {
         setState(() => _replyTo = null);
       }
       return accepted;
-    } catch (_) {
+    } catch (error) {
       if (mounted && widget.actions.canShow(widget.post)) {
-        setState(() => _submitError = context.l10n.feedActionFailed);
+        setState(
+          () => _submitError = error is FeedCommentOutboxFull
+              ? context.l10n.feedCommentQueueFull
+              : context.l10n.feedActionFailed,
+        );
       }
       return false;
     }

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:yap_chat/core/database/database.dart';
 import 'package:yap_chat/features/chat/data/data.dart';
-import 'package:yap_chat/repositories/chat/pending_message_retry_policy.dart';
+import 'package:yap_chat/core/services/services.dart';
 import 'package:yap_chat/repositories/chat/chat_history_cursor.dart';
 import 'package:yap_chat/repositories/chat/chat_history_coverage.dart';
 
@@ -1058,7 +1058,7 @@ class ChatCacheDataSource {
           variables: [
             Variable.withString(owner),
             Variable.withDateTime(dueAt.toUtc()),
-            Variable.withInt(PendingMessageRetryPolicy.maxAutomaticAttempts),
+            Variable.withInt(OutboxRetryPolicy.maxAutomaticAttempts),
             Variable.withInt(limit),
           ],
           readsFrom: {_database.pendingChatOperations},
@@ -1097,7 +1097,7 @@ class ChatCacheDataSource {
       ''',
           variables: [
             Variable.withString(owner),
-            Variable.withInt(PendingMessageRetryPolicy.maxAutomaticAttempts),
+            Variable.withInt(OutboxRetryPolicy.maxAutomaticAttempts),
           ],
           readsFrom: {_database.pendingChatOperations},
         )

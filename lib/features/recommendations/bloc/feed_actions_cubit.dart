@@ -27,6 +27,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
     this.isCurrent, {
     Duration Function()? elapsed,
     FeedPostSnapshotStore? postSnapshots,
+    this.outbox,
   }) : publicationCache = FeedPublicationCache(
          store: postSnapshots,
          account: account,
@@ -44,6 +45,7 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
        ));
 
   final IFeedPostRepository repository;
+  final FeedCommentOutbox? outbox;
   final thumbnailFrames = FeedMediaFrames(maxBytes: 8 * 1024 * 1024);
   final FeedPublicationCache publicationCache;
   final _hiddenComments = <String>{};
@@ -126,7 +128,15 @@ class FeedActionsCubit extends Cubit<FeedActionsState> {
   }
 
   void recordCommentCount(FeedPost post, FeedCommentCount count) {
-    if (canShow(post) && _updateCommentCount(post.id, count)) _publish();
+    if (canShow(post)) recordDeliveredCommentCount(post.id, count);
+  }
+
+  void recordDeliveredCommentCount(String postId, FeedCommentCount count) {
+    if (active &&
+        !_hidden.contains(postId) &&
+        _updateCommentCount(postId, count)) {
+      _publish();
+    }
   }
 
   bool _updateCommentCount(String id, FeedCommentCount count) {

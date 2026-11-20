@@ -14732,6 +14732,783 @@ class CachedFeedCommentSnapshotsCompanion
   }
 }
 
+class $FeedCommentOperationsTable extends FeedCommentOperations
+    with TableInfo<$FeedCommentOperationsTable, FeedCommentOperation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FeedCommentOperationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _postIdMeta = const VerificationMeta('postId');
+  @override
+  late final GeneratedColumn<String> postId = GeneratedColumn<String>(
+    'post_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _replyToIdMeta = const VerificationMeta(
+    'replyToId',
+  );
+  @override
+  late final GeneratedColumn<String> replyToId = GeneratedColumn<String>(
+    'reply_to_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rootIdMeta = const VerificationMeta('rootId');
+  @override
+  late final GeneratedColumn<String> rootId = GeneratedColumn<String>(
+    'root_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<int> nextAttemptAt = GeneratedColumn<int>(
+    'next_attempt_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rateLimitedUntilMeta = const VerificationMeta(
+    'rateLimitedUntil',
+  );
+  @override
+  late final GeneratedColumn<int> rateLimitedUntil = GeneratedColumn<int>(
+    'rate_limited_until',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _failureMeta = const VerificationMeta(
+    'failure',
+  );
+  @override
+  late final GeneratedColumn<String> failure = GeneratedColumn<String>(
+    'failure',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _receiptMeta = const VerificationMeta(
+    'receipt',
+  );
+  @override
+  late final GeneratedColumn<String> receipt = GeneratedColumn<String>(
+    'receipt',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _confirmedAtMeta = const VerificationMeta(
+    'confirmedAt',
+  );
+  @override
+  late final GeneratedColumn<int> confirmedAt = GeneratedColumn<int>(
+    'confirmed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerUserId,
+    id,
+    postId,
+    body,
+    replyToId,
+    rootId,
+    createdAt,
+    attempts,
+    nextAttemptAt,
+    rateLimitedUntil,
+    failure,
+    receipt,
+    confirmedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'feed_comment_operations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FeedCommentOperation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('post_id')) {
+      context.handle(
+        _postIdMeta,
+        postId.isAcceptableOrUnknown(data['post_id']!, _postIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_postIdMeta);
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bodyMeta);
+    }
+    if (data.containsKey('reply_to_id')) {
+      context.handle(
+        _replyToIdMeta,
+        replyToId.isAcceptableOrUnknown(data['reply_to_id']!, _replyToIdMeta),
+      );
+    }
+    if (data.containsKey('root_id')) {
+      context.handle(
+        _rootIdMeta,
+        rootId.isAcceptableOrUnknown(data['root_id']!, _rootIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('rate_limited_until')) {
+      context.handle(
+        _rateLimitedUntilMeta,
+        rateLimitedUntil.isAcceptableOrUnknown(
+          data['rate_limited_until']!,
+          _rateLimitedUntilMeta,
+        ),
+      );
+    }
+    if (data.containsKey('failure')) {
+      context.handle(
+        _failureMeta,
+        failure.isAcceptableOrUnknown(data['failure']!, _failureMeta),
+      );
+    }
+    if (data.containsKey('receipt')) {
+      context.handle(
+        _receiptMeta,
+        receipt.isAcceptableOrUnknown(data['receipt']!, _receiptMeta),
+      );
+    }
+    if (data.containsKey('confirmed_at')) {
+      context.handle(
+        _confirmedAtMeta,
+        confirmedAt.isAcceptableOrUnknown(
+          data['confirmed_at']!,
+          _confirmedAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerUserId, id};
+  @override
+  FeedCommentOperation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FeedCommentOperation(
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      postId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}post_id'],
+      )!,
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      )!,
+      replyToId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_id'],
+      ),
+      rootId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}root_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_attempt_at'],
+      ),
+      rateLimitedUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rate_limited_until'],
+      ),
+      failure: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}failure'],
+      ),
+      receipt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt'],
+      ),
+      confirmedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}confirmed_at'],
+      ),
+    );
+  }
+
+  @override
+  $FeedCommentOperationsTable createAlias(String alias) {
+    return $FeedCommentOperationsTable(attachedDatabase, alias);
+  }
+}
+
+class FeedCommentOperation extends DataClass
+    implements Insertable<FeedCommentOperation> {
+  final String ownerUserId;
+  final String id;
+  final String postId;
+  final String body;
+  final String? replyToId;
+  final String? rootId;
+  final int createdAt;
+  final int attempts;
+  final int? nextAttemptAt;
+  final int? rateLimitedUntil;
+  final String? failure;
+  final String? receipt;
+  final int? confirmedAt;
+  const FeedCommentOperation({
+    required this.ownerUserId,
+    required this.id,
+    required this.postId,
+    required this.body,
+    this.replyToId,
+    this.rootId,
+    required this.createdAt,
+    required this.attempts,
+    this.nextAttemptAt,
+    this.rateLimitedUntil,
+    this.failure,
+    this.receipt,
+    this.confirmedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['id'] = Variable<String>(id);
+    map['post_id'] = Variable<String>(postId);
+    map['body'] = Variable<String>(body);
+    if (!nullToAbsent || replyToId != null) {
+      map['reply_to_id'] = Variable<String>(replyToId);
+    }
+    if (!nullToAbsent || rootId != null) {
+      map['root_id'] = Variable<String>(rootId);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['attempts'] = Variable<int>(attempts);
+    if (!nullToAbsent || nextAttemptAt != null) {
+      map['next_attempt_at'] = Variable<int>(nextAttemptAt);
+    }
+    if (!nullToAbsent || rateLimitedUntil != null) {
+      map['rate_limited_until'] = Variable<int>(rateLimitedUntil);
+    }
+    if (!nullToAbsent || failure != null) {
+      map['failure'] = Variable<String>(failure);
+    }
+    if (!nullToAbsent || receipt != null) {
+      map['receipt'] = Variable<String>(receipt);
+    }
+    if (!nullToAbsent || confirmedAt != null) {
+      map['confirmed_at'] = Variable<int>(confirmedAt);
+    }
+    return map;
+  }
+
+  FeedCommentOperationsCompanion toCompanion(bool nullToAbsent) {
+    return FeedCommentOperationsCompanion(
+      ownerUserId: Value(ownerUserId),
+      id: Value(id),
+      postId: Value(postId),
+      body: Value(body),
+      replyToId: replyToId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyToId),
+      rootId: rootId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rootId),
+      createdAt: Value(createdAt),
+      attempts: Value(attempts),
+      nextAttemptAt: nextAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextAttemptAt),
+      rateLimitedUntil: rateLimitedUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rateLimitedUntil),
+      failure: failure == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failure),
+      receipt: receipt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receipt),
+      confirmedAt: confirmedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(confirmedAt),
+    );
+  }
+
+  factory FeedCommentOperation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FeedCommentOperation(
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      id: serializer.fromJson<String>(json['id']),
+      postId: serializer.fromJson<String>(json['postId']),
+      body: serializer.fromJson<String>(json['body']),
+      replyToId: serializer.fromJson<String?>(json['replyToId']),
+      rootId: serializer.fromJson<String?>(json['rootId']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      nextAttemptAt: serializer.fromJson<int?>(json['nextAttemptAt']),
+      rateLimitedUntil: serializer.fromJson<int?>(json['rateLimitedUntil']),
+      failure: serializer.fromJson<String?>(json['failure']),
+      receipt: serializer.fromJson<String?>(json['receipt']),
+      confirmedAt: serializer.fromJson<int?>(json['confirmedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'id': serializer.toJson<String>(id),
+      'postId': serializer.toJson<String>(postId),
+      'body': serializer.toJson<String>(body),
+      'replyToId': serializer.toJson<String?>(replyToId),
+      'rootId': serializer.toJson<String?>(rootId),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'attempts': serializer.toJson<int>(attempts),
+      'nextAttemptAt': serializer.toJson<int?>(nextAttemptAt),
+      'rateLimitedUntil': serializer.toJson<int?>(rateLimitedUntil),
+      'failure': serializer.toJson<String?>(failure),
+      'receipt': serializer.toJson<String?>(receipt),
+      'confirmedAt': serializer.toJson<int?>(confirmedAt),
+    };
+  }
+
+  FeedCommentOperation copyWith({
+    String? ownerUserId,
+    String? id,
+    String? postId,
+    String? body,
+    Value<String?> replyToId = const Value.absent(),
+    Value<String?> rootId = const Value.absent(),
+    int? createdAt,
+    int? attempts,
+    Value<int?> nextAttemptAt = const Value.absent(),
+    Value<int?> rateLimitedUntil = const Value.absent(),
+    Value<String?> failure = const Value.absent(),
+    Value<String?> receipt = const Value.absent(),
+    Value<int?> confirmedAt = const Value.absent(),
+  }) => FeedCommentOperation(
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    id: id ?? this.id,
+    postId: postId ?? this.postId,
+    body: body ?? this.body,
+    replyToId: replyToId.present ? replyToId.value : this.replyToId,
+    rootId: rootId.present ? rootId.value : this.rootId,
+    createdAt: createdAt ?? this.createdAt,
+    attempts: attempts ?? this.attempts,
+    nextAttemptAt: nextAttemptAt.present
+        ? nextAttemptAt.value
+        : this.nextAttemptAt,
+    rateLimitedUntil: rateLimitedUntil.present
+        ? rateLimitedUntil.value
+        : this.rateLimitedUntil,
+    failure: failure.present ? failure.value : this.failure,
+    receipt: receipt.present ? receipt.value : this.receipt,
+    confirmedAt: confirmedAt.present ? confirmedAt.value : this.confirmedAt,
+  );
+  FeedCommentOperation copyWithCompanion(FeedCommentOperationsCompanion data) {
+    return FeedCommentOperation(
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      id: data.id.present ? data.id.value : this.id,
+      postId: data.postId.present ? data.postId.value : this.postId,
+      body: data.body.present ? data.body.value : this.body,
+      replyToId: data.replyToId.present ? data.replyToId.value : this.replyToId,
+      rootId: data.rootId.present ? data.rootId.value : this.rootId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      nextAttemptAt: data.nextAttemptAt.present
+          ? data.nextAttemptAt.value
+          : this.nextAttemptAt,
+      rateLimitedUntil: data.rateLimitedUntil.present
+          ? data.rateLimitedUntil.value
+          : this.rateLimitedUntil,
+      failure: data.failure.present ? data.failure.value : this.failure,
+      receipt: data.receipt.present ? data.receipt.value : this.receipt,
+      confirmedAt: data.confirmedAt.present
+          ? data.confirmedAt.value
+          : this.confirmedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FeedCommentOperation(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('postId: $postId, ')
+          ..write('body: $body, ')
+          ..write('replyToId: $replyToId, ')
+          ..write('rootId: $rootId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('attempts: $attempts, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('rateLimitedUntil: $rateLimitedUntil, ')
+          ..write('failure: $failure, ')
+          ..write('receipt: $receipt, ')
+          ..write('confirmedAt: $confirmedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerUserId,
+    id,
+    postId,
+    body,
+    replyToId,
+    rootId,
+    createdAt,
+    attempts,
+    nextAttemptAt,
+    rateLimitedUntil,
+    failure,
+    receipt,
+    confirmedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FeedCommentOperation &&
+          other.ownerUserId == this.ownerUserId &&
+          other.id == this.id &&
+          other.postId == this.postId &&
+          other.body == this.body &&
+          other.replyToId == this.replyToId &&
+          other.rootId == this.rootId &&
+          other.createdAt == this.createdAt &&
+          other.attempts == this.attempts &&
+          other.nextAttemptAt == this.nextAttemptAt &&
+          other.rateLimitedUntil == this.rateLimitedUntil &&
+          other.failure == this.failure &&
+          other.receipt == this.receipt &&
+          other.confirmedAt == this.confirmedAt);
+}
+
+class FeedCommentOperationsCompanion
+    extends UpdateCompanion<FeedCommentOperation> {
+  final Value<String> ownerUserId;
+  final Value<String> id;
+  final Value<String> postId;
+  final Value<String> body;
+  final Value<String?> replyToId;
+  final Value<String?> rootId;
+  final Value<int> createdAt;
+  final Value<int> attempts;
+  final Value<int?> nextAttemptAt;
+  final Value<int?> rateLimitedUntil;
+  final Value<String?> failure;
+  final Value<String?> receipt;
+  final Value<int?> confirmedAt;
+  final Value<int> rowid;
+  const FeedCommentOperationsCompanion({
+    this.ownerUserId = const Value.absent(),
+    this.id = const Value.absent(),
+    this.postId = const Value.absent(),
+    this.body = const Value.absent(),
+    this.replyToId = const Value.absent(),
+    this.rootId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.rateLimitedUntil = const Value.absent(),
+    this.failure = const Value.absent(),
+    this.receipt = const Value.absent(),
+    this.confirmedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FeedCommentOperationsCompanion.insert({
+    required String ownerUserId,
+    required String id,
+    required String postId,
+    required String body,
+    this.replyToId = const Value.absent(),
+    this.rootId = const Value.absent(),
+    required int createdAt,
+    this.attempts = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.rateLimitedUntil = const Value.absent(),
+    this.failure = const Value.absent(),
+    this.receipt = const Value.absent(),
+    this.confirmedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : ownerUserId = Value(ownerUserId),
+       id = Value(id),
+       postId = Value(postId),
+       body = Value(body),
+       createdAt = Value(createdAt);
+  static Insertable<FeedCommentOperation> custom({
+    Expression<String>? ownerUserId,
+    Expression<String>? id,
+    Expression<String>? postId,
+    Expression<String>? body,
+    Expression<String>? replyToId,
+    Expression<String>? rootId,
+    Expression<int>? createdAt,
+    Expression<int>? attempts,
+    Expression<int>? nextAttemptAt,
+    Expression<int>? rateLimitedUntil,
+    Expression<String>? failure,
+    Expression<String>? receipt,
+    Expression<int>? confirmedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (id != null) 'id': id,
+      if (postId != null) 'post_id': postId,
+      if (body != null) 'body': body,
+      if (replyToId != null) 'reply_to_id': replyToId,
+      if (rootId != null) 'root_id': rootId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (attempts != null) 'attempts': attempts,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (rateLimitedUntil != null) 'rate_limited_until': rateLimitedUntil,
+      if (failure != null) 'failure': failure,
+      if (receipt != null) 'receipt': receipt,
+      if (confirmedAt != null) 'confirmed_at': confirmedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FeedCommentOperationsCompanion copyWith({
+    Value<String>? ownerUserId,
+    Value<String>? id,
+    Value<String>? postId,
+    Value<String>? body,
+    Value<String?>? replyToId,
+    Value<String?>? rootId,
+    Value<int>? createdAt,
+    Value<int>? attempts,
+    Value<int?>? nextAttemptAt,
+    Value<int?>? rateLimitedUntil,
+    Value<String?>? failure,
+    Value<String?>? receipt,
+    Value<int?>? confirmedAt,
+    Value<int>? rowid,
+  }) {
+    return FeedCommentOperationsCompanion(
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      id: id ?? this.id,
+      postId: postId ?? this.postId,
+      body: body ?? this.body,
+      replyToId: replyToId ?? this.replyToId,
+      rootId: rootId ?? this.rootId,
+      createdAt: createdAt ?? this.createdAt,
+      attempts: attempts ?? this.attempts,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      rateLimitedUntil: rateLimitedUntil ?? this.rateLimitedUntil,
+      failure: failure ?? this.failure,
+      receipt: receipt ?? this.receipt,
+      confirmedAt: confirmedAt ?? this.confirmedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (postId.present) {
+      map['post_id'] = Variable<String>(postId.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (replyToId.present) {
+      map['reply_to_id'] = Variable<String>(replyToId.value);
+    }
+    if (rootId.present) {
+      map['root_id'] = Variable<String>(rootId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<int>(nextAttemptAt.value);
+    }
+    if (rateLimitedUntil.present) {
+      map['rate_limited_until'] = Variable<int>(rateLimitedUntil.value);
+    }
+    if (failure.present) {
+      map['failure'] = Variable<String>(failure.value);
+    }
+    if (receipt.present) {
+      map['receipt'] = Variable<String>(receipt.value);
+    }
+    if (confirmedAt.present) {
+      map['confirmed_at'] = Variable<int>(confirmedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FeedCommentOperationsCompanion(')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('id: $id, ')
+          ..write('postId: $postId, ')
+          ..write('body: $body, ')
+          ..write('replyToId: $replyToId, ')
+          ..write('rootId: $rootId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('attempts: $attempts, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('rateLimitedUntil: $rateLimitedUntil, ')
+          ..write('failure: $failure, ')
+          ..write('receipt: $receipt, ')
+          ..write('confirmedAt: $confirmedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -14783,6 +15560,16 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedFeedPostSnapshotsTable(this);
   late final $CachedFeedCommentSnapshotsTable cachedFeedCommentSnapshots =
       $CachedFeedCommentSnapshotsTable(this);
+  late final $FeedCommentOperationsTable feedCommentOperations =
+      $FeedCommentOperationsTable(this);
+  late final Index feedCommentOutboxDue = Index(
+    'feed_comment_outbox_due',
+    'CREATE INDEX IF NOT EXISTS feed_comment_outbox_due ON feed_comment_operations (owner_user_id, next_attempt_at, created_at, id) WHERE next_attempt_at IS NOT NULL',
+  );
+  late final Index feedCommentOutboxPost = Index(
+    'feed_comment_outbox_post',
+    'CREATE INDEX IF NOT EXISTS feed_comment_outbox_post ON feed_comment_operations (owner_user_id, post_id, created_at, id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -14814,6 +15601,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedChatUnreadTotals,
     cachedFeedPostSnapshots,
     cachedFeedCommentSnapshots,
+    feedCommentOperations,
+    feedCommentOutboxDue,
+    feedCommentOutboxPost,
   ];
 }
 
@@ -22612,6 +23402,397 @@ typedef $$CachedFeedCommentSnapshotsTableProcessedTableManager =
       CachedFeedCommentSnapshot,
       PrefetchHooks Function()
     >;
+typedef $$FeedCommentOperationsTableCreateCompanionBuilder =
+    FeedCommentOperationsCompanion Function({
+      required String ownerUserId,
+      required String id,
+      required String postId,
+      required String body,
+      Value<String?> replyToId,
+      Value<String?> rootId,
+      required int createdAt,
+      Value<int> attempts,
+      Value<int?> nextAttemptAt,
+      Value<int?> rateLimitedUntil,
+      Value<String?> failure,
+      Value<String?> receipt,
+      Value<int?> confirmedAt,
+      Value<int> rowid,
+    });
+typedef $$FeedCommentOperationsTableUpdateCompanionBuilder =
+    FeedCommentOperationsCompanion Function({
+      Value<String> ownerUserId,
+      Value<String> id,
+      Value<String> postId,
+      Value<String> body,
+      Value<String?> replyToId,
+      Value<String?> rootId,
+      Value<int> createdAt,
+      Value<int> attempts,
+      Value<int?> nextAttemptAt,
+      Value<int?> rateLimitedUntil,
+      Value<String?> failure,
+      Value<String?> receipt,
+      Value<int?> confirmedAt,
+      Value<int> rowid,
+    });
+
+class $$FeedCommentOperationsTableFilterComposer
+    extends Composer<_$AppDatabase, $FeedCommentOperationsTable> {
+  $$FeedCommentOperationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get postId => $composableBuilder(
+    column: $table.postId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToId => $composableBuilder(
+    column: $table.replyToId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rootId => $composableBuilder(
+    column: $table.rootId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rateLimitedUntil => $composableBuilder(
+    column: $table.rateLimitedUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get failure => $composableBuilder(
+    column: $table.failure,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get receipt => $composableBuilder(
+    column: $table.receipt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get confirmedAt => $composableBuilder(
+    column: $table.confirmedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FeedCommentOperationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FeedCommentOperationsTable> {
+  $$FeedCommentOperationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get postId => $composableBuilder(
+    column: $table.postId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyToId => $composableBuilder(
+    column: $table.replyToId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rootId => $composableBuilder(
+    column: $table.rootId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rateLimitedUntil => $composableBuilder(
+    column: $table.rateLimitedUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get failure => $composableBuilder(
+    column: $table.failure,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get receipt => $composableBuilder(
+    column: $table.receipt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get confirmedAt => $composableBuilder(
+    column: $table.confirmedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FeedCommentOperationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FeedCommentOperationsTable> {
+  $$FeedCommentOperationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get postId =>
+      $composableBuilder(column: $table.postId, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get replyToId =>
+      $composableBuilder(column: $table.replyToId, builder: (column) => column);
+
+  GeneratedColumn<String> get rootId =>
+      $composableBuilder(column: $table.rootId, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<int> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get rateLimitedUntil => $composableBuilder(
+    column: $table.rateLimitedUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get failure =>
+      $composableBuilder(column: $table.failure, builder: (column) => column);
+
+  GeneratedColumn<String> get receipt =>
+      $composableBuilder(column: $table.receipt, builder: (column) => column);
+
+  GeneratedColumn<int> get confirmedAt => $composableBuilder(
+    column: $table.confirmedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$FeedCommentOperationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FeedCommentOperationsTable,
+          FeedCommentOperation,
+          $$FeedCommentOperationsTableFilterComposer,
+          $$FeedCommentOperationsTableOrderingComposer,
+          $$FeedCommentOperationsTableAnnotationComposer,
+          $$FeedCommentOperationsTableCreateCompanionBuilder,
+          $$FeedCommentOperationsTableUpdateCompanionBuilder,
+          (
+            FeedCommentOperation,
+            BaseReferences<
+              _$AppDatabase,
+              $FeedCommentOperationsTable,
+              FeedCommentOperation
+            >,
+          ),
+          FeedCommentOperation,
+          PrefetchHooks Function()
+        > {
+  $$FeedCommentOperationsTableTableManager(
+    _$AppDatabase db,
+    $FeedCommentOperationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FeedCommentOperationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$FeedCommentOperationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$FeedCommentOperationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> postId = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String?> replyToId = const Value.absent(),
+                Value<String?> rootId = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<int?> nextAttemptAt = const Value.absent(),
+                Value<int?> rateLimitedUntil = const Value.absent(),
+                Value<String?> failure = const Value.absent(),
+                Value<String?> receipt = const Value.absent(),
+                Value<int?> confirmedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FeedCommentOperationsCompanion(
+                ownerUserId: ownerUserId,
+                id: id,
+                postId: postId,
+                body: body,
+                replyToId: replyToId,
+                rootId: rootId,
+                createdAt: createdAt,
+                attempts: attempts,
+                nextAttemptAt: nextAttemptAt,
+                rateLimitedUntil: rateLimitedUntil,
+                failure: failure,
+                receipt: receipt,
+                confirmedAt: confirmedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerUserId,
+                required String id,
+                required String postId,
+                required String body,
+                Value<String?> replyToId = const Value.absent(),
+                Value<String?> rootId = const Value.absent(),
+                required int createdAt,
+                Value<int> attempts = const Value.absent(),
+                Value<int?> nextAttemptAt = const Value.absent(),
+                Value<int?> rateLimitedUntil = const Value.absent(),
+                Value<String?> failure = const Value.absent(),
+                Value<String?> receipt = const Value.absent(),
+                Value<int?> confirmedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FeedCommentOperationsCompanion.insert(
+                ownerUserId: ownerUserId,
+                id: id,
+                postId: postId,
+                body: body,
+                replyToId: replyToId,
+                rootId: rootId,
+                createdAt: createdAt,
+                attempts: attempts,
+                nextAttemptAt: nextAttemptAt,
+                rateLimitedUntil: rateLimitedUntil,
+                failure: failure,
+                receipt: receipt,
+                confirmedAt: confirmedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $FeedCommentOperationsTable,
+                    FeedCommentOperation
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FeedCommentOperationsTable,
+                    FeedCommentOperation
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FeedCommentOperationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FeedCommentOperationsTable,
+      FeedCommentOperation,
+      $$FeedCommentOperationsTableFilterComposer,
+      $$FeedCommentOperationsTableOrderingComposer,
+      $$FeedCommentOperationsTableAnnotationComposer,
+      $$FeedCommentOperationsTableCreateCompanionBuilder,
+      $$FeedCommentOperationsTableUpdateCompanionBuilder,
+      (
+        FeedCommentOperation,
+        BaseReferences<
+          _$AppDatabase,
+          $FeedCommentOperationsTable,
+          FeedCommentOperation
+        >,
+      ),
+      FeedCommentOperation,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -22714,4 +23895,6 @@ class $AppDatabaseManager {
         _db,
         _db.cachedFeedCommentSnapshots,
       );
+  $$FeedCommentOperationsTableTableManager get feedCommentOperations =>
+      $$FeedCommentOperationsTableTableManager(_db, _db.feedCommentOperations);
 }

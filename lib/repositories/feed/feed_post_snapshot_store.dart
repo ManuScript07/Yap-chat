@@ -238,6 +238,16 @@ class FeedPostSnapshotStore {
     });
   });
 
+  // The outbox calls this within its account-scoped SQLite transaction.
+  Future<void> recordOutboxCount(
+    String userId,
+    String postId,
+    FeedCommentCount count,
+  ) => _updatePostCount(userId, postId, count);
+
+  Future<void> evictOutboxPost(String userId, String postId) =>
+      _remove(userId, [postId]);
+
   Future<CachedFeedPostSnapshot?> _postRow(String userId, String id) =>
       (_database.select(_database.cachedFeedPostSnapshots)..where(
             (row) => row.ownerUserId.equals(userId) & row.postId.equals(id),

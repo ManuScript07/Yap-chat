@@ -255,17 +255,33 @@ class FeedRepository
   Future<T> _postRpc<T>(
     String name,
     Map<String, dynamic> params,
-    AccountSessionSnapshot account,
-  ) async {
+    AccountSessionSnapshot account, {
+    bool bindSession = false,
+  }) async {
     _ensureAccount(account);
     final result = await observeSupabaseRpc(
       _connection,
       _diagnostics,
       name,
-      () => _client
-          .rpc<T>(name, params: params)
-          .retry(enabled: false)
-          .timeout(_timeout),
+      () async {
+        final session = bindSession
+            ? await _client.auth.getSession().timeout(_timeout)
+            : null;
+        _ensureAccount(account);
+        final request = _client.rpc<T>(name, params: params);
+        if (bindSession) {
+          if (session?.user.id != account.userId) {
+            throw const StaleAccountSessionException();
+          }
+          // The SDK can resolve auth again while dispatching the HTTP request.
+          // A queued mutation must keep the credential of its original account.
+          return request
+              .setHeader('Authorization', 'Bearer ${session!.accessToken}')
+              .retry(enabled: false)
+              .timeout(_timeout);
+        }
+        return request.retry(enabled: false).timeout(_timeout);
+      },
     );
     _ensureAccount(account);
     return result;
@@ -638,12 +654,17 @@ class FeedRepository
     AccountSessionSnapshot account, {
     String? replyTo,
   }) async {
-    final row = await _postRpc<Map<String, dynamic>>('create_feed_comment', {
-      'requested_id': requestId,
-      'requested_post': id,
-      'requested_text': text,
-      'requested_reply_to': ?replyTo,
-    }, account);
+    final row = await _postRpc<Map<String, dynamic>>(
+      'create_feed_comment',
+      {
+        'requested_id': requestId,
+        'requested_post': id,
+        'requested_text': text,
+        'requested_reply_to': ?replyTo,
+      },
+      account,
+      bindSession: true,
+    );
     final count = row['post_comment_count'];
     final revision = row['post_comment_count_revision'];
     return (

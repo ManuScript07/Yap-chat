@@ -405,6 +405,34 @@ class CachedFeedCommentSnapshots extends Table {
   Set<Column> get primaryKey => {ownerUserId, postId, sort, rootId};
 }
 
+@TableIndex.sql(
+  'CREATE INDEX IF NOT EXISTS feed_comment_outbox_due '
+  'ON feed_comment_operations (owner_user_id, next_attempt_at, created_at, id) '
+  'WHERE next_attempt_at IS NOT NULL',
+)
+@TableIndex.sql(
+  'CREATE INDEX IF NOT EXISTS feed_comment_outbox_post '
+  'ON feed_comment_operations (owner_user_id, post_id, created_at, id)',
+)
+class FeedCommentOperations extends Table {
+  TextColumn get ownerUserId => text()();
+  TextColumn get id => text()();
+  TextColumn get postId => text()();
+  TextColumn get body => text()();
+  TextColumn get replyToId => text().nullable()();
+  TextColumn get rootId => text().nullable()();
+  IntColumn get createdAt => integer()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  IntColumn get nextAttemptAt => integer().nullable()();
+  IntColumn get rateLimitedUntil => integer().nullable()();
+  TextColumn get failure => text().nullable()();
+  TextColumn get receipt => text().nullable()();
+  IntColumn get confirmedAt => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {ownerUserId, id};
+}
+
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -433,6 +461,7 @@ class CachedFeedCommentSnapshots extends Table {
     CachedChatUnreadTotals,
     CachedFeedPostSnapshots,
     CachedFeedCommentSnapshots,
+    FeedCommentOperations,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -451,7 +480,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -783,6 +812,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 32) {
         await migrator.createTable(cachedFeedCommentSnapshots);
+      }
+      if (from < 33) {
+        await migrator.createTable(feedCommentOperations);
+        await migrator.createIndex(feedCommentOutboxDue);
+        await migrator.createIndex(feedCommentOutboxPost);
       }
     },
     beforeOpen: (details) async {
